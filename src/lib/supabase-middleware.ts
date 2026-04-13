@@ -29,17 +29,18 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isLoginPage = request.nextUrl.pathname === "/login";
+  const pathname = request.nextUrl.pathname;
+  const isPublicPage = pathname === "/login" || pathname === "/recuperar";
 
-  // If not authenticated and not on login page, redirect to login
-  if (!user && !isLoginPage) {
+  // If not authenticated and not on a public page, redirect to login
+  if (!user && !isPublicPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
   // If authenticated and on login page, redirect to dashboard
-  if (user && isLoginPage) {
+  if (user && isPublicPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

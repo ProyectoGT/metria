@@ -2,20 +2,40 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { login } from "./actions";
+import { resetPassword } from "./actions";
 
-export default function LoginForm() {
+export default function RecuperarForm() {
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(formData: FormData) {
     setError(null);
     startTransition(async () => {
-      const result = await login(formData);
+      const result = await resetPassword(formData);
       if (result?.error) {
         setError(result.error);
+      } else if (result?.success) {
+        setSent(true);
       }
     });
+  }
+
+  if (sent) {
+    return (
+      <div className="space-y-4 text-center">
+        <div className="rounded-lg bg-green-50 p-4 text-sm text-success">
+          Te hemos enviado un correo con las instrucciones para restablecer tu
+          contraseña.
+        </div>
+        <Link
+          href="/login"
+          className="inline-block text-sm font-medium text-primary hover:text-primary-dark"
+        >
+          Volver al login
+        </Link>
+      </div>
+    );
   }
 
   return (
@@ -44,39 +64,22 @@ export default function LoginForm() {
         />
       </div>
 
-      <div>
-        <div className="mb-1.5 flex items-center justify-between">
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-text-primary"
-          >
-            Contraseña
-          </label>
-          <Link
-            href="/recuperar"
-            className="text-xs font-medium text-primary hover:text-primary-dark"
-          >
-            ¿Olvidaste tu contraseña?
-          </Link>
-        </div>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          required
-          autoComplete="current-password"
-          placeholder="••••••••"
-          className="w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-text-primary placeholder:text-text-secondary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-        />
-      </div>
-
       <button
         type="submit"
         disabled={isPending}
         className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isPending ? "Iniciando sesión..." : "Iniciar sesión"}
+        {isPending ? "Enviando..." : "Enviar enlace de recuperación"}
       </button>
+
+      <div className="text-center">
+        <Link
+          href="/login"
+          className="text-sm font-medium text-primary hover:text-primary-dark"
+        >
+          Volver al login
+        </Link>
+      </div>
     </form>
   );
 }
