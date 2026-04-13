@@ -19,6 +19,7 @@
   --color-surface: #ffffff;
   --color-sidebar: #ffffff;
   --color-sidebar-hover: #f1f5f9;
+  --color-sidebar-logo: #0f1729;
   --color-text-primary: #0f172a;
   --color-text-secondary: #64748b;
   --color-border: #e2e8f0;
@@ -33,6 +34,7 @@ html.dark {
   --color-surface: #1e293b;
   --color-sidebar: #0f172a;
   --color-sidebar-hover: #1e293b;
+  --color-sidebar-logo: #0a0f1e;
   --color-text-primary: #f1f5f9;
   --color-text-secondary: #94a3b8;
   --color-border: #334155;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -14,6 +15,8 @@ import {
   FileText,
   LifeBuoy,
   LogOut,
+  Moon,
+  Sun,
 } from "lucide-react";
 import type { UserRole } from "@/lib/roles";
 
@@ -38,13 +41,25 @@ interface Props {
 
 export default function Sidebar({ userRole }: Props) {
   const pathname = usePathname();
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  function toggleTheme() {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("metria-theme", next ? "dark" : "light");
+  }
 
   const showOrdenes = userRole && ROLES_WITH_ORDENES.includes(userRole);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col border-r border-border bg-sidebar">
-      {/* Logo with black background */}
-      <div className="flex h-16 items-center justify-center bg-black px-4">
+      {/* Logo — blue midnight background */}
+      <div className="flex h-16 items-center justify-center bg-sidebar-logo px-4">
         <Image
           src="/logo-bg-master-iberica.png"
           alt="Master Ibérica"
@@ -110,8 +125,20 @@ export default function Sidebar({ userRole }: Props) {
         </Link>
       </nav>
 
-      {/* Logout at bottom */}
-      <div className="border-t border-border px-3 py-3">
+      {/* Bottom actions */}
+      <div className="border-t border-border px-3 py-3 space-y-0.5">
+        <button
+          onClick={toggleTheme}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-sidebar-hover hover:text-text-primary"
+        >
+          {dark ? (
+            <Sun className="h-[18px] w-[18px] shrink-0" />
+          ) : (
+            <Moon className="h-[18px] w-[18px] shrink-0" />
+          )}
+          {dark ? "Modo claro" : "Modo oscuro"}
+        </button>
+
         <form action={logout}>
           <button
             type="submit"
