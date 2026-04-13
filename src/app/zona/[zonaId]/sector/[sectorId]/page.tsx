@@ -13,11 +13,11 @@ export default async function SectorDetailPage({
   const supabase = await createClient();
 
   const [{ data: zona }, { data: sector }] = await Promise.all([
-    supabase.from("zona").select("id, nombre").eq("id", zonaId).single(),
+    supabase.from("zona").select("id, nombre").eq("id", Number(zonaId)).single(),
     supabase
       .from("sectores")
       .select("id, numero, fincas(id, numero, propiedades(id))")
-      .eq("id", sectorId)
+      .eq("id", Number(sectorId))
       .single(),
   ]);
 

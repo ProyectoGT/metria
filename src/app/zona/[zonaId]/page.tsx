@@ -15,7 +15,7 @@ export default async function ZonaDetailPage({
   const { data: zona } = await supabase
     .from("zona")
     .select("*, sectores(id, numero, fincas(id, propiedades(id)))")
-    .eq("id", zonaId)
+    .eq("id", Number(zonaId))
     .single();
 
   if (!zona) notFound();

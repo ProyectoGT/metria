@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { logout } from "@/app/(auth)/actions";
 
 interface NavItem {
   label: string;
@@ -49,7 +50,15 @@ export default function Sidebar() {
       </nav>
 
       <div className="border-t border-slate-700 p-4">
-        <p className="text-xs text-slate-500">Metria CRM v0.1.0</p>
+        <form action={logout}>
+          <button
+            type="submit"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-sidebar-hover hover:text-white"
+          >
+            <span className="text-lg">🚪</span>
+            Cerrar sesión
+          </button>
+        </form>
       </div>
     </aside>
   );
