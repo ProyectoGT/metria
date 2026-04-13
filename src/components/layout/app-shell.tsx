@@ -1,81 +1,50 @@
-"use client";
-
-import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase";
+import { normalizeUserRole } from "@/lib/roles";
 import Sidebar from "./sidebar";
-import Topnav from "./topnav";
+import Header from "./header";
+import ThemeScript from "./theme-script";
 
-export type Theme  = "light" | "dark";
-export type Layout = "sidebar" | "topnav";
+export default async function AppShell({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
-  const [theme,   setTheme]   = useState<Theme>("light");
-  const [layout,  setLayout]  = useState<Layout>("sidebar");
-  const [mounted, setMounted] = useState(false);
+  let userName = "Usuario";
+  let userEmail: string | null = null;
+  let userRole: ReturnType<typeof normalizeUserRole> | null = null;
 
-  // Read saved preferences on mount
-  useEffect(() => {
-    const savedTheme  = (localStorage.getItem("metria-theme")  as Theme)  || "light";
-    const savedLayout = (localStorage.getItem("metria-layout") as Layout) || "sidebar";
-    setTheme(savedTheme);
-    setLayout(savedLayout);
-    if (savedTheme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
+  if (user) {
+    userEmail = user.email ?? null;
+
+    const { data: profile } = await supabase
+      .from("usuarios")
+      .select("nombre, apellidos, puesto, rol")
+      .eq("auth_id", user.id)
+      .maybeSingle();
+
+    if (profile) {
+      userName = `${profile.nombre} ${profile.apellidos}`.trim() || "Usuario";
+      userRole = normalizeUserRole(
+        (profile as { rol?: string | null }).rol ?? profile.puesto
+      );
     }
-    setMounted(true);
-  }, []);
-
-  function toggleTheme() {
-    const next = theme === "light" ? "dark" : "light";
-    setTheme(next);
-    localStorage.setItem("metria-theme", next);
-    if (next === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }
-
-  function toggleLayout() {
-    const next = layout === "sidebar" ? "topnav" : "sidebar";
-    setLayout(next);
-    localStorage.setItem("metria-layout", next);
-  }
-
-  // Before mount: render the default shell (avoids hydration mismatch)
-  if (!mounted) {
-    return (
-      <div className="flex h-full">
-        <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-sidebar" />
-        <main className="ml-64 flex-1 overflow-y-auto p-8">{children}</main>
-      </div>
-    );
-  }
-
-  if (layout === "topnav") {
-    return (
-      <div className="flex h-full flex-col">
-        <Topnav
-          theme={theme}
-          layout={layout}
-          onToggleTheme={toggleTheme}
-          onToggleLayout={toggleLayout}
-        />
-        <main className="flex-1 overflow-y-auto p-8 pt-6">{children}</main>
-      </div>
-    );
   }
 
   return (
-    <div className="flex h-full">
-      <Sidebar
-        theme={theme}
-        layout={layout}
-        onToggleTheme={toggleTheme}
-        onToggleLayout={toggleLayout}
-      />
-      <main className="ml-64 flex-1 overflow-y-auto p-8">{children}</main>
-    </div>
+    <>
+      <ThemeScript />
+      <Sidebar userRole={userRole} />
+      <div className="flex min-h-screen flex-col pl-[220px]">
+        <Header userName={userName} userEmail={userEmail} />
+        <main className="flex-1 overflow-y-auto bg-background p-6">
+          {children}
+        </main>
+      </div>
+    </>
   );
 }

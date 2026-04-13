@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
-import Header from "@/components/layout/header";
+import PageHeader from "@/components/layout/page-header";
 import PedidosClient from "./pedidos-client";
 
 export default async function PedidosPage() {
@@ -14,7 +14,7 @@ export default async function PedidosPage() {
 
   return (
     <>
-      <Header title="Pedidos" description="Gestion de pedidos y solicitudes" />
+      <PageHeader title="Pedidos" description="Gestion de pedidos y solicitudes" />
       <PedidosClient
         initialPedidos={pedidos ?? []}
         zonas={zonas ?? []}

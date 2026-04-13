@@ -1,4 +1,4 @@
-import Header from "@/components/layout/header";
+import PageHeader from "@/components/layout/page-header";
 import { getConfirmationPasswordStatus } from "@/lib/delete-confirmation-password";
 import { getCurrentUserContext } from "@/lib/current-user";
 import SecuritySettingsForm from "./security-settings-form";
@@ -15,7 +15,7 @@ export default async function CuentaPage() {
 
   return (
     <>
-      <Header
+      <PageHeader
         title="Cuenta"
         description="Perfil actual y seguridad de operaciones sensibles"
       />

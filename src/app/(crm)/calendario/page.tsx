@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
-import Header from "@/components/layout/header";
+import PageHeader from "@/components/layout/page-header";
 import CalendarioClient from "./calendario-client";
 
 export default async function CalendarioPage() {
@@ -18,7 +18,7 @@ export default async function CalendarioPage() {
 
   return (
     <>
-      <Header title="Calendario" description="Gestiona tu agenda y actividades" />
+      <PageHeader title="Calendario" description="Gestiona tu agenda y actividades" />
       <CalendarioClient initialEvents={events ?? []} isConnected={isConnected} />
     </>
   );

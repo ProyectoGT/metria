@@ -1,6 +1,6 @@
 import AppShell from "@/components/layout/app-shell";
 
-export default function Layout({
+export default function CrmLayout({
   children,
 }: {
   children: React.ReactNode;

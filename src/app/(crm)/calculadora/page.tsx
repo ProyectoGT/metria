@@ -1,8 +1,8 @@
-import Header from "@/components/layout/header";
+import PageHeader from "@/components/layout/page-header";
 
 export default function CalculadoraPage() {
   return (
-    <Header
+    <PageHeader
       title="Calculadora"
       description="Herramientas de cálculo inmobiliario"
     />

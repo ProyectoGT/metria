@@ -1,9 +1,9 @@
-import Header from "@/components/layout/header";
+import PageHeader from "@/components/layout/page-header";
 
 export default function DashboardPage() {
   return (
     <>
-      <Header
+      <PageHeader
         title="Dashboard"
         description="Resumen general de la actividad del CRM"
       />

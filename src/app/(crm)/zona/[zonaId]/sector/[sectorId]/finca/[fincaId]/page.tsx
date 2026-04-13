@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
-import Header from "@/components/layout/header";
+import PageHeader from "@/components/layout/page-header";
 import Breadcrumb from "@/components/ui/breadcrumb";
 import { notFound } from "next/navigation";
 import PropiedadesClient from "./propiedades-client";
@@ -53,7 +53,7 @@ export default async function FincaDetailPage({
           { label: `Finca ${finca.numero}` },
         ]}
       />
-      <Header
+      <PageHeader
         title={`Finca ${finca.numero}`}
         description={`${propiedades?.length ?? 0} propiedades registradas`}
       />

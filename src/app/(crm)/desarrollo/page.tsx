@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase";
-import Header from "@/components/layout/header";
+import PageHeader from "@/components/layout/page-header";
 import DesarrolloClient from "./desarrollo-client";
 
 export default async function DesarrolloPage() {
@@ -41,7 +41,7 @@ export default async function DesarrolloPage() {
 
   return (
     <>
-      <Header
+      <PageHeader
         title="Desarrollo"
         description="Seguimiento de rendimiento y objetivos del equipo"
       />

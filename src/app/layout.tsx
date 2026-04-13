@@ -29,7 +29,6 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* Prevent flash of wrong theme on load */}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('metria-theme');if(t==='dark')document.documentElement.classList.add('dark');}catch(e){}})();`,
