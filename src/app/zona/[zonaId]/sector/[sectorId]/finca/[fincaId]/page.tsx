@@ -19,17 +19,17 @@ export default async function FincaDetailPage({
     { data: propiedades },
     { data: agentes },
   ] = await Promise.all([
-    supabase.from("zona").select("id, nombre").eq("id", zonaId).single(),
+    supabase.from("zona").select("id, nombre").eq("id", Number(zonaId)).single(),
     supabase
       .from("sectores")
       .select("id, numero")
-      .eq("id", sectorId)
+      .eq("id", Number(sectorId))
       .single(),
-    supabase.from("fincas").select("id, numero").eq("id", fincaId).single(),
+    supabase.from("fincas").select("id, numero").eq("id", Number(fincaId)).single(),
     supabase
       .from("propiedades")
       .select("*, usuarios(id, nombre, apellidos)")
-      .eq("finca_id", fincaId)
+      .eq("finca_id", Number(fincaId))
       .order("planta")
       .order("puerta"),
     supabase.from("usuarios").select("id, nombre, apellidos").order("nombre"),
