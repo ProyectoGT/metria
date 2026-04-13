@@ -6,7 +6,7 @@
   }
 }
 
-@theme inline {
+@theme {
   --color-primary: #1e40af;
   --color-primary-light: #3b82f6;
   --color-primary-dark: #1e3a8a;
