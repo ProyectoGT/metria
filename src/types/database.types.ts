@@ -12,6 +12,10 @@ export interface Database {
           result: string | null;
           gcal_event_id: string | null;
           user_id: number | null;
+          owner_user_id: number | null;
+          empresa_id: number | null;
+          equipo_id: number | null;
+          visibility: string;
           created_at: string;
         };
         Insert: {
@@ -24,6 +28,10 @@ export interface Database {
           result?: string | null;
           gcal_event_id?: string | null;
           user_id?: number | null;
+          owner_user_id?: number | null;
+          empresa_id?: number | null;
+          equipo_id?: number | null;
+          visibility?: string;
           created_at?: string;
         };
         Update: {
@@ -36,6 +44,10 @@ export interface Database {
           result?: string | null;
           gcal_event_id?: string | null;
           user_id?: number | null;
+          owner_user_id?: number | null;
+          empresa_id?: number | null;
+          equipo_id?: number | null;
+          visibility?: string;
           created_at?: string;
         };
         Relationships: [
@@ -43,6 +55,24 @@ export interface Database {
             foreignKeyName: "agenda_user_id_fkey";
             columns: ["user_id"];
             referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agenda_owner_user_id_fkey";
+            columns: ["owner_user_id"];
+            referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agenda_empresa_id_fkey";
+            columns: ["empresa_id"];
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agenda_equipo_id_fkey";
+            columns: ["equipo_id"];
+            referencedRelation: "equipos";
             referencedColumns: ["id"];
           },
         ];
@@ -68,6 +98,80 @@ export interface Database {
             foreignKeyName: "archivos_propiedad_id_fkey";
             columns: ["propiedad_id"];
             referencedRelation: "propiedades";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      configuracion_seguridad: {
+        Row: {
+          id: number;
+          delete_confirmation_password_hash: string | null;
+          updated_by: number | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          delete_confirmation_password_hash?: string | null;
+          updated_by?: number | null;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          delete_confirmation_password_hash?: string | null;
+          updated_by?: number | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "configuracion_seguridad_updated_by_fkey";
+            columns: ["updated_by"];
+            referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      empresas: {
+        Row: {
+          id: number;
+          nombre: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          nombre: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          nombre?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      equipos: {
+        Row: {
+          id: number;
+          empresa_id: number;
+          nombre: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          empresa_id: number;
+          nombre: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          empresa_id?: number;
+          nombre?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "equipos_empresa_id_fkey";
+            columns: ["empresa_id"];
+            referencedRelation: "empresas";
             referencedColumns: ["id"];
           },
         ];
@@ -112,6 +216,10 @@ export interface Database {
           referencia: string | null;
           caracteristicas: string | null;
           notas: string | null;
+          owner_user_id: number | null;
+          empresa_id: number | null;
+          equipo_id: number | null;
+          visibility: string;
         };
         Insert: {
           id?: number;
@@ -127,6 +235,10 @@ export interface Database {
           referencia?: string | null;
           caracteristicas?: string | null;
           notas?: string | null;
+          owner_user_id?: number | null;
+          empresa_id?: number | null;
+          equipo_id?: number | null;
+          visibility?: string;
         };
         Update: {
           id?: number;
@@ -142,12 +254,34 @@ export interface Database {
           referencia?: string | null;
           caracteristicas?: string | null;
           notas?: string | null;
+          owner_user_id?: number | null;
+          empresa_id?: number | null;
+          equipo_id?: number | null;
+          visibility?: string;
         };
         Relationships: [
           {
             foreignKeyName: "pedidos_zona_deseada_fkey";
             columns: ["zona_deseada"];
             referencedRelation: "zona";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pedidos_owner_user_id_fkey";
+            columns: ["owner_user_id"];
+            referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pedidos_empresa_id_fkey";
+            columns: ["empresa_id"];
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pedidos_equipo_id_fkey";
+            columns: ["equipo_id"];
+            referencedRelation: "equipos";
             referencedColumns: ["id"];
           },
         ];
@@ -164,6 +298,10 @@ export interface Database {
           notas: string | null;
           agente_asignado: number | null;
           finca_id: number | null;
+          owner_user_id: number | null;
+          empresa_id: number | null;
+          equipo_id: number | null;
+          visibility: string;
         };
         Insert: {
           id?: number;
@@ -176,6 +314,10 @@ export interface Database {
           notas?: string | null;
           agente_asignado?: number | null;
           finca_id?: number | null;
+          owner_user_id?: number | null;
+          empresa_id?: number | null;
+          equipo_id?: number | null;
+          visibility?: string;
         };
         Update: {
           id?: number;
@@ -188,6 +330,10 @@ export interface Database {
           notas?: string | null;
           agente_asignado?: number | null;
           finca_id?: number | null;
+          owner_user_id?: number | null;
+          empresa_id?: number | null;
+          equipo_id?: number | null;
+          visibility?: string;
         };
         Relationships: [
           {
@@ -200,6 +346,24 @@ export interface Database {
             foreignKeyName: "propiedades_finca_id_fkey";
             columns: ["finca_id"];
             referencedRelation: "fincas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "propiedades_owner_user_id_fkey";
+            columns: ["owner_user_id"];
+            referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "propiedades_empresa_id_fkey";
+            columns: ["empresa_id"];
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "propiedades_equipo_id_fkey";
+            columns: ["equipo_id"];
+            referencedRelation: "equipos";
             referencedColumns: ["id"];
           },
         ];
@@ -236,6 +400,10 @@ export interface Database {
           prioridad: string | null;
           estado: string | null;
           agente_asignado: number | null;
+          owner_user_id: number | null;
+          empresa_id: number | null;
+          equipo_id: number | null;
+          visibility: string;
         };
         Insert: {
           id?: number;
@@ -243,6 +411,10 @@ export interface Database {
           prioridad?: string | null;
           estado?: string | null;
           agente_asignado?: number | null;
+          owner_user_id?: number | null;
+          empresa_id?: number | null;
+          equipo_id?: number | null;
+          visibility?: string;
         };
         Update: {
           id?: number;
@@ -250,12 +422,34 @@ export interface Database {
           prioridad?: string | null;
           estado?: string | null;
           agente_asignado?: number | null;
+          owner_user_id?: number | null;
+          empresa_id?: number | null;
+          equipo_id?: number | null;
+          visibility?: string;
         };
         Relationships: [
           {
             foreignKeyName: "tareas_agente_asignado_fkey";
             columns: ["agente_asignado"];
             referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tareas_owner_user_id_fkey";
+            columns: ["owner_user_id"];
+            referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tareas_empresa_id_fkey";
+            columns: ["empresa_id"];
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tareas_equipo_id_fkey";
+            columns: ["equipo_id"];
+            referencedRelation: "equipos";
             referencedColumns: ["id"];
           },
         ];
@@ -318,26 +512,51 @@ export interface Database {
           nombre: string;
           apellidos: string;
           puesto: string;
+          rol: string;
           correo: string;
           auth_id: string | null;
+          empresa_id: number | null;
+          equipo_id: number | null;
+          estado: string;
         };
         Insert: {
           id?: number;
           nombre: string;
           apellidos: string;
           puesto?: string;
+          rol?: string;
           correo: string;
           auth_id?: string | null;
+          empresa_id?: number | null;
+          equipo_id?: number | null;
+          estado?: string;
         };
         Update: {
           id?: number;
           nombre?: string;
           apellidos?: string;
           puesto?: string;
+          rol?: string;
           correo?: string;
           auth_id?: string | null;
+          empresa_id?: number | null;
+          equipo_id?: number | null;
+          estado?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "usuarios_empresa_id_fkey";
+            columns: ["empresa_id"];
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "usuarios_equipo_id_fkey";
+            columns: ["equipo_id"];
+            referencedRelation: "equipos";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       zona: {
         Row: {
@@ -361,12 +580,77 @@ export interface Database {
         Args: Record<string, never>;
         Returns: undefined;
       };
+      current_usuario_id: {
+        Args: Record<string, never>;
+        Returns: number | null;
+      };
+      current_user_role: {
+        Args: Record<string, never>;
+        Returns: string | null;
+      };
+      current_empresa_id: {
+        Args: Record<string, never>;
+        Returns: number | null;
+      };
+      current_equipo_id: {
+        Args: Record<string, never>;
+        Returns: number | null;
+      };
+      is_admin_or_director: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      can_access_scoped_row: {
+        Args: {
+          row_owner_user_id: number | null;
+          row_empresa_id: number | null;
+          row_equipo_id: number | null;
+          row_visibility: string | null;
+        };
+        Returns: boolean;
+      };
+      can_manage_scoped_row: {
+        Args: {
+          row_owner_user_id: number | null;
+          row_empresa_id: number | null;
+        };
+        Returns: boolean;
+      };
+      delete_finca_cascade: {
+        Args: {
+          target_finca_id: number;
+        };
+        Returns: {
+          deleted_propiedades: number;
+          deleted_fincas: number;
+        }[];
+      };
+      delete_sector_cascade: {
+        Args: {
+          target_sector_id: number;
+        };
+        Returns: {
+          deleted_propiedades: number;
+          deleted_fincas: number;
+          deleted_sectores: number;
+        }[];
+      };
+      delete_zona_cascade: {
+        Args: {
+          target_zona_id: number;
+        };
+        Returns: {
+          deleted_propiedades: number;
+          deleted_fincas: number;
+          deleted_sectores: number;
+          deleted_zonas: number;
+        }[];
+      };
     };
     Enums: Record<string, never>;
   };
 }
 
-// Helper types for easier usage
 export type Tables<T extends keyof Database["public"]["Tables"]> =
   Database["public"]["Tables"][T]["Row"];
 export type InsertTables<T extends keyof Database["public"]["Tables"]> =

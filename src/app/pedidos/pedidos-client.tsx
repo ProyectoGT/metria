@@ -1,7 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
+import {
+  ACCESS_SCOPE_BADGES,
+  ACCESS_SCOPE_LABELS,
+  normalizeAccessScope,
+  type AccessScope,
+} from "@/lib/access-scope";
+import type { UserRole } from "@/lib/roles";
 import { useToast, Toaster } from "@/components/ui/toast";
 
 type Zona = { id: number; nombre: string };
@@ -19,16 +26,31 @@ type Pedido = {
   origen: string | null;
   referencia: string | null;
   notas: string | null;
+  visibility: AccessScope | string | null;
+  owner_user_id: number | null;
 };
+
+type PedidoForm = Omit<Pedido, "id" | "owner_user_id">;
 
 type Props = {
   initialPedidos: Pedido[];
   zonas: Zona[];
+  currentUserId: number | null;
+  currentUserRole: UserRole | null;
 };
 
-const TIPOS_PROPIEDAD = ["Piso", "Casa", "Chalet", "Local", "Nave", "Garaje", "Terreno", "Otro"];
+const TIPOS_PROPIEDAD = [
+  "Piso",
+  "Casa",
+  "Chalet",
+  "Local",
+  "Nave",
+  "Garaje",
+  "Terreno",
+  "Otro",
+];
 
-function emptyForm(): Omit<Pedido, "id"> {
+function emptyForm(): PedidoForm {
   return {
     nombre_cliente: "",
     telefono: null,
@@ -41,14 +63,40 @@ function emptyForm(): Omit<Pedido, "id"> {
     origen: null,
     referencia: null,
     notas: null,
+    visibility: "private",
   };
 }
 
-export default function PedidosClient({ initialPedidos, zonas }: Props) {
+function canManagePedido(
+  pedido: Pick<Pedido, "owner_user_id">,
+  currentUserId: number | null,
+  currentUserRole: UserRole | null
+) {
+  if (!currentUserId || !currentUserRole) {
+    return false;
+  }
+
+  if (
+    currentUserRole === "Administrador" ||
+    currentUserRole === "Director" ||
+    currentUserRole === "Responsable"
+  ) {
+    return true;
+  }
+
+  return pedido.owner_user_id === currentUserId;
+}
+
+export default function PedidosClient({
+  initialPedidos,
+  zonas,
+  currentUserId,
+  currentUserRole,
+}: Props) {
   const [pedidos, setPedidos] = useState<Pedido[]>(initialPedidos);
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [form, setForm] = useState(emptyForm());
+  const [form, setForm] = useState<PedidoForm>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -78,6 +126,7 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
       origen: pedido.origen,
       referencia: pedido.referencia,
       notas: pedido.notas,
+      visibility: normalizeAccessScope(pedido.visibility),
     });
     setSaveError(null);
     setModalOpen(true);
@@ -85,6 +134,7 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
 
   async function handleSave() {
     if (!form.nombre_cliente.trim()) return;
+
     setSaving(true);
     setSaveError(null);
 
@@ -100,6 +150,7 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
       origen: form.origen || null,
       referencia: form.referencia || null,
       notas: form.notas || null,
+      visibility: normalizeAccessScope(form.visibility),
     };
 
     if (editId !== null) {
@@ -109,10 +160,13 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
         .eq("id", editId)
         .select()
         .single();
+
       if (error) {
         setSaveError(error.message);
       } else if (data) {
-        setPedidos((prev) => prev.map((p) => (p.id === editId ? (data as Pedido) : p)));
+        setPedidos((prev) =>
+          prev.map((pedido) => (pedido.id === editId ? (data as Pedido) : pedido))
+        );
         toast("Pedido actualizado");
         setModalOpen(false);
       }
@@ -122,6 +176,7 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
         .insert(payload)
         .select()
         .single();
+
       if (error) {
         setSaveError(error.message);
       } else if (data) {
@@ -136,35 +191,46 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
 
   async function handleDelete() {
     if (deleteId === null) return;
+
     setDeleting(true);
+
     const { error } = await supabase.from("pedidos").delete().eq("id", deleteId);
+
     if (error) {
-      toast("Error al eliminar: " + error.message, "error");
+      toast(`Error al eliminar: ${error.message}`, "error");
     } else {
-      setPedidos((prev) => prev.filter((p) => p.id !== deleteId));
+      setPedidos((prev) => prev.filter((pedido) => pedido.id !== deleteId));
       toast("Pedido eliminado");
       setDeleteId(null);
     }
+
     setDeleting(false);
   }
 
-  function formatPresupuesto(v: number | null) {
-    if (!v) return "—";
+  function formatPresupuesto(value: number | null) {
+    if (!value) return "-";
+
     return new Intl.NumberFormat("es-ES", {
       style: "currency",
       currency: "EUR",
       maximumFractionDigits: 0,
-    }).format(v);
+    }).format(value);
   }
 
-  function zonaNombre(id: number | null) {
-    if (!id) return "—";
-    return zonas.find((z) => z.id === id)?.nombre ?? "—";
+  function scopeBadge(scope: Pedido["visibility"]) {
+    const normalized = normalizeAccessScope(scope);
+
+    return (
+      <span
+        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${ACCESS_SCOPE_BADGES[normalized]}`}
+      >
+        {ACCESS_SCOPE_LABELS[normalized]}
+      </span>
+    );
   }
 
   return (
     <>
-      {/* Header */}
       <div className="mb-8 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Pedidos</h1>
@@ -180,11 +246,14 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
         </button>
       </div>
 
-      {/* List */}
       {pedidos.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-surface py-20 text-center">
-          <p className="text-base font-medium text-text-primary">No hay pedidos todavía</p>
-          <p className="mt-1 text-sm text-text-secondary">Crea el primer pedido para empezar</p>
+          <p className="text-base font-medium text-text-primary">
+            No hay pedidos todavia
+          </p>
+          <p className="mt-1 text-sm text-text-secondary">
+            Crea el primer pedido para empezar
+          </p>
           <button
             onClick={openCreate}
             className="mt-5 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
@@ -197,86 +266,140 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-background">
-                <th className="px-5 py-3 text-left font-medium text-text-secondary">Cliente</th>
-                <th className="px-5 py-3 text-left font-medium text-text-secondary">Tipo</th>
-                <th className="w-28 px-5 py-3 text-center font-medium text-text-secondary">Modalidad</th>
-                <th className="w-32 px-5 py-3 text-right font-medium text-text-secondary">Presupuesto</th>
-                <th className="w-20 px-5 py-3 text-center font-medium text-text-secondary">Hab.</th>
-                <th className="w-20 px-5 py-3 text-center font-medium text-text-secondary">Garaje</th>
-                <th className="w-28 px-5 py-3 text-center font-medium text-text-secondary">Origen</th>
+                <th className="px-5 py-3 text-left font-medium text-text-secondary">
+                  Cliente
+                </th>
+                <th className="px-5 py-3 text-left font-medium text-text-secondary">
+                  Tipo
+                </th>
+                <th className="w-28 px-5 py-3 text-center font-medium text-text-secondary">
+                  Modalidad
+                </th>
+                <th className="w-32 px-5 py-3 text-right font-medium text-text-secondary">
+                  Presupuesto
+                </th>
+                <th className="w-20 px-5 py-3 text-center font-medium text-text-secondary">
+                  Hab.
+                </th>
+                <th className="w-20 px-5 py-3 text-center font-medium text-text-secondary">
+                  Garaje
+                </th>
+                <th className="w-28 px-5 py-3 text-center font-medium text-text-secondary">
+                  Origen
+                </th>
+                <th className="w-28 px-5 py-3 text-center font-medium text-text-secondary">
+                  Alcance
+                </th>
                 <th className="w-12 px-5 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {pedidos.map((p) => (
+              {pedidos.map((pedido) => (
                 <tr
-                  key={p.id}
-                  onClick={() => openEdit(p)}
+                  key={pedido.id}
+                  onClick={() => openEdit(pedido)}
                   className="group cursor-pointer transition-colors hover:bg-background"
                 >
                   <td className="px-5 py-3.5">
-                    <p className="font-medium text-text-primary">{p.nombre_cliente}</p>
-                    {p.telefono && (
-                      <p className="text-xs text-text-secondary">{p.telefono}</p>
+                    <p className="font-medium text-text-primary">
+                      {pedido.nombre_cliente}
+                    </p>
+                    {pedido.telefono && (
+                      <p className="text-xs text-text-secondary">
+                        {pedido.telefono}
+                      </p>
                     )}
                   </td>
-                  <td className="px-5 py-3.5 text-text-secondary">{p.tipo_propiedad ?? "—"}</td>
+                  <td className="px-5 py-3.5 text-text-secondary">
+                    {pedido.tipo_propiedad ?? "-"}
+                  </td>
                   <td className="w-28 px-5 py-3.5 text-center">
-                    {p.compra_alquiler === true ? (
+                    {pedido.compra_alquiler === true ? (
                       <span className="inline-block rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
                         Compra
                       </span>
-                    ) : p.compra_alquiler === false ? (
+                    ) : pedido.compra_alquiler === false ? (
                       <span className="inline-block rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
                         Alquiler
                       </span>
                     ) : (
-                      <span className="text-text-secondary">—</span>
+                      <span className="text-text-secondary">-</span>
                     )}
                   </td>
                   <td className="w-32 px-5 py-3.5 text-right font-medium text-text-primary">
-                    {formatPresupuesto(p.presupuesto)}
+                    {formatPresupuesto(pedido.presupuesto)}
                   </td>
                   <td className="w-20 px-5 py-3.5 text-center text-text-secondary">
-                    {p.habitaciones ?? "—"}
+                    {pedido.habitaciones ?? "-"}
                   </td>
                   <td className="w-20 px-5 py-3.5 text-center">
-                    {p.garaje === true ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    {pedido.garaje === true ? (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="mx-auto h-4 w-4 text-green-600"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2.5}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
-                    ) : p.garaje === false ? (
-                      <span className="text-text-secondary text-xs">No</span>
+                    ) : pedido.garaje === false ? (
+                      <span className="text-xs text-text-secondary">No</span>
                     ) : (
-                      <span className="text-text-secondary">—</span>
+                      <span className="text-text-secondary">-</span>
                     )}
                   </td>
                   <td className="w-28 px-5 py-3.5 text-center">
-                    {p.origen === "oficina" ? (
+                    {pedido.origen === "oficina" ? (
                       <span className="inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
                         Oficina
                       </span>
-                    ) : p.origen === "online" ? (
+                    ) : pedido.origen === "online" ? (
                       <span className="inline-block rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700">
                         Online
                       </span>
                     ) : (
-                      <span className="text-text-secondary">—</span>
+                      <span className="text-text-secondary">-</span>
                     )}
                   </td>
+                  <td className="w-28 px-5 py-3.5 text-center">
+                    {scopeBadge(pedido.visibility)}
+                  </td>
                   <td className="w-12 px-5 py-3.5 text-right">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteId(p.id);
-                      }}
-                      className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-red-50 hover:text-danger group-hover:opacity-100"
-                      title="Eliminar pedido"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                    {canManagePedido(
+                      pedido,
+                      currentUserId,
+                      currentUserRole
+                    ) && (
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDeleteId(pedido.id);
+                        }}
+                        className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-red-50 hover:text-danger group-hover:opacity-100"
+                        title="Eliminar pedido"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -285,7 +408,6 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
         </div>
       )}
 
-      {/* Create / Edit Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-surface shadow-xl">
@@ -297,55 +419,71 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
                 onClick={() => setModalOpen(false)}
                 className="text-text-secondary transition-colors hover:text-text-primary"
               >
-                ✕
+                ×
               </button>
             </div>
 
-            <div className="max-h-[70vh] overflow-y-auto px-6 py-5 space-y-4">
-              {/* Nombre */}
+            <div className="max-h-[70vh] space-y-4 overflow-y-auto px-6 py-5">
               <div>
-                <label className="text-xs font-medium text-text-secondary">Nombre del cliente *</label>
+                <label className="text-xs font-medium text-text-secondary">
+                  Nombre del cliente *
+                </label>
                 <input
                   type="text"
                   value={form.nombre_cliente}
-                  onChange={(e) => setForm({ ...form, nombre_cliente: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, nombre_cliente: e.target.value })
+                  }
                   placeholder="Nombre completo"
                   className="input mt-1.5"
                   autoFocus
                 />
               </div>
 
-              {/* Teléfono + Tipo */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-text-secondary">Teléfono</label>
+                  <label className="text-xs font-medium text-text-secondary">
+                    Telefono
+                  </label>
                   <input
                     type="tel"
                     value={form.telefono ?? ""}
-                    onChange={(e) => setForm({ ...form, telefono: e.target.value || null })}
+                    onChange={(e) =>
+                      setForm({ ...form, telefono: e.target.value || null })
+                    }
                     placeholder="600 000 000"
                     className="input mt-1.5"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-text-secondary">Tipo de propiedad</label>
+                  <label className="text-xs font-medium text-text-secondary">
+                    Tipo de propiedad
+                  </label>
                   <select
                     value={form.tipo_propiedad ?? ""}
-                    onChange={(e) => setForm({ ...form, tipo_propiedad: e.target.value || null })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        tipo_propiedad: e.target.value || null,
+                      })
+                    }
                     className="input mt-1.5"
                   >
                     <option value="">Seleccionar...</option>
-                    {TIPOS_PROPIEDAD.map((t) => (
-                      <option key={t} value={t}>{t}</option>
+                    {TIPOS_PROPIEDAD.map((tipo) => (
+                      <option key={tipo} value={tipo}>
+                        {tipo}
+                      </option>
                     ))}
                   </select>
                 </div>
               </div>
 
-              {/* Modalidad + Origen */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-text-secondary">Modalidad</label>
+                  <label className="text-xs font-medium text-text-secondary">
+                    Modalidad
+                  </label>
                   <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
                     <button
                       type="button"
@@ -360,7 +498,9 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setForm({ ...form, compra_alquiler: false })}
+                      onClick={() =>
+                        setForm({ ...form, compra_alquiler: false })
+                      }
                       className={`flex-1 border-l border-border py-2 text-sm font-medium transition-colors ${
                         form.compra_alquiler === false
                           ? "bg-primary text-white"
@@ -372,7 +512,9 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-text-secondary">Origen</label>
+                  <label className="text-xs font-medium text-text-secondary">
+                    Origen
+                  </label>
                   <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
                     <button
                       type="button"
@@ -400,30 +542,45 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
                 </div>
               </div>
 
-              {/* Zona + Presupuesto */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-text-secondary">Zona deseada</label>
+                  <label className="text-xs font-medium text-text-secondary">
+                    Zona deseada
+                  </label>
                   <select
                     value={form.zona_deseada ?? ""}
                     onChange={(e) =>
-                      setForm({ ...form, zona_deseada: e.target.value ? Number(e.target.value) : null })
+                      setForm({
+                        ...form,
+                        zona_deseada: e.target.value
+                          ? Number(e.target.value)
+                          : null,
+                      })
                     }
                     className="input mt-1.5"
                   >
                     <option value="">Cualquier zona</option>
-                    {zonas.map((z) => (
-                      <option key={z.id} value={z.id}>{z.nombre}</option>
+                    {zonas.map((zona) => (
+                      <option key={zona.id} value={zona.id}>
+                        {zona.nombre}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-text-secondary">Presupuesto (€)</label>
+                  <label className="text-xs font-medium text-text-secondary">
+                    Presupuesto (EUR)
+                  </label>
                   <input
                     type="number"
                     value={form.presupuesto ?? ""}
                     onChange={(e) =>
-                      setForm({ ...form, presupuesto: e.target.value ? Number(e.target.value) : null })
+                      setForm({
+                        ...form,
+                        presupuesto: e.target.value
+                          ? Number(e.target.value)
+                          : null,
+                      })
                     }
                     placeholder="150000"
                     min={0}
@@ -432,15 +589,21 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
                 </div>
               </div>
 
-              {/* Habitaciones + Garaje */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-text-secondary">Habitaciones</label>
+                  <label className="text-xs font-medium text-text-secondary">
+                    Habitaciones
+                  </label>
                   <input
                     type="number"
                     value={form.habitaciones ?? ""}
                     onChange={(e) =>
-                      setForm({ ...form, habitaciones: e.target.value ? Number(e.target.value) : null })
+                      setForm({
+                        ...form,
+                        habitaciones: e.target.value
+                          ? Number(e.target.value)
+                          : null,
+                      })
                     }
                     placeholder="3"
                     min={0}
@@ -448,7 +611,9 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-text-secondary">Garaje</label>
+                  <label className="text-xs font-medium text-text-secondary">
+                    Garaje
+                  </label>
                   <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
                     <button
                       type="button"
@@ -459,7 +624,7 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
                           : "bg-surface text-text-secondary hover:bg-background"
                       }`}
                     >
-                      Sí
+                      Si
                     </button>
                     <button
                       type="button"
@@ -476,24 +641,56 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
                 </div>
               </div>
 
-              {/* Referencia */}
               <div>
-                <label className="text-xs font-medium text-text-secondary">Referencia de inmueble</label>
+                <label className="text-xs font-medium text-text-secondary">
+                  Alcance del contenido
+                </label>
+                <div className="mt-1.5 grid grid-cols-3 gap-2">
+                  {(["private", "team", "company"] as const).map((scope) => (
+                    <button
+                      key={scope}
+                      type="button"
+                      onClick={() => setForm({ ...form, visibility: scope })}
+                      className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                        normalizeAccessScope(form.visibility) === scope
+                          ? "border-primary bg-primary text-white"
+                          : "border-border bg-background text-text-secondary hover:text-text-primary"
+                      }`}
+                    >
+                      {ACCESS_SCOPE_LABELS[scope]}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-text-secondary">
+                  Privado: solo propietario. Equipo: visible a tu equipo.
+                  Empresa: visible a toda la empresa.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-text-secondary">
+                  Referencia de inmueble
+                </label>
                 <input
                   type="text"
                   value={form.referencia ?? ""}
-                  onChange={(e) => setForm({ ...form, referencia: e.target.value || null })}
-                  placeholder="Ref. o descripción del inmueble"
+                  onChange={(e) =>
+                    setForm({ ...form, referencia: e.target.value || null })
+                  }
+                  placeholder="Ref. o descripcion del inmueble"
                   className="input mt-1.5"
                 />
               </div>
 
-              {/* Notas */}
               <div>
-                <label className="text-xs font-medium text-text-secondary">Notas</label>
+                <label className="text-xs font-medium text-text-secondary">
+                  Notas
+                </label>
                 <textarea
                   value={form.notas ?? ""}
-                  onChange={(e) => setForm({ ...form, notas: e.target.value || null })}
+                  onChange={(e) =>
+                    setForm({ ...form, notas: e.target.value || null })
+                  }
                   placeholder="Observaciones adicionales..."
                   rows={3}
                   className="input mt-1.5 resize-none"
@@ -501,7 +698,9 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
               </div>
 
               {saveError && (
-                <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-danger">{saveError}</p>
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-danger">
+                  {saveError}
+                </p>
               )}
             </div>
 
@@ -517,20 +716,25 @@ export default function PedidosClient({ initialPedidos, zonas }: Props) {
                 disabled={saving || !form.nombre_cliente.trim()}
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
               >
-                {saving ? "Guardando..." : editId !== null ? "Guardar cambios" : "Crear pedido"}
+                {saving
+                  ? "Guardando..."
+                  : editId !== null
+                    ? "Guardar cambios"
+                    : "Crear pedido"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation */}
       {deleteId !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
-            <h2 className="text-base font-semibold text-text-primary">Eliminar pedido</h2>
+            <h2 className="text-base font-semibold text-text-primary">
+              Eliminar pedido
+            </h2>
             <p className="mt-2 text-sm text-text-secondary">
-              Esta acción no se puede deshacer.
+              Esta accion no se puede deshacer.
             </p>
             <div className="mt-5 flex justify-end gap-3">
               <button

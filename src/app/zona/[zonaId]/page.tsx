@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase";
+import { getCurrentUserContext } from "@/lib/current-user";
 import SectoresClient from "./sectores-client";
 import { notFound } from "next/navigation";
 
@@ -10,11 +11,14 @@ export default async function ZonaDetailPage({
   const { zonaId } = await params;
   const supabase = await createClient();
 
-  const { data: zona } = await supabase
-    .from("zona")
-    .select("id, nombre, sectores(id, numero, fincas(id, propiedades(id)))")
-    .eq("id", Number(zonaId))
-    .single();
+  const [user, { data: zona }] = await Promise.all([
+    getCurrentUserContext(),
+    supabase
+      .from("zona")
+      .select("id, nombre, sectores(id, numero, fincas(id, propiedades(id)))")
+      .eq("id", Number(zonaId))
+      .single(),
+  ]);
 
   if (!zona) notFound();
 
@@ -25,6 +29,7 @@ export default async function ZonaDetailPage({
       zonaId={zona.id}
       zonaNombre={zona.nombre}
       initialSectores={sectores as Parameters<typeof SectoresClient>[0]["initialSectores"]}
+      canDeleteSectores={user?.canDeleteSectores ?? false}
     />
   );
 }

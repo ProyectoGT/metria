@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase";
+import { getCurrentUserContext } from "@/lib/current-user";
 import FincasClient from "./fincas-client";
 import { notFound } from "next/navigation";
 
@@ -10,7 +11,8 @@ export default async function SectorDetailPage({
   const { zonaId, sectorId } = await params;
   const supabase = await createClient();
 
-  const [{ data: zona }, { data: sector }] = await Promise.all([
+  const [user, { data: zona }, { data: sector }] = await Promise.all([
+    getCurrentUserContext(),
     supabase.from("zona").select("id, nombre").eq("id", Number(zonaId)).single(),
     supabase
       .from("sectores")
@@ -30,6 +32,7 @@ export default async function SectorDetailPage({
       sectorId={sector.id}
       sectorNumero={sector.numero}
       initialFincas={fincas as Parameters<typeof FincasClient>[0]["initialFincas"]}
+      canDeleteFincas={user?.canDeleteFincas ?? false}
     />
   );
 }

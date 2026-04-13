@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase";
+import { getCurrentUserContext } from "@/lib/current-user";
 import Header from "@/components/layout/header";
 import Breadcrumb from "@/components/ui/breadcrumb";
 import { notFound } from "next/navigation";
@@ -13,12 +14,14 @@ export default async function FincaDetailPage({
   const supabase = await createClient();
 
   const [
+    user,
     { data: zona },
     { data: sector },
     { data: finca },
     { data: propiedades },
     { data: agentes },
   ] = await Promise.all([
+    getCurrentUserContext(),
     supabase.from("zona").select("id, nombre").eq("id", Number(zonaId)).single(),
     supabase
       .from("sectores")
@@ -28,7 +31,7 @@ export default async function FincaDetailPage({
     supabase.from("fincas").select("id, numero").eq("id", Number(fincaId)).single(),
     supabase
       .from("propiedades")
-      .select("*, usuarios(id, nombre, apellidos)")
+      .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)")
       .eq("finca_id", Number(fincaId))
       .order("planta")
       .order("puerta"),
@@ -58,6 +61,7 @@ export default async function FincaDetailPage({
         fincaId={Number(fincaId)}
         initialPropiedades={propiedades ?? []}
         agentes={agentes ?? []}
+        canDeletePropiedades={user?.canDeletePropiedades ?? false}
       />
     </>
   );
