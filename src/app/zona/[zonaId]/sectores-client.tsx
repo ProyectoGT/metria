@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
 import Breadcrumb from "@/components/ui/breadcrumb";
+import { useToast, Toaster } from "@/components/ui/toast";
 
 type Sector = {
   id: number;
@@ -30,18 +31,23 @@ export default function SectoresClient({ zonaId, zonaNombre, initialSectores }: 
   const [error, setError] = useState<string | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
+  const { toasts, toast } = useToast();
 
   async function handleCreate() {
     const num = parseInt(numero);
     if (!num || isNaN(num)) return;
     setSaving(true);
-    const { data } = await supabase
+    const { data, error: err } = await supabase
       .from("sectores")
       .insert({ numero: num, zona_id: zonaId })
       .select("id, numero, fincas(id, propiedades(id))")
       .single();
-    if (data) {
+    if (err) {
+      toast("Error al crear el sector: " + err.message, "error");
+    } else if (data) {
       setSectores((prev) => [...prev, data as Sector].sort((a, b) => a.numero - b.numero));
+      toast("Sector creado correctamente");
     }
     setNumero("");
     setSaving(false);
@@ -61,6 +67,7 @@ export default function SectoresClient({ zonaId, zonaNombre, initialSectores }: 
     setSectores((prev) => prev.filter((s) => s.id !== deleteId));
     setDeleting(false);
     setDeleteId(null);
+    toast("Sector eliminado");
   }
 
   return (
@@ -74,11 +81,22 @@ export default function SectoresClient({ zonaId, zonaNombre, initialSectores }: 
 
       {/* Header */}
       <div className="mb-8 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">{zonaNombre}</h1>
-          <p className="mt-1 text-sm text-text-secondary">
-            {sectores.length} {sectores.length === 1 ? "sector" : "sectores"}
-          </p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push("/zona")}
+            className="rounded-lg border border-border p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
+            title="Volver a zonas"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-text-primary">{zonaNombre}</h1>
+            <p className="mt-1 text-sm text-text-secondary">
+              {sectores.length} {sectores.length === 1 ? "sector" : "sectores"}
+            </p>
+          </div>
         </div>
         <button
           onClick={() => { setModalOpen(true); setNumero(""); }}
@@ -88,7 +106,7 @@ export default function SectoresClient({ zonaId, zonaNombre, initialSectores }: 
         </button>
       </div>
 
-      {/* Grid */}
+      {/* List */}
       {sectores.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-surface py-20 text-center">
           <p className="text-base font-medium text-text-primary">No hay sectores todavía</p>
@@ -101,43 +119,46 @@ export default function SectoresClient({ zonaId, zonaNombre, initialSectores }: 
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {sectores.map((sector) => {
-            const fincaCount = sector.fincas?.length ?? 0;
-            const propiedadCount = sector.fincas?.reduce((acc, f) => acc + (f.propiedades?.length ?? 0), 0) ?? 0;
+        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-background">
+                <th className="px-5 py-3 text-left font-medium text-text-secondary">Sector</th>
+                <th className="w-32 px-5 py-3 text-center font-medium text-text-secondary">Fincas</th>
+                <th className="w-32 px-5 py-3 text-center font-medium text-text-secondary">Propiedades</th>
+                <th className="w-12 px-5 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {sectores.map((sector) => {
+                const fincaCount = sector.fincas?.length ?? 0;
+                const propiedadCount = sector.fincas?.reduce((acc, f) => acc + (f.propiedades?.length ?? 0), 0) ?? 0;
 
-            return (
-              <div
-                key={sector.id}
-                className="group relative rounded-xl border border-border bg-surface p-5 shadow-sm transition-all hover:border-primary hover:shadow-md"
-              >
-                <Link href={`/zona/${zonaId}/sector/${sector.id}`} className="block">
-                  <h3 className="text-base font-semibold text-text-primary transition-colors group-hover:text-primary">
-                    Sector {sector.numero}
-                  </h3>
-                  <div className="mt-3 space-y-1 text-sm text-text-secondary">
-                    <p>
-                      <span className="font-medium text-text-primary">{fincaCount}</span>{" "}
-                      {fincaCount === 1 ? "finca" : "fincas"}
-                    </p>
-                    <p>
-                      <span className="font-medium text-text-primary">{propiedadCount}</span>{" "}
-                      {propiedadCount === 1 ? "propiedad" : "propiedades"}
-                    </p>
-                  </div>
-                </Link>
-                <button
-                  onClick={() => { setError(null); setDeleteId(sector.id); }}
-                  className="absolute right-2 top-2 rounded-md p-1.5 text-text-secondary opacity-0 transition-all hover:bg-red-50 hover:text-danger group-hover:opacity-100"
-                  title="Eliminar sector"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            );
-          })}
+                return (
+                  <tr
+                    key={sector.id}
+                    onClick={() => router.push(`/zona/${zonaId}/sector/${sector.id}`)}
+                    className="group cursor-pointer transition-colors hover:bg-background"
+                  >
+                    <td className="px-5 py-3.5 font-medium text-text-primary">Sector {sector.numero}</td>
+                    <td className="w-32 px-5 py-3.5 text-center text-text-secondary">{fincaCount}</td>
+                    <td className="w-32 px-5 py-3.5 text-center text-text-secondary">{propiedadCount}</td>
+                    <td className="w-12 px-5 py-3.5 text-right">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setError(null); setDeleteId(sector.id); }}
+                        className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-red-50 hover:text-danger group-hover:opacity-100"
+                        title="Eliminar sector"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -210,6 +231,8 @@ export default function SectoresClient({ zonaId, zonaNombre, initialSectores }: 
           </div>
         </div>
       )}
+
+      <Toaster toasts={toasts} />
     </>
   );
 }

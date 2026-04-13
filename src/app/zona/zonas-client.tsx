@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
+import { useToast, Toaster } from "@/components/ui/toast";
 
 type Zona = {
   id: number;
@@ -26,16 +27,23 @@ export default function ZonasClient({ initialZonas }: { initialZonas: Zona[] }) 
   const [error, setError] = useState<string | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
+  const { toasts, toast } = useToast();
 
   async function handleCreate() {
     if (!nombre.trim()) return;
     setSaving(true);
-    const { data } = await supabase
+    const { data, error: err } = await supabase
       .from("zona")
       .insert({ nombre: nombre.trim() })
       .select("*, sectores(id, fincas(id, propiedades(id)))")
       .single();
-    if (data) setZonas((prev) => [...prev, data as Zona].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+    if (err) {
+      toast("Error al crear la zona: " + err.message, "error");
+    } else if (data) {
+      setZonas((prev) => [...prev, data as Zona].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+      toast("Zona creada correctamente");
+    }
     setNombre("");
     setSaving(false);
     setModalOpen(false);
@@ -54,6 +62,7 @@ export default function ZonasClient({ initialZonas }: { initialZonas: Zona[] }) 
     setZonas((prev) => prev.filter((z) => z.id !== deleteId));
     setDeleting(false);
     setDeleteId(null);
+    toast("Zona eliminada");
   }
 
   return (
@@ -74,7 +83,7 @@ export default function ZonasClient({ initialZonas }: { initialZonas: Zona[] }) 
         </button>
       </div>
 
-      {/* Grid */}
+      {/* List */}
       {zonas.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-surface py-20 text-center">
           <p className="text-base font-medium text-text-primary">No hay zonas todavía</p>
@@ -87,51 +96,52 @@ export default function ZonasClient({ initialZonas }: { initialZonas: Zona[] }) 
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {zonas.map((zona) => {
-            const sectorCount = zona.sectores?.length ?? 0;
-            const fincaCount = zona.sectores?.reduce((acc, s) => acc + (s.fincas?.length ?? 0), 0) ?? 0;
-            const propiedadCount = zona.sectores?.reduce(
-              (acc, s) => acc + (s.fincas?.reduce((a, f) => a + (f.propiedades?.length ?? 0), 0) ?? 0),
-              0
-            ) ?? 0;
+        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-background">
+                <th className="px-5 py-3 text-left font-medium text-text-secondary">Zona</th>
+                <th className="w-32 px-5 py-3 text-center font-medium text-text-secondary">Sectores</th>
+                <th className="w-32 px-5 py-3 text-center font-medium text-text-secondary">Fincas</th>
+                <th className="w-32 px-5 py-3 text-center font-medium text-text-secondary">Propiedades</th>
+                <th className="w-12 px-5 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {zonas.map((zona) => {
+                const sectorCount = zona.sectores?.length ?? 0;
+                const fincaCount = zona.sectores?.reduce((acc, s) => acc + (s.fincas?.length ?? 0), 0) ?? 0;
+                const propiedadCount = zona.sectores?.reduce(
+                  (acc, s) => acc + (s.fincas?.reduce((a, f) => a + (f.propiedades?.length ?? 0), 0) ?? 0),
+                  0
+                ) ?? 0;
 
-            return (
-              <div
-                key={zona.id}
-                className="group relative rounded-xl border border-border bg-surface p-6 shadow-sm transition-all hover:border-primary hover:shadow-md"
-              >
-                <Link href={`/zona/${zona.id}`} className="block">
-                  <h3 className="pr-7 text-lg font-semibold text-text-primary transition-colors group-hover:text-primary">
-                    {zona.nombre}
-                  </h3>
-                  <div className="mt-4 flex flex-wrap gap-4 text-sm text-text-secondary">
-                    <span>
-                      <span className="font-semibold text-text-primary">{sectorCount}</span>{" "}
-                      {sectorCount === 1 ? "sector" : "sectores"}
-                    </span>
-                    <span>
-                      <span className="font-semibold text-text-primary">{fincaCount}</span>{" "}
-                      {fincaCount === 1 ? "finca" : "fincas"}
-                    </span>
-                    <span>
-                      <span className="font-semibold text-text-primary">{propiedadCount}</span>{" "}
-                      {propiedadCount === 1 ? "propiedad" : "propiedades"}
-                    </span>
-                  </div>
-                </Link>
-                <button
-                  onClick={() => { setError(null); setDeleteId(zona.id); }}
-                  className="absolute right-3 top-3 rounded-md p-1.5 text-text-secondary opacity-0 transition-all hover:bg-red-50 hover:text-danger group-hover:opacity-100"
-                  title="Eliminar zona"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            );
-          })}
+                return (
+                  <tr
+                    key={zona.id}
+                    onClick={() => router.push(`/zona/${zona.id}`)}
+                    className="group cursor-pointer transition-colors hover:bg-background"
+                  >
+                    <td className="px-5 py-3.5 font-medium text-text-primary">{zona.nombre}</td>
+                    <td className="w-32 px-5 py-3.5 text-center text-text-secondary">{sectorCount}</td>
+                    <td className="w-32 px-5 py-3.5 text-center text-text-secondary">{fincaCount}</td>
+                    <td className="w-32 px-5 py-3.5 text-center text-text-secondary">{propiedadCount}</td>
+                    <td className="w-12 px-5 py-3.5 text-right">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setError(null); setDeleteId(zona.id); }}
+                        className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-red-50 hover:text-danger group-hover:opacity-100"
+                        title="Eliminar zona"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -203,6 +213,8 @@ export default function ZonasClient({ initialZonas }: { initialZonas: Zona[] }) 
           </div>
         </div>
       )}
+
+      <Toaster toasts={toasts} />
     </>
   );
 }
