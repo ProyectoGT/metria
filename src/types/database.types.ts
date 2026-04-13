@@ -260,6 +260,58 @@ export interface Database {
           },
         ];
       };
+      rendimiento: {
+        Row: {
+          id: number;
+          agente_id: number;
+          anio: number;
+          mes: number;
+          facturado: number;
+          objetivo_facturado: number;
+          encargos: number;
+          objetivo_encargos: number;
+          ventas: number;
+          objetivo_ventas: number;
+          contactos: number;
+          objetivo_contactos: number;
+        };
+        Insert: {
+          id?: number;
+          agente_id: number;
+          anio: number;
+          mes?: number;
+          facturado?: number;
+          objetivo_facturado?: number;
+          encargos?: number;
+          objetivo_encargos?: number;
+          ventas?: number;
+          objetivo_ventas?: number;
+          contactos?: number;
+          objetivo_contactos?: number;
+        };
+        Update: {
+          id?: number;
+          agente_id?: number;
+          anio?: number;
+          mes?: number;
+          facturado?: number;
+          objetivo_facturado?: number;
+          encargos?: number;
+          objetivo_encargos?: number;
+          ventas?: number;
+          objetivo_ventas?: number;
+          contactos?: number;
+          objetivo_contactos?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "rendimiento_agente_id_fkey";
+            columns: ["agente_id"];
+            referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       usuarios: {
         Row: {
           id: number;
