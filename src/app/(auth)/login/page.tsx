@@ -7,7 +7,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm rounded-xl bg-surface p-8 shadow-lg">
         <div className="mb-8 flex flex-col items-center gap-5">
           <Image
-            src="/logo-metria.webp"
+            src="/logo-metria.crm.png"
             alt="Metria CRM"
             width={80}
             height={80}
@@ -19,16 +19,6 @@ export default function LoginPage() {
         </div>
 
         <LoginForm />
-
-        <div className="mt-8 flex items-center justify-center border-t border-border pt-6">
-          <Image
-            src="/logo-master-iberica.png"
-            alt="Master Ibérica"
-            width={180}
-            height={45}
-            className="opacity-70"
-          />
-        </div>
       </div>
     </div>
   );
