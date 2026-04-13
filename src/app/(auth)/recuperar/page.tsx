@@ -7,7 +7,7 @@ export default function RecuperarPage() {
       <div className="w-full max-w-sm rounded-xl bg-surface p-8 shadow-lg">
         <div className="mb-8 flex flex-col items-center gap-3">
           <Image
-            src="/logo-metria.webp"
+            src="/logo-metria-crm.png"
             alt="Metria CRM"
             width={60}
             height={60}

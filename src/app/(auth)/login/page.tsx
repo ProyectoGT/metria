@@ -7,7 +7,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm rounded-xl bg-surface p-8 shadow-lg">
         <div className="mb-8 flex flex-col items-center gap-5">
           <Image
-            src="/logo-metria.crm.png"
+            src="/logo-metria-crm.png"
             alt="Metria CRM"
             width={80}
             height={80}
