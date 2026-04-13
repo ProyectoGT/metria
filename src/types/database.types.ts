@@ -106,6 +106,10 @@ export interface Database {
           zona_deseada: number | null;
           presupuesto: number | null;
           compra_alquiler: boolean | null;
+          habitaciones: number | null;
+          garaje: boolean | null;
+          origen: string | null;
+          referencia: string | null;
           caracteristicas: string | null;
           notas: string | null;
         };
@@ -117,6 +121,10 @@ export interface Database {
           zona_deseada?: number | null;
           presupuesto?: number | null;
           compra_alquiler?: boolean | null;
+          habitaciones?: number | null;
+          garaje?: boolean | null;
+          origen?: string | null;
+          referencia?: string | null;
           caracteristicas?: string | null;
           notas?: string | null;
         };
@@ -128,6 +136,10 @@ export interface Database {
           zona_deseada?: number | null;
           presupuesto?: number | null;
           compra_alquiler?: boolean | null;
+          habitaciones?: number | null;
+          garaje?: boolean | null;
+          origen?: string | null;
+          referencia?: string | null;
           caracteristicas?: string | null;
           notas?: string | null;
         };
