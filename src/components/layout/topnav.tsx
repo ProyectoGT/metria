@@ -99,7 +99,6 @@ export default function Topnav({ theme, layout, onToggleTheme, onToggleLayout }:
           <span className="hidden sm:inline">Lateral</span>
         </button>
 
-
         {/* Divider */}
         <div className="mx-1 h-5 w-px bg-border" />
 

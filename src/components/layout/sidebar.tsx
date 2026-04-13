@@ -5,13 +5,7 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/app/(auth)/actions";
 import type { Theme, Layout } from "./app-shell";
 
-interface NavItem {
-  label: string;
-  href: string;
-  icon: string;
-}
-
-const navItems: NavItem[] = [
+const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: "📊" },
   { label: "Zona", href: "/zona", icon: "📍" },
   { label: "Pedidos", href: "/pedidos", icon: "📋" },
