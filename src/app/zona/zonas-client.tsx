@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 
@@ -25,7 +25,7 @@ export default function ZonasClient({ initialZonas }: { initialZonas: Zona[] }) 
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   async function handleCreate() {
     if (!nombre.trim()) return;
