@@ -56,7 +56,7 @@ export default async function CuentaPage() {
         </section>
 
         <SecuritySettingsForm
-          currentRole={user?.role ?? "Comercial"}
+          currentRole={user?.role ?? "Agente"}
           canManageConfirmationPassword={user?.canManageConfirmationPassword ?? false}
           passwordStatus={passwordStatus}
         />
