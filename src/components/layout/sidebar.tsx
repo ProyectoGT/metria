@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { canManageUsers, normalizeUserRole } from "@/lib/roles";
 import {
   LayoutDashboard,
   MapPin,
@@ -15,8 +16,11 @@ import {
   LifeBuoy,
   Moon,
   Sun,
+  Users,
+  X,
 } from "lucide-react";
-const navItems = [
+
+const baseNavItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Zona / Sectores", href: "/zona", icon: MapPin },
   { label: "Pedidos", href: "/pedidos", icon: ClipboardList },
@@ -32,11 +36,31 @@ interface Props {
 
 export default function Sidebar({ userRole: _userRole }: Props) {
   const pathname = usePathname();
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(
+    () =>
+      typeof document !== "undefined" &&
+      document.documentElement.classList.contains("dark")
+  );
+  const [mobileOpen, setMobileOpen] = useState(false);
 
+  const userRole = _userRole ? normalizeUserRole(_userRole) : null;
+  const navItems = canManageUsers(userRole ?? "Agente")
+    ? [...baseNavItems, { label: "Usuarios", href: "/usuarios", icon: Users }]
+    : baseNavItems;
+
+  // Escuchar evento del botón hamburger en el header
   useEffect(() => {
-    setDark(document.documentElement.classList.contains("dark"));
+    function handleToggle() {
+      setMobileOpen((prev) => !prev);
+    }
+    window.addEventListener("sidebar:toggle", handleToggle);
+    return () => window.removeEventListener("sidebar:toggle", handleToggle);
   }, []);
+
+  // Cerrar al navegar
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   function toggleTheme() {
     const next = !dark;
@@ -45,10 +69,10 @@ export default function Sidebar({ userRole: _userRole }: Props) {
     localStorage.setItem("metria-theme", next ? "dark" : "light");
   }
 
-  return (
-    <aside className="fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col border-r border-border bg-sidebar">
-      {/* Logo — blue midnight background */}
-      <div className="flex h-16 items-center justify-center bg-sidebar-logo px-4">
+  const navContent = (
+    <>
+      {/* Logo */}
+      <div className="flex h-16 items-center justify-between bg-sidebar-logo px-4">
         <Image
           src="/logo-bg-master-iberica.png"
           alt="Master Ibérica"
@@ -57,6 +81,14 @@ export default function Sidebar({ userRole: _userRole }: Props) {
           className="h-9 w-auto object-contain"
           priority
         />
+        {/* Cerrar drawer — solo en móvil */}
+        <button
+          onClick={() => setMobileOpen(false)}
+          className="ml-2 rounded-lg p-1.5 text-white/70 hover:bg-white/10 md:hidden"
+          aria-label="Cerrar menú"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
       {/* Navigation */}
@@ -84,7 +116,6 @@ export default function Sidebar({ userRole: _userRole }: Props) {
           );
         })}
 
-        {/* Separator */}
         <div className="my-3 border-t border-border" />
 
         <Link
@@ -100,7 +131,7 @@ export default function Sidebar({ userRole: _userRole }: Props) {
         </Link>
       </nav>
 
-      {/* Bottom actions */}
+      {/* Tema */}
       <div className="border-t border-border px-3 py-3 space-y-0.5">
         <button
           onClick={toggleTheme}
@@ -114,6 +145,33 @@ export default function Sidebar({ userRole: _userRole }: Props) {
           {dark ? "Modo claro" : "Modo oscuro"}
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* ── Desktop: sidebar fijo siempre visible ────────────────────── */}
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-[220px] flex-col border-r border-border bg-sidebar md:flex">
+        {navContent}
+      </aside>
+
+      {/* ── Móvil: overlay + drawer deslizante ──────────────────────── */}
+      <div
+        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 md:hidden ${
+          mobileOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        }`}
+        onClick={() => setMobileOpen(false)}
+        aria-hidden="true"
+      />
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col border-r border-border bg-sidebar transition-transform duration-300 md:hidden ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {navContent}
+      </aside>
+    </>
   );
 }

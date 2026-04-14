@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Search, Bell, ChevronDown } from "lucide-react";
+import { Search, Bell, ChevronDown, Menu } from "lucide-react";
 import { logout } from "@/app/(auth)/actions";
 import Avatar from "@/components/ui/avatar";
 
@@ -36,7 +36,16 @@ export default function Header({ userName, userEmail }: HeaderProps) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center border-b border-border bg-surface px-6">
+    <header className="sticky top-0 z-40 flex h-16 items-center border-b border-border bg-surface px-4 md:px-6">
+      {/* Botón hamburger — solo en móvil */}
+      <button
+        onClick={() => window.dispatchEvent(new Event("sidebar:toggle"))}
+        className="mr-3 rounded-lg p-2 text-text-secondary hover:bg-background hover:text-text-primary md:hidden"
+        aria-label="Abrir menú"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
       {/* Search bar */}
       <div className="relative w-full max-w-md">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
