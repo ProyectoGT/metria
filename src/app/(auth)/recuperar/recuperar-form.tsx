@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useState, useTransition } from "react";
 import { resetPassword } from "./actions";
+
+const fieldClassName =
+  "w-full border-0 border-b border-[#d8d3cb] bg-transparent px-0 py-3 text-sm text-[#171717] outline-none transition placeholder:text-[#b1aba3] focus:border-[#7ba4e0] focus:ring-0";
 
 export default function RecuperarForm() {
   const [error, setError] = useState<string | null>(null);
@@ -23,14 +26,14 @@ export default function RecuperarForm() {
 
   if (sent) {
     return (
-      <div className="space-y-4 text-center">
-        <div className="rounded-lg bg-green-50 p-4 text-sm text-success">
+      <div className="space-y-8">
+        <div className="rounded-2xl border border-[#cfe8d3] bg-[#f3fbf4] px-4 py-4 text-sm leading-6 text-[#28643a]">
           Te hemos enviado un correo con las instrucciones para restablecer tu
           contraseña.
         </div>
         <Link
           href="/login"
-          className="inline-block text-sm font-medium text-primary hover:text-primary-dark"
+          className="inline-flex w-full justify-center rounded-full border border-[#9fc0ee] px-4 py-2.5 text-sm font-medium text-[#6f96cf] transition hover:border-[#7ba4e0] hover:text-[#5f8fd4]"
         >
           Volver al login
         </Link>
@@ -39,9 +42,9 @@ export default function RecuperarForm() {
   }
 
   return (
-    <form action={handleSubmit} className="space-y-5">
+    <form action={handleSubmit} className="space-y-8">
       {error && (
-        <div className="rounded-lg bg-red-50 p-3 text-sm text-danger">
+        <div className="rounded-2xl border border-[#f2c7c7] bg-[#fff3f3] px-4 py-3 text-sm text-[#b42318]">
           {error}
         </div>
       )}
@@ -49,7 +52,7 @@ export default function RecuperarForm() {
       <div>
         <label
           htmlFor="email"
-          className="mb-1.5 block text-sm font-medium text-text-primary"
+          className="mb-2 block text-sm font-medium text-[#2f2f2f]"
         >
           Correo electrónico
         </label>
@@ -60,14 +63,14 @@ export default function RecuperarForm() {
           required
           autoComplete="email"
           placeholder="tu@correo.com"
-          className="w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-text-primary placeholder:text-text-secondary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className={fieldClassName}
         />
       </div>
 
       <button
         type="submit"
         disabled={isPending}
-        className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-full border border-[#9fc0ee] px-4 py-2.5 text-sm font-medium text-[#6f96cf] transition hover:border-[#7ba4e0] hover:text-[#5f8fd4] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isPending ? "Enviando..." : "Enviar enlace de recuperación"}
       </button>
@@ -75,7 +78,7 @@ export default function RecuperarForm() {
       <div className="text-center">
         <Link
           href="/login"
-          className="text-sm font-medium text-primary hover:text-primary-dark"
+          className="text-sm font-medium text-[#7ba4e0] transition hover:text-[#5f8fd4]"
         >
           Volver al login
         </Link>
