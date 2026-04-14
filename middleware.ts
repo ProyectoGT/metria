@@ -1,39 +1,37 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-// Check session by reading the Supabase auth cookie directly.
-// This avoids any Node.js API usage and is fully Edge Runtime compatible.
-function hasSession(request: NextRequest): boolean {
-  const cookies = request.cookies;
-  // Supabase stores the session in chunked cookies: sb-<ref>-auth-token, sb-<ref>-auth-token.0, etc.
-  return cookies.getAll().some(
-    (c) =>
-      c.name.startsWith("sb-") &&
-      c.name.includes("-auth-token") &&
-      c.value.length > 0
-  );
-}
-
 export function middleware(request: NextRequest) {
-  const pathname = request.nextUrl.pathname;
+  const { pathname } = request.nextUrl;
+
+  // 1. Definir rutas públicas y estáticas
   const isPublicPage = pathname === "/login" || pathname === "/recuperar";
-  const authenticated = hasSession(request);
+  
+  // 2. Verificar sesión (Supabase suele usar este patrón de cookies)
+  const allCookies = request.cookies.getAll();
+  const hasSupabaseCookie = allCookies.some(
+    (c) => c.name.includes("auth-token") && c.value.length > 0
+  );
 
-  if (!authenticated && !isPublicPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+  // 3. LÓGICA DE REDIRECCIÓN
+
+  // CASO A: Si NO está autenticado y NO está en una página pública -> Ir a Login
+  if (!hasSupabaseCookie && !isPublicPage) {
+    const loginUrl = new URL("/login", request.url);
+    return NextResponse.redirect(loginUrl);
   }
 
-  if (authenticated && isPublicPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+  // CASO B: Si YA está autenticado e intenta ir al Login -> Ir al Dashboard
+  if (hasSupabaseCookie && isPublicPage) {
+    const dashboardUrl = new URL("/dashboard", request.url);
+    return NextResponse.redirect(dashboardUrl);
   }
 
+  // Si todo está bien, continuar
   return NextResponse.next();
 }
 
 export const config = {
+  // Este matcher excluye archivos estáticos para que el middleware no corra en cada imagen o CSS
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],

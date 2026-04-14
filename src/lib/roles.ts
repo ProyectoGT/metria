@@ -56,3 +56,11 @@ export function canDeleteZonas(role: UserRole) {
 export function canManageConfirmationPassword(role: UserRole) {
   return role === "Administrador";
 }
+
+export function canViewAllAgents(role: UserRole) {
+  return role === "Administrador" || role === "Director";
+}
+
+export function canViewSupervisedAgents(role: UserRole) {
+  return role === "Responsable";
+}
