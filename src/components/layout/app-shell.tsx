@@ -21,11 +21,20 @@ export default async function AppShell({
   if (user) {
     userEmail = user.email ?? null;
 
-    const { data: profile } = await supabase
+    let { data: profile } = await supabase
       .from("usuarios")
       .select("nombre, apellidos, puesto, rol")
       .eq("auth_id", user.id)
       .maybeSingle();
+
+    if (!profile && user.email) {
+      const { data: byEmail } = await supabase
+        .from("usuarios")
+        .select("nombre, apellidos, puesto, rol")
+        .eq("correo", user.email)
+        .maybeSingle();
+      profile = byEmail;
+    }
 
     if (profile) {
       userName = `${profile.nombre} ${profile.apellidos}`.trim() || "Usuario";
