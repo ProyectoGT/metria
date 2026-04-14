@@ -18,7 +18,8 @@ type KanbanBoardProps = {
 export default function KanbanBoard({
   initialData,
   role,
-  currentUserId,
+  // currentUserId reserved for future DB persistence
+  currentUserId: _currentUserId,
   agents = [],
 }: KanbanBoardProps) {
   const [columns, setColumns] = useState<KanbanColumnData[]>(initialData.columns);
@@ -86,7 +87,7 @@ export default function KanbanBoard({
               key={column.id}
               column={column}
               role={role}
-              currentUserId={currentUserId}
+              currentUserId={_currentUserId}
               onDeleteColumn={handleDeleteColumn}
               onAddCard={(colId) => setAddingCardCol(colId)}
               onDeleteCard={handleDeleteCard}
