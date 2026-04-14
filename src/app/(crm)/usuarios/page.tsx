@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import PageHeader from "@/components/layout/page-header";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { canManageUsers, USER_ROLES } from "@/lib/roles";
+import { createClient } from "@/lib/supabase";
 import CreateUserForm from "./create-user-form";
+import UsersManagementPanel from "./users-management-panel";
 
 export default async function UsuariosPage() {
   const currentUser = await getCurrentUserContext();
@@ -15,11 +17,39 @@ export default async function UsuariosPage() {
     redirect("/dashboard");
   }
 
+  const supabase = await createClient();
+  const usersQuery = supabase
+    .from("usuarios")
+    .select("id, nombre, apellidos, correo, rol, puesto, estado, auth_id")
+    .order("rol")
+    .order("nombre")
+    .order("apellidos");
+
+  const { data: usersData, error } =
+    currentUser.empresaId !== null
+      ? await usersQuery.eq("empresa_id", currentUser.empresaId)
+      : await usersQuery;
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const users = (usersData ?? []).map((user) => ({
+    id: user.id,
+    nombre: user.nombre,
+    apellidos: user.apellidos,
+    correo: user.correo,
+    rol: user.rol,
+    puesto: user.puesto,
+    estado: user.estado,
+    authId: user.auth_id,
+  }));
+
   return (
     <>
       <PageHeader
         title="Usuarios"
-        description="Crea cuentas de acceso nuevas y asignales un perfil dentro del CRM."
+        description="Panel de altas y gestion de accesos del CRM para administradores."
       />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
@@ -53,6 +83,10 @@ export default async function UsuariosPage() {
             </p>
           </div>
         </section>
+      </div>
+
+      <div className="mt-6">
+        <UsersManagementPanel users={users} roles={USER_ROLES} />
       </div>
     </>
   );

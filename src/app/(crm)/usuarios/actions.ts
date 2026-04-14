@@ -18,6 +18,10 @@ type CreateUserInput = {
 type ActionResult = {
   success?: boolean;
   error?: string;
+  message?: string;
+  role?: UserRole;
+  status?: string;
+  removed?: boolean;
 };
 
 function isValidEmail(email: string) {
@@ -52,6 +56,48 @@ function mapAuthError(message: string) {
   }
 
   return message;
+}
+
+function mapDeleteError(message: string) {
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("violates foreign key constraint") ||
+    normalized.includes("foreign key")
+  ) {
+    return "El usuario tiene datos relacionados en el CRM. Se desactivara su acceso, pero no se eliminara el perfil historico.";
+  }
+
+  return message;
+}
+
+async function getManagedUserTarget(
+  userId: number,
+  currentUser: NonNullable<Awaited<ReturnType<typeof getCurrentUserContext>>>
+) {
+  const adminClient = createAdminClient();
+  const target = await adminClient
+    .from("usuarios")
+    .select("id, nombre, apellidos, correo, rol, puesto, estado, auth_id, empresa_id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (target.error) {
+    return { error: target.error.message };
+  }
+
+  if (!target.data) {
+    return { error: "No se ha encontrado el usuario indicado." };
+  }
+
+  if (
+    currentUser.empresaId !== null &&
+    target.data.empresa_id !== currentUser.empresaId
+  ) {
+    return { error: "No puedes gestionar usuarios de otra empresa." };
+  }
+
+  return { data: target.data };
 }
 
 export async function createCrmUserAction(
@@ -185,5 +231,153 @@ export async function createCrmUserAction(
 
   revalidatePath("/usuarios");
 
-  return { success: true };
+  return {
+    success: true,
+    message:
+      "Usuario creado correctamente. Ya puede acceder con el correo y la contrasena indicados.",
+  };
+}
+
+export async function updateUserRoleAction(input: {
+  userId: number;
+  rol: string;
+}): Promise<ActionResult> {
+  const currentUser = await getCurrentUserContext();
+
+  if (!currentUser) {
+    return { error: "Tu sesion no es valida. Vuelve a iniciar sesion." };
+  }
+
+  if (!canManageUsers(currentUser.role)) {
+    return { error: "Solo un Administrador puede editar rangos." };
+  }
+
+  if (!isUserRole(input.rol)) {
+    return { error: "El rol indicado no es valido." };
+  }
+
+  if (input.userId === currentUser.id) {
+    return { error: "No puedes modificar tu propio rango desde este panel." };
+  }
+
+  const targetResult = await getManagedUserTarget(input.userId, currentUser);
+
+  if (targetResult.error || !targetResult.data) {
+    return { error: targetResult.error ?? "No se pudo cargar el usuario." };
+  }
+
+  if (targetResult.data.rol === "Administrador") {
+    return {
+      error: "Los usuarios con rango Administrador solo se pueden listar desde este panel.",
+    };
+  }
+
+  const adminClient = createAdminClient();
+  const nextRole = input.rol as UserRole;
+  const updateResult = await adminClient
+    .from("usuarios")
+    .update({
+      rol: nextRole,
+      puesto: nextRole,
+    })
+    .eq("id", input.userId);
+
+  if (updateResult.error) {
+    return {
+      error: updateResult.error.message ?? "No se pudo actualizar el rango.",
+    };
+  }
+
+  revalidatePath("/usuarios");
+
+  return {
+    success: true,
+    message: "Rango actualizado correctamente.",
+    role: nextRole,
+  };
+}
+
+export async function deleteUserAction(input: {
+  userId: number;
+}): Promise<ActionResult> {
+  const currentUser = await getCurrentUserContext();
+
+  if (!currentUser) {
+    return { error: "Tu sesion no es valida. Vuelve a iniciar sesion." };
+  }
+
+  if (!canManageUsers(currentUser.role)) {
+    return { error: "Solo un Administrador puede eliminar usuarios." };
+  }
+
+  const targetResult = await getManagedUserTarget(input.userId, currentUser);
+
+  if (targetResult.error || !targetResult.data) {
+    return { error: targetResult.error ?? "No se pudo cargar el usuario." };
+  }
+
+  const target = targetResult.data;
+
+  if (target.rol === "Administrador") {
+    return { error: "No se pueden eliminar usuarios con rango Administrador." };
+  }
+
+  const adminClient = createAdminClient();
+
+  if (target.auth_id) {
+    const authDelete = await adminClient.auth.admin.deleteUser(target.auth_id);
+    const authDeleteMessage = authDelete.error?.message?.toLowerCase() ?? "";
+
+    if (
+      authDelete.error &&
+      !authDeleteMessage.includes("not found") &&
+      !authDeleteMessage.includes("user not found")
+    ) {
+      return {
+        error:
+          authDelete.error.message ??
+          "No se pudo eliminar la cuenta de acceso del usuario.",
+      };
+    }
+  }
+
+  const deleteProfile = await adminClient
+    .from("usuarios")
+    .delete()
+    .eq("id", target.id);
+
+  if (!deleteProfile.error) {
+    revalidatePath("/usuarios");
+    return {
+      success: true,
+      message: "Usuario eliminado correctamente.",
+      removed: true,
+    };
+  }
+
+  const disableProfile = await adminClient
+    .from("usuarios")
+    .update({
+      auth_id: null,
+      estado: "disabled",
+    })
+    .eq("id", target.id);
+
+  if (disableProfile.error) {
+    return {
+      error:
+        deleteProfile.error.message ??
+        disableProfile.error.message ??
+        "No se pudo eliminar ni desactivar el usuario.",
+    };
+  }
+
+  revalidatePath("/usuarios");
+
+  return {
+    success: true,
+    message: mapDeleteError(deleteProfile.error.message),
+    status: "disabled",
+    removed: false,
+  };
 }
