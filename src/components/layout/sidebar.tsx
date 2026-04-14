@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { canManageUsers, normalizeUserRole } from "@/lib/roles";
 import {
   LayoutDashboard,
   MapPin,
@@ -15,8 +16,9 @@ import {
   LifeBuoy,
   Moon,
   Sun,
+  Users,
 } from "lucide-react";
-const navItems = [
+const baseNavItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Zona / Sectores", href: "/zona", icon: MapPin },
   { label: "Pedidos", href: "/pedidos", icon: ClipboardList },
@@ -32,11 +34,15 @@ interface Props {
 
 export default function Sidebar({ userRole: _userRole }: Props) {
   const pathname = usePathname();
-  const [dark, setDark] = useState(false);
-
-  useEffect(() => {
-    setDark(document.documentElement.classList.contains("dark"));
-  }, []);
+  const [dark, setDark] = useState(
+    () =>
+      typeof document !== "undefined" &&
+      document.documentElement.classList.contains("dark")
+  );
+  const userRole = _userRole ? normalizeUserRole(_userRole) : null;
+  const navItems = canManageUsers(userRole ?? "Agente")
+    ? [...baseNavItems, { label: "Usuarios", href: "/usuarios", icon: Users }]
+    : baseNavItems;
 
   function toggleTheme() {
     const next = !dark;

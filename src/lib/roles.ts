@@ -57,6 +57,10 @@ export function canManageConfirmationPassword(role: UserRole) {
   return role === "Administrador";
 }
 
+export function canManageUsers(role: UserRole) {
+  return role === "Administrador";
+}
+
 export function canViewAllAgents(role: UserRole) {
   return role === "Administrador" || role === "Director";
 }
