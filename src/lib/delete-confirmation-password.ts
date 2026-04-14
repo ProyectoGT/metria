@@ -37,6 +37,10 @@ async function verifyStoredHash(value: string, storedHash: string) {
 }
 
 async function getStoredConfiguration(): Promise<StoredConfiguration | null> {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return null;
+  }
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("configuracion_seguridad")

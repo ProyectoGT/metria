@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { logout } from "@/app/(auth)/actions";
 import {
   LayoutDashboard,
   MapPin,
@@ -14,7 +13,6 @@ import {
   Calculator,
   FileText,
   LifeBuoy,
-  LogOut,
   Moon,
   Sun,
 } from "lucide-react";
@@ -138,16 +136,6 @@ export default function Sidebar({ userRole }: Props) {
           )}
           {dark ? "Modo claro" : "Modo oscuro"}
         </button>
-
-        <form action={logout}>
-          <button
-            type="submit"
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-sidebar-hover hover:text-text-primary"
-          >
-            <LogOut className="h-[18px] w-[18px] shrink-0" />
-            Cerrar sesión
-          </button>
-        </form>
       </div>
     </aside>
   );
