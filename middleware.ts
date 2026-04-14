@@ -1,53 +1,37 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
+  // 1. Definir rutas públicas y estáticas
+  const isPublicPage = pathname === "/login" || pathname === "/recuperar";
+  
+  // 2. Verificar sesión (Supabase suele usar este patrón de cookies)
+  const allCookies = request.cookies.getAll();
+  const hasSupabaseCookie = allCookies.some(
+    (c) => c.name.includes("auth-token") && c.value.length > 0
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // 3. LÓGICA DE REDIRECCIÓN
 
-  const pathname = request.nextUrl.pathname;
-  const isPublicPage = pathname === "/login" || pathname === "/recuperar";
-
-  if (!user && !isPublicPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+  // CASO A: Si NO está autenticado y NO está en una página pública -> Ir a Login
+  if (!hasSupabaseCookie && !isPublicPage) {
+    const loginUrl = new URL("/login", request.url);
+    return NextResponse.redirect(loginUrl);
   }
 
-  if (user && isPublicPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+  // CASO B: Si YA está autenticado e intenta ir al Login -> Ir al Dashboard
+  if (hasSupabaseCookie && isPublicPage) {
+    const dashboardUrl = new URL("/dashboard", request.url);
+    return NextResponse.redirect(dashboardUrl);
   }
 
-  return supabaseResponse;
+  // Si todo está bien, continuar
+  return NextResponse.next();
 }
 
 export const config = {
+  // Este matcher excluye archivos estáticos para que el middleware no corra en cada imagen o CSS
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],

@@ -5,6 +5,8 @@ import {
   canDeleteSectores,
   canDeleteZonas,
   canManageConfirmationPassword,
+  canViewAllAgents,
+  canViewSupervisedAgents,
   normalizeUserRole,
   type UserRole,
 } from "@/lib/roles";
@@ -24,6 +26,8 @@ export type CurrentUserContext = {
   canDeleteSectores: boolean;
   canDeleteZonas: boolean;
   canManageConfirmationPassword: boolean;
+  canViewAllAgents: boolean;
+  supervisedAgentIds: number[];
 };
 
 export async function getCurrentUserContext(): Promise<CurrentUserContext | null> {
@@ -99,6 +103,16 @@ export async function getCurrentUserContext(): Promise<CurrentUserContext | null
 
   const role = normalizeUserRole(profile.rol ?? profile.puesto);
 
+  // Para Responsable: obtener IDs de los agentes que supervisa
+  let supervisedAgentIds: number[] = [];
+  if (canViewSupervisedAgents(role)) {
+    const { data: supervised } = await supabase
+      .from("usuarios")
+      .select("id")
+      .eq("supervisor_id", profile.id);
+    supervisedAgentIds = (supervised ?? []).map((u) => u.id);
+  }
+
   return {
     id: profile.id,
     authId: profile.auth_id,
@@ -114,5 +128,7 @@ export async function getCurrentUserContext(): Promise<CurrentUserContext | null
     canDeleteSectores: canDeleteSectores(role),
     canDeleteZonas: canDeleteZonas(role),
     canManageConfirmationPassword: canManageConfirmationPassword(role),
+    canViewAllAgents: canViewAllAgents(role),
+    supervisedAgentIds,
   };
 }

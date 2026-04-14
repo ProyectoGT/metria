@@ -16,28 +16,21 @@ import {
   Moon,
   Sun,
 } from "lucide-react";
-import type { UserRole } from "@/lib/roles";
-
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Zona / Sectores", href: "/zona", icon: MapPin },
   { label: "Pedidos", href: "/pedidos", icon: ClipboardList },
   { label: "Desarrollo", href: "/desarrollo", icon: TrendingUp },
   { label: "Calendario", href: "/calendario", icon: Calendar },
+  { label: "Órdenes del día", href: "/ordenes", icon: FileText },
   { label: "Calculadora", href: "/calculadora", icon: Calculator },
 ];
 
-const ROLES_WITH_ORDENES: UserRole[] = [
-  "Administrador",
-  "Director",
-  "Responsable",
-];
-
 interface Props {
-  userRole?: UserRole | null;
+  userRole?: string | null;
 }
 
-export default function Sidebar({ userRole }: Props) {
+export default function Sidebar({ userRole: _userRole }: Props) {
   const pathname = usePathname();
   const [dark, setDark] = useState(false);
 
@@ -51,8 +44,6 @@ export default function Sidebar({ userRole }: Props) {
     document.documentElement.classList.toggle("dark", next);
     localStorage.setItem("metria-theme", next ? "dark" : "light");
   }
-
-  const showOrdenes = userRole && ROLES_WITH_ORDENES.includes(userRole);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col border-r border-border bg-sidebar">
@@ -92,20 +83,6 @@ export default function Sidebar({ userRole }: Props) {
             </Link>
           );
         })}
-
-        {showOrdenes && (
-          <Link
-            href="/ordenes"
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              pathname.startsWith("/ordenes")
-                ? "bg-primary text-white"
-                : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary"
-            }`}
-          >
-            <FileText className="h-[18px] w-[18px] shrink-0" />
-            Órdenes del día
-          </Link>
-        )}
 
         {/* Separator */}
         <div className="my-3 border-t border-border" />

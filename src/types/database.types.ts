@@ -399,6 +399,7 @@ export interface Database {
           titulo: string;
           prioridad: string | null;
           estado: string | null;
+          fecha: string | null;
           agente_asignado: number | null;
           owner_user_id: number | null;
           empresa_id: number | null;
@@ -410,6 +411,7 @@ export interface Database {
           titulo: string;
           prioridad?: string | null;
           estado?: string | null;
+          fecha?: string | null;
           agente_asignado?: number | null;
           owner_user_id?: number | null;
           empresa_id?: number | null;
@@ -421,6 +423,7 @@ export interface Database {
           titulo?: string;
           prioridad?: string | null;
           estado?: string | null;
+          fecha?: string | null;
           agente_asignado?: number | null;
           owner_user_id?: number | null;
           empresa_id?: number | null;
@@ -518,6 +521,7 @@ export interface Database {
           empresa_id: number | null;
           equipo_id: number | null;
           estado: string;
+          supervisor_id: number | null;
         };
         Insert: {
           id?: number;
@@ -530,6 +534,7 @@ export interface Database {
           empresa_id?: number | null;
           equipo_id?: number | null;
           estado?: string;
+          supervisor_id?: number | null;
         };
         Update: {
           id?: number;
@@ -542,6 +547,7 @@ export interface Database {
           empresa_id?: number | null;
           equipo_id?: number | null;
           estado?: string;
+          supervisor_id?: number | null;
         };
         Relationships: [
           {
@@ -554,6 +560,12 @@ export interface Database {
             foreignKeyName: "usuarios_equipo_id_fkey";
             columns: ["equipo_id"];
             referencedRelation: "equipos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "usuarios_supervisor_id_fkey";
+            columns: ["supervisor_id"];
+            referencedRelation: "usuarios";
             referencedColumns: ["id"];
           },
         ];
@@ -599,6 +611,10 @@ export interface Database {
       is_admin_or_director: {
         Args: Record<string, never>;
         Returns: boolean;
+      };
+      get_supervised_user_ids: {
+        Args: Record<string, never>;
+        Returns: number[];
       };
       can_access_scoped_row: {
         Args: {

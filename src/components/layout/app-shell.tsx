@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase";
 import { normalizeUserRole } from "@/lib/roles";
+import { redirect } from "next/navigation";
 import Sidebar from "./sidebar";
 import Header from "./header";
 import ThemeScript from "./theme-script";
@@ -13,6 +14,8 @@ export default async function AppShell({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
 
   let userName = "Usuario";
   let userEmail: string | null = null;
