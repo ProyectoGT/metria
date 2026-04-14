@@ -44,6 +44,12 @@ function normalizePriority(p: string | null): KanbanPriority {
   return "media";
 }
 
+function normalizeNullablePriority(p: string | null): KanbanPriority | null {
+  if (p === null) return null;
+  if (p === "alta" || p === "media" || p === "baja") return p;
+  return "media";
+}
+
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {

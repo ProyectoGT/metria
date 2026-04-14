@@ -1,0 +1,42 @@
+﻿Ôû▓ Next.js 16.2.3 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+Ô£ô Compiled successfully in 5.6s
+  Running TypeScript ...
+  Finished TypeScript in 4.9s ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/18) ...
+  Generating static pages using 11 workers (4/18) 
+  Generating static pages using 11 workers (8/18) 
+  Generating static pages using 11 workers (13/18) 
+Ô£ô Generating static pages using 11 workers (18/18) in 392ms
+  Finalizing page optimization ...
+
+Route (app)
+Ôöî Ôùï /
+Ôö£ Ôùï /_not-found
+Ôö£ ãÆ /api/google/auth
+Ôö£ ãÆ /api/google/callback
+Ôö£ ãÆ /api/google/disconnect
+Ôö£ ãÆ /api/google/events
+Ôö£ ãÆ /calculadora
+Ôö£ ãÆ /calendario
+Ôö£ ãÆ /cuenta
+Ôö£ ãÆ /dashboard
+Ôö£ ãÆ /desarrollo
+Ôö£ Ôùï /login
+Ôö£ ãÆ /ordenes
+Ôö£ ãÆ /pedidos
+Ôö£ Ôùï /recuperar
+Ôö£ ãÆ /zona
+Ôö£ ãÆ /zona/[zonaId]
+Ôö£ ãÆ /zona/[zonaId]/sector/[sectorId]
+Ôöö ãÆ /zona/[zonaId]/sector/[sectorId]/finca/[fincaId]
+
+
+ãÆ Proxy (Middleware)
+
+Ôùï  (Static)   prerendered as static content
+ãÆ  (Dynamic)  server-rendered on demand
+
