@@ -1,17 +1,23 @@
 import PageHeader from "@/components/layout/page-header";
 import { getConfirmationPasswordStatus } from "@/lib/delete-confirmation-password";
 import { getCurrentUserContext } from "@/lib/current-user";
+import { createClient } from "@/lib/supabase";
 import SecuritySettingsForm from "./security-settings-form";
 
 export default async function CuentaPage() {
+  const supabase = await createClient();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+
+  if (!authUser) {
+    return null;
+  }
+
   const [user, passwordStatus] = await Promise.all([
     getCurrentUserContext(),
     getConfirmationPasswordStatus(),
   ]);
-
-  if (!user) {
-    return null;
-  }
 
   return (
     <>
@@ -25,20 +31,33 @@ export default async function CuentaPage() {
           <h2 className="text-base font-semibold text-text-primary">
             Usuario actual
           </h2>
-          <div className="mt-5 space-y-4">
-            <InfoRow
-              label="Nombre"
-              value={`${user.nombre} ${user.apellidos}`.trim()}
-            />
-            <InfoRow label="Correo" value={user.email ?? "-"} />
-            <InfoRow label="Rango" value={user.role} />
-            <InfoRow label="Puesto actual" value={user.puesto || "-"} />
-          </div>
+          {user ? (
+            <div className="mt-5 space-y-4">
+              <InfoRow
+                label="Nombre"
+                value={`${user.nombre} ${user.apellidos}`.trim() || "-"}
+              />
+              <InfoRow label="Correo" value={user.email ?? authUser.email ?? "-"} />
+              <InfoRow label="Rango" value={user.role} />
+              <InfoRow label="Puesto actual" value={user.puesto || "-"} />
+            </div>
+          ) : (
+            <div className="mt-5 space-y-4">
+              <InfoRow label="Correo" value={authUser.email ?? "-"} />
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="text-xs font-medium text-amber-800">
+                  Tu cuenta de acceso no está vinculada a un perfil de usuario.
+                  Contacta con el administrador para que asocie tu correo en la
+                  tabla de usuarios.
+                </p>
+              </div>
+            </div>
+          )}
         </section>
 
         <SecuritySettingsForm
-          currentRole={user.role}
-          canManageConfirmationPassword={user.canManageConfirmationPassword}
+          currentRole={user?.role ?? "Comercial"}
+          canManageConfirmationPassword={user?.canManageConfirmationPassword ?? false}
           passwordStatus={passwordStatus}
         />
       </div>
