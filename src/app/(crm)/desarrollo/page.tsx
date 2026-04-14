@@ -10,7 +10,7 @@ export default async function DesarrolloPage() {
   const [yo, { data: todosAgentes }, { data: rendimiento }, { count: totalNoticias }] =
     await Promise.all([
       getCurrentUserContext(),
-      supabase.from("usuarios").select("id, nombre, apellidos, puesto").order("nombre"),
+      supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
       supabase.from("rendimiento").select("*").eq("anio", anioActual).eq("mes", 0),
       supabase.from("propiedades").select("*", { count: "exact", head: true }),
     ]);

@@ -26,14 +26,14 @@ export default async function AppShell({
 
     let { data: profile } = await supabase
       .from("usuarios")
-      .select("nombre, apellidos, puesto, rol")
+      .select("nombre, apellidos, rol")
       .eq("auth_id", user.id)
       .maybeSingle();
 
     if (!profile && user.email) {
       const { data: byEmail } = await supabase
         .from("usuarios")
-        .select("nombre, apellidos, puesto, rol")
+        .select("nombre, apellidos, rol")
         .eq("correo", user.email)
         .maybeSingle();
       profile = byEmail;
@@ -42,7 +42,7 @@ export default async function AppShell({
     if (profile) {
       userName = `${profile.nombre} ${profile.apellidos}`.trim() || "Usuario";
       userRole = normalizeUserRole(
-        (profile as { rol?: string | null }).rol ?? profile.puesto
+        (profile as { rol?: string | null }).rol
       );
     }
   }

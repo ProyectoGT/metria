@@ -116,7 +116,7 @@ export default async function DashboardPage() {
     // Agentes y rendimiento (anual: mes=0)
     supabase
       .from("usuarios")
-      .select("id, nombre, apellidos, puesto")
+      .select("id, nombre, apellidos, rol")
       .order("nombre"),
     supabase.from("rendimiento").select("*").eq("anio", anioActual).eq("mes", 0),
 

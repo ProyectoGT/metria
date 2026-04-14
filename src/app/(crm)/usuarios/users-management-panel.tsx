@@ -9,7 +9,6 @@ type ManagedUser = {
   apellidos: string;
   correo: string;
   rol: string;
-  puesto: string;
   estado: string;
   authId: string | null;
 };
@@ -148,7 +147,7 @@ function UserRow({
           <p className="text-sm font-medium text-text-primary">
             {`${user.nombre} ${user.apellidos}`.trim()}
           </p>
-          <p className="text-xs text-text-secondary">{user.puesto}</p>
+          <p className="text-xs text-text-secondary">{user.rol}</p>
         </div>
       </td>
 

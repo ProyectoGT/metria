@@ -38,8 +38,7 @@ export default async function CuentaPage() {
                 value={`${user.nombre} ${user.apellidos}`.trim() || "-"}
               />
               <InfoRow label="Correo" value={user.email ?? authUser.email ?? "-"} />
-              <InfoRow label="Rango" value={user.role} />
-              <InfoRow label="Puesto actual" value={user.puesto || "-"} />
+              <InfoRow label="Rol" value={user.role} />
             </div>
           ) : (
             <div className="mt-5 space-y-4">

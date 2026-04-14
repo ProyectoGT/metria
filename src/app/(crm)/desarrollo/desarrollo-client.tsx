@@ -24,7 +24,7 @@ interface Agente {
   id: number;
   nombre: string;
   apellidos: string;
-  puesto: string;
+  rol: string;
   rendimiento: Rendimiento | null;
 }
 
@@ -279,7 +279,7 @@ export default function DesarrolloClient({
                       <p className="text-sm font-semibold text-text-primary">
                         {agente.nombre} {agente.apellidos}
                       </p>
-                      <p className="text-xs text-text-secondary">{agente.puesto}</p>
+                      <p className="text-xs text-text-secondary">{agente.rol}</p>
                     </div>
                   </div>
                   {canEdit && (

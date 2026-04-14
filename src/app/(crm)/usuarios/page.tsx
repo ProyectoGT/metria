@@ -20,7 +20,7 @@ export default async function UsuariosPage() {
   const supabase = await createClient();
   const usersQuery = supabase
     .from("usuarios")
-    .select("id, nombre, apellidos, correo, rol, puesto, estado, auth_id")
+    .select("id, nombre, apellidos, correo, rol, estado, auth_id")
     .order("rol")
     .order("nombre")
     .order("apellidos");
@@ -40,7 +40,6 @@ export default async function UsuariosPage() {
     apellidos: user.apellidos,
     correo: user.correo,
     rol: user.rol,
-    puesto: user.puesto,
     estado: user.estado,
     authId: user.auth_id,
   }));

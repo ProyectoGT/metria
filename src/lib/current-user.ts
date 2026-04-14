@@ -17,7 +17,6 @@ export type CurrentUserContext = {
   email: string | null;
   nombre: string;
   apellidos: string;
-  puesto: string;
   role: UserRole;
   empresaId: number | null;
   equipoId: number | null;
@@ -45,7 +44,6 @@ export async function getCurrentUserContext(): Promise<CurrentUserContext | null
         id: number;
         nombre: string;
         apellidos: string;
-        puesto: string;
         correo: string;
         auth_id: string | null;
         rol?: string | null;
@@ -56,8 +54,8 @@ export async function getCurrentUserContext(): Promise<CurrentUserContext | null
     | undefined = null;
 
   const profileSelect =
-    "id, nombre, apellidos, puesto, rol, correo, auth_id, empresa_id, equipo_id";
-  const fallbackSelect = "id, nombre, apellidos, puesto, correo, auth_id";
+    "id, nombre, apellidos, rol, correo, auth_id, empresa_id, equipo_id";
+  const fallbackSelect = "id, nombre, apellidos, correo, auth_id";
 
   const byAuthId = await supabase
     .from("usuarios")
@@ -101,7 +99,7 @@ export async function getCurrentUserContext(): Promise<CurrentUserContext | null
     return null;
   }
 
-  const role = normalizeUserRole(profile.rol ?? profile.puesto);
+  const role = normalizeUserRole(profile.rol);
 
   // Para Responsable: obtener IDs de los agentes que supervisa
   let supervisedAgentIds: number[] = [];
@@ -119,7 +117,6 @@ export async function getCurrentUserContext(): Promise<CurrentUserContext | null
     email: user.email ?? profile.correo ?? null,
     nombre: profile.nombre,
     apellidos: profile.apellidos,
-    puesto: profile.puesto,
     role,
     empresaId: profile.empresa_id ?? null,
     equipoId: profile.equipo_id ?? null,
