@@ -1,52 +1,36 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
+// Check session by reading the Supabase auth cookie directly.
+// This avoids any Node.js API usage and is fully Edge Runtime compatible.
+function hasSession(request: NextRequest): boolean {
+  const cookies = request.cookies;
+  // Supabase stores the session in chunked cookies: sb-<ref>-auth-token, sb-<ref>-auth-token.0, etc.
+  return cookies.getAll().some(
+    (c) =>
+      c.name.startsWith("sb-") &&
+      c.name.includes("-auth-token") &&
+      c.value.length > 0
   );
+}
 
-  // getSession() reads the JWT from the cookie without a network call,
-  // making it safe and fast in Edge Runtime.
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
+export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isPublicPage = pathname === "/login" || pathname === "/recuperar";
+  const authenticated = hasSession(request);
 
-  if (!session && !isPublicPage) {
+  if (!authenticated && !isPublicPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (session && isPublicPage) {
+  if (authenticated && isPublicPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
-  return supabaseResponse;
+  return NextResponse.next();
 }
 
 export const config = {
