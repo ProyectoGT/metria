@@ -17,42 +17,55 @@ type Tarea = {
   visibility: string;
 };
 
+type Usuario = {
+  id: number;
+  nombre: string;
+  apellidos: string;
+};
+
 type TareaForm = {
   titulo: string;
   prioridad: string;
   fecha: string;
+  owner_user_id: number | null;
 };
 
 type Props = {
   initialTareas: Tarea[];
-  currentUserId: number | null;
+  currentUserId: number;
   currentUserRole: UserRole | null;
+  usuarios: Usuario[];
 };
 
 const PRIORIDADES = ["alta", "media", "baja"];
 
-function emptyForm(): TareaForm {
+function emptyForm(defaultOwnerId: number | null): TareaForm {
   return {
     titulo: "",
     prioridad: "media",
     fecha: new Date().toISOString().slice(0, 10),
+    owner_user_id: defaultOwnerId,
   };
 }
 
-function canDeleteTarea(
-  tarea: Pick<Tarea, "owner_user_id">,
-  currentUserId: number | null,
-  currentUserRole: UserRole | null
-): boolean {
+/** Solo Admin, Director y Responsable pueden crear tareas para otros usuarios */
+function canCreateForOthers(role: UserRole | null): boolean {
+  if (!role) return false;
+  return role === "Administrador" || role === "Director" || role === "Responsable";
+}
+
+/**
+ * Puede eliminar si:
+ * - Admin / Director / Responsable → siempre
+ * - Agente → nunca
+ */
+function canDeleteTarea(currentUserRole: UserRole | null): boolean {
   if (!currentUserRole) return false;
-  if (currentUserRole === "Agente") return false;
-  if (
+  return (
     currentUserRole === "Administrador" ||
     currentUserRole === "Director" ||
     currentUserRole === "Responsable"
-  )
-    return true;
-  return tarea.owner_user_id === currentUserId;
+  );
 }
 
 const PRIORIDAD_BADGE: Record<string, string> = {
@@ -71,24 +84,50 @@ function formatFecha(fecha: string): string {
   });
 }
 
+function nombreCompleto(u: Usuario) {
+  return `${u.nombre} ${u.apellidos}`.trim();
+}
+
 export default function OrdenesClient({
   initialTareas,
   currentUserId,
   currentUserRole,
+  usuarios,
 }: Props) {
   const supabase = createClient();
   const { toast: showToast, toasts } = useToast();
 
   const [tareas, setTareas] = useState<Tarea[]>(initialTareas);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState<TareaForm>(emptyForm());
+  const [form, setForm] = useState<TareaForm>(emptyForm(currentUserId));
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  // Agrupar tareas por fecha
+  // Filtro activo: null = todas, número = solo las de ese usuario
+  const [filterUserId, setFilterUserId] = useState<number | null>(null);
+
+  const multiUser = usuarios.length > 1 && canCreateForOthers(currentUserRole);
+
+  // Mapa id → nombre para renderizar en cada tarea
+  const userMap = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const u of usuarios) m.set(u.id, nombreCompleto(u));
+    return m;
+  }, [usuarios]);
+
+  // Tareas filtradas según el selector
+  const tareasFiltradas = useMemo(
+    () =>
+      filterUserId === null
+        ? tareas
+        : tareas.filter((t) => t.owner_user_id === filterUserId),
+    [tareas, filterUserId]
+  );
+
+  // Agrupar por fecha
   const grouped = useMemo(() => {
     const map = new Map<string, Tarea[]>();
-    for (const t of tareas) {
+    for (const t of tareasFiltradas) {
       const key = t.fecha ?? "sin-fecha";
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(t);
@@ -100,12 +139,17 @@ export default function OrdenesClient({
         return a.localeCompare(b);
       })
     );
-  }, [tareas]);
+  }, [tareasFiltradas]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!form.titulo.trim()) return;
     setSaving(true);
+
+    const ownerId = canCreateForOthers(currentUserRole)
+      ? (form.owner_user_id ?? currentUserId)
+      : currentUserId;
+
     const { data, error } = await supabase
       .from("tareas")
       .insert({
@@ -114,6 +158,7 @@ export default function OrdenesClient({
         fecha: form.fecha,
         estado: "pendiente",
         visibility: "private",
+        owner_user_id: ownerId,
       })
       .select()
       .single();
@@ -125,7 +170,7 @@ export default function OrdenesClient({
     }
     setTareas((prev) => [data as Tarea, ...prev]);
     setShowModal(false);
-    setForm(emptyForm());
+    setForm(emptyForm(currentUserId));
     showToast("Tarea creada", "success");
   }
 
@@ -164,14 +209,45 @@ export default function OrdenesClient({
     <div className="space-y-6">
       <Toaster toasts={toasts} />
 
-      {/* Botón nueva tarea */}
-      <div className="flex justify-end">
+      {/* Barra superior: filtro de usuario + botón nueva tarea */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Filtro por usuario (solo si hay múltiples) */}
+        {multiUser && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setFilterUserId(null)}
+              className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                filterUserId === null
+                  ? "bg-primary text-white"
+                  : "bg-background border border-border text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              Todos
+            </button>
+            {usuarios.map((u) => (
+              <button
+                key={u.id}
+                onClick={() =>
+                  setFilterUserId(filterUserId === u.id ? null : u.id)
+                }
+                className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                  filterUserId === u.id
+                    ? "bg-primary text-white"
+                    : "bg-background border border-border text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {nombreCompleto(u)}
+              </button>
+            ))}
+          </div>
+        )}
+
         <button
           onClick={() => {
-            setForm(emptyForm());
+            setForm(emptyForm(currentUserId));
             setShowModal(true);
           }}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+          className="ml-auto rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
         >
           + Nueva tarea
         </button>
@@ -199,24 +275,32 @@ export default function OrdenesClient({
                     type="checkbox"
                     checked={tarea.estado === "completada"}
                     onChange={() => handleToggle(tarea)}
-                    className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
+                    className="h-4 w-4 rounded border-border accent-primary cursor-pointer shrink-0"
                   />
 
-                  {/* Título */}
-                  <span
-                    className={`flex-1 text-sm ${
-                      tarea.estado === "completada"
-                        ? "line-through text-text-secondary"
-                        : "text-text-primary"
-                    }`}
-                  >
-                    {tarea.titulo}
-                  </span>
+                  {/* Título + dueño */}
+                  <div className="flex-1 min-w-0">
+                    <span
+                      className={`block text-sm truncate ${
+                        tarea.estado === "completada"
+                          ? "line-through text-text-secondary"
+                          : "text-text-primary"
+                      }`}
+                    >
+                      {tarea.titulo}
+                    </span>
+                    {/* Mostrar propietario si hay múltiples usuarios visibles */}
+                    {multiUser && tarea.owner_user_id && (
+                      <span className="text-xs text-text-secondary">
+                        {userMap.get(tarea.owner_user_id) ?? "—"}
+                      </span>
+                    )}
+                  </div>
 
                   {/* Badge prioridad */}
                   {tarea.prioridad && (
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
                         PRIORIDAD_BADGE[tarea.prioridad] ?? ""
                       }`}
                     >
@@ -225,11 +309,11 @@ export default function OrdenesClient({
                   )}
 
                   {/* Botón eliminar */}
-                  {canDeleteTarea(tarea, currentUserId, currentUserRole) && (
+                  {canDeleteTarea(currentUserRole) && (
                     <button
                       onClick={() => handleDelete(tarea.id)}
                       disabled={deletingId === tarea.id}
-                      className="ml-1 rounded p-1 text-text-secondary hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                      className="ml-1 shrink-0 rounded p-1 text-text-secondary hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                       title="Eliminar tarea"
                     >
                       {deletingId === tarea.id ? (
@@ -266,6 +350,31 @@ export default function OrdenesClient({
               Nueva tarea
             </h2>
             <form onSubmit={handleCreate} className="space-y-4">
+              {/* Asignar a (solo si puede crear para otros) */}
+              {canCreateForOthers(currentUserRole) && usuarios.length > 1 && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-text-primary">
+                    Asignar a
+                  </label>
+                  <select
+                    value={form.owner_user_id ?? currentUserId}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        owner_user_id: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    {usuarios.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {nombreCompleto(u)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="mb-1 block text-sm font-medium text-text-primary">
                   Título <span className="text-red-500">*</span>
@@ -278,6 +387,7 @@ export default function OrdenesClient({
                   }
                   placeholder="Ej: Llamar a cliente García"
                   required
+                  autoFocus
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>

@@ -514,7 +514,6 @@ export interface Database {
           id: number;
           nombre: string;
           apellidos: string;
-          puesto: string;
           rol: string;
           correo: string;
           auth_id: string | null;
@@ -527,7 +526,6 @@ export interface Database {
           id?: number;
           nombre: string;
           apellidos: string;
-          puesto?: string;
           rol?: string;
           correo: string;
           auth_id?: string | null;
@@ -540,7 +538,6 @@ export interface Database {
           id?: number;
           nombre?: string;
           apellidos?: string;
-          puesto?: string;
           rol?: string;
           correo?: string;
           auth_id?: string | null;

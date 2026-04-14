@@ -9,7 +9,6 @@ type CreateUserInput = {
   nombre: string;
   apellidos: string;
   correo: string;
-  puesto: string;
   rol: string;
   password: string;
   confirmPassword: string;
@@ -78,7 +77,7 @@ async function getManagedUserTarget(
   const adminClient = createAdminClient();
   const target = await adminClient
     .from("usuarios")
-    .select("id, nombre, apellidos, correo, rol, puesto, estado, auth_id, empresa_id")
+    .select("id, nombre, apellidos, correo, rol, estado, auth_id, empresa_id")
     .eq("id", userId)
     .maybeSingle();
 
@@ -117,7 +116,6 @@ export async function createCrmUserAction(
   const apellidos = input.apellidos.trim();
   const correo = input.correo.trim().toLowerCase();
   const rol = input.rol.trim();
-  const puesto = input.puesto.trim() || rol;
   const password = input.password;
   const confirmPassword = input.confirmPassword;
 
@@ -172,7 +170,6 @@ export async function createCrmUserAction(
     user_metadata: {
       nombre,
       apellidos,
-      puesto,
       rol,
     },
   });
@@ -189,7 +186,6 @@ export async function createCrmUserAction(
   const profilePayload = {
     nombre,
     apellidos,
-    puesto,
     rol,
     correo,
     auth_id: authUserId,
@@ -278,7 +274,6 @@ export async function updateUserRoleAction(input: {
     .from("usuarios")
     .update({
       rol: nextRole,
-      puesto: nextRole,
     })
     .eq("id", input.userId);
 

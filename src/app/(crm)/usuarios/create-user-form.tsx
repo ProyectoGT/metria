@@ -11,7 +11,6 @@ const initialForm = {
   nombre: "",
   apellidos: "",
   correo: "",
-  puesto: "",
   rol: "Agente",
   password: "",
   confirmPassword: "",
@@ -22,8 +21,6 @@ export default function CreateUserForm({ roles }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  const effectivePuesto = form.puesto.trim() || form.rol;
 
   function updateField<K extends keyof typeof initialForm>(
     key: K,
@@ -79,7 +76,7 @@ export default function CreateUserForm({ roles }: Props) {
             <StatCard
               label="Rango inicial"
               value={form.rol}
-              description={`Puesto efectivo: ${effectivePuesto}`}
+              description="Rol asignado al crear la cuenta."
             />
           </div>
         </div>
@@ -134,35 +131,21 @@ export default function CreateUserForm({ roles }: Props) {
 
             <FormBlock
               title="Permisos"
-              description="Rango y puesto operativo del nuevo usuario."
+              description="Rol del nuevo usuario dentro del CRM."
             >
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <Field label="Rango">
-                  <select
-                    value={form.rol}
-                    onChange={(event) => updateField("rol", event.target.value)}
-                    className="input"
-                  >
-                    {roles.map((role) => (
-                      <option key={role} value={role}>
-                        {role}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field
-                  label="Puesto"
-                  hint="Si lo dejas vacio, usaremos el mismo valor que el rango."
+              <Field label="Rango">
+                <select
+                  value={form.rol}
+                  onChange={(event) => updateField("rol", event.target.value)}
+                  className="input"
                 >
-                  <input
-                    value={form.puesto}
-                    onChange={(event) => updateField("puesto", event.target.value)}
-                    className="input"
-                    placeholder={form.rol}
-                  />
-                </Field>
-              </div>
+                  {roles.map((role) => (
+                    <option key={role} value={role}>
+                      {role}
+                    </option>
+                  ))}
+                </select>
+              </Field>
 
               <div className="grid gap-3 md:grid-cols-3">
                 <RoleInfo
@@ -230,7 +213,6 @@ export default function CreateUserForm({ roles }: Props) {
               </p>
               <dl className="mt-4 space-y-3">
                 <SummaryRow label="Rango" value={form.rol} />
-                <SummaryRow label="Puesto" value={effectivePuesto} />
                 <SummaryRow
                   label="Estado inicial"
                   value="Activo"
