@@ -25,20 +25,22 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // getSession() reads the JWT from the cookie without a network call,
+  // making it safe and fast in Edge Runtime.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
   const pathname = request.nextUrl.pathname;
   const isPublicPage = pathname === "/login" || pathname === "/recuperar";
 
-  if (!user && !isPublicPage) {
+  if (!session && !isPublicPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && isPublicPage) {
+  if (session && isPublicPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
