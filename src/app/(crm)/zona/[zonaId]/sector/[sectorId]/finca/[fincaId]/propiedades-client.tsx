@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deletePropiedadAction } from "@/app/actions/security";
+import { createTareaAction } from "@/app/(crm)/dashboard/actions";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase-browser";
@@ -26,6 +28,8 @@ type Propiedad = {
   agente_asignado: number | null;
   finca_id: number | null;
   usuarios: { id: number; nombre: string; apellidos: string } | null;
+  // Orden local (no en BD, solo para UI)
+  _order?: number;
 };
 
 type FormData = {
@@ -37,6 +41,12 @@ type FormData = {
   fecha_visita: string;
   notas: string;
   agente_asignado: string;
+};
+
+type ReminderForm = {
+  fecha: string;
+  hora: string;
+  nota: string;
 };
 
 const ESTADOS = [
@@ -55,6 +65,9 @@ const ESTADOS = [
   { value: "encargo", label: "Encargo", classes: "bg-green-100 text-green-700" },
 ] as const;
 
+// Estados que se consideran "sin contactar" (pendientes)
+const ESTADOS_SIN_CONTACTAR = ["neutral", "investigacion"];
+
 function estadoClasses(estado: string | null) {
   const found = ESTADOS.find((item) => item.value === estado);
   return found?.classes ?? "bg-gray-100 text-gray-500";
@@ -71,6 +84,12 @@ function isOverdue(fechaVisita: string | null): boolean {
   return diffMs > 90 * 24 * 60 * 60 * 1000;
 }
 
+function isPendienteContactar(propiedad: Propiedad): boolean {
+  const sinEstado = !propiedad.estado || ESTADOS_SIN_CONTACTAR.includes(propiedad.estado);
+  const sinVisita = !propiedad.fecha_visita;
+  return sinEstado && sinVisita;
+}
+
 const EMPTY_FORM: FormData = {
   planta: "",
   puerta: "",
@@ -80,6 +99,12 @@ const EMPTY_FORM: FormData = {
   fecha_visita: "",
   notas: "",
   agente_asignado: "",
+};
+
+const EMPTY_REMINDER: ReminderForm = {
+  fecha: "",
+  hora: "",
+  nota: "",
 };
 
 export default function PropiedadesClient({
@@ -93,7 +118,9 @@ export default function PropiedadesClient({
   agentes: Agente[];
   canDeletePropiedades: boolean;
 }) {
-  const [propiedades, setPropiedades] = useState<Propiedad[]>(initialPropiedades);
+  const [propiedades, setPropiedades] = useState<Propiedad[]>(
+    initialPropiedades.map((p, i) => ({ ...p, _order: i }))
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Propiedad | null>(null);
   const [encargoPropiedad, setEncargoPropiedad] = useState<Propiedad | null>(null);
@@ -105,9 +132,28 @@ export default function PropiedadesClient({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletePassword, setDeletePassword] = useState("");
 
+  // Filtro pendientes
+  const [filtroPendientes, setFiltroPendientes] = useState(false);
+
+  // Recordatorio modal
+  const [reminderPropiedad, setReminderPropiedad] = useState<Propiedad | null>(null);
+  const [reminderForm, setReminderForm] = useState<ReminderForm>(EMPTY_REMINDER);
+  const [reminderSaving, setReminderSaving] = useState(false);
+
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const { toasts, toast } = useToast();
+
+  // Propiedades filtradas
+  const propiedadesFiltradas = filtroPendientes
+    ? propiedades.filter(isPendienteContactar)
+    : propiedades;
+
+  // Cuántas están pendientes de contactar (para badge del filtro)
+  const pendientesCount = propiedades.filter(isPendienteContactar).length;
+
+  // Cuántas tienen overdue 90 días
+  const overdueCount = propiedades.filter((p) => isOverdue(p.fecha_visita)).length;
 
   function openCreate() {
     setEditTarget(null);
@@ -142,6 +188,49 @@ export default function PropiedadesClient({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function openReminder(propiedad: Propiedad) {
+    setReminderPropiedad(propiedad);
+    // Si tiene visita, precarga la fecha + 90 días como sugerencia
+    if (propiedad.fecha_visita) {
+      const suggested = new Date(propiedad.fecha_visita);
+      suggested.setDate(suggested.getDate() + 90);
+      const yyyy = suggested.getFullYear();
+      const mm = String(suggested.getMonth() + 1).padStart(2, "0");
+      const dd = String(suggested.getDate()).padStart(2, "0");
+      setReminderForm({ fecha: `${yyyy}-${mm}-${dd}`, hora: "10:00", nota: "" });
+    } else {
+      setReminderForm(EMPTY_REMINDER);
+    }
+  }
+
+  function closeReminder() {
+    setReminderPropiedad(null);
+    setReminderForm(EMPTY_REMINDER);
+  }
+
+  async function handleSaveReminder() {
+    if (!reminderPropiedad || !reminderForm.fecha) return;
+    setReminderSaving(true);
+
+    const fechaHora = reminderForm.hora
+      ? `${reminderForm.fecha}T${reminderForm.hora}:00`
+      : `${reminderForm.fecha}T09:00:00`;
+
+    const propDesc = reminderPropiedad.propietario
+      ?? `Planta ${reminderPropiedad.planta ?? "-"} Puerta ${reminderPropiedad.puerta ?? "-"}`;
+    const notaSufijo = reminderForm.nota ? ` — ${reminderForm.nota}` : "";
+    const titulo = `Recordatorio: ${propDesc}${notaSufijo}`.slice(0, 200);
+
+    try {
+      await createTareaAction({ titulo, prioridad: "media", fecha: fechaHora });
+      toast("Recordatorio creado — aparecera en notificaciones");
+      closeReminder();
+    } catch (err) {
+      toast(`Error al crear recordatorio: ${err instanceof Error ? err.message : "Error desconocido"}`, "error");
+    }
+    setReminderSaving(false);
+  }
+
   async function handleSave() {
     setSaving(true);
     setSaveError(null);
@@ -174,7 +263,9 @@ export default function PropiedadesClient({
       if (data) {
         setPropiedades((prev) =>
           prev.map((propiedad) =>
-            propiedad.id === editTarget.id ? (data as Propiedad) : propiedad
+            propiedad.id === editTarget.id
+              ? { ...(data as Propiedad), _order: propiedad._order }
+              : propiedad
           )
         );
         toast("Propiedad actualizada correctamente");
@@ -193,7 +284,8 @@ export default function PropiedadesClient({
       }
 
       if (data) {
-        setPropiedades((prev) => [...prev, data as Propiedad]);
+        const newOrder = propiedades.length;
+        setPropiedades((prev) => [...prev, { ...(data as Propiedad), _order: newOrder }]);
         toast("Propiedad creada correctamente");
       }
     }
@@ -226,6 +318,47 @@ export default function PropiedadesClient({
     toast("Propiedad eliminada");
   }
 
+  function handleDragEnd(result: DropResult) {
+    const { source, destination } = result;
+    if (!destination) return;
+    if (source.index === destination.index) return;
+
+    // Reordenar dentro de la lista filtrada o completa
+    const lista = filtroPendientes ? propiedadesFiltradas : propiedades;
+    const ids = lista.map((p) => p.id);
+    const reordered = [...ids];
+    const [moved] = reordered.splice(source.index, 1);
+    reordered.splice(destination.index, 0, moved);
+
+    // Reconstruir el orden completo
+    setPropiedades((prev) => {
+      const orderMap = new Map<number, number>();
+      reordered.forEach((id, idx) => orderMap.set(id, idx));
+
+      if (filtroPendientes) {
+        // Mantener el orden de los no-filtrados intercalado
+        const allIds = prev.map((p) => p.id);
+        const newOrder: Propiedad[] = [];
+        let filtIdx = 0;
+        for (const id of allIds) {
+          const p = prev.find((x) => x.id === id)!;
+          if (isPendienteContactar(p)) {
+            const newId = reordered[filtIdx++];
+            newOrder.push(prev.find((x) => x.id === newId)!);
+          } else {
+            newOrder.push(p);
+          }
+        }
+        return newOrder.map((p, i) => ({ ...p, _order: i }));
+      } else {
+        return reordered.map((id, idx) => ({
+          ...prev.find((p) => p.id === id)!,
+          _order: idx,
+        }));
+      }
+    });
+  }
+
   return (
     <>
       <div className="mb-4 flex items-center justify-between">
@@ -251,9 +384,70 @@ export default function PropiedadesClient({
             </svg>
           </button>
           <p className="text-sm text-text-secondary">
-            {propiedades.length}{" "}
-            {propiedades.length === 1 ? "propiedad" : "propiedades"}
+            {propiedadesFiltradas.length}{" "}
+            {propiedadesFiltradas.length === 1 ? "propiedad" : "propiedades"}
+            {filtroPendientes && propiedades.length !== propiedadesFiltradas.length && (
+              <span className="ml-1 text-text-secondary">
+                de {propiedades.length}
+              </span>
+            )}
           </p>
+
+          {/* Filtro pendientes de contactar */}
+          {pendientesCount > 0 && (
+            <button
+              onClick={() => setFiltroPendientes((v) => !v)}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                filtroPendientes
+                  ? "bg-amber-500 text-white"
+                  : "bg-amber-100 text-amber-700 hover:bg-amber-200"
+              }`}
+              title="Propiedades sin estado de seguimiento ni visita registrada"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-3.5 w-3.5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Pendientes de contactar
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${
+                  filtroPendientes ? "bg-white/30 text-white" : "bg-amber-200 text-amber-800"
+                }`}
+              >
+                {pendientesCount}
+              </span>
+            </button>
+          )}
+
+          {/* Aviso overdue 90 días */}
+          {overdueCount > 0 && (
+            <span
+              className="flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700"
+              title="Propiedades con mas de 90 dias sin visita"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-3.5 w-3.5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              {overdueCount} sin visita +90d
+            </span>
+          )}
         </div>
         <button
           onClick={openCreate}
@@ -263,21 +457,37 @@ export default function PropiedadesClient({
         </button>
       </div>
 
-      {propiedades.length === 0 ? (
+      {propiedadesFiltradas.length === 0 ? (
         <div className="rounded-xl border border-border bg-surface py-16 text-center">
-          <p className="text-text-secondary">No hay propiedades registradas.</p>
-          <button
-            onClick={openCreate}
-            className="mt-4 text-sm font-medium text-primary hover:underline"
-          >
-            Anadir la primera propiedad
-          </button>
+          <p className="text-text-secondary">
+            {filtroPendientes
+              ? "No hay propiedades pendientes de contactar."
+              : "No hay propiedades registradas."}
+          </p>
+          {!filtroPendientes && (
+            <button
+              onClick={openCreate}
+              className="mt-4 text-sm font-medium text-primary hover:underline"
+            >
+              Anadir la primera propiedad
+            </button>
+          )}
+          {filtroPendientes && (
+            <button
+              onClick={() => setFiltroPendientes(false)}
+              className="mt-4 text-sm font-medium text-primary hover:underline"
+            >
+              Ver todas las propiedades
+            </button>
+          )}
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-background">
+                {/* Columna drag handle */}
+                <th className="w-8 px-2 py-3" />
                 <th className="px-4 py-3 text-left font-medium text-text-secondary">
                   Planta
                 </th>
@@ -302,115 +512,287 @@ export default function PropiedadesClient({
                 <th className="px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {propiedades.map((propiedad) => {
-                const overdue = isOverdue(propiedad.fecha_visita);
-                const isEncargo = propiedad.estado === "encargo";
-
-                return (
-                  <tr
-                    key={propiedad.id}
-                    className={`transition-colors hover:bg-background ${isEncargo ? "bg-green-50/40 dark:bg-green-950/10" : ""}`}
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Droppable droppableId="propiedades-table" direction="vertical">
+                {(provided) => (
+                  <tbody
+                    className="divide-y divide-border"
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
                   >
-                    <td className="px-4 py-3 text-text-primary">
-                      {propiedad.planta ?? "-"}
-                    </td>
-                    <td className="px-4 py-3 text-text-primary">
-                      {propiedad.puerta ?? "-"}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-text-primary">
-                      {propiedad.propietario ?? "-"}
-                    </td>
-                    <td className="px-4 py-3 text-text-secondary">
-                      {propiedad.telefono ?? "-"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {propiedad.estado ? (
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${estadoClasses(propiedad.estado)}`}
+                    {propiedadesFiltradas.map((propiedad, index) => {
+                      const overdue = isOverdue(propiedad.fecha_visita);
+                      const isEncargo = propiedad.estado === "encargo";
+                      const pendiente = isPendienteContactar(propiedad);
+
+                      return (
+                        <Draggable
+                          key={propiedad.id}
+                          draggableId={String(propiedad.id)}
+                          index={index}
                         >
-                          {estadoLabel(propiedad.estado)}
-                        </span>
-                      ) : (
-                        <span className="text-text-secondary">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        {overdue && (
-                          <span
-                            title="Han pasado mas de 90 dias desde la ultima visita"
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-3 w-3"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
+                          {(dragProvided, dragSnapshot) => (
+                            <tr
+                              ref={dragProvided.innerRef}
+                              {...dragProvided.draggableProps}
+                              className={`transition-colors hover:bg-background ${
+                                isEncargo ? "bg-green-50/40 dark:bg-green-950/10" : ""
+                              } ${pendiente && !filtroPendientes ? "bg-amber-50/30 dark:bg-amber-950/10" : ""} ${
+                                dragSnapshot.isDragging ? "opacity-90 shadow-lg" : ""
+                              }`}
                             >
-                              <path
-                                fillRule="evenodd"
-                                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                          </span>
-                        )}
-                        <span
-                          className={
-                            overdue
-                              ? "font-medium text-amber-600"
-                              : "text-text-secondary"
-                          }
-                        >
-                          {propiedad.fecha_visita
-                            ? new Date(propiedad.fecha_visita).toLocaleDateString(
-                                "es-ES"
-                              )
-                            : "-"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-text-secondary">
-                      {propiedad.usuarios
-                        ? `${propiedad.usuarios.nombre} ${propiedad.usuarios.apellidos}`
-                        : "-"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
-                        {isEncargo && (
-                          <button
-                            onClick={() => setEncargoPropiedad(propiedad)}
-                            className="rounded px-2 py-1 text-xs font-semibold text-green-700 transition-colors hover:bg-green-50"
-                          >
-                            Ver encargo
-                          </button>
-                        )}
-                        <button
-                          onClick={() => openEdit(propiedad)}
-                          className="rounded px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-blue-50"
-                        >
-                          Editar
-                        </button>
-                        {canDeletePropiedades && (
-                          <button
-                            onClick={() => {
-                              setDeleteError(null);
-                              setDeletePassword("");
-                              setDeleteId(propiedad.id);
-                            }}
-                            className="rounded px-2 py-1 text-xs font-medium text-danger transition-colors hover:bg-red-50"
-                          >
-                            Eliminar
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
+                              {/* Drag handle */}
+                              <td className="w-8 px-2 py-3">
+                                <div
+                                  {...dragProvided.dragHandleProps}
+                                  className="flex cursor-grab items-center justify-center text-text-secondary opacity-30 hover:opacity-70 active:cursor-grabbing"
+                                  title="Arrastrar para reordenar"
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-4 w-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M4 8h16M4 16h16"
+                                    />
+                                  </svg>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-text-primary">
+                                {propiedad.planta ?? "-"}
+                              </td>
+                              <td className="px-4 py-3 text-text-primary">
+                                {propiedad.puerta ?? "-"}
+                              </td>
+                              <td className="px-4 py-3 font-medium text-text-primary">
+                                {propiedad.propietario ?? "-"}
+                              </td>
+                              <td className="px-4 py-3 text-text-secondary">
+                                {propiedad.telefono ?? "-"}
+                              </td>
+                              <td className="px-4 py-3">
+                                {propiedad.estado ? (
+                                  <span
+                                    className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${estadoClasses(propiedad.estado)}`}
+                                  >
+                                    {estadoLabel(propiedad.estado)}
+                                  </span>
+                                ) : (
+                                  <span className="text-text-secondary">-</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-1.5">
+                                  {overdue && (
+                                    <span
+                                      title="Han pasado mas de 90 dias desde la ultima visita"
+                                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600"
+                                    >
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className="h-3 w-3"
+                                        viewBox="0 0 20 20"
+                                        fill="currentColor"
+                                      >
+                                        <path
+                                          fillRule="evenodd"
+                                          d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                                          clipRule="evenodd"
+                                        />
+                                      </svg>
+                                    </span>
+                                  )}
+                                  <span
+                                    className={
+                                      overdue
+                                        ? "font-medium text-amber-600"
+                                        : "text-text-secondary"
+                                    }
+                                  >
+                                    {propiedad.fecha_visita
+                                      ? new Date(propiedad.fecha_visita).toLocaleDateString(
+                                          "es-ES"
+                                        )
+                                      : "-"}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-text-secondary">
+                                {propiedad.usuarios
+                                  ? `${propiedad.usuarios.nombre} ${propiedad.usuarios.apellidos}`
+                                  : "-"}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center justify-end gap-2">
+                                  {/* Botón recordatorio */}
+                                  <button
+                                    onClick={() => openReminder(propiedad)}
+                                    className="rounded px-2 py-1 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-primary"
+                                    title="Crear recordatorio o cita para esta propiedad"
+                                  >
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      className="h-3.5 w-3.5"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                                      />
+                                    </svg>
+                                  </button>
+                                  {isEncargo && (
+                                    <button
+                                      onClick={() => setEncargoPropiedad(propiedad)}
+                                      className="rounded px-2 py-1 text-xs font-semibold text-green-700 transition-colors hover:bg-green-50"
+                                    >
+                                      Ver encargo
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => openEdit(propiedad)}
+                                    className="rounded px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-blue-50"
+                                  >
+                                    Editar
+                                  </button>
+                                  {canDeletePropiedades && (
+                                    <button
+                                      onClick={() => {
+                                        setDeleteError(null);
+                                        setDeletePassword("");
+                                        setDeleteId(propiedad.id);
+                                      }}
+                                      className="rounded px-2 py-1 text-xs font-medium text-danger transition-colors hover:bg-red-50"
+                                    >
+                                      Eliminar
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Draggable>
+                      );
+                    })}
+                    {provided.placeholder}
+                  </tbody>
+                )}
+              </Droppable>
+            </DragDropContext>
           </table>
+        </div>
+      )}
+
+      {/* Modal recordatorio */}
+      {reminderPropiedad && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <div>
+                <h2 className="text-base font-semibold text-text-primary">
+                  Recordatorio / Cita
+                </h2>
+                <p className="mt-0.5 text-xs text-text-secondary">
+                  {reminderPropiedad.propietario ?? `Planta ${reminderPropiedad.planta ?? "-"} Puerta ${reminderPropiedad.puerta ?? "-"}`}
+                </p>
+              </div>
+              <button
+                onClick={closeReminder}
+                className="text-text-secondary transition-colors hover:text-text-primary"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              {isOverdue(reminderPropiedad.fecha_visita) && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span>
+                    Han pasado mas de 90 dias desde la ultima visita. La fecha sugerida es
+                    a los 90 dias de la ultima visita.
+                  </span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Fecha *">
+                  <input
+                    type="date"
+                    value={reminderForm.fecha}
+                    onChange={(e) =>
+                      setReminderForm((prev) => ({ ...prev, fecha: e.target.value }))
+                    }
+                    className="input"
+                  />
+                </FormField>
+                <FormField label="Hora">
+                  <input
+                    type="time"
+                    value={reminderForm.hora}
+                    onChange={(e) =>
+                      setReminderForm((prev) => ({ ...prev, hora: e.target.value }))
+                    }
+                    className="input"
+                  />
+                </FormField>
+              </div>
+
+              <FormField label="Nota (opcional)">
+                <textarea
+                  value={reminderForm.nota}
+                  onChange={(e) =>
+                    setReminderForm((prev) => ({ ...prev, nota: e.target.value }))
+                  }
+                  placeholder="Motivo de la cita o recordatorio..."
+                  rows={2}
+                  className="input resize-none"
+                />
+              </FormField>
+
+              <p className="text-xs text-text-secondary">
+                El recordatorio aparecera como tarea pendiente en el icono de notificaciones
+                de la barra superior.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+              <button
+                onClick={closeReminder}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveReminder}
+                disabled={reminderSaving || !reminderForm.fecha}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
+              >
+                {reminderSaving ? "Guardando..." : "Crear recordatorio"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

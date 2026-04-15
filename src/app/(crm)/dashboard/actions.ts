@@ -32,17 +32,22 @@ export async function createTareaAction(data: {
   return { id: row.id };
 }
 
-// ─── Completar tarea ──────────────────────────────────────────────────────────
+// ─── Cambiar estado de tarea ──────────────────────────────────────────────────
 
-export async function completeTareaAction(id: number): Promise<void> {
+export async function updateTareaEstadoAction(
+  id: number,
+  estado: "pendiente" | "en_progreso" | "completado",
+): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("tareas")
-    .update({ estado: "completada" })
-    .eq("id", id);
-
+  const { error } = await supabase.from("tareas").update({ estado }).eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
+}
+
+// ─── Completar tarea (alias para compatibilidad) ──────────────────────────────
+
+export async function completeTareaAction(id: number): Promise<void> {
+  return updateTareaEstadoAction(id, "completado");
 }
 
 // ─── Eliminar tarea ───────────────────────────────────────────────────────────

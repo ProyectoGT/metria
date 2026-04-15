@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
+import { getCurrentUserContext } from "@/lib/current-user";
 import PageHeader from "@/components/layout/page-header";
 import CalendarioClient from "./calendario-client";
 
@@ -11,15 +12,27 @@ export default async function CalendarioPage() {
   );
 
   const supabase = await createClient();
-  const { data: events } = await supabase
-    .from("agenda")
-    .select("*")
-    .order("event_date", { ascending: true });
+  const yo = await getCurrentUserContext();
+  const userId = yo?.id ?? 0;
+
+  const [{ data: events }, { data: tareas }] = await Promise.all([
+    supabase.from("agenda").select("*").order("event_date", { ascending: true }),
+    supabase
+      .from("tareas")
+      .select("id, titulo, prioridad, fecha, estado")
+      .eq("owner_user_id", userId)
+      .not("fecha", "is", null)
+      .order("fecha", { ascending: true }),
+  ]);
 
   return (
     <>
       <PageHeader title="Calendario" description="Gestiona tu agenda y actividades" />
-      <CalendarioClient initialEvents={events ?? []} isConnected={isConnected} />
+      <CalendarioClient
+        initialEvents={events ?? []}
+        initialTareas={tareas ?? []}
+        isConnected={isConnected}
+      />
     </>
   );
 }

@@ -8,14 +8,27 @@ import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog
 import { useToast, Toaster } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase-browser";
 
+type PropiedadResumen = {
+  id: number;
+  estado: string | null;
+  fecha_visita: string | null;
+};
+
 type Sector = {
   id: number;
   numero: number;
   fincas: Array<{
     id: number;
-    propiedades: Array<{ id: number }>;
+    propiedades: PropiedadResumen[];
   }>;
 };
+
+// Una propiedad se considera "contactada" si tiene estado distinto de neutral/null o tiene fecha de visita
+function estaContactada(p: PropiedadResumen): boolean {
+  const tieneEstadoActivo =
+    p.estado !== null && p.estado !== "neutral" && p.estado !== "investigacion";
+  return tieneEstadoActivo || !!p.fecha_visita;
+}
 
 type Props = {
   zonaId: number;
@@ -176,17 +189,23 @@ export default function SectoresClient({
                 <th className="w-32 px-5 py-3 text-center font-medium text-text-secondary">
                   Propiedades
                 </th>
+                <th className="w-44 px-5 py-3 text-center font-medium text-text-secondary">
+                  Contactados
+                </th>
                 <th className="w-12 px-5 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {sectores.map((sector) => {
                 const fincaCount = sector.fincas?.length ?? 0;
-                const propiedadCount =
-                  sector.fincas?.reduce(
-                    (acc, finca) => acc + (finca.propiedades?.length ?? 0),
-                    0
-                  ) ?? 0;
+                const todasPropiedades: PropiedadResumen[] =
+                  sector.fincas?.flatMap((f) => f.propiedades ?? []) ?? [];
+                const propiedadCount = todasPropiedades.length;
+                const contactadasCount = todasPropiedades.filter(estaContactada).length;
+                const pct =
+                  propiedadCount > 0
+                    ? Math.round((contactadasCount / propiedadCount) * 100)
+                    : null;
 
                 return (
                   <tr
@@ -202,6 +221,37 @@ export default function SectoresClient({
                     </td>
                     <td className="w-32 px-5 py-3.5 text-center text-text-secondary">
                       {propiedadCount}
+                    </td>
+                    <td className="w-44 px-5 py-3.5">
+                      {pct === null ? (
+                        <span className="block text-center text-text-secondary">-</span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 overflow-hidden rounded-full bg-gray-100">
+                            <div
+                              className={`h-1.5 rounded-full transition-all ${
+                                pct >= 80
+                                  ? "bg-green-500"
+                                  : pct >= 50
+                                    ? "bg-amber-400"
+                                    : "bg-red-400"
+                              }`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span
+                            className={`w-10 shrink-0 text-right text-xs font-medium ${
+                              pct >= 80
+                                ? "text-green-600"
+                                : pct >= 50
+                                  ? "text-amber-600"
+                                  : "text-red-500"
+                            }`}
+                          >
+                            {pct}%
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="w-12 px-5 py-3.5 text-right">
                       {canDeleteSectores && (

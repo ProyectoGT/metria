@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import { useToast, Toaster } from "@/components/ui/toast";
+import { updateTareaEstadoAction } from "@/app/(crm)/dashboard/actions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,6 +18,14 @@ type AgendaEvent = {
   gcal_event_id: string | null;
   user_id: number | null;
   created_at: string;
+};
+
+type TareaEvent = {
+  id: number;
+  titulo: string;
+  prioridad: string | null;
+  fecha: string; // ISO datetime o date
+  estado: string | null;
 };
 
 type GCalEvent = {
@@ -38,6 +47,7 @@ type FormState = {
 
 type Props = {
   initialEvents: AgendaEvent[];
+  initialTareas: TareaEvent[];
   isConnected: boolean;
 };
 
@@ -104,7 +114,7 @@ function emptyForm(date?: Date): FormState {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function CalendarioClient({ initialEvents, isConnected }: Props) {
+export default function CalendarioClient({ initialEvents, initialTareas, isConnected }: Props) {
   const today = useMemo(() => new Date(), []);
 
   const [currentDate, setCurrentDate] = useState(
@@ -112,6 +122,7 @@ export default function CalendarioClient({ initialEvents, isConnected }: Props) 
   );
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [events, setEvents]       = useState<AgendaEvent[]>(initialEvents);
+  const [tareas, setTareas]       = useState<TareaEvent[]>(initialTareas);
   const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -151,6 +162,15 @@ export default function CalendarioClient({ initialEvents, isConnected }: Props) 
     }
     return map;
   }, [gcalEvents]);
+
+  const tareasByDate = useMemo(() => {
+    const map: Record<string, TareaEvent[]> = {};
+    for (const t of tareas) {
+      const dateStr = t.fecha.split("T")[0];
+      (map[dateStr] ??= []).push(t);
+    }
+    return map;
+  }, [tareas]);
 
   // ── Google Calendar fetch ───────────────────────────────────────────────────
 
@@ -306,12 +326,27 @@ export default function CalendarioClient({ initialEvents, isConnected }: Props) 
     setDeleting(false);
   }
 
+  // ── Completar tarea desde el calendario ───────────────────────────────────
+
+  async function handleCompleteTarea(id: number) {
+    try {
+      await updateTareaEstadoAction(id, "completado");
+      setTareas((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, estado: "completado" } : t))
+      );
+      toast("Tarea completada");
+    } catch {
+      toast("Error al completar la tarea", "error");
+    }
+  }
+
   // ── Selected day data ──────────────────────────────────────────────────────
 
   const todayStr        = toDateStr(today);
   const selectedDateStr = toDateStr(selectedDate);
   const dayLocalEvents  = eventsByDate[selectedDateStr] ?? [];
   const dayGcalEvents   = gcalByDate[selectedDateStr]  ?? [];
+  const dayTareas       = tareasByDate[selectedDateStr] ?? [];
 
   const deleteTarget = events.find((e) => e.id === deleteId);
 
@@ -402,9 +437,10 @@ export default function CalendarioClient({ initialEvents, isConnected }: Props) 
               const dateStr   = toDateStr(date);
               const localEvs  = eventsByDate[dateStr] ?? [];
               const gcalEvs   = gcalByDate[dateStr]   ?? [];
+              const tareaEvs  = tareasByDate[dateStr]  ?? [];
               const isToday    = dateStr === todayStr;
               const isSelected = dateStr === selectedDateStr;
-              const total      = localEvs.length + gcalEvs.length;
+              const total      = localEvs.length + gcalEvs.length + tareaEvs.length;
 
               return (
                 <button
@@ -429,11 +465,17 @@ export default function CalendarioClient({ initialEvents, isConnected }: Props) 
 
                   {total > 0 && (
                     <div className="mt-1.5 flex flex-wrap items-center gap-0.5">
-                      {localEvs.slice(0, 3).map((ev) => {
+                      {localEvs.slice(0, 2).map((ev) => {
                         const p = PRIORITIES.find((p) => p.value === ev.priority);
                         return <span key={ev.id} className={`h-1.5 w-1.5 rounded-full ${p?.dot ?? "bg-gray-400"}`} />;
                       })}
-                      {gcalEvs.slice(0, 2).map((ev) => (
+                      {tareaEvs.slice(0, 2).map((t) => (
+                        <span
+                          key={`t-${t.id}`}
+                          className={`h-1.5 w-1.5 rounded-full ${t.estado === "completado" ? "bg-green-400" : "bg-violet-500"}`}
+                        />
+                      ))}
+                      {gcalEvs.slice(0, 1).map((ev) => (
                         <span key={ev.id} className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                       ))}
                       {total > 5 && (
@@ -454,6 +496,10 @@ export default function CalendarioClient({ initialEvents, isConnected }: Props) 
                 <span className="text-xs text-text-secondary">{p.label}</span>
               </div>
             ))}
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-violet-500" />
+              <span className="text-xs text-text-secondary">Tarea</span>
+            </div>
             {isConnected && (
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-blue-500" />
@@ -481,7 +527,7 @@ export default function CalendarioClient({ initialEvents, isConnected }: Props) 
             })}
           </p>
 
-          {dayLocalEvents.length === 0 && dayGcalEvents.length === 0 ? (
+          {dayLocalEvents.length === 0 && dayGcalEvents.length === 0 && dayTareas.length === 0 ? (
             <div className="flex flex-col items-center py-10">
               <p className="text-sm text-text-secondary">Sin actividades este día</p>
               <button
@@ -493,7 +539,52 @@ export default function CalendarioClient({ initialEvents, isConnected }: Props) 
             </div>
           ) : (
             <div className="space-y-2">
-              {/* Local events */}
+              {/* Tareas del kanban */}
+              {dayTareas.map((t) => {
+                const p = PRIORITIES.find((pr) => pr.value === t.prioridad);
+                const completada = t.estado === "completado";
+                const hora = t.fecha.includes("T")
+                  ? new Date(t.fecha).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+                  : null;
+                return (
+                  <div
+                    key={`tarea-${t.id}`}
+                    className="group rounded-xl border border-violet-200 bg-violet-50 p-3"
+                  >
+                    <div className="flex items-start gap-2">
+                      <button
+                        onClick={() => !completada && handleCompleteTarea(t.id)}
+                        title={completada ? "Completada" : "Marcar como completada"}
+                        className={`mt-0.5 shrink-0 transition-colors ${completada ? "text-green-500 cursor-default" : "text-violet-400 hover:text-green-500"}`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          {completada
+                            ? <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            : <circle cx="12" cy="12" r="9" />}
+                        </svg>
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-sm font-medium leading-snug ${completada ? "line-through text-text-secondary" : "text-text-primary"}`}>
+                          {t.titulo}
+                        </p>
+                        <div className="mt-1 flex items-center gap-2">
+                          {hora && <span className="text-xs text-text-secondary">{hora}</span>}
+                          <span className="rounded-full bg-violet-100 px-1.5 py-px text-[10px] font-medium text-violet-700">
+                            Tarea
+                          </span>
+                          {p && (
+                            <span className={`rounded-full px-1.5 py-px text-[10px] font-medium ${p.badge}`}>
+                              {p.label}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Local agenda events */}
               {dayLocalEvents.map((ev) => {
                 const p = PRIORITIES.find((pr) => pr.value === ev.priority);
                 return (
