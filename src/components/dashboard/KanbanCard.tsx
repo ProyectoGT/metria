@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, User, Trash2, CheckCircle2, Circle } from "lucide-react";
+import { Calendar, User, Trash2, CheckCircle2, Circle, ExternalLink } from "lucide-react";
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 
 // ─── Priority styles ──────────────────────────────────────────────────────────
@@ -15,6 +15,32 @@ const priorityBadge: Record<KanbanPriority, { cls: string; label: string }> = {
 function formatDate(iso: string) {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
+}
+
+// Genera un link de Google Calendar para añadir el evento
+function googleCalendarUrl(title: string, dateIso: string) {
+  // Si la fecha viene como ISO con hora (timestamptz), la usamos; si no, es solo día
+  const hasTime = dateIso.includes("T");
+  let start: string;
+  let end: string;
+  if (hasTime) {
+    // Formato GCal: YYYYMMDDTHHmmssZ
+    start = dateIso.replace(/[-:]/g, "").replace(/\.\d+/, "").slice(0, 15) + "Z";
+    // Evento de 1 hora
+    const dt = new Date(dateIso);
+    dt.setHours(dt.getHours() + 1);
+    end = dt.toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "").slice(0, 15) + "Z";
+  } else {
+    // Todo el día: YYYYMMDD
+    start = dateIso.replace(/-/g, "");
+    end = start;
+  }
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: title,
+    dates: `${start}/${end}`,
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -124,7 +150,17 @@ export default function KanbanCard({
           {card.dueDate && (
             <span className="flex items-center gap-1 text-xs text-text-secondary">
               <Calendar className="h-3 w-3" />
-              {formatDate(card.dueDate)}
+              {formatDate(card.dueDate.split("T")[0])}
+              <a
+                href={googleCalendarUrl(card.title, card.dueDate)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title="Añadir al calendario"
+                className="ml-0.5 text-text-secondary transition-colors hover:text-primary"
+              >
+                <ExternalLink className="h-3 w-3" />
+              </a>
             </span>
           )}
           {card.assignedBy && (

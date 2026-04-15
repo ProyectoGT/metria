@@ -11,6 +11,7 @@ import {
   createTareaAction,
   deleteTareaAction,
   completeTareaAction,
+  updateTareaEstadoAction,
 } from "@/app/(crm)/dashboard/actions";
 
 type KanbanBoardProps = {
@@ -18,6 +19,13 @@ type KanbanBoardProps = {
   role: UserRole;
   currentUserId: string;
   agents?: Array<{ id: string; nombre: string }>;
+};
+
+// Mapa columna-id → estado en BD
+const COL_TO_ESTADO: Record<string, "pendiente" | "en_progreso" | "completado"> = {
+  pendientes: "pendiente",
+  en_progreso: "en_progreso",
+  completado: "completado",
 };
 
 export default function KanbanBoard({
@@ -31,7 +39,7 @@ export default function KanbanBoard({
 
   // ─── Drag & drop ────────────────────────────────────────────────────────────
   function handleDragEnd(result: DropResult) {
-    const { source, destination } = result;
+    const { source, destination, draggableId } = result;
     if (!destination) return;
     if (
       source.droppableId === destination.droppableId &&
@@ -50,6 +58,17 @@ export default function KanbanBoard({
       destCol.cards.splice(destination.index, 0, moved);
       return next;
     });
+
+    // Si cambió de columna, persistir el nuevo estado en BD
+    if (source.droppableId !== destination.droppableId) {
+      const nuevoEstado = COL_TO_ESTADO[destination.droppableId];
+      const numId = parseInt(draggableId, 10);
+      if (nuevoEstado && !isNaN(numId)) {
+        updateTareaEstadoAction(numId, nuevoEstado).catch((err) =>
+          console.error("Error al mover tarea:", err),
+        );
+      }
+    }
   }
 
   // ─── Column ops ─────────────────────────────────────────────────────────────
@@ -105,14 +124,18 @@ export default function KanbanBoard({
   }
 
   async function handleCompleteCard(columnId: string, cardId: string) {
-    // Quitar de UI (el componente KanbanCard ya muestra el tachado antes de llamar aquí)
-    setColumns((prev) =>
-      prev.map((col) =>
-        col.id === columnId
-          ? { ...col, cards: col.cards.filter((c) => c.id !== cardId) }
-          : col,
-      ),
-    );
+    // Mover la tarjeta a la columna "completado" en la UI
+    setColumns((prev) => {
+      const next = prev.map((col) => ({ ...col, cards: [...col.cards] }));
+      const srcCol = next.find((c) => c.id === columnId);
+      const dstCol = next.find((c) => c.id === "completado");
+      if (!srcCol || !dstCol) return prev;
+      const idx = srcCol.cards.findIndex((c) => c.id === cardId);
+      if (idx === -1) return prev;
+      const [moved] = srcCol.cards.splice(idx, 1);
+      dstCol.cards.unshift(moved);
+      return next;
+    });
     // Persistir en BD
     const numId = parseInt(cardId, 10);
     if (!isNaN(numId)) {
@@ -135,9 +158,9 @@ export default function KanbanBoard({
               role={role}
               currentUserId={_currentUserId}
               onDeleteColumn={handleDeleteColumn}
-              onAddCard={(colId) => setAddingCardCol(colId)}
+              onAddCard={column.id === "completado" ? undefined : (colId) => setAddingCardCol(colId)}
               onDeleteCard={handleDeleteCard}
-              onCompleteCard={handleCompleteCard}
+              onCompleteCard={column.id === "completado" ? undefined : handleCompleteCard}
             />
           ))}
           <KanbanAddColumn onAdd={handleAddColumn} />

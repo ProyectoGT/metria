@@ -120,11 +120,11 @@ export default async function DashboardPage() {
       .order("nombre"),
     supabase.from("rendimiento").select("*").eq("anio", anioActual).eq("mes", 0),
 
-    // Tareas pendientes (todas, filtramos abajo por rol)
+    // Tareas del usuario (pendiente + en_progreso + completado)
     supabase
       .from("tareas")
       .select("id, titulo, prioridad, fecha, estado, owner_user_id")
-      .eq("estado", "pendiente")
+      .in("estado", ["pendiente", "en_progreso", "completado"])
       .order("fecha", { ascending: true, nullsFirst: false }),
   ]);
 
@@ -234,21 +234,38 @@ export default async function DashboardPage() {
   const ownMetrics =
     agentMetrics.find((a) => a.id === String(userId))?.rendimiento ?? emptyRendimiento();
 
-  // ─── 4. Kanban personal: solo "Tareas pendientes" del usuario ────────────
+  // ─── 4. Kanban personal: 3 columnas (pendiente / en_progreso / completado) ──
   const myTareas = (tareasData ?? []).filter((t) => t.owner_user_id === userId);
+
+  function toCard(t: (typeof myTareas)[0]) {
+    return {
+      id: String(t.id),
+      title: t.titulo,
+      priority: normalizePriority(t.prioridad),
+      dueDate: t.fecha ?? undefined,
+      assignedBy: null,
+    };
+  }
+
   const kanbanData: KanbanData = {
     columns: [
       {
         id: "pendientes",
-        title: "Tareas pendientes",
+        title: "Pendientes",
         fixed: true,
-        cards: myTareas.map((t) => ({
-          id: String(t.id),
-          title: t.titulo,
-          priority: normalizePriority(t.prioridad),
-          dueDate: t.fecha ?? undefined,
-          assignedBy: null,
-        })),
+        cards: myTareas.filter((t) => t.estado === "pendiente").map(toCard),
+      },
+      {
+        id: "en_progreso",
+        title: "Orden del día",
+        fixed: true,
+        cards: myTareas.filter((t) => t.estado === "en_progreso").map(toCard),
+      },
+      {
+        id: "completado",
+        title: "Realizado",
+        fixed: true,
+        cards: myTareas.filter((t) => t.estado === "completado").map(toCard),
       },
     ],
   };
@@ -262,7 +279,7 @@ export default async function DashboardPage() {
         id: a.id,
         nombre: `${a.nombre} ${a.apellidos}`.trim(),
         tareas: (tareasData ?? [])
-          .filter((t) => t.owner_user_id === a.id)
+          .filter((t) => t.owner_user_id === a.id && t.estado !== "completado")
           .map((t) => ({
             id: t.id,
             titulo: t.titulo,

@@ -12,9 +12,9 @@ type KanbanColumnProps = {
   role: UserRole;
   currentUserId: string;
   onDeleteColumn: (columnId: string) => void;
-  onAddCard: (columnId: string) => void;
+  onAddCard?: (columnId: string) => void;
   onDeleteCard: (columnId: string, cardId: string) => void;
-  onCompleteCard: (columnId: string, cardId: string) => void;
+  onCompleteCard?: (columnId: string, cardId: string) => void;
 };
 
 export default function KanbanColumn({
@@ -88,16 +88,18 @@ export default function KanbanColumn({
         )}
       </Droppable>
 
-      {/* Footer: add card */}
-      <div className="border-t border-border p-2">
-        <button
-          onClick={() => onAddCard(column.id)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background hover:text-primary"
-        >
-          <Plus className="h-4 w-4" />
-          Añadir tarea
-        </button>
-      </div>
+      {/* Footer: add card (oculto en columna Realizado) */}
+      {onAddCard && (
+        <div className="border-t border-border p-2">
+          <button
+            onClick={() => onAddCard(column.id)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background hover:text-primary"
+          >
+            <Plus className="h-4 w-4" />
+            Añadir tarea
+          </button>
+        </div>
+      )}
     </div>
   );
 }
