@@ -22,7 +22,8 @@ export default async function CalendarioPage() {
       .select("id, titulo, prioridad, fecha, estado")
       .eq("owner_user_id", userId)
       .not("fecha", "is", null)
-      .order("fecha", { ascending: true }),
+      .order("fecha", { ascending: true })
+      .returns<{ id: number; titulo: string; prioridad: string | null; fecha: string; estado: string | null }[]>(),
   ]);
 
   return (
