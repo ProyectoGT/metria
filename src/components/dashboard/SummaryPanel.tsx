@@ -1,7 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Newspaper, Search, ClipboardList, ShoppingBag, X, type LucideIcon } from "lucide-react";
+import Link from "next/link";
+import {
+  Newspaper,
+  Search,
+  ClipboardList,
+  ShoppingBag,
+  ArrowLeft,
+  ExternalLink,
+  type LucideIcon,
+} from "lucide-react";
 import SummaryCard from "./SummaryCard";
 import type { SummaryData, SummaryType, PropertyListing } from "@/lib/mock/dashboard";
 
@@ -54,7 +63,7 @@ function estadoBadge(estado: string) {
   if (s === "cerrado") return "bg-gray-100 text-gray-600";
   if (s === "reservado") return "bg-purple-100 text-purple-700";
   if (s === "pendiente") return "bg-yellow-100 text-yellow-700";
-  return "bg-blue-100 text-blue-700"; // en negociación, en proceso, en estudio…
+  return "bg-blue-100 text-blue-700";
 }
 
 // ─── Property table ───────────────────────────────────────────────────────────
@@ -62,7 +71,7 @@ function estadoBadge(estado: string) {
 function PropertyTable({ listings }: { listings: PropertyListing[] }) {
   if (listings.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-text-secondary">
+      <p className="py-12 text-center text-sm text-text-secondary">
         No hay propiedades en esta categoría.
       </p>
     );
@@ -85,30 +94,52 @@ function PropertyTable({ listings }: { listings: PropertyListing[] }) {
             <th className="pb-3 pr-6 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
               Estado
             </th>
-            <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
+            <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
               Agente
+            </th>
+            <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              &nbsp;
             </th>
           </tr>
         </thead>
         <tbody>
-          {listings.map((item) => (
-            <tr
-              key={item.id}
-              className="border-b border-border last:border-0 transition-colors hover:bg-background"
-            >
-              <td className="py-3 pr-6 font-medium text-text-primary">{item.nombre}</td>
-              <td className="py-3 pr-6 text-text-secondary">{item.sector}</td>
-              <td className="py-3 pr-6 text-text-secondary">{item.finca}</td>
-              <td className="py-3 pr-6">
-                <span
-                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${estadoBadge(item.estado)}`}
-                >
-                  {item.estado}
-                </span>
-              </td>
-              <td className="py-3 text-text-secondary">{item.agente}</td>
-            </tr>
-          ))}
+          {listings.map((item) => {
+            const href =
+              item.zonaId && item.sectorId && item.fincaId
+                ? `/zona/${item.zonaId}/sector/${item.sectorId}/finca/${item.fincaId}`
+                : null;
+
+            return (
+              <tr
+                key={item.id}
+                className="group border-b border-border last:border-0 transition-colors hover:bg-background"
+              >
+                <td className="py-3 pr-6 font-medium text-text-primary">{item.nombre}</td>
+                <td className="py-3 pr-6 text-text-secondary">{item.sector}</td>
+                <td className="py-3 pr-6 text-text-secondary">{item.finca}</td>
+                <td className="py-3 pr-6">
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${estadoBadge(item.estado)}`}
+                  >
+                    {item.estado}
+                  </span>
+                </td>
+                <td className="py-3 pr-4 text-text-secondary">{item.agente}</td>
+                <td className="py-3">
+                  {href ? (
+                    <Link
+                      href={href}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary opacity-0 transition-opacity hover:bg-primary/10 group-hover:opacity-100"
+                      title="Ver ficha del piso"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Ver ficha
+                    </Link>
+                  ) : null}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -128,11 +159,15 @@ export default function SummaryPanel({ summary, listings }: SummaryPanelProps) {
   const activeCard = CARDS.find((c) => c.key === activeKey);
 
   function handleCardClick(key: SummaryType) {
-    setActiveKey((prev) => (prev === key ? null : key));
+    setActiveKey(key);
+  }
+
+  function handleClose() {
+    setActiveKey(null);
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <>
       {/* Cards row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {CARDS.map((card) => (
@@ -149,27 +184,34 @@ export default function SummaryPanel({ summary, listings }: SummaryPanelProps) {
         ))}
       </div>
 
-      {/* Expanded listing */}
+      {/* Full-screen overlay — cubre el contenido principal bajo el header */}
       {activeKey && activeCard && (
-        <div className="rounded-xl border-2 border-blue-600 bg-surface p-6 shadow-sm">
-          <div className="mb-5 flex items-center justify-between">
-            <h3 className="font-semibold text-text-primary">
-              {activeCard.label}
-              <span className="ml-2 text-sm font-normal text-text-secondary">
-                — todas las propiedades
-              </span>
-            </h3>
+        <div className="fixed inset-0 z-[45] flex flex-col bg-background pt-16 md:pl-[220px]">
+          {/* Cabecera de la pantalla */}
+          <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4 md:px-6">
             <button
-              onClick={() => setActiveKey(null)}
-              className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
-              aria-label="Cerrar listado"
+              onClick={handleClose}
+              className="flex items-center gap-1.5 rounded-lg p-1.5 text-sm font-medium text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
+              aria-label="Volver al dashboard"
             >
-              <X className="h-5 w-5" />
+              <ArrowLeft className="h-4 w-4" />
+              Volver
             </button>
+            <div className="h-4 w-px bg-border" />
+            <h2 className="font-semibold text-text-primary">{activeCard.label}</h2>
+            <span className="ml-1 text-sm text-text-secondary">
+              — {listings[activeKey].length} propiedades
+            </span>
           </div>
-          <PropertyTable listings={listings[activeKey]} />
+
+          {/* Contenido */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-6">
+            <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+              <PropertyTable listings={listings[activeKey]} />
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

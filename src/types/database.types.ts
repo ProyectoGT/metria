@@ -82,20 +82,57 @@ export interface Database {
           id: number;
           nombre: string;
           propiedad_id: number | null;
+          tipo: string;
+          url: string | null;
+          created_at: string;
         };
         Insert: {
           id?: number;
           nombre: string;
           propiedad_id?: number | null;
+          tipo?: string;
+          url?: string | null;
+          created_at?: string;
         };
         Update: {
           id?: number;
           nombre?: string;
           propiedad_id?: number | null;
+          tipo?: string;
+          url?: string | null;
+          created_at?: string;
         };
         Relationships: [
           {
             foreignKeyName: "archivos_propiedad_id_fkey";
+            columns: ["propiedad_id"];
+            referencedRelation: "propiedades";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      encargo_notas: {
+        Row: {
+          id: number;
+          propiedad_id: number;
+          contenido: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          propiedad_id: number;
+          contenido: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          propiedad_id?: number;
+          contenido?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "encargo_notas_propiedad_id_fkey";
             columns: ["propiedad_id"];
             referencedRelation: "propiedades";
             referencedColumns: ["id"];
@@ -179,17 +216,17 @@ export interface Database {
       fincas: {
         Row: {
           id: number;
-          numero: number;
+          numero: string;
           sector_id: number | null;
         };
         Insert: {
           id?: number;
-          numero: number;
+          numero: string;
           sector_id?: number | null;
         };
         Update: {
           id?: number;
-          numero?: number;
+          numero?: string;
           sector_id?: number | null;
         };
         Relationships: [

@@ -46,13 +46,7 @@ export default function OrdenDiaPanel({ agentes }: OrdenDiaPanelProps) {
 
   return (
     <div className="rounded-xl bg-surface p-6 shadow-sm">
-      <div className="mb-5 flex items-end justify-between">
-        <div>
-          <h2 className="font-semibold text-text-primary">Orden del día por agente</h2>
-          <p className="mt-1 text-sm text-text-secondary">
-            Tareas pendientes de tu equipo. Pulsa un agente para desplegarlas.
-          </p>
-        </div>
+      <div className="mb-5 flex items-center justify-end">
         <span className="rounded-full bg-background px-3 py-1 text-xs font-medium text-text-secondary">
           {totalTareas} {totalTareas === 1 ? "tarea" : "tareas"}
         </span>

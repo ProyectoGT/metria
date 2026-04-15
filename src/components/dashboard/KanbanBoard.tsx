@@ -7,6 +7,11 @@ import KanbanAddColumn from "./KanbanAddColumn";
 import KanbanAddCard from "./KanbanAddCard";
 import type { KanbanData, KanbanColumnData, KanbanCardData } from "@/lib/mock/dashboard";
 import type { UserRole } from "@/lib/roles";
+import {
+  createTareaAction,
+  deleteTareaAction,
+  completeTareaAction,
+} from "@/app/(crm)/dashboard/actions";
 
 type KanbanBoardProps = {
   initialData: KanbanData;
@@ -18,7 +23,6 @@ type KanbanBoardProps = {
 export default function KanbanBoard({
   initialData,
   role,
-  // currentUserId reserved for future DB persistence
   currentUserId: _currentUserId,
   agents = [],
 }: KanbanBoardProps) {
@@ -59,16 +63,29 @@ export default function KanbanBoard({
   }
 
   // ─── Card ops ───────────────────────────────────────────────────────────────
-  function handleAddCard(columnId: string, newCard: Omit<KanbanCardData, "id">) {
-    const id = `card-${Date.now()}`;
-    setColumns((prev) =>
-      prev.map((col) =>
-        col.id === columnId ? { ...col, cards: [...col.cards, { id, ...newCard }] } : col,
-      ),
-    );
+  async function handleAddCard(columnId: string, newCard: Omit<KanbanCardData, "id">) {
+    try {
+      // Guardar en BD y obtener el ID real
+      const { id: dbId } = await createTareaAction({
+        titulo: newCard.title,
+        prioridad: newCard.priority,
+        fecha: newCard.dueDate,
+      });
+
+      setColumns((prev) =>
+        prev.map((col) =>
+          col.id === columnId
+            ? { ...col, cards: [...col.cards, { id: String(dbId), ...newCard }] }
+            : col,
+        ),
+      );
+    } catch (err) {
+      console.error("Error al crear tarea:", err);
+    }
   }
 
-  function handleDeleteCard(columnId: string, cardId: string) {
+  async function handleDeleteCard(columnId: string, cardId: string) {
+    // Quitar de UI inmediatamente (optimista)
     setColumns((prev) =>
       prev.map((col) =>
         col.id === columnId
@@ -76,6 +93,35 @@ export default function KanbanBoard({
           : col,
       ),
     );
+    // Persistir si es un ID numérico (viene de la BD)
+    const numId = parseInt(cardId, 10);
+    if (!isNaN(numId)) {
+      try {
+        await deleteTareaAction(numId);
+      } catch (err) {
+        console.error("Error al eliminar tarea:", err);
+      }
+    }
+  }
+
+  async function handleCompleteCard(columnId: string, cardId: string) {
+    // Quitar de UI (el componente KanbanCard ya muestra el tachado antes de llamar aquí)
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === columnId
+          ? { ...col, cards: col.cards.filter((c) => c.id !== cardId) }
+          : col,
+      ),
+    );
+    // Persistir en BD
+    const numId = parseInt(cardId, 10);
+    if (!isNaN(numId)) {
+      try {
+        await completeTareaAction(numId);
+      } catch (err) {
+        console.error("Error al completar tarea:", err);
+      }
+    }
   }
 
   return (
@@ -91,6 +137,7 @@ export default function KanbanBoard({
               onDeleteColumn={handleDeleteColumn}
               onAddCard={(colId) => setAddingCardCol(colId)}
               onDeleteCard={handleDeleteCard}
+              onCompleteCard={handleCompleteCard}
             />
           ))}
           <KanbanAddColumn onAdd={handleAddColumn} />

@@ -85,14 +85,14 @@ export default async function DashboardPage() {
     supabase
       .from("propiedades")
       .select(
-        "id, planta, puerta, propietario, estado, fincas(numero, sectores(numero)), usuarios:usuarios!propiedades_agente_asignado_fkey(nombre, apellidos)",
+        "id, planta, puerta, propietario, estado, fincas(id, numero, sectores(id, numero, zona_id)), usuarios:usuarios!propiedades_agente_asignado_fkey(nombre, apellidos)",
       )
       .order("id", { ascending: false })
       .limit(50),
     supabase
       .from("propiedades")
       .select(
-        "id, planta, puerta, propietario, estado, fincas(numero, sectores(numero)), usuarios:usuarios!propiedades_agente_asignado_fkey(nombre, apellidos)",
+        "id, planta, puerta, propietario, estado, fincas(id, numero, sectores(id, numero, zona_id)), usuarios:usuarios!propiedades_agente_asignado_fkey(nombre, apellidos)",
       )
       .ilike("estado", "investig%")
       .order("id", { ascending: false })
@@ -100,7 +100,7 @@ export default async function DashboardPage() {
     supabase
       .from("propiedades")
       .select(
-        "id, planta, puerta, propietario, estado, fincas(numero, sectores(numero)), usuarios:usuarios!propiedades_agente_asignado_fkey(nombre, apellidos)",
+        "id, planta, puerta, propietario, estado, fincas(id, numero, sectores(id, numero, zona_id)), usuarios:usuarios!propiedades_agente_asignado_fkey(nombre, apellidos)",
       )
       .ilike("estado", "encarg%")
       .order("id", { ascending: false })
@@ -143,7 +143,7 @@ export default async function DashboardPage() {
     puerta: string | null;
     propietario: string | null;
     estado: string | null;
-    fincas: { numero: number; sectores: { numero: number } | null } | null;
+    fincas: { id: number; numero: string; sectores: { id: number; numero: number; zona_id: number } | null } | null;
     usuarios: { nombre: string | null; apellidos: string | null } | null;
   };
 
@@ -155,7 +155,7 @@ export default async function DashboardPage() {
       : planta || puerta
         ? `Planta ${planta}${puerta ? ` ${puerta}` : ""}`.trim()
         : `Propiedad #${p.id}`;
-    const finca = p.fincas?.numero != null ? `Finca ${p.fincas.numero}` : "—";
+    const finca = p.fincas?.numero != null ? p.fincas.numero : "—";
     const sector = p.fincas?.sectores?.numero != null ? `Sector ${p.fincas.sectores.numero}` : "—";
     const agente = p.usuarios
       ? `${p.usuarios.nombre ?? ""} ${p.usuarios.apellidos ?? ""}`.trim() || "Sin asignar"
@@ -167,6 +167,9 @@ export default async function DashboardPage() {
       finca,
       estado: p.estado ?? "—",
       agente,
+      fincaId: p.fincas?.id,
+      sectorId: p.fincas?.sectores?.id,
+      zonaId: p.fincas?.sectores?.zona_id,
     };
   }
 
@@ -287,24 +290,35 @@ export default async function DashboardPage() {
       {/* 2 — Summary panel */}
       <SummaryPanel summary={summary} listings={listings} />
 
-      {/* 3 — Kanban personal */}
-      <section>
-        <div className="mb-4">
-          <h2 className="font-semibold text-text-primary">Mis tareas</h2>
-          <p className="text-sm text-text-secondary">
-            Organiza tu trabajo arrastrando las tarjetas entre columnas.
-          </p>
-        </div>
-        <KanbanBoard
-          initialData={kanbanData}
-          role={role}
-          currentUserId={String(userId)}
-          agents={agentMetrics.map((a) => ({ id: a.id, nombre: a.nombre }))}
-        />
-      </section>
+      {/* 3 — Kanban + Orden del día (side-by-side cuando hay managers) */}
+      <div className={showOrdenDia ? "grid grid-cols-1 gap-8 xl:grid-cols-2" : ""}>
+        <section className="min-w-0">
+          <div className="mb-4">
+            <h2 className="font-semibold text-text-primary">Mis tareas</h2>
+            <p className="text-sm text-text-secondary">
+              Organiza tu trabajo arrastrando las tarjetas entre columnas.
+            </p>
+          </div>
+          <KanbanBoard
+            initialData={kanbanData}
+            role={role}
+            currentUserId={String(userId)}
+            agents={agentMetrics.map((a) => ({ id: a.id, nombre: a.nombre }))}
+          />
+        </section>
 
-      {/* 4 — Orden del día por agente (managers) */}
-      {showOrdenDia && <OrdenDiaPanel agentes={ordenDiaAgentes} />}
+        {showOrdenDia && (
+          <section className="min-w-0">
+            <div className="mb-4">
+              <h2 className="font-semibold text-text-primary">Orden del día</h2>
+              <p className="text-sm text-text-secondary">
+                Tareas pendientes de tu equipo.
+              </p>
+            </div>
+            <OrdenDiaPanel agentes={ordenDiaAgentes} />
+          </section>
+        )}
+      </div>
 
       {/* 5 — Agente del mes (mock: no existe tabla en BD) */}
       <AgentOfMonth
