@@ -16,6 +16,10 @@ export type PropertyListing = {
   finca: string;
   estado: string;
   agente: string;
+  // IDs para navegar a la ficha del piso (solo propiedades, no pedidos)
+  zonaId?: number;
+  sectorId?: number;
+  fincaId?: number;
 };
 
 export type Rendimiento = {
@@ -36,7 +40,7 @@ export type AgentMetrics = {
 };
 
 export type AgentOfMonthData = {
-  agente: string;
+  agente: string | null; // null = premio sin premiado asignado aún
   premio: string;
   añadidoPor: string;
   mes: string;
@@ -81,12 +85,7 @@ export type OrdenDiaAgente = {
 // ─── Mock: Agente del mes ────────────────────────────────────────────────────
 // No existe tabla en la BD; mantener mock hasta que se cree.
 
-export const mockAgentOfMonth: AgentOfMonthData = {
-  agente: "Laura Martínez",
-  premio: "Mejor cierre del trimestre",
-  añadidoPor: "Carlos Méndez",
-  mes: "Abril 2026",
-};
+export const mockAgentOfMonth: AgentOfMonthData | null = null;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -14,6 +14,7 @@ type KanbanColumnProps = {
   onDeleteColumn: (columnId: string) => void;
   onAddCard: (columnId: string) => void;
   onDeleteCard: (columnId: string, cardId: string) => void;
+  onCompleteCard: (columnId: string, cardId: string) => void;
 };
 
 export default function KanbanColumn({
@@ -21,6 +22,7 @@ export default function KanbanColumn({
   onDeleteColumn,
   onAddCard,
   onDeleteCard,
+  onCompleteCard,
 }: KanbanColumnProps) {
   const [hovered, setHovered] = useState(false);
 
@@ -73,6 +75,7 @@ export default function KanbanColumn({
                       card={card}
                       canDelete={!card.assignedBy}
                       onDelete={(id) => onDeleteCard(column.id, id)}
+                      onComplete={(id) => onCompleteCard(column.id, id)}
                       dragHandleProps={dragProvided.dragHandleProps ?? undefined}
                       isDragging={dragSnapshot.isDragging}
                     />

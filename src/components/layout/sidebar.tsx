@@ -72,7 +72,7 @@ export default function Sidebar({ userRole: _userRole }: Props) {
   const navContent = (
     <>
       {/* Logo */}
-      <div className="flex h-16 items-center justify-between bg-sidebar-logo px-4">
+      <div className="relative flex h-16 items-center justify-center bg-sidebar-logo px-4">
         <Image
           src="/logo-bg-master-iberica.png"
           alt="Master Ibérica"
@@ -84,7 +84,7 @@ export default function Sidebar({ userRole: _userRole }: Props) {
         {/* Cerrar drawer — solo en móvil */}
         <button
           onClick={() => setMobileOpen(false)}
-          className="ml-2 rounded-lg p-1.5 text-white/70 hover:bg-white/10 md:hidden"
+          className="absolute right-2 rounded-lg p-1.5 text-white/70 hover:bg-white/10 md:hidden"
           aria-label="Cerrar menú"
         >
           <X className="h-5 w-5" />

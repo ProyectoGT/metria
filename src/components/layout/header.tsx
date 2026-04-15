@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Search, Bell, ChevronDown, Menu } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Search, Bell, ChevronDown, Menu, X, Calendar, AlertCircle } from "lucide-react";
 import { logout } from "@/app/(auth)/actions";
 import Avatar from "@/components/ui/avatar";
+import type { NotificationItem } from "./app-shell";
 
 function formatDate(): string {
   const now = new Date();
@@ -16,24 +18,108 @@ function formatDate(): string {
   });
 }
 
+function prioridadColor(p: string | null) {
+  if (p === "alta") return "text-red-500";
+  if (p === "media") return "text-amber-500";
+  return "text-blue-500";
+}
+
+function formatFecha(fecha: string | null): string {
+  if (!fecha) return "";
+  const d = new Date(fecha);
+  return d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+}
+
+type SearchResult = {
+  id: number;
+  nombre: string;
+  finca: string;
+  estado: string;
+  href: string;
+};
+
 interface HeaderProps {
   userName: string;
   userEmail?: string | null;
+  notifications?: NotificationItem[];
 }
 
-export default function Header({ userName, userEmail }: HeaderProps) {
+export default function Header({ userName, userEmail, notifications = [] }: HeaderProps) {
+  const router = useRouter();
+
+  // User menu
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Bell panel
+  const [bellOpen, setBellOpen] = useState(false);
+  const bellRef = useRef<HTMLDivElement>(null);
+
+  // Search
+  const [searchValue, setSearchValue] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
       }
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
+        setBellOpen(false);
+      }
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Debounced search
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchValue(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+
+    if (value.trim().length < 2) {
+      setSearchResults([]);
+      setSearchOpen(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(value.trim())}`);
+        const json = await res.json();
+        setSearchResults(json.results ?? []);
+        setSearchOpen(true);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+  }, []);
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Escape") {
+      setSearchOpen(false);
+      setSearchValue("");
+    }
+  }
+
+  function handleResultClick(href: string) {
+    setSearchOpen(false);
+    setSearchValue("");
+    router.push(href);
+  }
+
+  const unreadCount = notifications.length;
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center border-b border-border bg-surface px-4 md:px-6">
@@ -47,13 +133,50 @@ export default function Header({ userName, userEmail }: HeaderProps) {
       </button>
 
       {/* Search bar */}
-      <div className="relative w-full max-w-md">
+      <div ref={searchRef} className="relative w-full max-w-md">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
         <input
           type="text"
-          placeholder="Buscar..."
-          className="w-full rounded-lg border border-border bg-background py-2 pl-10 pr-4 text-sm text-text-primary outline-none transition-colors placeholder:text-text-secondary focus:border-primary focus:ring-2 focus:ring-primary/20"
+          value={searchValue}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
+          onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
+          placeholder="Buscar propietario o propiedad…"
+          className="w-full rounded-lg border border-border bg-background py-2 pl-10 pr-8 text-sm text-text-primary outline-none transition-colors placeholder:text-text-secondary focus:border-primary focus:ring-2 focus:ring-primary/20"
         />
+        {searchValue && (
+          <button
+            onClick={() => { setSearchValue(""); setSearchResults([]); setSearchOpen(false); }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-text-secondary hover:text-text-primary"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+
+        {/* Results dropdown */}
+        {searchOpen && (
+          <div className="absolute left-0 top-full mt-1 w-full rounded-xl border border-border bg-surface shadow-lg z-50 overflow-hidden">
+            {searchLoading ? (
+              <p className="px-4 py-3 text-sm text-text-secondary">Buscando…</p>
+            ) : searchResults.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-text-secondary">Sin resultados para &ldquo;{searchValue}&rdquo;</p>
+            ) : (
+              <ul>
+                {searchResults.map((r) => (
+                  <li key={r.id}>
+                    <button
+                      onClick={() => handleResultClick(r.href)}
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-background"
+                    >
+                      <span className="flex-1 font-medium text-text-primary truncate">{r.nombre}</span>
+                      <span className="shrink-0 text-xs text-text-secondary">{r.finca}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Spacer */}
@@ -64,13 +187,68 @@ export default function Header({ userName, userEmail }: HeaderProps) {
         {formatDate()}
       </span>
 
-      {/* Notifications */}
-      <button className="relative mr-4 rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary">
-        <Bell className="h-5 w-5" />
-        <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[10px] font-bold text-white">
-          3
-        </span>
-      </button>
+      {/* Notifications bell */}
+      <div ref={bellRef} className="relative mr-4">
+        <button
+          onClick={() => setBellOpen((prev) => !prev)}
+          className="relative rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
+          aria-label="Notificaciones"
+        >
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[10px] font-bold text-white">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {/* Notifications panel */}
+        {bellOpen && (
+          <div className="absolute right-0 top-full mt-1 w-80 rounded-xl border border-border bg-surface shadow-lg z-50">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <p className="text-sm font-semibold text-text-primary">Tareas pendientes</p>
+              {unreadCount > 0 && (
+                <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-medium text-danger">
+                  {unreadCount}
+                </span>
+              )}
+            </div>
+
+            {notifications.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-text-secondary">
+                Sin tareas pendientes
+              </p>
+            ) : (
+              <ul className="max-h-72 overflow-y-auto divide-y divide-border">
+                {notifications.map((n) => (
+                  <li key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-background transition-colors">
+                    <AlertCircle className={`mt-0.5 h-4 w-4 shrink-0 ${prioridadColor(n.prioridad)}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate text-sm font-medium text-text-primary">{n.titulo}</p>
+                      {n.fecha && (
+                        <p className="flex items-center gap-1 mt-0.5 text-xs text-text-secondary">
+                          <Calendar className="h-3 w-3" />
+                          {formatFecha(n.fecha)}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="border-t border-border px-4 py-2.5">
+              <Link
+                href="/ordenes"
+                onClick={() => setBellOpen(false)}
+                className="block text-center text-xs font-medium text-primary hover:underline"
+              >
+                Ver todas las tareas →
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* User menu */}
       <div ref={menuRef} className="relative">
