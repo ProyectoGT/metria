@@ -6,6 +6,7 @@ import { deletePropiedadAction } from "@/app/actions/security";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase-browser";
+import EncargoPanel from "@/components/propiedades/EncargoPanel";
 
 type Agente = {
   id: number;
@@ -95,6 +96,7 @@ export default function PropiedadesClient({
   const [propiedades, setPropiedades] = useState<Propiedad[]>(initialPropiedades);
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Propiedad | null>(null);
+  const [encargoPropiedad, setEncargoPropiedad] = useState<Propiedad | null>(null);
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -303,11 +305,12 @@ export default function PropiedadesClient({
             <tbody className="divide-y divide-border">
               {propiedades.map((propiedad) => {
                 const overdue = isOverdue(propiedad.fecha_visita);
+                const isEncargo = propiedad.estado === "encargo";
 
                 return (
                   <tr
                     key={propiedad.id}
-                    className="transition-colors hover:bg-background"
+                    className={`transition-colors hover:bg-background ${isEncargo ? "bg-green-50/40 dark:bg-green-950/10" : ""}`}
                   >
                     <td className="px-4 py-3 text-text-primary">
                       {propiedad.planta ?? "-"}
@@ -375,6 +378,14 @@ export default function PropiedadesClient({
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
+                        {isEncargo && (
+                          <button
+                            onClick={() => setEncargoPropiedad(propiedad)}
+                            className="rounded px-2 py-1 text-xs font-semibold text-green-700 transition-colors hover:bg-green-50"
+                          >
+                            Ver encargo
+                          </button>
+                        )}
                         <button
                           onClick={() => openEdit(propiedad)}
                           className="rounded px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-blue-50"
@@ -553,6 +564,17 @@ export default function PropiedadesClient({
             setDeleteError(null);
           }}
           onConfirm={handleDelete}
+        />
+      )}
+
+      {encargoPropiedad && (
+        <EncargoPanel
+          propiedad={encargoPropiedad}
+          onClose={() => setEncargoPropiedad(null)}
+          onEdit={() => {
+            setEncargoPropiedad(null);
+            openEdit(encargoPropiedad);
+          }}
         />
       )}
 

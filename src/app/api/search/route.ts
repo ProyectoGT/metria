@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     estado: string | null;
     fincas: {
       id: number;
-      numero: number;
+      numero: string;
       sectores: { id: number; numero: number; zona_id: number } | null;
     } | null;
   };
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
           .filter(Boolean)
           .join(" ") ||
         `Propiedad #${p.id}`,
-      finca: `Finca ${p.fincas!.numero}`,
+      finca: p.fincas!.numero,
       estado: p.estado ?? "",
       href: `/zona/${p.fincas!.sectores!.zona_id}/sector/${p.fincas!.sectores!.id}/finca/${p.fincas!.id}`,
     }));

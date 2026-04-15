@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase-browser";
 
 type Finca = {
   id: number;
-  numero: number;
+  numero: string;
   propiedades: Array<{ id: number }>;
 };
 
@@ -45,14 +45,13 @@ export default function FincasClient({
   const { toasts, toast } = useToast();
 
   async function handleCreate() {
-    const num = parseInt(numero, 10);
-    if (!num || Number.isNaN(num)) return;
+    if (!numero.trim()) return;
 
     setSaving(true);
 
     const { data, error: err } = await supabase
       .from("fincas")
-      .insert({ numero: num, sector_id: sectorId })
+      .insert({ numero: numero.trim(), sector_id: sectorId })
       .select("id, numero, propiedades(id)")
       .single();
 
@@ -60,7 +59,7 @@ export default function FincasClient({
       toast(`Error al crear la finca: ${err.message}`, "error");
     } else if (data) {
       setFincas((prev) =>
-        [...prev, data as Finca].sort((a, b) => a.numero - b.numero)
+        [...prev, data as Finca].sort((a, b) => a.numero.localeCompare(b.numero))
       );
       toast("Finca creada correctamente");
     }
@@ -194,7 +193,7 @@ export default function FincasClient({
                     className="group cursor-pointer transition-colors hover:bg-background"
                   >
                     <td className="px-5 py-3.5 font-medium text-text-primary">
-                      Finca {finca.numero}
+                      {finca.numero}
                     </td>
                     <td className="w-32 px-5 py-3.5 text-center text-text-secondary">
                       {propiedadCount}
@@ -252,15 +251,14 @@ export default function FincasClient({
             </div>
             <div className="px-6 py-5">
               <label className="text-xs font-medium text-text-secondary">
-                Numero de finca
+                Nombre de la finca
               </label>
               <input
-                type="number"
+                type="text"
                 value={numero}
                 onChange={(e) => setNumero(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                placeholder="Ej: 105"
-                min={1}
+                placeholder="Ej: Las Palmeras"
                 className="input mt-1.5"
                 autoFocus
               />

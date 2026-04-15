@@ -23,7 +23,9 @@ export default async function SectorDetailPage({
 
   if (!zona || !sector) notFound();
 
-  const fincas = (sector.fincas ?? []).sort((a, b) => a.numero - b.numero);
+  const fincas = (sector.fincas ?? []).sort((a, b) =>
+    String(a.numero).localeCompare(String(b.numero))
+  );
 
   return (
     <FincasClient

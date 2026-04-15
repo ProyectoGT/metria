@@ -8,7 +8,7 @@ export default async function ZonaPage() {
     getCurrentUserContext(),
     supabase
       .from("zona")
-      .select("*, sectores(id, fincas(id, propiedades(id)))")
+      .select("id, nombre, sectores(id, numero, fincas(id, propiedades(id)))")
       .order("nombre"),
   ]);
 
@@ -18,6 +18,7 @@ export default async function ZonaPage() {
         (zonas as Parameters<typeof ZonasClient>[0]["initialZonas"]) ?? []
       }
       canDeleteZonas={user?.canDeleteZonas ?? false}
+      canDeleteSectores={user?.canDeleteSectores ?? false}
     />
   );
 }

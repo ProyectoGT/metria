@@ -143,7 +143,7 @@ export default async function DashboardPage() {
     puerta: string | null;
     propietario: string | null;
     estado: string | null;
-    fincas: { id: number; numero: number; sectores: { id: number; numero: number; zona_id: number } | null } | null;
+    fincas: { id: number; numero: string; sectores: { id: number; numero: number; zona_id: number } | null } | null;
     usuarios: { nombre: string | null; apellidos: string | null } | null;
   };
 
@@ -155,7 +155,7 @@ export default async function DashboardPage() {
       : planta || puerta
         ? `Planta ${planta}${puerta ? ` ${puerta}` : ""}`.trim()
         : `Propiedad #${p.id}`;
-    const finca = p.fincas?.numero != null ? `Finca ${p.fincas.numero}` : "—";
+    const finca = p.fincas?.numero != null ? p.fincas.numero : "—";
     const sector = p.fincas?.sectores?.numero != null ? `Sector ${p.fincas.sectores.numero}` : "—";
     const agente = p.usuarios
       ? `${p.usuarios.nombre ?? ""} ${p.usuarios.apellidos ?? ""}`.trim() || "Sin asignar"
