@@ -308,7 +308,13 @@ export default async function DashboardPage() {
       <SummaryPanel summary={summary} listings={listings} />
 
       {/* 3 — Kanban + Orden del día (side-by-side cuando hay managers) */}
-      <div className={showOrdenDia ? "grid grid-cols-1 gap-8 xl:grid-cols-2" : ""}>
+      <div
+        className={
+          showOrdenDia
+            ? "grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]"
+            : ""
+        }
+      >
         <section className="min-w-0">
           <div className="mb-4">
             <h2 className="font-semibold text-text-primary">Mis tareas</h2>

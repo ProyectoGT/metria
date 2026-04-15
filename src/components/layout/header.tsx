@@ -8,16 +8,6 @@ import { logout } from "@/app/(auth)/actions";
 import Avatar from "@/components/ui/avatar";
 import type { NotificationItem } from "./app-shell";
 
-function formatDate(): string {
-  const now = new Date();
-  return now.toLocaleDateString("es-ES", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
-
 function prioridadColor(p: string | null) {
   if (p === "alta") return "text-red-500";
   if (p === "media") return "text-amber-500";
@@ -182,11 +172,6 @@ export default function Header({ userName, userEmail, notifications = [] }: Head
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Date */}
-      <span className="mr-6 hidden text-sm text-text-secondary lg:block">
-        {formatDate()}
-      </span>
-
       {/* Notifications bell */}
       <div ref={bellRef} className="relative mr-4">
         <button
@@ -264,11 +249,16 @@ export default function Header({ userName, userEmail, notifications = [] }: Head
         </button>
 
         {menuOpen && (
-          <div className="absolute right-0 top-full mt-1 w-48 rounded-xl border border-border bg-surface py-1 shadow-lg">
+          <div className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-border bg-surface py-1 shadow-lg">
             {userEmail && (
-              <p className="border-b border-border px-4 py-2 text-xs text-text-secondary">
-                {userEmail}
-              </p>
+              <div className="overflow-hidden border-b border-border px-4 py-2">
+                <p
+                  className="truncate text-xs text-text-secondary"
+                  title={userEmail}
+                >
+                  {userEmail}
+                </p>
+              </div>
             )}
             <Link
               href="/cuenta"
