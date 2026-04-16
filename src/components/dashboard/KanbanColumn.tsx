@@ -74,6 +74,7 @@ export default function KanbanColumn({
                     <KanbanCard
                       card={card}
                       canDelete={!card.assignedBy}
+                      isCompleted={column.id === "completado"}
                       onDelete={(id) => onDeleteCard(column.id, id)}
                       onComplete={(id) => onCompleteCard?.(column.id, id)}
                       dragHandleProps={dragProvided.dragHandleProps ?? undefined}

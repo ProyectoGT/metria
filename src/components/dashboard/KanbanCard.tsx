@@ -49,6 +49,8 @@ type KanbanCardProps = {
   card: KanbanCardData;
   /** Whether this card can be deleted (own cards) */
   canDelete: boolean;
+  /** Whether the card is in the completed column */
+  isCompleted?: boolean;
   /** Called when the delete button is pressed */
   onDelete: (id: string) => void;
   /** Called when the card is marked as completed */
@@ -61,6 +63,7 @@ type KanbanCardProps = {
 export default function KanbanCard({
   card,
   canDelete,
+  isCompleted = false,
   onDelete,
   onComplete,
   dragHandleProps,
@@ -68,6 +71,7 @@ export default function KanbanCard({
 }: KanbanCardProps) {
   const badge = priorityBadge[card.priority];
   const [completing, setCompleting] = useState(false);
+  const done = isCompleted || completing;
 
   function handleComplete(e: React.MouseEvent) {
     e.stopPropagation();
@@ -83,21 +87,27 @@ export default function KanbanCard({
     <div
       {...dragHandleProps}
       className={[
-        "rounded-lg border border-border bg-surface p-3 shadow-sm",
+        "rounded-lg border border-border p-3 shadow-sm",
         "transition-all duration-150 select-none",
-        isDragging ? "shadow-lg rotate-1 opacity-90" : "hover:shadow-md",
-        completing ? "opacity-50" : "",
+        done ? "bg-background opacity-70" : "bg-surface hover:shadow-md",
+        isDragging ? "shadow-lg rotate-1 opacity-90" : "",
+        completing && !isCompleted ? "opacity-50" : "",
       ].join(" ")}
     >
       {/* Top row: priority badge + actions */}
       <div className="mb-2 flex items-start justify-between gap-2">
         <span
-          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${badge.cls}`}
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${badge.cls} ${done ? "opacity-50" : ""}`}
         >
           {badge.label}
         </span>
         <div className="flex items-center gap-1">
-          {onComplete && (
+          {/* Icono de completado permanente en columna Realizado */}
+          {isCompleted && (
+            <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+          )}
+          {/* Botón para marcar como completado (solo en otras columnas) */}
+          {onComplete && !isCompleted && (
             <button
               onClick={handleComplete}
               className={`shrink-0 rounded p-0.5 transition-colors ${
@@ -130,22 +140,22 @@ export default function KanbanCard({
         </div>
       </div>
 
-      {/* Title — tachado cuando se está completando */}
+      {/* Title — tachado cuando está completada */}
       <p
-        className={`text-sm font-medium leading-snug text-text-primary transition-all duration-300 ${
-          completing ? "line-through text-text-secondary" : ""
+        className={`text-sm font-medium leading-snug transition-all duration-300 ${
+          done ? "line-through text-text-secondary" : "text-text-primary"
         }`}
       >
         {card.title}
       </p>
 
       {/* Description */}
-      {card.description && !completing && (
+      {card.description && !done && (
         <p className="mt-1 line-clamp-2 text-xs text-text-secondary">{card.description}</p>
       )}
 
       {/* Footer: date + assigned badge */}
-      {!completing && (card.dueDate || card.assignedBy) && (
+      {!done && (card.dueDate || card.assignedBy) && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {card.dueDate && (
             <span className="flex items-center gap-1 text-xs text-text-secondary">
