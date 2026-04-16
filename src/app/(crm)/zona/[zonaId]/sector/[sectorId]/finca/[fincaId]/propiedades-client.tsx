@@ -27,8 +27,8 @@ type Propiedad = {
   notas: string | null;
   agente_asignado: number | null;
   finca_id: number | null;
-  latitud: number | null;
-  longitud: number | null;
+  latitud?: number | null;
+  longitud?: number | null;
   usuarios: { id: number; nombre: string; apellidos: string } | null;
   // Orden local (no en BD, solo para UI)
   _order?: number;
@@ -181,8 +181,8 @@ export default function PropiedadesClient({
       fecha_visita: propiedad.fecha_visita ?? "",
       notas: propiedad.notas ?? "",
       agente_asignado: propiedad.agente_asignado?.toString() ?? "",
-      latitud: propiedad.latitud?.toString() ?? "",
-      longitud: propiedad.longitud?.toString() ?? "",
+      latitud: propiedad.latitud != null ? propiedad.latitud.toString() : "",
+      longitud: propiedad.longitud != null ? propiedad.longitud.toString() : "",
     });
     setModalOpen(true);
   }
@@ -257,8 +257,11 @@ export default function PropiedadesClient({
       longitud: form.longitud ? parseFloat(form.longitud) : null,
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabaseAny = supabase as any;
+
     if (editTarget) {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAny
         .from("propiedades")
         .update(payload)
         .eq("id", editTarget.id)
@@ -282,7 +285,7 @@ export default function PropiedadesClient({
         toast("Propiedad actualizada correctamente");
       }
     } else {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAny
         .from("propiedades")
         .insert({ ...payload, finca_id: fincaId })
         .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)")
