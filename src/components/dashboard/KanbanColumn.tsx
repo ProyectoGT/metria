@@ -75,7 +75,7 @@ export default function KanbanColumn({
                       card={card}
                       canDelete={!card.assignedBy}
                       onDelete={(id) => onDeleteCard(column.id, id)}
-                      onComplete={(id) => onCompleteCard(column.id, id)}
+                      onComplete={(id) => onCompleteCard?.(column.id, id)}
                       dragHandleProps={dragProvided.dragHandleProps ?? undefined}
                       isDragging={dragSnapshot.isDragging}
                     />
