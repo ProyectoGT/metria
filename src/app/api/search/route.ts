@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
       .or(`asunto.ilike.%${q}%,tipo.ilike.%${q}%,nombre_usuario.ilike.%${q}%,descripcion.ilike.%${q}%`)
       .limit(ctx === "soporte" ? 10 : 5);
 
-    for (const t of tickets ?? []) {
+    for (const t of (tickets ?? []) as any[]) {
       results.push({
         id: `ticket-${t.id}`,
         type: "ticket",
