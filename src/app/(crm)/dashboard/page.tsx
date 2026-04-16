@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
+import { getPeriodRange, mergeRendimientoRows } from "@/lib/desarrollo-metrics";
 import {
   mockAgentOfMonth,
   emptyRendimiento,
@@ -61,6 +62,7 @@ export default async function DashboardPage() {
   const userId = yo?.id ?? 0;
   const fullName = yo ? `${yo.nombre} ${yo.apellidos}`.trim() : "Usuario";
   const anioActual = new Date().getFullYear();
+  const periodRange = getPeriodRange(anioActual, 0);
 
   // ─── 1. Summary counts (paralelo) ────────────────────────────────────────
   const [
@@ -74,6 +76,7 @@ export default async function DashboardPage() {
     { data: pedidosList },
     { data: todosAgentes },
     { data: rendimientoData },
+    { data: actividadData },
     { data: tareasData },
   ] = await Promise.all([
     supabase.from("propiedades").select("*", { count: "exact", head: true }),
@@ -119,6 +122,11 @@ export default async function DashboardPage() {
       .select("id, nombre, apellidos, rol")
       .order("nombre"),
     supabase.from("rendimiento").select("*").eq("anio", anioActual).eq("mes", 0),
+    supabase
+      .from("actividad_desarrollo")
+      .select("agente_id, metric, value")
+      .gte("occurred_at", periodRange.from)
+      .lt("occurred_at", periodRange.to),
 
     // Tareas del usuario (pendiente + en_progreso + completado)
     supabase
@@ -210,8 +218,16 @@ export default async function DashboardPage() {
     visibleAgentes = visibleAgentes.filter((a) => a.id === userId);
   }
 
+  const rendimientoMap = mergeRendimientoRows({
+    agentes: visibleAgentes,
+    objetivos: rendimientoData ?? [],
+    actividades: actividadData ?? [],
+    anio: anioActual,
+    mes: 0,
+  });
+
   const agentMetrics: AgentMetrics[] = visibleAgentes.map((a) => {
-    const r = (rendimientoData ?? []).find((x) => x.agente_id === a.id);
+    const r = rendimientoMap[a.id];
     const rendimiento: Rendimiento = r
       ? {
           facturado: r.facturado,
