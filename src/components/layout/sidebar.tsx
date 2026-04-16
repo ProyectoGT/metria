@@ -36,11 +36,11 @@ interface Props {
 
 export default function Sidebar({ userRole: _userRole }: Props) {
   const pathname = usePathname();
-  const [dark, setDark] = useState(
-    () =>
-      typeof document !== "undefined" &&
-      document.documentElement.classList.contains("dark")
-  );
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains("dark"));
+  }, []);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const userRole = _userRole ? normalizeUserRole(_userRole) : null;
