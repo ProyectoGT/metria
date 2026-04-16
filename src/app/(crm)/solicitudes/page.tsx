@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
 import PageHeader from "@/components/layout/page-header";
-import PedidosClient from "./pedidos-client";
+import PedidosClient from "./solicitudes-client";
 
 export default async function PedidosPage() {
   const supabase = await createClient();
