@@ -16,7 +16,7 @@ type KanbanAddCardProps = {
 };
 
 const PRIORITIES: { value: KanbanPriority; label: string; cls: string; activeClsBorder: string }[] = [
-  { value: "alta", label: "Alta", cls: "text-red-700 hover:bg-red-50", activeClsBorder: "border-red-500 bg-red-100 text-red-700" },
+  { value: "alta", label: "Alta", cls: "text-red-700 hover:bg-red-500/10", activeClsBorder: "border-red-500 bg-red-500/15 text-red-700 dark:bg-red-500/20 dark:text-red-400" },
   { value: "media", label: "Media", cls: "text-yellow-700 hover:bg-yellow-50", activeClsBorder: "border-yellow-500 bg-yellow-100 text-yellow-700" },
   { value: "baja", label: "Baja", cls: "text-gray-600 hover:bg-gray-50", activeClsBorder: "border-gray-400 bg-gray-100 text-gray-700" },
 ];

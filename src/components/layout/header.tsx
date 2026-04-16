@@ -132,7 +132,7 @@ export default function Header({ userName, userEmail, notifications = [] }: Head
           onKeyDown={handleSearchKeyDown}
           onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
           placeholder="Buscar propietario o propiedad…"
-          className="w-full rounded-lg border border-border bg-background py-2 pl-10 pr-8 text-sm text-text-primary outline-none transition-colors placeholder:text-text-secondary focus:border-primary focus:ring-2 focus:ring-primary/20"
+          className="input py-2 pl-10 pr-8"
         />
         {searchValue && (
           <button
@@ -189,7 +189,7 @@ export default function Header({ userName, userEmail, notifications = [] }: Head
 
         {/* Notifications panel */}
         {bellOpen && (
-          <div className="absolute right-0 top-full mt-1 w-80 rounded-xl border border-border bg-surface shadow-lg z-50">
+          <div className="absolute right-0 top-full mt-1 w-[calc(100vw-2rem)] max-w-80 rounded-xl border border-border bg-surface shadow-lg z-50 sm:w-80">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <p className="text-sm font-semibold text-text-primary">Tareas pendientes</p>
               {unreadCount > 0 && (

@@ -7,9 +7,9 @@ import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 // ─── Priority styles ──────────────────────────────────────────────────────────
 
 const priorityBadge: Record<KanbanPriority, { cls: string; label: string }> = {
-  alta: { cls: "bg-red-100 text-red-700", label: "Alta" },
-  media: { cls: "bg-yellow-100 text-yellow-700", label: "Media" },
-  baja: { cls: "bg-gray-100 text-gray-600", label: "Baja" },
+  alta: { cls: "bg-red-500/15 text-red-700 dark:bg-red-500/20 dark:text-red-400", label: "Alta" },
+  media: { cls: "bg-yellow-500/15 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400", label: "Media" },
+  baja: { cls: "bg-gray-500/15 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400", label: "Baja" },
 };
 
 function formatDate(iso: string) {
@@ -103,7 +103,7 @@ export default function KanbanCard({
               className={`shrink-0 rounded p-0.5 transition-colors ${
                 completing
                   ? "text-green-500"
-                  : "text-text-secondary hover:bg-green-50 hover:text-green-600"
+                  : "text-text-secondary hover:bg-success/10 hover:text-green-600 dark:hover:text-green-400"
               }`}
               aria-label="Marcar como realizada"
               title="Marcar como realizada"
@@ -121,7 +121,7 @@ export default function KanbanCard({
                 e.stopPropagation();
                 onDelete(card.id);
               }}
-              className="shrink-0 rounded p-0.5 text-text-secondary transition-colors hover:bg-red-50 hover:text-danger"
+              className="shrink-0 rounded p-0.5 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
               aria-label="Eliminar tarea"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -164,7 +164,7 @@ export default function KanbanCard({
             </span>
           )}
           {card.assignedBy && (
-            <span className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+            <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary dark:bg-primary/20">
               <User className="h-3 w-3" />
               por {card.assignedBy}
             </span>

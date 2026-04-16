@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { canManageUsers, USER_ROLES, type UserRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { validatePassword } from "@/lib/password";
 
 type CreateUserInput = {
   nombre: string;
@@ -44,14 +45,18 @@ function mapAuthError(message: string) {
   }
 
   if (normalized.includes("password")) {
-    return "La contrasena no cumple los requisitos de seguridad de Supabase.";
+    return "La contrasena no cumple los requisitos de seguridad.";
   }
 
   if (
     normalized.includes("database error creating new user") ||
     normalized.includes("unexpected_failure")
   ) {
-    return "Supabase Auth no ha podido crear el usuario. Revisa si existe un trigger en auth.users que necesite nombre, apellidos o mas campos obligatorios.";
+    return (
+      "Supabase no pudo crear el usuario (posible trigger en auth.users). " +
+      "Aplica la migración 20260416_fix_auth_trigger.sql en el panel de Supabase. " +
+      `Error original: ${message}`
+    );
   }
 
   return message;
@@ -131,8 +136,9 @@ export async function createCrmUserAction(
     return { error: "El rol indicado no es valido." };
   }
 
-  if (password.length < 8) {
-    return { error: "La contrasena debe tener al menos 8 caracteres." };
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    return { error: `La contrasena no cumple los requisitos: ${passwordError}.` };
   }
 
   if (password !== confirmPassword) {

@@ -34,7 +34,7 @@ export default function AgentOfMonth({
       <>
         <div className="flex items-center justify-between rounded-xl border-2 border-dashed border-border bg-surface p-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/15 text-accent">
               <Trophy className="h-5 w-5" />
             </div>
             <div>
@@ -69,14 +69,14 @@ export default function AgentOfMonth({
   // Premio configurado (con o sin premiado)
   return (
     <>
-      <div className="overflow-hidden rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-accent/20 bg-accent/5 shadow-sm">
         <div className="flex items-start justify-between p-6">
           <div className="flex items-start gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-md">
               <Trophy className="h-7 w-7" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+              <p className="text-xs font-semibold uppercase tracking-wide text-accent">
                 Premio del mes · {data!.mes}
               </p>
               {data!.agente ? (
@@ -100,7 +100,7 @@ export default function AgentOfMonth({
               {!data!.agente && (
                 <button
                   onClick={() => setModalMode("winner")}
-                  className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white/70 px-3 py-1.5 text-sm font-medium text-amber-800 transition-colors hover:bg-white"
+                  className="flex items-center gap-1.5 rounded-lg border border-accent/30 bg-surface px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
                 >
                   <Award className="h-4 w-4" />
                   Asignar premiado
@@ -109,14 +109,14 @@ export default function AgentOfMonth({
               {/* Cambiar premio */}
               <button
                 onClick={() => setModalMode("prize")}
-                className="rounded-lg border border-amber-300 bg-white/70 px-3 py-1.5 text-sm font-medium text-amber-800 transition-colors hover:bg-white"
+                className="rounded-lg border border-accent/30 bg-surface px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
               >
                 Cambiar premio
               </button>
               {/* Quitar */}
               <button
                 onClick={() => setData(null)}
-                className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-white/70 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-white"
+                className="flex items-center gap-1.5 rounded-lg border border-danger/30 bg-surface px-3 py-1.5 text-sm font-medium text-danger transition-colors hover:bg-danger/10"
               >
                 <Trash2 className="h-4 w-4" />
                 Quitar

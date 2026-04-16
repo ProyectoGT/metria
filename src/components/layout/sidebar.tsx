@@ -23,7 +23,7 @@ import {
 const baseNavItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Zona / Sectores", href: "/zona", icon: MapPin },
-  { label: "Pedidos", href: "/pedidos", icon: ClipboardList },
+  { label: "Solicitudes", href: "/solicitudes", icon: ClipboardList },
   { label: "Desarrollo", href: "/desarrollo", icon: TrendingUp },
   { label: "Calendario", href: "/calendario", icon: Calendar },
   { label: "Órdenes del día", href: "/ordenes", icon: FileText },
@@ -72,13 +72,13 @@ export default function Sidebar({ userRole: _userRole }: Props) {
   const navContent = (
     <>
       {/* Logo */}
-      <div className="relative flex h-20 items-center justify-center bg-sidebar-logo px-4">
+      <div className="relative flex h-16 items-center justify-center bg-sidebar-logo px-2">
         <Image
           src="/logo-bg-master-iberica.png"
           alt="Master Ibérica"
-          width={200}
+          width={240}
           height={56}
-          className="h-14 w-auto object-contain"
+          className="h-20 w-auto object-contain"
           priority
         />
         {/* Cerrar drawer — solo en móvil */}

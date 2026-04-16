@@ -29,29 +29,29 @@ const CARDS: CardDef[] = [
     key: "noticias",
     label: "Noticias",
     icon: Newspaper,
-    accentColor: "bg-blue-100 text-blue-600",
-    activeBg: "bg-blue-50",
+    accentColor: "bg-blue-500/15 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400",
+    activeBg: "bg-blue-500/5 dark:bg-blue-500/10",
   },
   {
     key: "investigaciones",
     label: "Investigaciones",
     icon: Search,
-    accentColor: "bg-purple-100 text-purple-600",
-    activeBg: "bg-purple-50",
+    accentColor: "bg-purple-500/15 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400",
+    activeBg: "bg-purple-500/5 dark:bg-purple-500/10",
   },
   {
     key: "encargos",
     label: "Encargos",
     icon: ClipboardList,
-    accentColor: "bg-green-100 text-green-600",
-    activeBg: "bg-green-50",
+    accentColor: "bg-green-500/15 text-green-600 dark:bg-green-500/20 dark:text-green-400",
+    activeBg: "bg-green-500/5 dark:bg-green-500/10",
   },
   {
     key: "pedidosActivos",
     label: "Pedidos activos",
     icon: ShoppingBag,
-    accentColor: "bg-orange-100 text-orange-600",
-    activeBg: "bg-orange-50",
+    accentColor: "bg-orange-500/15 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400",
+    activeBg: "bg-orange-500/5 dark:bg-orange-500/10",
   },
 ];
 
@@ -59,11 +59,11 @@ const CARDS: CardDef[] = [
 
 function estadoBadge(estado: string) {
   const s = estado.toLowerCase();
-  if (s === "activo") return "bg-green-100 text-green-700";
-  if (s === "cerrado") return "bg-gray-100 text-gray-600";
-  if (s === "reservado") return "bg-purple-100 text-purple-700";
-  if (s === "pendiente") return "bg-yellow-100 text-yellow-700";
-  return "bg-blue-100 text-blue-700";
+  if (s === "activo") return "bg-green-500/15 text-green-700 dark:bg-green-500/20 dark:text-green-400";
+  if (s === "cerrado") return "bg-gray-500/15 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400";
+  if (s === "reservado") return "bg-purple-500/15 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400";
+  if (s === "pendiente") return "bg-yellow-500/15 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400";
+  return "bg-blue-500/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400";
 }
 
 // ─── Property table ───────────────────────────────────────────────────────────

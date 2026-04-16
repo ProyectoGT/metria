@@ -42,10 +42,10 @@ function ToastCard({ toast }: { toast: ToastItem }) {
     "flex items-center gap-2.5 rounded-lg px-4 py-3 text-sm font-medium shadow-lg transition-all duration-300";
   const colors =
     toast.type === "success"
-      ? "bg-green-600 text-white"
+      ? "bg-success text-white"
       : toast.type === "error"
-      ? "bg-red-600 text-white"
-      : "bg-gray-800 text-white";
+      ? "bg-danger text-white"
+      : "bg-text-primary text-background";
   const opacity = visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2";
 
   return (

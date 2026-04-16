@@ -54,9 +54,9 @@ type Props = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PRIORITIES = [
-  { value: "alta",  label: "Alta",  dot: "bg-red-500",  badge: "bg-red-100 text-red-700"   },
-  { value: "media", label: "Media", dot: "bg-amber-400", badge: "bg-amber-100 text-amber-700" },
-  { value: "baja",  label: "Baja",  dot: "bg-blue-400", badge: "bg-blue-100 text-blue-700"  },
+  { value: "alta",  label: "Alta",  dot: "bg-red-500",  badge: "bg-red-500/15 text-red-700 dark:bg-red-500/20 dark:text-red-400"   },
+  { value: "media", label: "Media", dot: "bg-amber-400", badge: "bg-amber-500/15 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400" },
+  { value: "baja",  label: "Baja",  dot: "bg-blue-400", badge: "bg-blue-500/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400"  },
 ];
 
 const MONTH_NAMES = [
@@ -358,7 +358,7 @@ export default function CalendarioClient({ initialEvents, initialTareas, isConne
       <div className="mb-6 flex items-center justify-end gap-3">
         {isConnected ? (
           <>
-            <span className="flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+            <span className="flex items-center gap-1.5 rounded-full bg-success/15 px-3 py-1 text-xs font-medium text-success dark:bg-success/20">
               <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
               Conectado
             </span>
@@ -371,7 +371,7 @@ export default function CalendarioClient({ initialEvents, initialTareas, isConne
           </>
         ) : (
           <>
-            <span className="flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-text-secondary">
+            <span className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium text-text-secondary">
               <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
               No conectado
             </span>
@@ -386,7 +386,7 @@ export default function CalendarioClient({ initialEvents, initialTareas, isConne
       </div>
 
       {/* Two-panel layout */}
-      <div className="flex gap-5">
+      <div className="flex flex-col gap-5 lg:flex-row">
 
         {/* ── Left: Calendar grid ── */}
         <div className="flex-1 rounded-2xl border border-border bg-surface p-6 shadow-sm">
@@ -510,7 +510,7 @@ export default function CalendarioClient({ initialEvents, initialTareas, isConne
         </div>
 
         {/* ── Right: Day activities ── */}
-        <div className="w-72 shrink-0 rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        <div className="w-full shrink-0 rounded-2xl border border-border bg-surface p-6 shadow-sm lg:w-72">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-text-primary">Actividades del día</h3>
             <button
@@ -549,7 +549,7 @@ export default function CalendarioClient({ initialEvents, initialTareas, isConne
                 return (
                   <div
                     key={`tarea-${t.id}`}
-                    className="group rounded-xl border border-violet-200 bg-violet-50 p-3"
+                    className="group rounded-xl border border-violet-500/30 bg-violet-500/10 p-3"
                   >
                     <div className="flex items-start gap-2">
                       <button
@@ -569,7 +569,7 @@ export default function CalendarioClient({ initialEvents, initialTareas, isConne
                         </p>
                         <div className="mt-1 flex items-center gap-2">
                           {hora && <span className="text-xs text-text-secondary">{hora}</span>}
-                          <span className="rounded-full bg-violet-100 px-1.5 py-px text-[10px] font-medium text-violet-700">
+                          <span className="rounded-full bg-violet-500/15 px-1.5 py-px text-[10px] font-medium text-violet-700 dark:bg-violet-500/20 dark:text-violet-400">
                             Tarea
                           </span>
                           {p && (
@@ -607,7 +607,7 @@ export default function CalendarioClient({ initialEvents, initialTareas, isConne
                             {p?.label}
                           </span>
                           {ev.gcal_event_id && (
-                            <span className="rounded-full bg-blue-100 px-1.5 py-px text-[10px] font-medium text-blue-600">
+                            <span className="rounded-full bg-blue-500/15 px-1.5 py-px text-[10px] font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
                               GCal
                             </span>
                           )}
@@ -615,7 +615,7 @@ export default function CalendarioClient({ initialEvents, initialTareas, isConne
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); setDeleteId(ev.id); }}
-                        className="shrink-0 rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-red-50 hover:text-danger group-hover:opacity-100"
+                        className="shrink-0 rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -630,7 +630,7 @@ export default function CalendarioClient({ initialEvents, initialTareas, isConne
               {dayGcalEvents.map((ev) => (
                 <div
                   key={ev.id}
-                  className="rounded-xl border border-blue-100 bg-blue-50 p-3"
+                  className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3"
                 >
                   <div className="flex items-start gap-2">
                     <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
@@ -775,7 +775,7 @@ export default function CalendarioClient({ initialEvents, initialTareas, isConne
               )}
 
               {saveError && (
-                <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-danger">{saveError}</p>
+                <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{saveError}</p>
               )}
             </div>
 

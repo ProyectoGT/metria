@@ -44,7 +44,7 @@ export default function DeleteConfirmationDialog({
         </div>
 
         {error && (
-          <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-danger">
+          <p className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
             {error}
           </p>
         )}

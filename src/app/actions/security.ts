@@ -7,6 +7,7 @@ import {
   verifyConfirmationPassword,
 } from "@/lib/delete-confirmation-password";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { validatePassword } from "@/lib/password";
 
 type ActionResult = {
   success?: boolean;
@@ -183,8 +184,9 @@ export async function updateDeleteConfirmationPasswordAction(input: {
     return { error: "Debes introducir una nueva contraseña de confirmación." };
   }
 
-  if (nextPassword.length < 8) {
-    return { error: "La nueva contraseña debe tener al menos 8 caracteres." };
+  const passwordError = validatePassword(nextPassword);
+  if (passwordError) {
+    return { error: `La contraseña no cumple los requisitos: ${passwordError}.` };
   }
 
   if (nextPassword !== confirmPassword) {

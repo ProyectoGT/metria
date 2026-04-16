@@ -47,13 +47,13 @@ export default async function AppShell({
       profile = byEmail;
     }
 
-    if (profile) {
-      userName = `${profile.nombre} ${profile.apellidos}`.trim() || "Usuario";
-      userRole = normalizeUserRole(
-        (profile as { rol?: string | null }).rol
-      );
-      userId = (profile as { id?: number | null }).id ?? null;
+    if (!profile) {
+      redirect("/sin-acceso");
     }
+
+    userName = `${profile.nombre} ${profile.apellidos}`.trim() || "Usuario";
+    userRole = normalizeUserRole((profile as { rol?: string | null }).rol);
+    userId = (profile as { id?: number | null }).id ?? null;
   }
 
   // Notificaciones: tareas pendientes del usuario actual
@@ -73,7 +73,7 @@ export default async function AppShell({
     <>
       <ThemeScript />
       <Sidebar userRole={userRole} />
-      <div className="flex min-h-screen flex-col md:pl-[220px]">
+      <div className="flex h-screen flex-col md:pl-[220px]">
         <Header userName={userName} userEmail={userEmail} notifications={notifications} />
         <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
           {children}
