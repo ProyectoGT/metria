@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bienvenido al CRM</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 16px;">
+    <tr>
+      <td align="center">
+
+        <!-- Card -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border-radius:12px;border:1px solid #e4e4e7;overflow:hidden;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color:#000000;padding:28px 40px;text-align:center;">
+              <img
+                src="https://TU_DOMINIO/logo-bg-master-iberica.png"
+                alt="Master Ibérica"
+                height="44"
+                style="height:44px;width:auto;display:inline-block;"
+              />
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:40px 40px 32px;">
+
+              <!-- Icon -->
+              <div style="text-align:center;margin-bottom:24px;">
+                <div style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;background-color:#eff6ff;margin:0 auto;">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="#2563eb"/>
+                  </svg>
+                </div>
+              </div>
+
+              <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#09090b;text-align:center;">
+                ¡Bienvenido al CRM!
+              </h1>
+              <p style="margin:0 0 28px;font-size:15px;color:#71717a;text-align:center;line-height:1.6;">
+                Has sido invitado a acceder al CRM de <strong style="color:#09090b;">Master Ibérica</strong>. Haz clic en el botón para establecer tu contraseña y comenzar.
+              </p>
+
+              <!-- CTA Button -->
+              <div style="text-align:center;margin-bottom:28px;">
+                <a
+                  href="{{ .ConfirmationURL }}"
+                  style="display:inline-block;background-color:#2563eb;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 32px;border-radius:8px;letter-spacing:0.01em;"
+                >
+                  Activar mi cuenta
+                </a>
+              </div>
+
+              <!-- What to expect -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:8px;border:1px solid #e4e4e7;margin-bottom:28px;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <p style="margin:0 0 12px;font-size:13px;font-weight:600;color:#3f3f46;text-transform:uppercase;letter-spacing:0.05em;">¿Qué puedes hacer?</p>
+                    <table cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding:4px 0;font-size:13px;color:#52525b;line-height:1.5;">
+                          ✓ &nbsp;Gestionar propiedades y fincas
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:4px 0;font-size:13px;color:#52525b;line-height:1.5;">
+                          ✓ &nbsp;Consultar y crear solicitudes
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:4px 0;font-size:13px;color:#52525b;line-height:1.5;">
+                          ✓ &nbsp;Gestionar tu agenda y tareas diarias
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:4px 0;font-size:13px;color:#52525b;line-height:1.5;">
+                          ✓ &nbsp;Acceder al módulo de desarrollo
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 8px;font-size:13px;color:#a1a1aa;text-align:center;line-height:1.5;">
+                El enlace de activación expira en <strong>24 horas</strong>.<br/>
+                Si no esperabas esta invitación, puedes ignorar este correo.
+              </p>
+
+              <!-- Divider -->
+              <hr style="border:none;border-top:1px solid #e4e4e7;margin:28px 0;" />
+
+              <!-- Fallback URL -->
+              <p style="margin:0;font-size:12px;color:#a1a1aa;text-align:center;line-height:1.5;">
+                Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>
+                <span style="color:#2563eb;word-break:break-all;">{{ .ConfirmationURL }}</span>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#fafafa;border-top:1px solid #e4e4e7;padding:20px 40px;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#a1a1aa;line-height:1.5;">
+                © 2026 Master Ibérica · CRM Interno<br/>
+                Este es un correo automático, por favor no respondas a este mensaje.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

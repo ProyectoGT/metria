@@ -133,6 +133,9 @@ export default function Sidebar({ userRole: _userRole }: Props) {
 
       {/* Tema */}
       <div className="border-t border-border px-3 py-3 space-y-0.5">
+        <p className="px-3 pb-1 text-[10px] font-medium text-text-secondary/50 tracking-widest uppercase">
+          v0.8.0 Beta
+        </p>
         <button
           onClick={toggleTheme}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-sidebar-hover hover:text-text-primary"

@@ -27,15 +27,17 @@ export default async function DesarrolloPage() {
     supabase.from("propiedades").select("*", { count: "exact", head: true }),
   ]);
 
-  // Filtrar agentes según rol
-  let agentes = todosAgentes ?? [];
+  // Filtrar agentes según rol — los Administradores no aparecen en desarrollo
+  let agentes = (todosAgentes ?? []).filter(
+    (a) => a.rol?.toLowerCase() !== "administrador" && a.rol?.toLowerCase() !== "admin",
+  );
   if (yo?.role === "Responsable") {
     const allowed = new Set([yo.id, ...yo.supervisedAgentIds]);
     agentes = agentes.filter((a) => allowed.has(a.id));
   } else if (yo?.role === "Agente") {
     agentes = agentes.filter((a) => a.id === yo.id);
   }
-  // Admin / Director: sin filtro
+  // Admin / Director: sin filtro (excepto admins excluidos arriba)
 
   const canManageObjectives = yo?.canViewAllAgents ?? false;
 

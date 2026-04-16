@@ -19,6 +19,8 @@ import OrdenDiaPanel from "@/components/dashboard/OrdenDiaPanel";
 import AgentOfMonth from "@/components/dashboard/AgentOfMonth";
 import AgentPerformanceTable from "@/components/dashboard/AgentPerformanceTable";
 import MyActivity from "@/components/dashboard/MyActivity";
+import MapaDashboard from "@/components/dashboard/MapaDashboard";
+import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -78,6 +80,7 @@ export default async function DashboardPage() {
     { data: rendimientoData },
     { data: actividadData },
     { data: tareasData },
+    { data: noticiasMapData },
   ] = await Promise.all([
     supabase.from("propiedades").select("*", { count: "exact", head: true }),
     supabase.from("propiedades").select("*", { count: "exact", head: true }).ilike("estado", "investig%"),
@@ -134,6 +137,14 @@ export default async function DashboardPage() {
       .select("id, titulo, prioridad, fecha, estado, owner_user_id")
       .in("estado", ["pendiente", "en_progreso", "completado"])
       .order("fecha", { ascending: true, nullsFirst: false }),
+
+    // Noticias con coordenadas para el mapa
+    supabase
+      .from("propiedades")
+      .select("id, propietario, planta, puerta, latitud, longitud, fincas(numero, sectores(numero))")
+      .ilike("estado", "noticia")
+      .not("latitud", "is", null)
+      .not("longitud", "is", null),
   ]);
 
   // ─── 2. Map summary data ──────────────────────────────────────────────────
@@ -310,6 +321,27 @@ export default async function DashboardPage() {
     role === "Administrador" || role === "Director" || role === "Responsable";
   const showMyActivity = role === "Agente";
 
+  // ─── 7. Noticias con coordenadas para el mapa ─────────────────────────────
+  type NoticiasMapRow = {
+    id: number;
+    propietario: string | null;
+    planta: string | null;
+    puerta: string | null;
+    latitud: number;
+    longitud: number;
+    fincas: { numero: string; sectores: { numero: number } | null } | null;
+  };
+  const noticiasMap: NoticiaMapPoint[] = ((noticiasMapData ?? []) as unknown as NoticiasMapRow[]).map((n) => ({
+    id: n.id,
+    propietario: n.propietario,
+    planta: n.planta,
+    puerta: n.puerta,
+    latitud: n.latitud,
+    longitud: n.longitud,
+    finca: n.fincas?.numero ?? "—",
+    sector: n.fincas?.sectores ? `Sector ${n.fincas.sectores.numero}` : "—",
+  }));
+
   return (
     <div className="flex flex-col gap-8">
       {/* 1 — Saludo */}
@@ -323,43 +355,29 @@ export default async function DashboardPage() {
       {/* 2 — Summary panel */}
       <SummaryPanel summary={summary} listings={listings} />
 
-      {/* 3 — Kanban + Orden del día (side-by-side cuando hay managers) */}
-      <div
-        className={
-          showOrdenDia
-            ? "grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]"
-            : ""
-        }
-      >
-        <section className="min-w-0">
-          <div className="mb-4">
-            <h2 className="font-semibold text-text-primary">Mis tareas</h2>
-            <p className="text-sm text-text-secondary">
-              Organiza tu trabajo arrastrando las tarjetas entre columnas.
-            </p>
-          </div>
-          <KanbanBoard
-            initialData={kanbanData}
-            role={role}
-            currentUserId={String(userId)}
-            agents={agentMetrics.map((a) => ({ id: a.id, nombre: a.nombre }))}
-          />
-        </section>
+      {/* 3 — Mapa de noticias */}
+      <MapaDashboard noticias={noticiasMap} />
 
-        {showOrdenDia && (
-          <section className="min-w-0">
-            <div className="mb-4">
-              <h2 className="font-semibold text-text-primary">Orden del día</h2>
-              <p className="text-sm text-text-secondary">
-                Tareas pendientes de tu equipo.
-              </p>
-            </div>
-            <OrdenDiaPanel agentes={ordenDiaAgentes} />
-          </section>
-        )}
-      </div>
+      {/* 4 — Mis tareas (Kanban) */}
+      <section className="min-w-0">
+        <div className="mb-4">
+          <h2 className="font-semibold text-text-primary">Mis tareas</h2>
+          <p className="text-sm text-text-secondary">
+            Organiza tu trabajo arrastrando las tarjetas entre columnas.
+          </p>
+        </div>
+        <KanbanBoard
+          initialData={kanbanData}
+          role={role}
+          currentUserId={String(userId)}
+          agents={agentMetrics.map((a) => ({ id: a.id, nombre: a.nombre }))}
+        />
+      </section>
 
-      {/* 5 — Agente del mes (mock: no existe tabla en BD) */}
+      {/* 5 — Orden del día */}
+      {showOrdenDia && <OrdenDiaPanel agentes={ordenDiaAgentes} />}
+
+      {/* 6 — Agente del mes */}
       <AgentOfMonth
         initialData={mockAgentOfMonth}
         role={role}
@@ -367,7 +385,7 @@ export default async function DashboardPage() {
         agents={agentMetrics.map((a) => ({ id: a.id, nombre: a.nombre }))}
       />
 
-      {/* 6 — Rendimiento / Mi actividad */}
+      {/* 7 — Rendimiento / Mi actividad */}
       {showAgentPerformance && <AgentPerformanceTable agents={agentMetrics} />}
       {showMyActivity && <MyActivity rendimiento={ownMetrics} />}
     </div>

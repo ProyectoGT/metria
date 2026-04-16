@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import KanbanColumn from "./KanbanColumn";
 import KanbanAddColumn from "./KanbanAddColumn";
@@ -13,6 +13,8 @@ import {
   completeTareaAction,
   updateTareaEstadoAction,
 } from "@/app/(crm)/dashboard/actions";
+
+const CUSTOM_COLS_KEY = "kanban_custom_columns";
 
 type KanbanBoardProps = {
   initialData: KanbanData;
@@ -36,6 +38,23 @@ export default function KanbanBoard({
 }: KanbanBoardProps) {
   const [columns, setColumns] = useState<KanbanColumnData[]>(initialData.columns);
   const [addingCardCol, setAddingCardCol] = useState<string | null>(null);
+
+  // Restaurar columnas custom desde localStorage al montar
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(CUSTOM_COLS_KEY);
+      if (saved) {
+        const customCols: Array<{ id: string; title: string }> = JSON.parse(saved);
+        setColumns((prev) => {
+          const existingIds = new Set(prev.map((c) => c.id));
+          const toAdd = customCols.filter((c) => !existingIds.has(c.id));
+          return [...prev, ...toAdd.map((c) => ({ ...c, fixed: false, cards: [] }))];
+        });
+      }
+    } catch {
+      // ignorar errores de localStorage
+    }
+  }, []);
 
   // ─── Drag & drop ────────────────────────────────────────────────────────────
   function handleDragEnd(result: DropResult) {
@@ -72,13 +91,26 @@ export default function KanbanBoard({
   }
 
   // ─── Column ops ─────────────────────────────────────────────────────────────
+  function saveCustomCols(cols: KanbanColumnData[]) {
+    const custom = cols.filter((c) => !c.fixed).map((c) => ({ id: c.id, title: c.title }));
+    localStorage.setItem(CUSTOM_COLS_KEY, JSON.stringify(custom));
+  }
+
   function handleAddColumn(title: string) {
     const id = `col-${Date.now()}`;
-    setColumns((prev) => [...prev, { id, title, fixed: false, cards: [] }]);
+    setColumns((prev) => {
+      const next = [...prev, { id, title, fixed: false, cards: [] }];
+      saveCustomCols(next);
+      return next;
+    });
   }
 
   function handleDeleteColumn(columnId: string) {
-    setColumns((prev) => prev.filter((c) => c.id !== columnId || c.fixed));
+    setColumns((prev) => {
+      const next = prev.filter((c) => c.id !== columnId || c.fixed);
+      saveCustomCols(next);
+      return next;
+    });
   }
 
   // ─── Card ops ───────────────────────────────────────────────────────────────

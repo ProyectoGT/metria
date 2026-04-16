@@ -27,6 +27,8 @@ type Propiedad = {
   notas: string | null;
   agente_asignado: number | null;
   finca_id: number | null;
+  latitud: number | null;
+  longitud: number | null;
   usuarios: { id: number; nombre: string; apellidos: string } | null;
   // Orden local (no en BD, solo para UI)
   _order?: number;
@@ -41,6 +43,8 @@ type FormData = {
   fecha_visita: string;
   notas: string;
   agente_asignado: string;
+  latitud: string;
+  longitud: string;
 };
 
 type ReminderForm = {
@@ -100,6 +104,8 @@ const EMPTY_FORM: FormData = {
   fecha_visita: "",
   notas: "",
   agente_asignado: "",
+  latitud: "",
+  longitud: "",
 };
 
 const EMPTY_REMINDER: ReminderForm = {
@@ -175,6 +181,8 @@ export default function PropiedadesClient({
       fecha_visita: propiedad.fecha_visita ?? "",
       notas: propiedad.notas ?? "",
       agente_asignado: propiedad.agente_asignado?.toString() ?? "",
+      latitud: propiedad.latitud?.toString() ?? "",
+      longitud: propiedad.longitud?.toString() ?? "",
     });
     setModalOpen(true);
   }
@@ -245,6 +253,8 @@ export default function PropiedadesClient({
       fecha_visita: form.fecha_visita || null,
       notas: form.notas || null,
       agente_asignado: form.agente_asignado ? Number(form.agente_asignado) : null,
+      latitud: form.latitud ? parseFloat(form.latitud) : null,
+      longitud: form.longitud ? parseFloat(form.longitud) : null,
     };
 
     if (editTarget) {
@@ -902,6 +912,48 @@ export default function PropiedadesClient({
                   className="input resize-none"
                 />
               </FormField>
+
+              {form.estado === "noticia" && (
+                <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+                  <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                    Ubicación en el mapa
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField label="Latitud">
+                      <input
+                        type="number"
+                        step="any"
+                        value={form.latitud}
+                        onChange={(e) => setField("latitud", e.target.value)}
+                        placeholder="Ej: 41.3851"
+                        className="input"
+                      />
+                    </FormField>
+                    <FormField label="Longitud">
+                      <input
+                        type="number"
+                        step="any"
+                        value={form.longitud}
+                        onChange={(e) => setField("longitud", e.target.value)}
+                        placeholder="Ej: 2.1734"
+                        className="input"
+                      />
+                    </FormField>
+                  </div>
+                  <p className="text-xs text-text-secondary">
+                    Abre{" "}
+                    <a
+                      href="https://maps.google.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline"
+                    >
+                      Google Maps
+                    </a>
+                    , haz clic derecho sobre la dirección → &quot;¿Qué hay aquí?&quot; y copia las coordenadas.
+                  </p>
+                </div>
+              )}
 
               {saveError && (
                 <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">

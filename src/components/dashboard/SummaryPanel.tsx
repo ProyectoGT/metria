@@ -186,7 +186,7 @@ export default function SummaryPanel({ summary, listings }: SummaryPanelProps) {
 
       {/* Full-screen overlay — cubre el contenido principal bajo el header */}
       {activeKey && activeCard && (
-        <div className="fixed inset-0 z-[45] flex flex-col bg-background pt-16 md:pl-[220px]">
+        <div className="fixed inset-0 z-30 flex flex-col bg-background pt-16 md:pl-[220px]">
           {/* Cabecera de la pantalla */}
           <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4 md:px-6">
             <button

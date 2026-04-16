@@ -27,117 +27,61 @@ type Props = {
 };
 
 const MESES_LABEL = [
-  "Ene",
-  "Feb",
-  "Mar",
-  "Abr",
-  "May",
-  "Jun",
-  "Jul",
-  "Ago",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dic",
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
-
-const RADIUS = 38;
-const CIRC = 2 * Math.PI * RADIUS;
 
 const METRICS = [
   {
-    key: "facturado",
-    objKey: "objetivo_facturado",
+    key: "facturado" as const,
+    objKey: "objetivo_facturado" as const,
     label: "Facturado",
-    color: "var(--color-primary)",
+    color: "var(--color-accent)",
     isCurrency: true,
   },
   {
-    key: "encargos",
-    objKey: "objetivo_encargos",
+    key: "encargos" as const,
+    objKey: "objetivo_encargos" as const,
     label: "Encargos",
     color: "#7c3aed",
     isCurrency: false,
   },
   {
-    key: "ventas",
-    objKey: "objetivo_ventas",
+    key: "ventas" as const,
+    objKey: "objetivo_ventas" as const,
     label: "Ventas",
     color: "var(--color-success)",
     isCurrency: false,
   },
   {
-    key: "contactos",
-    objKey: "objetivo_contactos",
+    key: "contactos" as const,
+    objKey: "objetivo_contactos" as const,
     label: "Contactos",
-    color: "var(--color-accent)",
+    color: "var(--color-primary)",
     isCurrency: false,
   },
 ] as const;
 
 function fmtNum(v: number, isCurrency: boolean): string {
   if (!isCurrency) return String(v);
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
-  return String(v);
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M €`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K €`;
+  return `${v} €`;
 }
 
-function fmtEur(v: number) {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M EUR`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K EUR`;
-  return `${v} EUR`;
+function pct(value: number, obj: number) {
+  if (obj <= 0) return 0;
+  return Math.min(Math.round((value / obj) * 100), 100);
 }
 
-function Ring({
-  value,
-  objetivo,
-  color,
-  label,
-  isCurrency,
-}: {
-  value: number;
-  objetivo: number;
-  color: string;
-  label: string;
-  isCurrency: boolean;
-}) {
-  const pct = objetivo > 0 ? Math.min(value / objetivo, 1) : 0;
-  const offset = CIRC * (1 - pct);
-
+function ProgressBar({ value, objetivo, color }: { value: number; objetivo: number; color: string }) {
+  const p = pct(value, objetivo);
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="relative h-[84px] w-[84px]">
-        <svg className="h-[84px] w-[84px] -rotate-90" viewBox="0 0 100 100">
-          <circle
-            cx="50"
-            cy="50"
-            r={RADIUS}
-            fill="none"
-            strokeWidth="7"
-            style={{ stroke: "var(--color-border)" }}
-          />
-          <circle
-            cx="50"
-            cy="50"
-            r={RADIUS}
-            fill="none"
-            strokeWidth="7"
-            strokeLinecap="round"
-            strokeDasharray={CIRC}
-            strokeDashoffset={offset}
-            style={{ stroke: color, transition: "stroke-dashoffset 0.6s ease" }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[13px] font-bold leading-none text-text-primary">
-            {fmtNum(value, isCurrency)}
-          </span>
-          <span className="mt-0.5 text-[10px] leading-tight text-text-secondary">
-            /{fmtNum(objetivo, isCurrency)}
-          </span>
-        </div>
-      </div>
-      <span className="text-[11px] font-medium text-text-secondary">{label}</span>
+    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-border">
+      <div
+        className="h-full rounded-full transition-all duration-500"
+        style={{ width: `${p}%`, backgroundColor: color }}
+      />
     </div>
   );
 }
@@ -215,10 +159,8 @@ export default function DesarrolloClient({
 
   async function handleSave() {
     if (!editForm || !editAgente) return;
-
     setSaving(true);
     setSaveError(null);
-
     try {
       const data = await updateObjetivosRendimientoAction({
         agenteId: editAgente.id,
@@ -229,7 +171,6 @@ export default function DesarrolloClient({
         objetivo_ventas: editForm.objetivo_ventas,
         objetivo_contactos: editForm.objetivo_contactos,
       });
-
       setStatsMap((prev) => ({
         ...prev,
         [editAgente.id]: {
@@ -245,12 +186,9 @@ export default function DesarrolloClient({
       setEditForm(null);
     } catch (error) {
       setSaveError(
-        error instanceof Error
-          ? error.message
-          : "No se pudieron guardar los objetivos.",
+        error instanceof Error ? error.message : "No se pudieron guardar los objetivos.",
       );
     }
-
     setSaving(false);
   }
 
@@ -260,150 +198,175 @@ export default function DesarrolloClient({
       facturado: vals.reduce((s, v) => s + (v.facturado || 0), 0),
       encargos: vals.reduce((s, v) => s + (v.encargos || 0), 0),
       ventas: vals.reduce((s, v) => s + (v.ventas || 0), 0),
+      contactos: vals.reduce((s, v) => s + (v.contactos || 0), 0),
     };
   }, [statsMap]);
 
   const yearOptions = [defaultAnio - 1, defaultAnio, defaultAnio + 1];
 
+  const summaryCards = [
+    { label: "Noticias", value: String(totalNoticias), color: "var(--color-primary)" },
+    { label: "Encargos", value: String(totals.encargos), color: "#7c3aed" },
+    { label: "Ventas", value: String(totals.ventas), color: "var(--color-success)" },
+    { label: "Facturado", value: fmtNum(totals.facturado, true), color: "var(--color-accent)" },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
+
+      {/* ── Resumen de rendimiento ─────────────────────────────────── */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {summaryCards.map(({ label, value, color }) => (
+          <div key={label} className="rounded-xl border border-border bg-surface p-5">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+              <p className="text-xs font-medium text-text-secondary">{label}</p>
+            </div>
+            <p className="text-2xl font-bold text-text-primary">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Filtros ────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-3">
         <select
           value={anio}
           onChange={(e) => handlePeriod(Number(e.target.value), mes)}
-          className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text-primary"
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
         >
           {yearOptions.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
+            <option key={y} value={y}>{y}</option>
           ))}
         </select>
 
-        <div className="flex flex-wrap gap-1">
-          <button
-            onClick={() => handlePeriod(anio, 0)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-              mes === 0
-                ? "bg-primary text-white"
-                : "border border-border bg-surface text-text-secondary hover:bg-background"
-            }`}
-          >
-            Todo el ano
-          </button>
+        <select
+          value={mes}
+          onChange={(e) => handlePeriod(anio, Number(e.target.value))}
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <option value={0}>Todo el año</option>
           {MESES_LABEL.map((m, i) => (
-            <button
-              key={m}
-              onClick={() => handlePeriod(anio, i + 1)}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                mes === i + 1
-                  ? "bg-primary text-white"
-                  : "border border-border bg-surface text-text-secondary hover:bg-background"
-              }`}
-            >
-              {m}
-            </button>
+            <option key={m} value={i + 1}>{m}</option>
           ))}
-        </div>
+        </select>
       </div>
 
+      {/* ── Tabla tipo Excel ────────────────────────────────────────── */}
       {agentes.length === 0 ? (
         <p className="text-sm text-text-secondary">No hay agentes registrados.</p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {agentes.map((agente) => {
-            const stats = statsMap[agente.id] ?? defaultRendimiento(agente.id, anio, mes);
+        <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+          <table className="w-full min-w-[640px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted">
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                  Agente
+                </th>
+                {METRICS.map(({ label, color }) => (
+                  <th
+                    key={label}
+                    className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-text-secondary"
+                  >
+                    <span className="flex items-center justify-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                      {label}
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {agentes.map((agente, idx) => {
+                const stats = statsMap[agente.id] ?? defaultRendimiento(agente.id, anio, mes);
+                const isLast = idx === agentes.length - 1;
 
-            return (
-              <div key={agente.id} className="rounded-xl border border-border bg-surface p-5">
-                <div className="mb-5 flex items-center justify-between">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                      {agente.nombre[0]}
-                      {agente.apellidos[0]}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-text-primary">
-                        {agente.nombre} {agente.apellidos}
+                return (
+                  <tr
+                    key={agente.id}
+                    className={`transition-colors hover:bg-muted ${!isLast ? "border-b border-border" : ""}`}
+                  >
+                    {/* Agente */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                          {agente.nombre[0]}{agente.apellidos[0]}
+                        </div>
+                        <div>
+                          <p className="font-medium text-text-primary">
+                            {agente.nombre} {agente.apellidos}
+                          </p>
+                          <p className="text-xs text-text-secondary">{agente.rol}</p>
+                        </div>
+                        {canManageObjectives && (
+                          <button
+                            onClick={() => openEdit(agente)}
+                            className="ml-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
+                          >
+                            Objetivos
+                          </button>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Métricas */}
+                    {METRICS.map(({ key, objKey, color, isCurrency }) => {
+                      const val = stats[key];
+                      const obj = stats[objKey];
+                      const p = pct(val, obj);
+
+                      return (
+                        <td key={key} className="px-4 py-3 text-center">
+                          <p className="font-semibold text-text-primary">
+                            {fmtNum(val, isCurrency)}
+                          </p>
+                          <p className="text-xs text-text-secondary">
+                            obj. {fmtNum(obj, isCurrency)}
+                          </p>
+                          <ProgressBar value={val} objetivo={obj} color={color} />
+                          <p className="mt-0.5 text-[11px] text-text-secondary">{p}%</p>
+                        </td>
+                      );
+                    })}
+
+                  </tr>
+                );
+              })}
+
+              {/* Fila totales */}
+              {agentes.length > 1 && (
+                <tr className="border-t-2 border-border bg-muted font-semibold">
+                  <td className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-text-secondary">
+                    Total
+                  </td>
+                  {METRICS.map(({ key, isCurrency, color }) => (
+                    <td key={key} className="px-4 py-3 text-center">
+                      <p className="font-bold text-text-primary" style={{ color }}>
+                        {fmtNum(totals[key], isCurrency)}
                       </p>
-                      <p className="text-xs text-text-secondary">{agente.rol}</p>
-                    </div>
-                  </div>
-                  {canManageObjectives && (
-                    <button
-                      onClick={() => openEdit(agente)}
-                      className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
-                    >
-                      Objetivos
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-4 gap-1">
-                  {METRICS.map(({ key, objKey, label, color, isCurrency }) => (
-                    <Ring
-                      key={key}
-                      value={stats[key]}
-                      objetivo={stats[objKey]}
-                      color={color}
-                      label={label}
-                      isCurrency={isCurrency}
-                    />
+                    </td>
                   ))}
-                </div>
-              </div>
-            );
-          })}
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       )}
 
-      <div>
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-text-secondary opacity-70">
-          Resumen de Rendimiento
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "Noticias", value: String(totalNoticias), dot: "var(--color-primary)" },
-            { label: "Encargos", value: String(totals.encargos), dot: "#7c3aed" },
-            { label: "Ventas", value: String(totals.ventas), dot: "var(--color-success)" },
-            { label: "Facturado", value: fmtEur(totals.facturado), dot: "var(--color-accent)" },
-          ].map(({ label, value, dot }) => (
-            <div key={label} className="rounded-xl border border-border bg-surface p-5">
-              <div className="mb-2 flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: dot }} />
-                <p className="text-xs font-medium text-text-secondary">{label}</p>
-              </div>
-              <p className="text-2xl font-bold text-text-primary">{value}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
+      {/* ── Modal de objetivos ──────────────────────────────────────── */}
       {editAgente && editForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-base font-semibold text-text-primary">
-                {editAgente.nombre} {editAgente.apellidos}
+                Objetivos — {editAgente.nombre} {editAgente.apellidos}
               </h2>
               <button
                 onClick={() => setEditAgente(null)}
                 className="rounded-lg p-1 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
                 aria-label="Cerrar"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>

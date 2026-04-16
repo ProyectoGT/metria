@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { createCrmUserAction } from "./actions";
 import { PASSWORD_RULES, isPasswordValid } from "@/lib/password";
+import { Mail, KeyRound } from "lucide-react";
 
 type Props = {
   roles: readonly string[];
@@ -20,6 +21,7 @@ const initialForm = {
 
 export default function CreateUserForm({ roles, onSuccess }: Props) {
   const [form, setForm] = useState(initialForm);
+  const [sendInvite, setSendInvite] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -35,7 +37,7 @@ export default function CreateUserForm({ roles, onSuccess }: Props) {
     setError(null);
 
     startTransition(async () => {
-      const result = await createCrmUserAction(form);
+      const result = await createCrmUserAction({ ...form, sendInvite });
 
       if (result.error) {
         setError(result.error);
@@ -43,9 +45,8 @@ export default function CreateUserForm({ roles, onSuccess }: Props) {
       }
 
       setForm(initialForm);
-      onSuccess?.(
-        result.message ?? "Usuario creado correctamente."
-      );
+      setSendInvite(false);
+      onSuccess?.(result.message ?? "Usuario creado correctamente.");
     });
   }
 
@@ -108,40 +109,78 @@ export default function CreateUserForm({ roles, onSuccess }: Props) {
         </div>
       </Field>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Contrasena">
-          <input
-            type="password"
-            value={form.password}
-            onChange={(event) => updateField("password", event.target.value)}
-            className="input"
-            placeholder="Contrasena segura"
-            autoComplete="new-password"
-            required
-          />
-        </Field>
-        <Field label="Confirmar contrasena">
-          <input
-            type="password"
-            value={form.confirmPassword}
-            onChange={(event) =>
-              updateField("confirmPassword", event.target.value)
-            }
-            className="input"
-            placeholder="Repite la contrasena"
-            autoComplete="new-password"
-            required
-          />
-        </Field>
-      </div>
+      {/* Toggle: contraseña manual vs invitación por correo */}
+      <Field label="Contraseña">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setSendInvite(false)}
+            className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
+              !sendInvite
+                ? "border-primary bg-primary text-white"
+                : "border-border bg-background text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            <KeyRound className="h-4 w-4 shrink-0" />
+            Establecer ahora
+          </button>
+          <button
+            type="button"
+            onClick={() => setSendInvite(true)}
+            className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
+              sendInvite
+                ? "border-primary bg-primary text-white"
+                : "border-border bg-background text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            <Mail className="h-4 w-4 shrink-0" />
+            Enviar por correo
+          </button>
+        </div>
+      </Field>
 
-      {form.password && <PasswordChecklist password={form.password} />}
+      {sendInvite ? (
+        <div className="rounded-lg border border-border bg-background px-4 py-3 text-sm text-text-secondary">
+          Se enviará un correo a <span className="font-medium text-text-primary">{form.correo || "la dirección indicada"}</span> con un enlace para que el usuario establezca su propia contraseña.
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Contrasena">
+              <input
+                type="password"
+                value={form.password}
+                onChange={(event) => updateField("password", event.target.value)}
+                className="input"
+                placeholder="Contrasena segura"
+                autoComplete="new-password"
+                required={!sendInvite}
+              />
+            </Field>
+            <Field label="Confirmar contrasena">
+              <input
+                type="password"
+                value={form.confirmPassword}
+                onChange={(event) =>
+                  updateField("confirmPassword", event.target.value)
+                }
+                className="input"
+                placeholder="Repite la contrasena"
+                autoComplete="new-password"
+                required={!sendInvite}
+              />
+            </Field>
+          </div>
 
-      {passwordsDiffer && (
-        <p className="text-xs text-danger">Las contrasenas no coinciden.</p>
-      )}
-      {passwordsMatch && isPasswordValid(form.password) && (
-        <p className="text-xs text-success">Las contrasenas coinciden.</p>
+          {form.password && <PasswordChecklist password={form.password} />}
+
+          {passwordsDiffer && (
+            <p className="text-xs text-danger">Las contrasenas no coinciden.</p>
+          )}
+          {passwordsMatch && isPasswordValid(form.password) && (
+            <p className="text-xs text-success">Las contrasenas coinciden.</p>
+          )}
+        </>
       )}
 
       {error && (
@@ -156,7 +195,9 @@ export default function CreateUserForm({ roles, onSuccess }: Props) {
           disabled={isPending}
           className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
         >
-          {isPending ? "Creando..." : "Crear usuario"}
+          {isPending
+            ? sendInvite ? "Enviando invitación..." : "Creando..."
+            : sendInvite ? "Crear y enviar invitación" : "Crear usuario"}
         </button>
       </div>
     </form>

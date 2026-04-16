@@ -13,6 +13,7 @@ type CreateUserInput = {
   rol: string;
   password: string;
   confirmPassword: string;
+  sendInvite?: boolean;
 };
 
 type ActionResult = {
@@ -123,6 +124,7 @@ export async function createCrmUserAction(
   const rol = input.rol.trim();
   const password = input.password;
   const confirmPassword = input.confirmPassword;
+  const sendInvite = input.sendInvite ?? false;
 
   if (!nombre || !apellidos) {
     return { error: "Debes indicar nombre y apellidos." };
@@ -136,13 +138,14 @@ export async function createCrmUserAction(
     return { error: "El rol indicado no es valido." };
   }
 
-  const passwordError = validatePassword(password);
-  if (passwordError) {
-    return { error: `La contrasena no cumple los requisitos: ${passwordError}.` };
-  }
-
-  if (password !== confirmPassword) {
-    return { error: "La confirmacion de la contrasena no coincide." };
+  if (!sendInvite) {
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return { error: `La contrasena no cumple los requisitos: ${passwordError}.` };
+    }
+    if (password !== confirmPassword) {
+      return { error: "La confirmacion de la contrasena no coincide." };
+    }
   }
 
   const adminClient = createAdminClient();
@@ -169,9 +172,14 @@ export async function createCrmUserAction(
     };
   }
 
+  // Si es invitación, generamos una contraseña aleatoria temporal
+  const effectivePassword = sendInvite
+    ? `Tmp_${Math.random().toString(36).slice(2, 10)}A1!`
+    : password;
+
   const authResponse = await adminClient.auth.admin.createUser({
     email: correo,
-    password,
+    password: effectivePassword,
     email_confirm: true,
     user_metadata: {
       nombre,
@@ -231,12 +239,25 @@ export async function createCrmUserAction(
     };
   }
 
+  // Enviar email de recuperación si se eligió invitación por correo
+  if (sendInvite) {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+    await adminClient.auth.admin.generateLink({
+      type: "recovery",
+      email: correo,
+      options: {
+        redirectTo: `${siteUrl}/auth/callback?next=/nueva-contrasena`,
+      },
+    });
+  }
+
   revalidatePath("/usuarios");
 
   return {
     success: true,
-    message:
-      "Usuario creado correctamente. Ya puede acceder con el correo y la contrasena indicados.",
+    message: sendInvite
+      ? `Invitacion enviada a ${correo}. El usuario recibirá un correo para establecer su contraseña.`
+      : "Usuario creado correctamente. Ya puede acceder con el correo y la contrasena indicados.",
   };
 }
 
