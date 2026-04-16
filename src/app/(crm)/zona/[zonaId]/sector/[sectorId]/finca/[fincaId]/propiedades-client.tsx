@@ -257,8 +257,11 @@ export default function PropiedadesClient({
       longitud: form.longitud ? parseFloat(form.longitud) : null,
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabaseAny = supabase as any;
+
     if (editTarget) {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAny
         .from("propiedades")
         .update(payload)
         .eq("id", editTarget.id)
@@ -282,7 +285,7 @@ export default function PropiedadesClient({
         toast("Propiedad actualizada correctamente");
       }
     } else {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAny
         .from("propiedades")
         .insert({ ...payload, finca_id: fincaId })
         .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)")
