@@ -63,6 +63,7 @@ const ESTADOS = [
   },
   { value: "noticia", label: "Noticia", classes: "bg-purple-100 text-purple-700" },
   { value: "encargo", label: "Encargo", classes: "bg-green-500/15 text-green-700 dark:bg-green-500/20 dark:text-green-400" },
+  { value: "vendido", label: "Vendido", classes: "bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400" },
 ] as const;
 
 // Estados que se consideran "sin contactar" (pendientes)

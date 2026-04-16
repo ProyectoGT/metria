@@ -1,6 +1,76 @@
 export interface Database {
   public: {
     Tables: {
+      actividad_desarrollo: {
+        Row: {
+          id: number;
+          agente_id: number;
+          actor_user_id: number | null;
+          empresa_id: number | null;
+          equipo_id: number | null;
+          metric: string;
+          action: string;
+          source_table: string;
+          source_id: number;
+          value: number;
+          occurred_at: string;
+          metadata: Record<string, unknown>;
+        };
+        Insert: {
+          id?: number;
+          agente_id: number;
+          actor_user_id?: number | null;
+          empresa_id?: number | null;
+          equipo_id?: number | null;
+          metric: string;
+          action: string;
+          source_table: string;
+          source_id: number;
+          value?: number;
+          occurred_at?: string;
+          metadata?: Record<string, unknown>;
+        };
+        Update: {
+          id?: number;
+          agente_id?: number;
+          actor_user_id?: number | null;
+          empresa_id?: number | null;
+          equipo_id?: number | null;
+          metric?: string;
+          action?: string;
+          source_table?: string;
+          source_id?: number;
+          value?: number;
+          occurred_at?: string;
+          metadata?: Record<string, unknown>;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "actividad_desarrollo_agente_id_fkey";
+            columns: ["agente_id"];
+            referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "actividad_desarrollo_actor_user_id_fkey";
+            columns: ["actor_user_id"];
+            referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "actividad_desarrollo_empresa_id_fkey";
+            columns: ["empresa_id"];
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "actividad_desarrollo_equipo_id_fkey";
+            columns: ["equipo_id"];
+            referencedRelation: "equipos";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       agenda: {
         Row: {
           id: number;
@@ -508,6 +578,8 @@ export interface Database {
           objetivo_ventas: number;
           contactos: number;
           objetivo_contactos: number;
+          created_at: string;
+          updated_at: string;
         };
         Insert: {
           id?: number;
@@ -522,6 +594,8 @@ export interface Database {
           objetivo_ventas?: number;
           contactos?: number;
           objetivo_contactos?: number;
+          created_at?: string;
+          updated_at?: string;
         };
         Update: {
           id?: number;
@@ -536,6 +610,8 @@ export interface Database {
           objetivo_ventas?: number;
           contactos?: number;
           objetivo_contactos?: number;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [
           {
@@ -665,6 +741,31 @@ export interface Database {
           row_empresa_id: number | null;
         };
         Returns: boolean;
+      };
+      can_view_agent_metrics: {
+        Args: {
+          target_agente_id: number;
+        };
+        Returns: boolean;
+      };
+      can_manage_agent_objectives: {
+        Args: {
+          target_agente_id: number;
+        };
+        Returns: boolean;
+      };
+      insert_desarrollo_activity: {
+        Args: {
+          target_agente_id: number;
+          target_actor_user_id: number | null;
+          target_metric: string;
+          target_action: string;
+          target_source_table: string;
+          target_source_id: number;
+          target_value?: number;
+          target_metadata?: Record<string, unknown>;
+        };
+        Returns: undefined;
       };
       delete_finca_cascade: {
         Args: {

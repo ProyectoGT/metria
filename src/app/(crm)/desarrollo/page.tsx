@@ -1,19 +1,31 @@
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
+import { getPeriodRange, mergeRendimientoRows } from "@/lib/desarrollo-metrics";
 import PageHeader from "@/components/layout/page-header";
 import DesarrolloClient from "./desarrollo-client";
 
 export default async function DesarrolloPage() {
   const supabase = await createClient();
   const anioActual = new Date().getFullYear();
+  const periodRange = getPeriodRange(anioActual, 0);
 
-  const [yo, { data: todosAgentes }, { data: rendimiento }, { count: totalNoticias }] =
-    await Promise.all([
-      getCurrentUserContext(),
-      supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
-      supabase.from("rendimiento").select("*").eq("anio", anioActual).eq("mes", 0),
-      supabase.from("propiedades").select("*", { count: "exact", head: true }),
-    ]);
+  const [
+    yo,
+    { data: todosAgentes },
+    { data: rendimiento },
+    { data: actividad },
+    { count: totalNoticias },
+  ] = await Promise.all([
+    getCurrentUserContext(),
+    supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
+    supabase.from("rendimiento").select("*").eq("anio", anioActual).eq("mes", 0),
+    supabase
+      .from("actividad_desarrollo")
+      .select("agente_id, metric, value")
+      .gte("occurred_at", periodRange.from)
+      .lt("occurred_at", periodRange.to),
+    supabase.from("propiedades").select("*", { count: "exact", head: true }),
+  ]);
 
   // Filtrar agentes según rol
   let agentes = todosAgentes ?? [];
@@ -25,13 +37,19 @@ export default async function DesarrolloPage() {
   }
   // Admin / Director: sin filtro
 
-  const canEdit = yo
-    ? yo.role === "Administrador" || yo.role === "Director" || yo.role === "Responsable"
-    : false;
+  const canManageObjectives = yo?.canViewAllAgents ?? false;
+
+  const statsMap = mergeRendimientoRows({
+    agentes,
+    objetivos: rendimiento ?? [],
+    actividades: actividad ?? [],
+    anio: anioActual,
+    mes: 0,
+  });
 
   const agentesConStats = agentes.map((a) => ({
     ...a,
-    rendimiento: rendimiento?.find((r) => r.agente_id === a.id) ?? null,
+    rendimiento: statsMap[a.id] ?? null,
   }));
 
   return (
@@ -43,7 +61,7 @@ export default async function DesarrolloPage() {
       <DesarrolloClient
         agentes={agentesConStats}
         totalNoticias={totalNoticias ?? 0}
-        canEdit={canEdit}
+        canManageObjectives={canManageObjectives}
         defaultAnio={anioActual}
       />
     </>
