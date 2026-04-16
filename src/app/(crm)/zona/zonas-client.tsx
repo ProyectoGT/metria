@@ -260,7 +260,7 @@ export default function ZonasClient({
                           setDeletePassword("");
                           setDeleteTarget({ kind: "zona", id: zona.id });
                         }}
-                        className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-red-50 hover:text-danger"
+                        className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
                         title="Eliminar zona"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -331,7 +331,7 @@ export default function ZonasClient({
                                           zonaId: zona.id,
                                         });
                                       }}
-                                      className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-red-50 hover:text-danger group-hover:opacity-100"
+                                      className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
                                       title="Eliminar sector"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />

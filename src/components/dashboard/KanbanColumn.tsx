@@ -43,7 +43,7 @@ export default function KanbanColumn({
         {!column.fixed && (
           <button
             onClick={() => onDeleteColumn(column.id)}
-            className={`rounded p-1 text-text-secondary transition-all hover:bg-red-50 hover:text-danger ${
+            className={`rounded p-1 text-text-secondary transition-all hover:bg-danger/10 hover:text-danger ${
               hovered ? "opacity-100" : "opacity-0"
             }`}
             aria-label="Eliminar columna"
@@ -60,7 +60,7 @@ export default function KanbanColumn({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`flex max-h-[480px] min-h-[80px] flex-1 flex-col gap-2 overflow-y-auto p-3 transition-colors ${
-              snapshot.isDraggingOver ? "bg-blue-50/50" : ""
+              snapshot.isDraggingOver ? "bg-primary/5" : ""
             }`}
           >
             {column.cards.map((card: KanbanCardData, index: number) => (

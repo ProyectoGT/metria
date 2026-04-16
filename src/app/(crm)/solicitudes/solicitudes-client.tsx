@@ -381,7 +381,7 @@ export default function PedidosClient({
                           event.stopPropagation();
                           setDeleteId(pedido.id);
                         }}
-                        className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-red-50 hover:text-danger group-hover:opacity-100"
+                        className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
                         title="Eliminar pedido"
                       >
                         <svg
@@ -698,7 +698,7 @@ export default function PedidosClient({
               </div>
 
               {saveError && (
-                <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-danger">
+                <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
                   {saveError}
                 </p>
               )}

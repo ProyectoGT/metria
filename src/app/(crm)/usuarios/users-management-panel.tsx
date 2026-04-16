@@ -141,7 +141,7 @@ function UserRow({
   }
 
   return (
-    <tr className={isAdmin ? "bg-slate-50/70 align-top" : "align-top"}>
+    <tr className={isAdmin ? "bg-muted/70 align-top" : "align-top"}>
       <td className="py-4 pr-4">
         <div className="space-y-1">
           <p className="text-sm font-medium text-text-primary">
@@ -205,14 +205,14 @@ function UserRow({
                 type="button"
                 onClick={handleDelete}
                 disabled={isPending}
-                className="rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-danger/30 px-3 py-2 text-xs font-medium text-danger transition-colors hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Eliminar
               </button>
             </div>
 
             {error && <p className="text-xs text-danger">{error}</p>}
-            {feedback && <p className="text-xs text-green-700">{feedback}</p>}
+            {feedback && <p className="text-xs text-success">{feedback}</p>}
           </div>
         )}
       </td>
@@ -229,7 +229,7 @@ function PanelBadge({
 }) {
   const className =
     tone === "dark"
-      ? "bg-slate-900 text-white"
+      ? "bg-text-primary text-background"
       : "bg-background text-text-secondary";
 
   return (
@@ -244,12 +244,12 @@ function PanelBadge({
 function RoleBadge({ role }: { role: string }) {
   const className =
     role === "Administrador"
-      ? "bg-slate-900 text-white"
+      ? "bg-text-primary text-background"
       : role === "Director"
-        ? "bg-blue-100 text-blue-800"
+        ? "bg-primary/15 text-primary dark:bg-primary/25"
         : role === "Responsable"
-          ? "bg-amber-100 text-amber-800"
-          : "bg-emerald-100 text-emerald-800";
+          ? "bg-accent/15 text-accent dark:bg-accent/25"
+          : "bg-success/15 text-success dark:bg-success/25";
 
   return (
     <span
@@ -264,10 +264,10 @@ function StatusBadge({ status }: { status: string }) {
   const normalized = status.toLowerCase();
   const className =
     normalized === "active"
-      ? "bg-green-100 text-green-800"
+      ? "bg-success/15 text-success dark:bg-success/25"
       : normalized === "disabled"
-        ? "bg-red-100 text-red-800"
-        : "bg-amber-100 text-amber-800";
+        ? "bg-danger/15 text-danger dark:bg-danger/25"
+        : "bg-accent/15 text-accent dark:bg-accent/25";
 
   const label =
     normalized === "active"

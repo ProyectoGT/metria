@@ -109,8 +109,8 @@ export default function AgentOfMonthModal({
           {!isPrizeMode && (
             <>
               {existingData?.premio && (
-                <div className="rounded-lg bg-amber-50 px-4 py-3">
-                  <p className="text-xs font-medium text-amber-700">Premio del mes</p>
+                <div className="rounded-lg bg-accent/10 px-4 py-3">
+                  <p className="text-xs font-medium text-accent">Premio del mes</p>
                   <p className="mt-0.5 text-sm text-text-primary">{existingData.premio}</p>
                 </div>
               )}

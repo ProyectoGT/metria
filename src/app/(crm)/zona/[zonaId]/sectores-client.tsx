@@ -262,7 +262,7 @@ export default function SectoresClient({
                             setDeletePassword("");
                             setDeleteId(sector.id);
                           }}
-                          className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-red-50 hover:text-danger group-hover:opacity-100"
+                          className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
                           title="Eliminar sector"
                         >
                           <svg

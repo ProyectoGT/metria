@@ -9,9 +9,9 @@ type OrdenDiaPanelProps = {
 };
 
 const PRIORITY_BADGE: Record<KanbanPriority, { cls: string; label: string }> = {
-  alta: { cls: "bg-red-100 text-red-700", label: "Alta" },
-  media: { cls: "bg-yellow-100 text-yellow-700", label: "Media" },
-  baja: { cls: "bg-gray-100 text-gray-600", label: "Baja" },
+  alta: { cls: "bg-red-500/15 text-red-700 dark:bg-red-500/20 dark:text-red-400", label: "Alta" },
+  media: { cls: "bg-yellow-500/15 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400", label: "Media" },
+  baja: { cls: "bg-gray-500/15 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400", label: "Baja" },
 };
 
 function formatDate(iso: string) {

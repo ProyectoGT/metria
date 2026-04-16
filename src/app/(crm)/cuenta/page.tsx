@@ -42,8 +42,8 @@ export default async function CuentaPage() {
                 {authUser.email ?? "-"}
               </p>
             </div>
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <p className="text-xs font-medium text-amber-800">
+            <div className="rounded-xl border border-accent/30 bg-accent/10 px-4 py-3">
+              <p className="text-xs font-medium text-accent">
                 Tu cuenta de acceso no está vinculada a un perfil de usuario.
                 Contacta con el administrador para que asocie tu correo en la
                 tabla de usuarios.

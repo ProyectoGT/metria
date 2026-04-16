@@ -143,9 +143,9 @@ const PRIORIDAD_LABELS: Record<string, string> = {
 };
 
 const PRIORIDAD_BADGES: Record<string, string> = {
-  alta: "bg-red-100 text-red-700",
-  media: "bg-amber-100 text-amber-700",
-  baja: "bg-blue-100 text-blue-700",
+  alta: "bg-red-500/15 text-red-700 dark:bg-red-500/20 dark:text-red-400",
+  media: "bg-amber-500/15 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400",
+  baja: "bg-blue-500/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400",
 };
 
 const ESTADO_LABELS: Record<string, string> = {
@@ -156,10 +156,10 @@ const ESTADO_LABELS: Record<string, string> = {
 };
 
 const ESTADO_BADGES: Record<string, string> = {
-  abierto: "bg-blue-100 text-blue-700",
-  en_proceso: "bg-amber-100 text-amber-700",
-  resuelto: "bg-green-100 text-green-700",
-  cerrado: "bg-gray-100 text-gray-600",
+  abierto: "bg-blue-500/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400",
+  en_proceso: "bg-amber-500/15 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400",
+  resuelto: "bg-green-500/15 text-green-700 dark:bg-green-500/20 dark:text-green-400",
+  cerrado: "bg-gray-500/15 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -168,7 +168,7 @@ function prioridadBadge(p: string) {
   return (
     <span
       className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-        PRIORIDAD_BADGES[p] ?? "bg-gray-100 text-gray-600"
+        PRIORIDAD_BADGES[p] ?? "bg-gray-500/15 text-gray-600 dark:text-gray-400"
       }`}
     >
       {PRIORIDAD_LABELS[p] ?? p}
@@ -180,7 +180,7 @@ function estadoBadge(e: string) {
   return (
     <span
       className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-        ESTADO_BADGES[e] ?? "bg-gray-100 text-gray-600"
+        ESTADO_BADGES[e] ?? "bg-gray-500/15 text-gray-600 dark:text-gray-400"
       }`}
     >
       {ESTADO_LABELS[e] ?? e}
@@ -693,7 +693,7 @@ export default function SoporteClient({
                         </button>
                         <button
                           onClick={() => setDeleteContactoId(c.id)}
-                          className="rounded p-1.5 text-text-secondary transition-colors hover:bg-red-50 hover:text-danger"
+                          className="rounded p-1.5 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
                           title="Eliminar"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -927,7 +927,7 @@ export default function SoporteClient({
                   </div>
 
                   {sendError && (
-                    <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-danger">
+                    <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
                       {sendError}
                     </p>
                   )}
@@ -999,15 +999,15 @@ export default function SoporteClient({
 
                         {/* Respuesta del admin */}
                         {ticket.respuesta && (
-                          <div className="mt-4 rounded-lg bg-green-50 p-3">
-                            <p className="mb-1 text-xs font-medium text-green-700">
+                          <div className="mt-4 rounded-lg bg-success/10 p-3">
+                            <p className="mb-1 text-xs font-medium text-success">
                               Respuesta del administrador:
                             </p>
-                            <p className="whitespace-pre-wrap text-sm text-green-800">
+                            <p className="whitespace-pre-wrap text-sm text-text-primary">
                               {ticket.respuesta}
                             </p>
                             {ticket.respondido_por_nombre && (
-                              <p className="mt-1.5 text-xs text-green-600">
+                              <p className="mt-1.5 text-xs text-text-secondary">
                                 — {ticket.respondido_por_nombre}
                                 {ticket.respondido_at
                                   ? `, ${formatDate(ticket.respondido_at)}`
@@ -1120,15 +1120,15 @@ export default function SoporteClient({
 
               {/* Respuesta existente */}
               {detailTicket.respuesta && (
-                <div className="rounded-lg bg-green-50 p-3">
-                  <p className="mb-1 text-xs font-medium text-green-700">
+                <div className="rounded-lg bg-success/10 p-3">
+                  <p className="mb-1 text-xs font-medium text-success">
                     Respuesta guardada:
                   </p>
-                  <p className="whitespace-pre-wrap text-sm text-green-800">
+                  <p className="whitespace-pre-wrap text-sm text-text-primary">
                     {detailTicket.respuesta}
                   </p>
                   {detailTicket.respondido_por_nombre && (
-                    <p className="mt-1 text-xs text-green-600">
+                    <p className="mt-1 text-xs text-text-secondary">
                       — {detailTicket.respondido_por_nombre}
                       {detailTicket.respondido_at
                         ? `, ${formatDate(detailTicket.respondido_at)}`
@@ -1265,7 +1265,7 @@ export default function SoporteClient({
               </div>
 
               {contactoError && (
-                <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-danger">
+                <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
                   {contactoError}
                 </p>
               )}

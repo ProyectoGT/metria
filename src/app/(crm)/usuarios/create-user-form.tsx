@@ -51,17 +51,17 @@ export default function CreateUserForm({ roles }: Props) {
   }
 
   return (
-    <section className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-surface shadow-sm">
-      <div className="border-b border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#eef4ff_45%,#f9fafb_100%)] px-6 py-6">
+    <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+      <div className="border-b border-border bg-muted px-6 py-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-text-secondary">
               Alta de acceso
             </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-text-primary">
               Crear un usuario nuevo
             </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
+            <p className="mt-2 text-sm leading-6 text-text-secondary">
               El alta crea la cuenta en Supabase Auth y deja el perfil enlazado
               dentro del CRM en un solo paso.
             </p>
@@ -207,8 +207,8 @@ export default function CreateUserForm({ roles }: Props) {
               </Field>
             </FormBlock>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <div className="rounded-2xl border border-border bg-muted p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-secondary">
                 Resumen
               </p>
               <dl className="mt-4 space-y-3">
@@ -227,25 +227,25 @@ export default function CreateUserForm({ roles }: Props) {
         </div>
 
         {error && (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-danger">
+          <p className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
             {error}
           </p>
         )}
 
         {success && (
-          <p className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+          <p className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
             {success}
           </p>
         )}
 
-        <div className="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-text-secondary">
             Revisa bien el correo y el rango antes de crear la cuenta.
           </p>
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60"
+            className="rounded-xl bg-primary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
           >
             {isPending ? "Creando usuario..." : "Crear usuario"}
           </button>
@@ -265,10 +265,10 @@ function FormBlock({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5">
+    <section className="rounded-2xl border border-border bg-surface p-5">
       <div className="mb-4">
-        <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
+        <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+        <p className="mt-1 text-sm text-text-secondary">{description}</p>
       </div>
       <div className="space-y-4">{children}</div>
     </section>
@@ -286,11 +286,11 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <label className="text-xs font-medium uppercase tracking-wide text-text-secondary">
         {label}
       </label>
       {children}
-      {hint && <p className="text-xs text-slate-500">{hint}</p>}
+      {hint && <p className="text-xs text-text-secondary">{hint}</p>}
     </div>
   );
 }
@@ -305,12 +305,12 @@ function StatCard({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm backdrop-blur">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+    <div className="rounded-2xl border border-border bg-surface px-4 py-3 shadow-sm">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-text-secondary">
         {label}
       </p>
-      <p className="mt-2 text-base font-semibold text-slate-950">{value}</p>
-      <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+      <p className="mt-2 text-base font-semibold text-text-primary">{value}</p>
+      <p className="mt-1 text-xs leading-5 text-text-secondary">{description}</p>
     </div>
   );
 }
@@ -329,15 +329,15 @@ function RoleInfo({
   const className =
     tone === "dark"
       ? active
-        ? "border-slate-900 bg-slate-900 text-white"
-        : "border-slate-200 bg-slate-50 text-slate-700"
+        ? "border-text-primary bg-text-primary text-background"
+        : "border-border bg-muted text-text-secondary"
       : tone === "blue"
         ? active
-          ? "border-blue-600 bg-blue-600 text-white"
-          : "border-blue-200 bg-blue-50 text-blue-800"
+          ? "border-primary bg-primary text-white"
+          : "border-primary/20 bg-primary/10 text-primary"
         : active
-          ? "border-amber-500 bg-amber-500 text-white"
-          : "border-amber-200 bg-amber-50 text-amber-800";
+          ? "border-accent bg-accent text-white"
+          : "border-accent/20 bg-accent/10 text-accent";
 
   return (
     <div className={`rounded-xl border px-4 py-3 ${className}`}>
@@ -350,10 +350,10 @@ function RoleInfo({
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <dt className="text-xs font-medium uppercase tracking-wide text-text-secondary">
         {label}
       </dt>
-      <dd className="text-right text-sm font-medium text-slate-900">{value}</dd>
+      <dd className="text-right text-sm font-medium text-text-primary">{value}</dd>
     </div>
   );
 }

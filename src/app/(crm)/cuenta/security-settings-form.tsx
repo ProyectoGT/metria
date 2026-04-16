@@ -79,7 +79,7 @@ export default function SecuritySettingsForm({
       </div>
 
       {!canManageConfirmationPassword ? (
-        <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="mt-5 rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
           Solo el Administrador puede actualizar la contrasena de confirmacion.
         </div>
       ) : (
@@ -117,13 +117,13 @@ export default function SecuritySettingsForm({
           </Field>
 
           {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger">
+            <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
               {error}
             </p>
           )}
 
           {success && (
-            <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+            <p className="rounded-lg bg-success/10 px-3 py-2 text-sm text-success">
               {success}
             </p>
           )}

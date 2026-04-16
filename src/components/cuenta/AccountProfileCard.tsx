@@ -124,12 +124,12 @@ export default function AccountProfileCard({
       </div>
 
       {error && (
-        <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-danger">
+        <p className="mt-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
           {error}
         </p>
       )}
       {success && (
-        <p className="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+        <p className="mt-4 rounded-lg bg-success/10 px-3 py-2 text-sm text-success">
           {success}
         </p>
       )}
@@ -202,12 +202,12 @@ export default function AccountProfileCard({
           </FloatingField>
 
           {pwError && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger">
+            <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
               {pwError}
             </p>
           )}
           {pwSuccess && (
-            <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+            <p className="rounded-lg bg-success/10 px-3 py-2 text-sm text-success">
               {pwSuccess}
             </p>
           )}

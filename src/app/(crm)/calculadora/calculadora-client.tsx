@@ -265,9 +265,9 @@ function ComisionCalc() {
               <ResultRow label="Neto para el vendedor" value={fmtEur(base)} />
 
               {/* Verificación */}
-              <div className="rounded-xl border border-green-200 bg-green-50 p-3">
-                <p className="text-xs font-semibold text-green-700">✓ Verificación inversa</p>
-                <p className="mt-1 text-xs text-green-600">
+              <div className="rounded-xl border border-success/30 bg-success/10 p-3">
+                <p className="text-xs font-semibold text-success">✓ Verificación inversa</p>
+                <p className="mt-1 text-xs text-success/80">
                   {fmtEur(finalCalc)} × (1 − {pct}%) = <strong>{fmtEur(baseVerif!)}</strong>
                   {" "}— coincide exactamente con el precio base
                 </p>
@@ -298,9 +298,9 @@ function ComisionCalc() {
               <ResultRow label={`Comisión (${pct}% sobre el final)`} value={fmtEur(comFromFinal!)} />
               <ResultRow label="Precio al comprador" value={fmtEur(final)} />
 
-              <div className="rounded-xl border border-green-200 bg-green-50 p-3">
-                <p className="text-xs font-semibold text-green-700">✓ Verificación</p>
-                <p className="mt-1 text-xs text-green-600">
+              <div className="rounded-xl border border-success/30 bg-success/10 p-3">
+                <p className="text-xs font-semibold text-success">✓ Verificación</p>
+                <p className="mt-1 text-xs text-success/80">
                   {fmtEur(baseFromFinal)} + {fmtEur(comFromFinal!)} = <strong>{fmtEur(final)}</strong>
                 </p>
               </div>

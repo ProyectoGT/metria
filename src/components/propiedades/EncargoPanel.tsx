@@ -218,7 +218,7 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
         className="fixed inset-y-0 right-0 z-[61] flex w-full flex-col bg-surface shadow-2xl sm:w-[520px]"
       >
         {/* ── Header ── */}
-        <div className="flex shrink-0 flex-col gap-3 border-b border-border bg-green-50 px-5 py-4 dark:bg-green-950/30">
+        <div className="flex shrink-0 flex-col gap-3 border-b border-border bg-success/10 px-5 py-4 dark:bg-success/15">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="mb-1 flex items-center gap-2">
@@ -356,7 +356,7 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
                             )}
                             <button
                               onClick={() => handleDeleteArchivo(doc.id)}
-                              className="rounded p-1 text-text-secondary transition-colors hover:bg-red-50 hover:text-danger"
+                              className="rounded p-1 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
                               title="Eliminar"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -447,14 +447,14 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
                                 href={img.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="rounded-lg bg-white/90 p-1 shadow transition-colors hover:bg-white"
+                                className="rounded-lg bg-surface/90 p-1 shadow transition-colors hover:bg-surface"
                               >
                                 <ExternalLink className="h-3.5 w-3.5 text-text-primary" />
                               </a>
                             )}
                             <button
                               onClick={() => handleDeleteArchivo(img.id)}
-                              className="rounded-lg bg-white/90 p-1 shadow transition-colors hover:bg-red-50"
+                              className="rounded-lg bg-white/90 p-1 shadow transition-colors hover:bg-danger/10"
                             >
                               <Trash2 className="h-3.5 w-3.5 text-danger" />
                             </button>
@@ -513,7 +513,7 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
                           </p>
                           <button
                             onClick={() => handleDeleteNota(nota.id)}
-                            className="absolute right-2 top-2 rounded p-1 text-text-secondary opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-danger"
+                            className="absolute right-2 top-2 rounded p-1 text-text-secondary opacity-0 transition-all group-hover:opacity-100 hover:bg-danger/10 hover:text-danger"
                             title="Eliminar nota"
                           >
                             <Trash2 className="h-3.5 w-3.5" />

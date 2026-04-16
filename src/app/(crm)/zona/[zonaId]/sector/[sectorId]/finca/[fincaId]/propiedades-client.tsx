@@ -50,7 +50,7 @@ type ReminderForm = {
 };
 
 const ESTADOS = [
-  { value: "neutral", label: "Neutral", classes: "bg-gray-100 text-gray-600" },
+  { value: "neutral", label: "Neutral", classes: "bg-gray-500/15 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400" },
   {
     value: "investigacion",
     label: "Investigacion",
@@ -62,7 +62,7 @@ const ESTADOS = [
     classes: "bg-amber-100 text-amber-700",
   },
   { value: "noticia", label: "Noticia", classes: "bg-purple-100 text-purple-700" },
-  { value: "encargo", label: "Encargo", classes: "bg-green-100 text-green-700" },
+  { value: "encargo", label: "Encargo", classes: "bg-green-500/15 text-green-700 dark:bg-green-500/20 dark:text-green-400" },
 ] as const;
 
 // Estados que se consideran "sin contactar" (pendientes)
@@ -70,7 +70,7 @@ const ESTADOS_SIN_CONTACTAR = ["neutral", "investigacion"];
 
 function estadoClasses(estado: string | null) {
   const found = ESTADOS.find((item) => item.value === estado);
-  return found?.classes ?? "bg-gray-100 text-gray-500";
+  return found?.classes ?? "bg-gray-500/15 text-gray-500 dark:bg-gray-500/20 dark:text-gray-400";
 }
 
 function estadoLabel(estado: string | null) {
@@ -654,14 +654,14 @@ export default function PropiedadesClient({
                                   {isEncargo && (
                                     <button
                                       onClick={() => setEncargoPropiedad(propiedad)}
-                                      className="rounded px-2 py-1 text-xs font-semibold text-green-700 transition-colors hover:bg-green-50"
+                                      className="rounded px-2 py-1 text-xs font-semibold text-success transition-colors hover:bg-success/10"
                                     >
                                       Ver encargo
                                     </button>
                                   )}
                                   <button
                                     onClick={() => openEdit(propiedad)}
-                                    className="rounded px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-blue-50"
+                                    className="rounded px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
                                   >
                                     Editar
                                   </button>
@@ -672,7 +672,7 @@ export default function PropiedadesClient({
                                         setDeletePassword("");
                                         setDeleteId(propiedad.id);
                                       }}
-                                      className="rounded px-2 py-1 text-xs font-medium text-danger transition-colors hover:bg-red-50"
+                                      className="rounded px-2 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/10"
                                     >
                                       Eliminar
                                     </button>
@@ -716,7 +716,7 @@ export default function PropiedadesClient({
 
             <div className="space-y-4 px-6 py-5">
               {isOverdue(reminderPropiedad.fecha_visita) && (
-                <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
+                <div className="flex items-start gap-2 rounded-lg bg-accent/10 px-3 py-2.5 text-xs text-accent">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="mt-0.5 h-3.5 w-3.5 shrink-0"
@@ -903,7 +903,7 @@ export default function PropiedadesClient({
               </FormField>
 
               {saveError && (
-                <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-danger">
+                <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
                   {saveError}
                 </p>
               )}

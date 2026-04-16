@@ -69,9 +69,9 @@ function canDeleteTarea(currentUserRole: UserRole | null): boolean {
 }
 
 const PRIORIDAD_BADGE: Record<string, string> = {
-  alta: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  media: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  baja: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  alta: "bg-red-500/15 text-red-700 dark:bg-red-500/20 dark:text-red-400",
+  media: "bg-yellow-500/15 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400",
+  baja: "bg-green-500/15 text-green-700 dark:bg-green-500/20 dark:text-green-400",
 };
 
 function formatFecha(fecha: string): string {
@@ -313,7 +313,7 @@ export default function OrdenesClient({
                     <button
                       onClick={() => handleDelete(tarea.id)}
                       disabled={deletingId === tarea.id}
-                      className="ml-1 shrink-0 rounded p-1 text-text-secondary hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                      className="ml-1 shrink-0 rounded p-1 text-text-secondary hover:text-danger hover:bg-danger/10 transition-colors disabled:opacity-50"
                       title="Eliminar tarea"
                     >
                       {deletingId === tarea.id ? (
