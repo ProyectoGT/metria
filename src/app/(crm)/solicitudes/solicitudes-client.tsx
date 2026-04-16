@@ -102,6 +102,31 @@ export default function PedidosClient({
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [filterTipo, setFilterTipo] = useState<string>("");
+  const [filterModalidad, setFilterModalidad] = useState<string>("");
+  const [filterOrigen, setFilterOrigen] = useState<string>("");
+  const [filterZona, setFilterZona] = useState<string>("");
+
+  const filtered = useMemo(() => {
+    return pedidos.filter((p) => {
+      if (filterTipo && p.tipo_propiedad !== filterTipo) return false;
+      if (filterModalidad === "compra" && p.compra_alquiler !== true) return false;
+      if (filterModalidad === "alquiler" && p.compra_alquiler !== false) return false;
+      if (filterOrigen && p.origen !== filterOrigen) return false;
+      if (filterZona && String(p.zona_deseada) !== filterZona) return false;
+      return true;
+    });
+  }, [pedidos, filterTipo, filterModalidad, filterOrigen, filterZona]);
+
+  const hasFilters = filterTipo || filterModalidad || filterOrigen || filterZona;
+
+  function clearFilters() {
+    setFilterTipo("");
+    setFilterModalidad("");
+    setFilterOrigen("");
+    setFilterZona("");
+  }
+
   const supabase = useMemo(() => createClient(), []);
   const { toasts, toast } = useToast();
 
@@ -167,7 +192,7 @@ export default function PedidosClient({
         setPedidos((prev) =>
           prev.map((pedido) => (pedido.id === editId ? (data as Pedido) : pedido))
         );
-        toast("Pedido actualizado");
+        toast("Solicitud actualizada");
         setModalOpen(false);
       }
     } else {
@@ -181,7 +206,7 @@ export default function PedidosClient({
         setSaveError(error.message);
       } else if (data) {
         setPedidos((prev) => [data as Pedido, ...prev]);
-        toast("Pedido creado");
+        toast("Solicitud creada");
         setModalOpen(false);
       }
     }
@@ -200,7 +225,7 @@ export default function PedidosClient({
       toast(`Error al eliminar: ${error.message}`, "error");
     } else {
       setPedidos((prev) => prev.filter((pedido) => pedido.id !== deleteId));
-      toast("Pedido eliminado");
+      toast("Solicitud eliminada");
       setDeleteId(null);
     }
 
@@ -231,34 +256,98 @@ export default function PedidosClient({
 
   return (
     <>
-      <div className="mb-8 flex items-start justify-between">
+      <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Pedidos</h1>
+          <h1 className="text-2xl font-bold text-text-primary">Solicitudes</h1>
           <p className="mt-1 text-sm text-text-secondary">
-            {pedidos.length} {pedidos.length === 1 ? "pedido" : "pedidos"}
+            {filtered.length} {filtered.length === 1 ? "solicitud" : "solicitudes"}
+            {hasFilters && pedidos.length !== filtered.length && (
+              <span className="ml-1 text-text-secondary">de {pedidos.length}</span>
+            )}
           </p>
         </div>
         <button
           onClick={openCreate}
           className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
         >
-          + Nuevo pedido
+          + Nueva solicitud
         </button>
+      </div>
+
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        <select
+          value={filterTipo}
+          onChange={(e) => setFilterTipo(e.target.value)}
+          className="input h-9 py-0 text-sm"
+        >
+          <option value="">Tipo: todos</option>
+          {TIPOS_PROPIEDAD.map((tipo) => (
+            <option key={tipo} value={tipo}>{tipo}</option>
+          ))}
+        </select>
+        <select
+          value={filterModalidad}
+          onChange={(e) => setFilterModalidad(e.target.value)}
+          className="input h-9 py-0 text-sm"
+        >
+          <option value="">Modalidad: todas</option>
+          <option value="compra">Compra</option>
+          <option value="alquiler">Alquiler</option>
+        </select>
+        <select
+          value={filterOrigen}
+          onChange={(e) => setFilterOrigen(e.target.value)}
+          className="input h-9 py-0 text-sm"
+        >
+          <option value="">Origen: todos</option>
+          <option value="oficina">Oficina</option>
+          <option value="online">Online</option>
+        </select>
+        <select
+          value={filterZona}
+          onChange={(e) => setFilterZona(e.target.value)}
+          className="input h-9 py-0 text-sm"
+        >
+          <option value="">Zona: todas</option>
+          {zonas.map((zona) => (
+            <option key={zona.id} value={String(zona.id)}>{zona.nombre}</option>
+          ))}
+        </select>
+        {hasFilters && (
+          <button
+            onClick={clearFilters}
+            className="text-sm text-text-secondary transition-colors hover:text-text-primary"
+          >
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       {pedidos.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-surface py-20 text-center">
           <p className="text-base font-medium text-text-primary">
-            No hay pedidos todavia
+            No hay solicitudes todavia
           </p>
           <p className="mt-1 text-sm text-text-secondary">
-            Crea el primer pedido para empezar
+            Crea la primera solicitud para empezar
           </p>
           <button
             onClick={openCreate}
             className="mt-5 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
           >
-            + Nuevo pedido
+            + Nueva solicitud
+          </button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border bg-surface py-20 text-center">
+          <p className="text-base font-medium text-text-primary">
+            No hay solicitudes con estos filtros
+          </p>
+          <button
+            onClick={clearFilters}
+            className="mt-3 text-sm text-primary hover:underline"
+          >
+            Limpiar filtros
           </button>
         </div>
       ) : (
@@ -294,7 +383,7 @@ export default function PedidosClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {pedidos.map((pedido) => (
+              {filtered.map((pedido) => (
                 <tr
                   key={pedido.id}
                   onClick={() => openEdit(pedido)}
@@ -413,7 +502,7 @@ export default function PedidosClient({
           <div className="w-full max-w-lg rounded-2xl bg-surface shadow-xl">
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <h2 className="text-base font-semibold text-text-primary">
-                {editId !== null ? "Editar pedido" : "Nuevo pedido"}
+                {editId !== null ? "Editar solicitud" : "Nueva solicitud"}
               </h2>
               <button
                 onClick={() => setModalOpen(false)}
@@ -720,7 +809,7 @@ export default function PedidosClient({
                   ? "Guardando..."
                   : editId !== null
                     ? "Guardar cambios"
-                    : "Crear pedido"}
+                    : "Crear solicitud"}
               </button>
             </div>
           </div>
@@ -731,7 +820,7 @@ export default function PedidosClient({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
             <h2 className="text-base font-semibold text-text-primary">
-              Eliminar pedido
+              Eliminar solicitud
             </h2>
             <p className="mt-2 text-sm text-text-secondary">
               Esta accion no se puede deshacer.

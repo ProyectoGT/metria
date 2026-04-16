@@ -14,7 +14,7 @@ export default async function PedidosPage() {
 
   return (
     <>
-      <PageHeader title="Pedidos" description="Gestion de pedidos y solicitudes" />
+      <PageHeader title="Solicitudes" description="Gestion de solicitudes de clientes" />
       <PedidosClient
         initialPedidos={pedidos ?? []}
         zonas={zonas ?? []}
