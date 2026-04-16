@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createCrmUserAction } from "./actions";
+import { PASSWORD_RULES, isPasswordValid } from "@/lib/password";
 
 type Props = {
   roles: readonly string[];
@@ -133,41 +134,15 @@ export default function CreateUserForm({ roles }: Props) {
               title="Permisos"
               description="Rol del nuevo usuario dentro del CRM."
             >
-              <Field label="Rango">
-                <select
-                  value={form.rol}
-                  onChange={(event) => updateField("rol", event.target.value)}
-                  className="input"
-                >
-                  {roles.map((role) => (
-                    <option key={role} value={role}>
-                      {role}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <div className="grid gap-3 md:grid-cols-3">
-                <RoleInfo
-                  title="Administrador"
-                  description="Acceso total y gestion global del CRM."
-                  active={form.rol === "Administrador"}
-                  tone="dark"
-                />
-                <RoleInfo
-                  title="Director"
-                  description="Vision global y control operativo."
-                  active={form.rol === "Director"}
-                  tone="blue"
-                />
-                <RoleInfo
-                  title="Responsable / Agente"
-                  description="Gestion de equipo o trabajo comercial directo."
-                  active={
-                    form.rol === "Responsable" || form.rol === "Agente"
-                  }
-                  tone="amber"
-                />
+              <div className="flex flex-col gap-2">
+                {roles.map((role) => (
+                  <RoleOption
+                    key={role}
+                    role={role}
+                    active={form.rol === role}
+                    onSelect={() => updateField("rol", role)}
+                  />
+                ))}
               </div>
             </FormBlock>
           </div>
@@ -177,19 +152,19 @@ export default function CreateUserForm({ roles }: Props) {
               title="Credenciales"
               description="Contrasena inicial para el primer acceso."
             >
-              <Field
-                label="Contrasena"
-                hint="Minimo 8 caracteres."
-              >
+              <Field label="Contrasena">
                 <input
                   type="password"
                   value={form.password}
                   onChange={(event) => updateField("password", event.target.value)}
                   className="input"
-                  placeholder="Minimo 8 caracteres"
+                  placeholder="Contrasena segura"
                   autoComplete="new-password"
                   required
                 />
+                {form.password && (
+                  <PasswordChecklist password={form.password} />
+                )}
               </Field>
 
               <Field label="Confirmar contrasena">
@@ -204,6 +179,12 @@ export default function CreateUserForm({ roles }: Props) {
                   autoComplete="new-password"
                   required
                 />
+                {form.confirmPassword && form.confirmPassword !== form.password && (
+                  <p className="text-xs text-danger">Las contrasenas no coinciden.</p>
+                )}
+                {form.confirmPassword && form.confirmPassword === form.password && isPasswordValid(form.password) && (
+                  <p className="text-xs text-success">Las contrasenas coinciden.</p>
+                )}
               </Field>
             </FormBlock>
 
@@ -315,35 +296,87 @@ function StatCard({
   );
 }
 
-function RoleInfo({
-  title,
-  description,
+const ROLE_META: Record<string, { description: string; color: string; dot: string; activeBg: string; activeBorder: string; activeText: string }> = {
+  Administrador: {
+    description: "Acceso total y gestion global del CRM.",
+    color: "text-text-primary",
+    dot: "bg-text-primary",
+    activeBg: "bg-text-primary",
+    activeBorder: "border-text-primary",
+    activeText: "text-background",
+  },
+  Director: {
+    description: "Vision global y control operativo.",
+    color: "text-primary",
+    dot: "bg-primary",
+    activeBg: "bg-primary",
+    activeBorder: "border-primary",
+    activeText: "text-white",
+  },
+  Responsable: {
+    description: "Gestion de equipo y supervision comercial.",
+    color: "text-accent",
+    dot: "bg-accent",
+    activeBg: "bg-accent",
+    activeBorder: "border-accent",
+    activeText: "text-white",
+  },
+  Agente: {
+    description: "Trabajo comercial directo con clientes.",
+    color: "text-accent",
+    dot: "bg-amber-400",
+    activeBg: "bg-amber-400",
+    activeBorder: "border-amber-400",
+    activeText: "text-white",
+  },
+};
+
+function RoleOption({
+  role,
   active,
-  tone,
+  onSelect,
 }: {
-  title: string;
-  description: string;
+  role: string;
   active: boolean;
-  tone: "dark" | "blue" | "amber";
+  onSelect: () => void;
 }) {
-  const className =
-    tone === "dark"
-      ? active
-        ? "border-text-primary bg-text-primary text-background"
-        : "border-border bg-muted text-text-secondary"
-      : tone === "blue"
-        ? active
-          ? "border-primary bg-primary text-white"
-          : "border-primary/20 bg-primary/10 text-primary"
-        : active
-          ? "border-accent bg-accent text-white"
-          : "border-accent/20 bg-accent/10 text-accent";
+  const meta = ROLE_META[role] ?? {
+    description: "",
+    color: "text-text-secondary",
+    dot: "bg-text-secondary",
+    activeBg: "bg-primary",
+    activeBorder: "border-primary",
+    activeText: "text-white",
+  };
 
   return (
-    <div className={`rounded-xl border px-4 py-3 ${className}`}>
-      <p className="text-sm font-semibold">{title}</p>
-      <p className="mt-1 text-xs leading-5 opacity-90">{description}</p>
-    </div>
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
+        active
+          ? `${meta.activeBorder} ${meta.activeBg} ${meta.activeText}`
+          : "border-border bg-surface text-text-primary hover:border-border hover:bg-muted"
+      }`}
+    >
+      <span
+        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+          active
+            ? "border-current bg-current"
+            : "border-text-secondary/40 bg-transparent"
+        }`}
+      >
+        {active && (
+          <span className={`h-1.5 w-1.5 rounded-full ${meta.activeBg === "bg-text-primary" ? "bg-background" : "bg-white"}`} />
+        )}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold leading-tight">{role}</p>
+        <p className={`mt-0.5 text-xs leading-4 ${active ? "opacity-80" : "text-text-secondary"}`}>
+          {meta.description}
+        </p>
+      </div>
+    </button>
   );
 }
 
@@ -355,5 +388,29 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
       </dt>
       <dd className="text-right text-sm font-medium text-text-primary">{value}</dd>
     </div>
+  );
+}
+
+function PasswordChecklist({ password }: { password: string }) {
+  return (
+    <ul className="mt-2 space-y-1">
+      {PASSWORD_RULES.map((rule) => {
+        const ok = rule.test(password);
+        return (
+          <li key={rule.id} className="flex items-center gap-2">
+            <span
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                ok ? "bg-success/15 text-success" : "bg-danger/10 text-danger"
+              }`}
+            >
+              {ok ? "✓" : "✕"}
+            </span>
+            <span className={`text-xs ${ok ? "text-success" : "text-text-secondary"}`}>
+              {rule.label}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

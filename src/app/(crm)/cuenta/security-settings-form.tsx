@@ -4,6 +4,7 @@ import { useState } from "react";
 import { updateDeleteConfirmationPasswordAction } from "@/app/actions/security";
 import type { ConfirmationPasswordStatus } from "@/lib/delete-confirmation-password";
 import type { UserRole } from "@/lib/roles";
+import { PASSWORD_RULES, isPasswordValid } from "@/lib/password";
 
 type Props = {
   currentRole: UserRole;
@@ -102,8 +103,25 @@ export default function SecuritySettingsForm({
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               className="input"
-              placeholder="Minimo 8 caracteres"
+              placeholder="Contrasena segura"
             />
+            {newPassword && (
+              <ul className="mt-2 space-y-1">
+                {PASSWORD_RULES.map((rule) => {
+                  const ok = rule.test(newPassword);
+                  return (
+                    <li key={rule.id} className="flex items-center gap-2">
+                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${ok ? "bg-success/15 text-success" : "bg-danger/10 text-danger"}`}>
+                        {ok ? "✓" : "✕"}
+                      </span>
+                      <span className={`text-xs ${ok ? "text-success" : "text-text-secondary"}`}>
+                        {rule.label}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </Field>
 
           <Field label="Confirmar nueva contrasena">
@@ -114,6 +132,12 @@ export default function SecuritySettingsForm({
               className="input"
               placeholder="Repite la nueva contrasena"
             />
+            {confirmPassword && confirmPassword !== newPassword && (
+              <p className="mt-1 text-xs text-danger">Las contrasenas no coinciden.</p>
+            )}
+            {confirmPassword && confirmPassword === newPassword && isPasswordValid(newPassword) && (
+              <p className="mt-1 text-xs text-success">Las contrasenas coinciden.</p>
+            )}
           </Field>
 
           {error && (

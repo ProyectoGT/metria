@@ -10,13 +10,39 @@ export async function login(formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { error, data } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
   if (error) {
     return { error: error.message };
+  }
+
+  // Verificar que el usuario tiene perfil en la base de datos
+  let profile = null;
+  if (data.user) {
+    const { data: byAuthId } = await supabase
+      .from("usuarios")
+      .select("id")
+      .eq("auth_id", data.user.id)
+      .maybeSingle();
+
+    if (!byAuthId && data.user.email) {
+      const { data: byEmail } = await supabase
+        .from("usuarios")
+        .select("id")
+        .eq("correo", data.user.email)
+        .maybeSingle();
+      profile = byEmail;
+    } else {
+      profile = byAuthId;
+    }
+  }
+
+  if (!profile) {
+    await supabase.auth.signOut();
+    return { error: "Tu cuenta no está registrada en el sistema. Contacta con el administrador." };
   }
 
   redirect("/dashboard");
