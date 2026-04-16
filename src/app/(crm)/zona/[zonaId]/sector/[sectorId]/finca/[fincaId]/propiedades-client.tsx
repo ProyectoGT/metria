@@ -27,8 +27,8 @@ type Propiedad = {
   notas: string | null;
   agente_asignado: number | null;
   finca_id: number | null;
-  latitud: number | null;
-  longitud: number | null;
+  latitud?: number | null;
+  longitud?: number | null;
   usuarios: { id: number; nombre: string; apellidos: string } | null;
   // Orden local (no en BD, solo para UI)
   _order?: number;
@@ -181,8 +181,8 @@ export default function PropiedadesClient({
       fecha_visita: propiedad.fecha_visita ?? "",
       notas: propiedad.notas ?? "",
       agente_asignado: propiedad.agente_asignado?.toString() ?? "",
-      latitud: propiedad.latitud?.toString() ?? "",
-      longitud: propiedad.longitud?.toString() ?? "",
+      latitud: propiedad.latitud != null ? propiedad.latitud.toString() : "",
+      longitud: propiedad.longitud != null ? propiedad.longitud.toString() : "",
     });
     setModalOpen(true);
   }
