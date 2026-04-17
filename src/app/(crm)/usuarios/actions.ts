@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUserContext } from "@/lib/current-user";
-import { canManageUsers, USER_ROLES, type UserRole } from "@/lib/roles";
+import { canManageUsers, canCreateUsers, USER_ROLES, type UserRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { validatePassword } from "@/lib/password";
 
@@ -11,6 +11,7 @@ type CreateUserInput = {
   apellidos: string;
   correo: string;
   rol: string;
+  supervisorId?: number | null;
   password: string;
   confirmPassword: string;
   sendInvite?: boolean;
@@ -24,6 +25,8 @@ type ActionResult = {
   status?: string;
   removed?: boolean;
 };
+
+const DIRECTOR_ALLOWED_ROLES: UserRole[] = ["Responsable", "Agente"];
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -114,8 +117,8 @@ export async function createCrmUserAction(
     return { error: "Tu sesion no es valida. Vuelve a iniciar sesion." };
   }
 
-  if (!canManageUsers(currentUser.role)) {
-    return { error: "Solo un Administrador puede crear usuarios." };
+  if (!canCreateUsers(currentUser.role)) {
+    return { error: "No tienes permiso para crear usuarios." };
   }
 
   const nombre = input.nombre.trim();
@@ -136,6 +139,11 @@ export async function createCrmUserAction(
 
   if (!isUserRole(rol)) {
     return { error: "El rol indicado no es valido." };
+  }
+
+  // Director solo puede crear Responsable y Agente
+  if (currentUser.role === "Director" && !DIRECTOR_ALLOWED_ROLES.includes(rol as UserRole)) {
+    return { error: "Como Director solo puedes crear usuarios con rango Responsable o Agente." };
   }
 
   if (!sendInvite) {
@@ -172,7 +180,6 @@ export async function createCrmUserAction(
     };
   }
 
-  // Si es invitación, generamos una contraseña aleatoria temporal
   const effectivePassword = sendInvite
     ? `Tmp_${Math.random().toString(36).slice(2, 10)}A1!`
     : password;
@@ -206,6 +213,7 @@ export async function createCrmUserAction(
     empresa_id: currentUser.empresaId ?? 1,
     equipo_id: currentUser.equipoId ?? 1,
     estado: "active",
+    supervisor_id: input.supervisorId ?? null,
   };
 
   const createdProfile = await adminClient
@@ -239,7 +247,6 @@ export async function createCrmUserAction(
     };
   }
 
-  // Enviar email de recuperación si se eligió invitación por correo
   if (sendInvite) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
     await adminClient.auth.admin.generateLink({
@@ -258,6 +265,168 @@ export async function createCrmUserAction(
     message: sendInvite
       ? `Invitacion enviada a ${correo}. El usuario recibirá un correo para establecer su contraseña.`
       : "Usuario creado correctamente. Ya puede acceder con el correo y la contrasena indicados.",
+  };
+}
+
+export async function updateUserSupervisorAction(input: {
+  userId: number;
+  supervisorId: number | null;
+}): Promise<ActionResult> {
+  const currentUser = await getCurrentUserContext();
+  if (!currentUser) return { error: "Tu sesion no es valida. Vuelve a iniciar sesion." };
+  if (!canManageUsers(currentUser.role)) return { error: "Solo un Administrador puede editar usuarios." };
+
+  const adminClient = createAdminClient();
+  const updateResult = await adminClient
+    .from("usuarios")
+    .update({ supervisor_id: input.supervisorId })
+    .eq("id", input.userId);
+
+  if (updateResult.error) {
+    return { error: updateResult.error.message ?? "No se pudo actualizar el supervisor." };
+  }
+
+  revalidatePath("/usuarios");
+  return { success: true, message: "Supervisor actualizado." };
+}
+
+export async function updateUserInfoAction(input: {
+  userId: number;
+  nombre: string;
+  apellidos: string;
+  correo: string;
+  rol: string;
+  supervisorId?: number | null;
+}): Promise<ActionResult> {
+  const currentUser = await getCurrentUserContext();
+
+  if (!currentUser) {
+    return { error: "Tu sesion no es valida. Vuelve a iniciar sesion." };
+  }
+
+  if (!canManageUsers(currentUser.role)) {
+    return { error: "Solo un Administrador puede editar usuarios." };
+  }
+
+  const nombre = input.nombre.trim();
+  const apellidos = input.apellidos.trim();
+  const correo = input.correo.trim().toLowerCase();
+  const rol = input.rol.trim();
+
+  if (!nombre || !apellidos) {
+    return { error: "Debes indicar nombre y apellidos." };
+  }
+
+  if (!correo || !isValidEmail(correo)) {
+    return { error: "Debes indicar un correo valido." };
+  }
+
+  if (!isUserRole(rol)) {
+    return { error: "El rol indicado no es valido." };
+  }
+
+  if (input.userId === currentUser.id) {
+    return { error: "No puedes editarte a ti mismo desde este panel." };
+  }
+
+  const targetResult = await getManagedUserTarget(input.userId, currentUser);
+  if (targetResult.error || !targetResult.data) {
+    return { error: targetResult.error ?? "No se pudo cargar el usuario." };
+  }
+
+  if (targetResult.data.rol === "Administrador" && rol !== "Administrador") {
+    return { error: "No puedes cambiar el rango de un Administrador." };
+  }
+
+  const adminClient = createAdminClient();
+
+  // Si cambia el correo, actualizarlo también en auth
+  if (targetResult.data.correo !== correo && targetResult.data.auth_id) {
+    const authUpdate = await adminClient.auth.admin.updateUserById(
+      targetResult.data.auth_id,
+      { email: correo }
+    );
+    if (authUpdate.error) {
+      return { error: authUpdate.error.message ?? "No se pudo actualizar el correo de acceso." };
+    }
+  }
+
+  const updateResult = await adminClient
+    .from("usuarios")
+    .update({
+      nombre,
+      apellidos,
+      correo,
+      rol,
+      ...(input.supervisorId !== undefined ? { supervisor_id: input.supervisorId } : {}),
+    })
+    .eq("id", input.userId);
+
+  if (updateResult.error) {
+    return { error: updateResult.error.message ?? "No se pudo actualizar el usuario." };
+  }
+
+  revalidatePath("/usuarios");
+  return { success: true, message: "Usuario actualizado correctamente." };
+}
+
+export async function toggleUserStatusAction(input: {
+  userId: number;
+}): Promise<ActionResult> {
+  const currentUser = await getCurrentUserContext();
+
+  if (!currentUser) {
+    return { error: "Tu sesion no es valida. Vuelve a iniciar sesion." };
+  }
+
+  if (!canManageUsers(currentUser.role)) {
+    return { error: "Solo un Administrador puede activar o desactivar usuarios." };
+  }
+
+  if (input.userId === currentUser.id) {
+    return { error: "No puedes desactivarte a ti mismo." };
+  }
+
+  const targetResult = await getManagedUserTarget(input.userId, currentUser);
+  if (targetResult.error || !targetResult.data) {
+    return { error: targetResult.error ?? "No se pudo cargar el usuario." };
+  }
+
+  const target = targetResult.data;
+
+  if (target.rol === "Administrador") {
+    return { error: "No puedes desactivar un Administrador." };
+  }
+
+  const isActive = target.estado === "active";
+  const newEstado = isActive ? "disabled" : "active";
+
+  const adminClient = createAdminClient();
+
+  // Ban/unban en Supabase Auth para invalidar sesiones activas
+  if (target.auth_id) {
+    const authUpdate = await adminClient.auth.admin.updateUserById(target.auth_id, {
+      ban_duration: isActive ? "876000h" : "none",
+    });
+    if (authUpdate.error) {
+      return { error: authUpdate.error.message ?? "No se pudo actualizar el acceso del usuario." };
+    }
+  }
+
+  const updateResult = await adminClient
+    .from("usuarios")
+    .update({ estado: newEstado })
+    .eq("id", input.userId);
+
+  if (updateResult.error) {
+    return { error: updateResult.error.message ?? "No se pudo actualizar el estado." };
+  }
+
+  revalidatePath("/usuarios");
+  return {
+    success: true,
+    message: isActive ? "Usuario desactivado. Ya no puede acceder al CRM." : "Usuario activado correctamente.",
+    status: newEstado,
   };
 }
 
@@ -299,9 +468,7 @@ export async function updateUserRoleAction(input: {
   const nextRole = input.rol as UserRole;
   const updateResult = await adminClient
     .from("usuarios")
-    .update({
-      rol: nextRole,
-    })
+    .update({ rol: nextRole })
     .eq("id", input.userId);
 
   if (updateResult.error) {
@@ -379,10 +546,7 @@ export async function deleteUserAction(input: {
 
   const disableProfile = await adminClient
     .from("usuarios")
-    .update({
-      auth_id: null,
-      estado: "disabled",
-    })
+    .update({ auth_id: null, estado: "disabled" })
     .eq("id", target.id);
 
   if (disableProfile.error) {

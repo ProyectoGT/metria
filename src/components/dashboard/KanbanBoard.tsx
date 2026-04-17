@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import KanbanColumn from "./KanbanColumn";
 import KanbanAddColumn from "./KanbanAddColumn";
@@ -12,12 +12,13 @@ import {
   deleteTareaAction,
   completeTareaAction,
   updateTareaEstadoAction,
+  addKanbanColumnAction,
+  deleteKanbanColumnAction,
 } from "@/app/(crm)/dashboard/actions";
-
-const CUSTOM_COLS_KEY = "kanban_custom_columns";
 
 type KanbanBoardProps = {
   initialData: KanbanData;
+  customColumns?: Array<{ id: string; title: string }>;
   role: UserRole;
   currentUserId: string;
   agents?: Array<{ id: string; nombre: string }>;
@@ -32,29 +33,19 @@ const COL_TO_ESTADO: Record<string, "pendiente" | "en_progreso" | "completado"> 
 
 export default function KanbanBoard({
   initialData,
+  customColumns = [],
   role,
   currentUserId: _currentUserId,
   agents = [],
 }: KanbanBoardProps) {
-  const [columns, setColumns] = useState<KanbanColumnData[]>(initialData.columns);
+  const [columns, setColumns] = useState<KanbanColumnData[]>(() => {
+    const existingIds = new Set(initialData.columns.map((c) => c.id));
+    const extra = customColumns
+      .filter((c) => !existingIds.has(c.id))
+      .map((c) => ({ ...c, fixed: false, cards: [] }));
+    return [...initialData.columns, ...extra];
+  });
   const [addingCardCol, setAddingCardCol] = useState<string | null>(null);
-
-  // Restaurar columnas custom desde localStorage al montar
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(CUSTOM_COLS_KEY);
-      if (saved) {
-        const customCols: Array<{ id: string; title: string }> = JSON.parse(saved);
-        setColumns((prev) => {
-          const existingIds = new Set(prev.map((c) => c.id));
-          const toAdd = customCols.filter((c) => !existingIds.has(c.id));
-          return [...prev, ...toAdd.map((c) => ({ ...c, fixed: false, cards: [] }))];
-        });
-      }
-    } catch {
-      // ignorar errores de localStorage
-    }
-  }, []);
 
   // ─── Drag & drop ────────────────────────────────────────────────────────────
   function handleDragEnd(result: DropResult) {
@@ -84,33 +75,31 @@ export default function KanbanBoard({
       const numId = parseInt(draggableId, 10);
       if (nuevoEstado && !isNaN(numId)) {
         updateTareaEstadoAction(numId, nuevoEstado).catch((err) =>
-          console.error("Error al mover tarea:", err),
+          console.warn("Error al mover tarea:", err),
         );
       }
     }
   }
 
   // ─── Column ops ─────────────────────────────────────────────────────────────
-  function saveCustomCols(cols: KanbanColumnData[]) {
-    const custom = cols.filter((c) => !c.fixed).map((c) => ({ id: c.id, title: c.title }));
-    localStorage.setItem(CUSTOM_COLS_KEY, JSON.stringify(custom));
-  }
-
-  function handleAddColumn(title: string) {
+  async function handleAddColumn(title: string) {
     const id = `col-${Date.now()}`;
-    setColumns((prev) => {
-      const next = [...prev, { id, title, fixed: false, cards: [] }];
-      saveCustomCols(next);
-      return next;
-    });
+    setColumns((prev) => [...prev, { id, title, fixed: false, cards: [] }]);
+    try {
+      const orden = columns.filter((c) => !c.fixed).length;
+      await addKanbanColumnAction({ col_id: id, titulo: title, orden });
+    } catch (err) {
+      console.warn("Error al guardar columna:", err);
+    }
   }
 
-  function handleDeleteColumn(columnId: string) {
-    setColumns((prev) => {
-      const next = prev.filter((c) => c.id !== columnId || c.fixed);
-      saveCustomCols(next);
-      return next;
-    });
+  async function handleDeleteColumn(columnId: string) {
+    setColumns((prev) => prev.filter((c) => c.id !== columnId || c.fixed));
+    try {
+      await deleteKanbanColumnAction(columnId);
+    } catch (err) {
+      console.warn("Error al eliminar columna:", err);
+    }
   }
 
   // ─── Card ops ───────────────────────────────────────────────────────────────
@@ -131,7 +120,7 @@ export default function KanbanBoard({
         ),
       );
     } catch (err) {
-      console.error("Error al crear tarea:", err);
+      console.warn("Error al crear tarea:", err);
     }
   }
 
@@ -150,7 +139,7 @@ export default function KanbanBoard({
       try {
         await deleteTareaAction(numId);
       } catch (err) {
-        console.error("Error al eliminar tarea:", err);
+        console.warn("Error al eliminar tarea:", err);
       }
     }
   }
@@ -174,7 +163,7 @@ export default function KanbanBoard({
       try {
         await completeTareaAction(numId);
       } catch (err) {
-        console.error("Error al completar tarea:", err);
+        console.warn("Error al completar tarea:", err);
       }
     }
   }

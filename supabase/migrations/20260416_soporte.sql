@@ -70,13 +70,13 @@ CREATE POLICY "contactos_soporte_admin_write"
   USING (
     EXISTS (
       SELECT 1 FROM usuarios
-      WHERE auth_id = auth.uid()::text AND rol = 'Administrador'
+      WHERE auth_id = auth.uid() AND rol = 'Administrador'
     )
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM usuarios
-      WHERE auth_id = auth.uid()::text AND rol = 'Administrador'
+      WHERE auth_id = auth.uid() AND rol = 'Administrador'
     )
   );
 
@@ -85,11 +85,11 @@ CREATE POLICY "tickets_soporte_select"
   ON tickets_soporte FOR SELECT TO authenticated
   USING (
     user_id IN (
-      SELECT id FROM usuarios WHERE auth_id = auth.uid()::text
+      SELECT id FROM usuarios WHERE auth_id = auth.uid()
     )
     OR EXISTS (
       SELECT 1 FROM usuarios
-      WHERE auth_id = auth.uid()::text AND rol = 'Administrador'
+      WHERE auth_id = auth.uid() AND rol = 'Administrador'
     )
   );
 
@@ -104,12 +104,12 @@ CREATE POLICY "tickets_soporte_update"
   USING (
     EXISTS (
       SELECT 1 FROM usuarios
-      WHERE auth_id = auth.uid()::text AND rol = 'Administrador'
+      WHERE auth_id = auth.uid() AND rol = 'Administrador'
     )
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM usuarios
-      WHERE auth_id = auth.uid()::text AND rol = 'Administrador'
+      WHERE auth_id = auth.uid() AND rol = 'Administrador'
     )
   );

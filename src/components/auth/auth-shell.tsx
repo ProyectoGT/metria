@@ -32,15 +32,15 @@ export default function AuthShell({
 
       <section className="flex min-h-screen items-center justify-center px-6 py-12 sm:px-10 lg:px-16">
         <div className="w-full max-w-md rounded-[2rem] border border-white/70 bg-white/80 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur md:p-10">
-          <div className="mb-10 space-y-3">
-            <div className="lg:hidden">
+          <div className="mb-4 space-y-1">
+            <div className="mb-1 flex justify-center lg:hidden">
               <Image
-                src="/logo-bg-master-iberica.png"
+                src="/logo-bg-master-iberica-black.png"
                 alt="Master Iberica"
                 width={220}
                 height={64}
                 priority
-                className="h-auto w-auto max-w-[220px]"
+                className="h-36 w-auto mix-blend-multiply"
               />
             </div>
             <div className="space-y-2">

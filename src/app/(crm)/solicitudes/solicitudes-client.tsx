@@ -256,16 +256,13 @@ export default function PedidosClient({
 
   return (
     <>
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Solicitudes</h1>
-          <p className="mt-1 text-sm text-text-secondary">
-            {filtered.length} {filtered.length === 1 ? "solicitud" : "solicitudes"}
-            {hasFilters && pedidos.length !== filtered.length && (
-              <span className="ml-1 text-text-secondary">de {pedidos.length}</span>
-            )}
-          </p>
-        </div>
+      <div className="mb-6 flex items-center justify-between">
+        <p className="text-sm text-text-secondary">
+          {filtered.length} {filtered.length === 1 ? "solicitud" : "solicitudes"}
+          {hasFilters && pedidos.length !== filtered.length && (
+            <span className="ml-1">de {pedidos.length}</span>
+          )}
+        </p>
         <button
           onClick={openCreate}
           className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
@@ -274,52 +271,114 @@ export default function PedidosClient({
         </button>
       </div>
 
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        <select
-          value={filterTipo}
-          onChange={(e) => setFilterTipo(e.target.value)}
-          className="input h-9 py-0 text-sm"
-        >
-          <option value="">Tipo: todos</option>
-          {TIPOS_PROPIEDAD.map((tipo) => (
-            <option key={tipo} value={tipo}>{tipo}</option>
-          ))}
-        </select>
-        <select
-          value={filterModalidad}
-          onChange={(e) => setFilterModalidad(e.target.value)}
-          className="input h-9 py-0 text-sm"
-        >
-          <option value="">Modalidad: todas</option>
-          <option value="compra">Compra</option>
-          <option value="alquiler">Alquiler</option>
-        </select>
-        <select
-          value={filterOrigen}
-          onChange={(e) => setFilterOrigen(e.target.value)}
-          className="input h-9 py-0 text-sm"
-        >
-          <option value="">Origen: todos</option>
-          <option value="oficina">Oficina</option>
-          <option value="online">Online</option>
-        </select>
-        <select
-          value={filterZona}
-          onChange={(e) => setFilterZona(e.target.value)}
-          className="input h-9 py-0 text-sm"
-        >
-          <option value="">Zona: todas</option>
-          {zonas.map((zona) => (
-            <option key={zona.id} value={String(zona.id)}>{zona.nombre}</option>
-          ))}
-        </select>
+      {/* ── Filtros ── */}
+      <div className="mb-6 rounded-xl border border-border bg-surface px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-end gap-3">
+          {/* Tipo */}
+          <div className="flex min-w-[130px] flex-1 flex-col gap-1">
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+              Tipo
+            </label>
+            <select
+              value={filterTipo}
+              onChange={(e) => setFilterTipo(e.target.value)}
+              className="input h-8 py-0 text-sm"
+            >
+              <option value="">Todos</option>
+              {TIPOS_PROPIEDAD.map((tipo) => (
+                <option key={tipo} value={tipo}>{tipo}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Modalidad */}
+          <div className="flex min-w-[130px] flex-1 flex-col gap-1">
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+              Modalidad
+            </label>
+            <select
+              value={filterModalidad}
+              onChange={(e) => setFilterModalidad(e.target.value)}
+              className="input h-8 py-0 text-sm"
+            >
+              <option value="">Todas</option>
+              <option value="compra">Compra</option>
+              <option value="alquiler">Alquiler</option>
+            </select>
+          </div>
+
+          {/* Origen */}
+          <div className="flex min-w-[130px] flex-1 flex-col gap-1">
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+              Origen
+            </label>
+            <select
+              value={filterOrigen}
+              onChange={(e) => setFilterOrigen(e.target.value)}
+              className="input h-8 py-0 text-sm"
+            >
+              <option value="">Todos</option>
+              <option value="oficina">Oficina</option>
+              <option value="online">Online</option>
+            </select>
+          </div>
+
+          {/* Zona */}
+          <div className="flex min-w-[160px] flex-1 flex-col gap-1">
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+              Zona
+            </label>
+            <select
+              value={filterZona}
+              onChange={(e) => setFilterZona(e.target.value)}
+              className="input h-8 py-0 text-sm"
+            >
+              <option value="">Todas</option>
+              {zonas.map((zona) => (
+                <option key={zona.id} value={String(zona.id)}>{zona.nombre}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Limpiar */}
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              className="mb-0.5 shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:border-danger/40 hover:bg-danger/5 hover:text-danger"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+
+        {/* Chips de filtros activos */}
         {hasFilters && (
-          <button
-            onClick={clearFilters}
-            className="text-sm text-text-secondary transition-colors hover:text-text-primary"
-          >
-            Limpiar filtros
-          </button>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {filterTipo && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                {filterTipo}
+                <button onClick={() => setFilterTipo("")} className="ml-0.5 hover:text-primary-dark">×</button>
+              </span>
+            )}
+            {filterModalidad && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                {filterModalidad === "compra" ? "Compra" : "Alquiler"}
+                <button onClick={() => setFilterModalidad("")} className="ml-0.5 hover:text-primary-dark">×</button>
+              </span>
+            )}
+            {filterOrigen && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                {filterOrigen === "oficina" ? "Oficina" : "Online"}
+                <button onClick={() => setFilterOrigen("")} className="ml-0.5 hover:text-primary-dark">×</button>
+              </span>
+            )}
+            {filterZona && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                {zonas.find((z) => String(z.id) === filterZona)?.nombre ?? filterZona}
+                <button onClick={() => setFilterZona("")} className="ml-0.5 hover:text-primary-dark">×</button>
+              </span>
+            )}
+          </div>
         )}
       </div>
 

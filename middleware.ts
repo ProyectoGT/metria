@@ -37,9 +37,22 @@ export async function middleware(request: NextRequest) {
   // Obtener usuario real (refresca el token si es necesario)
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
   const isAuthenticated = !!user;
+
+  // Token caducado o inválido → limpiar cookies sb-* y redirigir a login
+  if (authError && !isAuthenticated && !isPublicPage) {
+    const loginUrl = new URL("/login", request.url);
+    const redirectResponse = NextResponse.redirect(loginUrl);
+    request.cookies.getAll().forEach(({ name }) => {
+      if (name.startsWith("sb-")) {
+        redirectResponse.cookies.delete(name);
+      }
+    });
+    return redirectResponse;
+  }
 
   // Sin sesión y ruta protegida → login
   if (!isAuthenticated && !isPublicPage) {

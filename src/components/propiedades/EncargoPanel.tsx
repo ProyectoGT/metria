@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Loader2,
   Upload,
+  Paperclip,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 
@@ -20,6 +21,7 @@ type ArchivoEntry = {
   id: number;
   nombre: string;
   url: string | null;
+  storage_path: string | null;
   tipo: string;
   created_at: string;
 };
@@ -66,6 +68,14 @@ function propLabel(p: Propiedad): string {
   return parts.length ? parts.join(" · ") : `Propiedad #${p.id}`;
 }
 
+function uniqueStorageName(filename: string): string {
+  const ext = filename.includes(".") ? filename.split(".").pop() : "";
+  const base = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  return ext ? `${base}.${ext}` : base;
+}
+
+const BUCKET = "encargo-archivos";
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPanelProps) {
@@ -74,19 +84,24 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
   const [notas, setNotas] = useState<NotaEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Add-document form
+  // Document form
   const [docNombre, setDocNombre] = useState("");
   const [docUrl, setDocUrl] = useState("");
+  const [docFile, setDocFile] = useState<File | null>(null);
   const [savingDoc, setSavingDoc] = useState(false);
+  const docFileRef = useRef<HTMLInputElement>(null);
 
-  // Add-image form
+  // Image form
   const [imgNombre, setImgNombre] = useState("");
   const [imgUrl, setImgUrl] = useState("");
+  const [imgFile, setImgFile] = useState<File | null>(null);
   const [savingImg, setSavingImg] = useState(false);
+  const imgFileRef = useRef<HTMLInputElement>(null);
 
-  // Add-note form
+  // Note form
   const [notaTexto, setNotaTexto] = useState("");
   const [savingNota, setSavingNota] = useState(false);
+  const [notaError, setNotaError] = useState<string | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -98,7 +113,7 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
       const [{ data: archivoData }, { data: notaData }] = await Promise.all([
         supabase
           .from("archivos")
-          .select("id, nombre, url, tipo, created_at")
+          .select("id, nombre, url, storage_path, tipo, created_at")
           .eq("propiedad_id", propiedad.id)
           .order("created_at", { ascending: false }),
         supabase
@@ -123,46 +138,82 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // ── Upload helper ─────────────────────────────────────────────────────────
+
+  async function uploadFile(file: File, tipo: "documento" | "imagen"): Promise<{ url: string; storage_path: string } | null> {
+    const path = `${propiedad.id}/${tipo}s/${uniqueStorageName(file.name)}`;
+    const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false });
+    if (error) {
+      console.warn("Error subiendo archivo:", error.message);
+      return null;
+    }
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    return { url: data.publicUrl, storage_path: path };
+  }
+
   // ── Handlers ─────────────────────────────────────────────────────────────
 
   async function handleAddDocumento() {
     if (!docNombre.trim()) return;
     setSavingDoc(true);
+
+    let url: string | null = docUrl.trim() || null;
+    let storage_path: string | null = null;
+
+    if (docFile) {
+      const uploaded = await uploadFile(docFile, "documento");
+      if (uploaded) {
+        url = uploaded.url;
+        storage_path = uploaded.storage_path;
+      }
+    }
+
     const { data, error } = await supabase
       .from("archivos")
-      .insert({
-        nombre: docNombre.trim(),
-        url: docUrl.trim() || null,
-        tipo: "documento",
-        propiedad_id: propiedad.id,
-      })
-      .select("id, nombre, url, tipo, created_at")
+      .insert({ nombre: docNombre.trim(), url, storage_path, tipo: "documento", propiedad_id: propiedad.id })
+      .select("id, nombre, url, storage_path, tipo, created_at")
       .single();
+
     if (!error && data) {
       setArchivos((prev) => [data as ArchivoEntry, ...prev]);
       setDocNombre("");
       setDocUrl("");
+      setDocFile(null);
+      if (docFileRef.current) docFileRef.current.value = "";
     }
     setSavingDoc(false);
   }
 
   async function handleAddImagen() {
-    if (!imgNombre.trim()) return;
+    if (!imgNombre.trim() && !imgFile) return;
     setSavingImg(true);
+
+    let url: string | null = imgUrl.trim() || null;
+    let storage_path: string | null = null;
+    const nombre = imgNombre.trim() || (imgFile?.name ?? "Imagen");
+
+    if (imgFile) {
+      const uploaded = await uploadFile(imgFile, "imagen");
+      if (uploaded) {
+        url = uploaded.url;
+        storage_path = uploaded.storage_path;
+      }
+    }
+
+    if (!nombre) { setSavingImg(false); return; }
+
     const { data, error } = await supabase
       .from("archivos")
-      .insert({
-        nombre: imgNombre.trim(),
-        url: imgUrl.trim() || null,
-        tipo: "imagen",
-        propiedad_id: propiedad.id,
-      })
-      .select("id, nombre, url, tipo, created_at")
+      .insert({ nombre, url, storage_path, tipo: "imagen", propiedad_id: propiedad.id })
+      .select("id, nombre, url, storage_path, tipo, created_at")
       .single();
+
     if (!error && data) {
       setArchivos((prev) => [data as ArchivoEntry, ...prev]);
       setImgNombre("");
       setImgUrl("");
+      setImgFile(null);
+      if (imgFileRef.current) imgFileRef.current.value = "";
     }
     setSavingImg(false);
   }
@@ -170,21 +221,27 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
   async function handleAddNota() {
     if (!notaTexto.trim()) return;
     setSavingNota(true);
+    setNotaError(null);
     const { data, error } = await supabase
       .from("encargo_notas")
       .insert({ contenido: notaTexto.trim(), propiedad_id: propiedad.id })
       .select("id, contenido, created_at")
       .single();
-    if (!error && data) {
+    if (error) {
+      setNotaError(error.message);
+    } else if (data) {
       setNotas((prev) => [data as NotaEntry, ...prev]);
       setNotaTexto("");
     }
     setSavingNota(false);
   }
 
-  async function handleDeleteArchivo(id: number) {
-    await supabase.from("archivos").delete().eq("id", id);
-    setArchivos((prev) => prev.filter((a) => a.id !== id));
+  async function handleDeleteArchivo(archivo: ArchivoEntry) {
+    if (archivo.storage_path) {
+      await supabase.storage.from(BUCKET).remove([archivo.storage_path]);
+    }
+    await supabase.from("archivos").delete().eq("id", archivo.id);
+    setArchivos((prev) => prev.filter((a) => a.id !== archivo.id));
   }
 
   async function handleDeleteNota(id: number) {
@@ -199,7 +256,7 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
 
   const tabs: { key: Tab; label: string; icon: React.ElementType; count: number }[] = [
     { key: "documentos", label: "Documentos", icon: FileText, count: documentos.length },
-    { key: "imagenes", label: "Imágenes", icon: ImageIcon, count: imagenes.length },
+    { key: "imagenes", label: "Imagenes", icon: ImageIcon, count: imagenes.length },
     { key: "notas", label: "Notas", icon: StickyNote, count: notas.length },
   ];
 
@@ -288,7 +345,6 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
               {/* ── DOCUMENTOS ── */}
               {activeTab === "documentos" && (
                 <div className="space-y-4">
-                  {/* Add form */}
                   <div className="rounded-xl border border-border bg-background p-4">
                     <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-secondary">
                       Añadir documento
@@ -301,13 +357,43 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
                         placeholder="Nombre del documento (ej: Nota simple)"
                         className="input text-sm"
                       />
-                      <input
-                        type="url"
-                        value={docUrl}
-                        onChange={(e) => setDocUrl(e.target.value)}
-                        placeholder="URL o enlace (opcional)"
-                        className="input text-sm"
-                      />
+                      {/* File upload area */}
+                      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2.5 text-sm text-text-secondary transition-colors hover:border-primary hover:text-primary">
+                        <Paperclip className="h-4 w-4 shrink-0" />
+                        <span className="truncate">
+                          {docFile ? docFile.name : "Seleccionar archivo (PDF, Word, etc.)"}
+                        </span>
+                        <input
+                          ref={docFileRef}
+                          type="file"
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.ppt,.pptx"
+                          className="sr-only"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0] ?? null;
+                            setDocFile(f);
+                            if (f && !docNombre) setDocNombre(f.name.replace(/\.[^.]+$/, ""));
+                            if (f) setDocUrl("");
+                          }}
+                        />
+                      </label>
+                      {!docFile && (
+                        <input
+                          type="url"
+                          value={docUrl}
+                          onChange={(e) => setDocUrl(e.target.value)}
+                          placeholder="O pega un enlace (opcional)"
+                          className="input text-sm"
+                        />
+                      )}
+                      {docFile && (
+                        <button
+                          type="button"
+                          onClick={() => { setDocFile(null); if (docFileRef.current) docFileRef.current.value = ""; }}
+                          className="text-xs text-text-secondary hover:text-danger"
+                        >
+                          Quitar archivo seleccionado
+                        </button>
+                      )}
                       <button
                         onClick={handleAddDocumento}
                         disabled={savingDoc || !docNombre.trim()}
@@ -318,14 +404,13 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
                         ) : (
                           <Upload className="h-3.5 w-3.5" />
                         )}
-                        Añadir
+                        {savingDoc ? "Subiendo..." : "Añadir"}
                       </button>
                     </div>
                   </div>
 
-                  {/* List */}
                   {documentos.length === 0 ? (
-                    <EmptyState icon={FileText} text="No hay documentos todavía" />
+                    <EmptyState icon={FileText} text="No hay documentos todavia" />
                   ) : (
                     <ul className="space-y-2">
                       {documentos.map((doc) => (
@@ -349,13 +434,13 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="rounded p-1 text-text-secondary transition-colors hover:bg-blue-50 hover:text-blue-600"
-                                title="Abrir enlace"
+                                title="Abrir"
                               >
                                 <ExternalLink className="h-4 w-4" />
                               </a>
                             )}
                             <button
-                              onClick={() => handleDeleteArchivo(doc.id)}
+                              onClick={() => handleDeleteArchivo(doc)}
                               className="rounded p-1 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
                               title="Eliminar"
                             >
@@ -372,7 +457,6 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
               {/* ── IMÁGENES ── */}
               {activeTab === "imagenes" && (
                 <div className="space-y-4">
-                  {/* Add form */}
                   <div className="rounded-xl border border-border bg-background p-4">
                     <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-secondary">
                       Añadir imagen
@@ -382,19 +466,58 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
                         type="text"
                         value={imgNombre}
                         onChange={(e) => setImgNombre(e.target.value)}
-                        placeholder="Descripción (ej: Fachada principal)"
+                        placeholder="Descripcion (ej: Fachada principal)"
                         className="input text-sm"
                       />
-                      <input
-                        type="url"
-                        value={imgUrl}
-                        onChange={(e) => setImgUrl(e.target.value)}
-                        placeholder="URL de la imagen"
-                        className="input text-sm"
-                      />
+                      {/* Image upload area */}
+                      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border px-3 py-4 text-sm text-text-secondary transition-colors hover:border-primary hover:text-primary">
+                        {imgFile ? (
+                          // Preview for selected image
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={URL.createObjectURL(imgFile)}
+                            alt="preview"
+                            className="h-24 w-full rounded object-cover"
+                          />
+                        ) : (
+                          <>
+                            <ImageIcon className="h-6 w-6" />
+                            <span>Seleccionar imagen</span>
+                          </>
+                        )}
+                        <input
+                          ref={imgFileRef}
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0] ?? null;
+                            setImgFile(f);
+                            if (f) setImgUrl("");
+                          }}
+                        />
+                      </label>
+                      {!imgFile && (
+                        <input
+                          type="url"
+                          value={imgUrl}
+                          onChange={(e) => setImgUrl(e.target.value)}
+                          placeholder="O pega una URL de imagen"
+                          className="input text-sm"
+                        />
+                      )}
+                      {imgFile && (
+                        <button
+                          type="button"
+                          onClick={() => { setImgFile(null); if (imgFileRef.current) imgFileRef.current.value = ""; }}
+                          className="text-xs text-text-secondary hover:text-danger"
+                        >
+                          Quitar imagen seleccionada
+                        </button>
+                      )}
                       <button
                         onClick={handleAddImagen}
-                        disabled={savingImg || !imgNombre.trim()}
+                        disabled={savingImg || (!imgNombre.trim() && !imgFile)}
                         className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-50"
                       >
                         {savingImg ? (
@@ -402,14 +525,13 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
                         ) : (
                           <Plus className="h-3.5 w-3.5" />
                         )}
-                        Añadir
+                        {savingImg ? "Subiendo..." : "Añadir"}
                       </button>
                     </div>
                   </div>
 
-                  {/* Grid */}
                   {imagenes.length === 0 ? (
-                    <EmptyState icon={ImageIcon} text="No hay imágenes todavía" />
+                    <EmptyState icon={ImageIcon} text="No hay imagenes todavia" />
                   ) : (
                     <div className="grid grid-cols-2 gap-3">
                       {imagenes.map((img) => (
@@ -440,7 +562,6 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
                               {formatDateTime(img.created_at)}
                             </p>
                           </div>
-                          {/* Overlay actions */}
                           <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                             {img.url && (
                               <a
@@ -453,7 +574,7 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
                               </a>
                             )}
                             <button
-                              onClick={() => handleDeleteArchivo(img.id)}
+                              onClick={() => handleDeleteArchivo(img)}
                               className="rounded-lg bg-white/90 p-1 shadow transition-colors hover:bg-danger/10"
                             >
                               <Trash2 className="h-3.5 w-3.5 text-danger" />
@@ -469,7 +590,6 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
               {/* ── NOTAS ── */}
               {activeTab === "notas" && (
                 <div className="space-y-4">
-                  {/* Add form */}
                   <div className="rounded-xl border border-border bg-background p-4">
                     <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-secondary">
                       Nueva nota
@@ -477,10 +597,13 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
                     <textarea
                       value={notaTexto}
                       onChange={(e) => setNotaTexto(e.target.value)}
-                      placeholder="Escribe una nota sobre la operación..."
+                      placeholder="Escribe una nota sobre la operacion..."
                       rows={3}
                       className="input resize-none text-sm"
                     />
+                    {notaError && (
+                      <p className="mt-2 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{notaError}</p>
+                    )}
                     <button
                       onClick={handleAddNota}
                       disabled={savingNota || !notaTexto.trim()}
@@ -495,9 +618,8 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
                     </button>
                   </div>
 
-                  {/* List */}
                   {notas.length === 0 ? (
-                    <EmptyState icon={StickyNote} text="No hay notas todavía" />
+                    <EmptyState icon={StickyNote} text="No hay notas todavia" />
                   ) : (
                     <ul className="space-y-3">
                       {notas.map((nota) => (

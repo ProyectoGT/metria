@@ -61,6 +61,10 @@ export function canManageUsers(role: UserRole) {
   return role === "Administrador";
 }
 
+export function canCreateUsers(role: UserRole) {
+  return role === "Administrador" || role === "Director";
+}
+
 export function canViewAllAgents(role: UserRole) {
   return role === "Administrador" || role === "Director";
 }

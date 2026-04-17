@@ -1,13 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { X, Trophy, Award } from "lucide-react";
 import type { AgentOfMonthData } from "@/lib/mock/dashboard";
+import {
+  saveAgentOfMonthPrizeAction,
+  saveAgentOfMonthWinnerAction,
+} from "@/app/(crm)/dashboard/actions";
 
 type Mode = "prize" | "winner";
 
 type AgentOfMonthModalProps = {
   mode: Mode;
+  empresaId: number | null;
   agents: Array<{ id: string; nombre: string }>;
   currentUserName: string;
   existingData?: AgentOfMonthData | null;
@@ -17,6 +22,7 @@ type AgentOfMonthModalProps = {
 
 export default function AgentOfMonthModal({
   mode,
+  empresaId,
   agents,
   currentUserName,
   existingData,
@@ -25,35 +31,57 @@ export default function AgentOfMonthModal({
 }: AgentOfMonthModalProps) {
   const [agenteId, setAgenteId] = useState("");
   const [premio, setPremio] = useState(existingData?.premio ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function getMesLabel() {
+    const now = new Date();
+    const label = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
 
-    const now = new Date();
-    const monthName = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
-    const mes = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-
-    if (mode === "prize") {
-      // Solo guardamos el premio; el agente queda sin asignar
-      onSave({
-        agente: null,
-        premio: premio.trim(),
-        añadidoPor: currentUserName,
-        mes,
-      });
-    } else {
-      // Asignamos el premiado manteniendo el premio existente
-      const agente = agents.find((a) => a.id === agenteId);
-      if (!agente) return;
-      onSave({
-        agente: agente.nombre,
-        premio: existingData?.premio ?? "",
-        añadidoPor: existingData?.añadidoPor ?? currentUserName,
-        mes: existingData?.mes ?? mes,
-      });
-    }
-
-    onClose();
+    startTransition(async () => {
+      try {
+        if (mode === "prize") {
+          const mes = getMesLabel();
+          const result = await saveAgentOfMonthPrizeAction({
+            mes,
+            premio: premio.trim(),
+            anadidoPor: currentUserName,
+          });
+          onSave({
+            id: result.id,
+            agente: existingData?.agente ?? null,
+            agenteId: existingData?.agenteId ?? null,
+            premio: premio.trim(),
+            añadidoPor: currentUserName,
+            mes,
+          });
+        } else {
+          const agente = agents.find((a) => a.id === agenteId);
+          if (!agente || !empresaId) return;
+          await saveAgentOfMonthWinnerAction({
+            empresaId,
+            agenteId: Number(agenteId),
+            agenteNombre: agente.nombre,
+          });
+          onSave({
+            id: existingData?.id,
+            agente: agente.nombre,
+            agenteId: Number(agenteId),
+            premio: existingData?.premio ?? "",
+            añadidoPor: existingData?.añadidoPor ?? currentUserName,
+            mes: existingData?.mes ?? getMesLabel(),
+          });
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al guardar");
+      }
+    });
   }
 
   const isPrizeMode = mode === "prize";
@@ -65,7 +93,6 @@ export default function AgentOfMonthModal({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="w-full max-w-md rounded-xl bg-surface shadow-xl">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
             {isPrizeMode ? (
@@ -136,6 +163,10 @@ export default function AgentOfMonthModal({
             </>
           )}
 
+          {error && (
+            <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>
+          )}
+
           <div className="flex gap-3 pt-2">
             <button
               type="button"
@@ -146,10 +177,14 @@ export default function AgentOfMonthModal({
             </button>
             <button
               type="submit"
-              disabled={!canSubmit}
+              disabled={!canSubmit || isPending}
               className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isPrizeMode ? "Guardar premio" : "Asignar premiado"}
+              {isPending
+                ? "Guardando..."
+                : isPrizeMode
+                  ? "Guardar premio"
+                  : "Asignar premiado"}
             </button>
           </div>
         </form>
