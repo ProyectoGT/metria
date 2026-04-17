@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { getPeriodRange, mergeRendimientoRows } from "@/lib/desarrollo-metrics";
 import {
-  mockAgentOfMonth,
   emptyRendimiento,
   type SummaryData,
   type SummaryType,
@@ -19,7 +18,7 @@ import OrdenDiaPanel from "@/components/dashboard/OrdenDiaPanel";
 import AgentOfMonth from "@/components/dashboard/AgentOfMonth";
 import AgentPerformanceTable from "@/components/dashboard/AgentPerformanceTable";
 import MyActivity from "@/components/dashboard/MyActivity";
-import MapaDashboard from "@/components/dashboard/MapaDashboard";
+import MapaDashboardLazy from "@/components/dashboard/MapaDashboardLazy";
 import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -66,7 +65,76 @@ export default async function DashboardPage() {
   const anioActual = new Date().getFullYear();
   const periodRange = getPeriodRange(anioActual, 0);
 
-  // ─── 1. Summary counts (paralelo) ────────────────────────────────────────
+  const isManager = role === "Administrador" || role === "Director";
+
+  // ─── 0. Calcular filtros de acceso ──────────────────────────────────────
+  // fincaIdFilter: null = sin restricción, [] = sin acceso, [ids] = filtrar
+  let fincaIdFilter: number[] | null = null;
+  // agentIdFilter: null = sin restricción, [ids] = solo estos agentes
+  let agentIdFilter: number[] | null = null;
+  // pedidoAgentFilter: null = sin restricción, [ids] = solo estos
+  let pedidoAgentFilter: number[] | null = null;
+
+  if (!isManager) {
+    // Obtener zonas accesibles del usuario
+    const { data: accesos } = await supabase
+      .from("zona_acceso")
+      .select("zona_id")
+      .eq("usuario_id", userId);
+
+    const zonaIds = (accesos ?? []).map((a) => a.zona_id);
+
+    if (zonaIds.length > 0) {
+      // Resolver finca IDs en esas zonas
+      const { data: sectoresData } = await supabase
+        .from("sectores")
+        .select("fincas(id)")
+        .in("zona_id", zonaIds);
+
+      type SectorWithFincas = { fincas: { id: number }[] | null };
+      fincaIdFilter = ((sectoresData ?? []) as unknown as SectorWithFincas[]).flatMap(
+        (s) => (Array.isArray(s.fincas) ? s.fincas.map((f) => f.id) : [])
+      );
+    } else {
+      // Sin zonas asignadas → no ve nada de propiedades
+      fincaIdFilter = [];
+    }
+
+    // Filtro de agente: cada rol ve sus propias propiedades/pedidos
+    if (role === "Agente") {
+      agentIdFilter = [userId];
+      pedidoAgentFilter = [userId];
+    } else if (role === "Responsable") {
+      const supervised = [userId, ...(yo?.supervisedAgentIds ?? [])];
+      agentIdFilter = supervised;
+      pedidoAgentFilter = supervised;
+    }
+  }
+
+  // Aplica filtros de zona/agente a una query builder de propiedades
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function applyPropFilters(query: any): any {
+    let q = query;
+    if (fincaIdFilter !== null) {
+      q = fincaIdFilter.length === 0 ? q.eq("id", -1) : q.in("finca_id", fincaIdFilter);
+    }
+    if (agentIdFilter !== null) {
+      q = agentIdFilter.length === 0 ? q.eq("agente_asignado", -1) : q.in("agente_asignado", agentIdFilter);
+    }
+    return q;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function applyPedidoFilters(query: any): any {
+    if (pedidoAgentFilter === null) return query;
+    return pedidoAgentFilter.length === 0
+      ? query.eq("owner_user_id", -1)
+      : query.in("owner_user_id", pedidoAgentFilter);
+  }
+
+  // ─── 1. Summary counts + listings (paralelo) ────────────────────────────
+  const propSelect = "id, planta, puerta, propietario, estado, fincas(id, numero, sectores(id, numero, zona_id)), usuarios:usuarios!propiedades_agente_asignado_fkey(nombre, apellidos)";
+
   const [
     { count: noticiasCount },
     { count: investigacionesCount },
@@ -80,50 +148,31 @@ export default async function DashboardPage() {
     { data: rendimientoData },
     { data: actividadData },
     { data: tareasData },
+    { data: kanbanColsData },
+    { data: agenteMesData },
     { data: noticiasMapData },
   ] = await Promise.all([
-    supabase.from("propiedades").select("*", { count: "exact", head: true }),
-    supabase.from("propiedades").select("*", { count: "exact", head: true }).ilike("estado", "investig%"),
-    supabase.from("propiedades").select("*", { count: "exact", head: true }).ilike("estado", "encarg%"),
-    supabase.from("pedidos").select("*", { count: "exact", head: true }),
+    applyPropFilters(supabase.from("propiedades").select("*", { count: "exact", head: true })),
+    applyPropFilters(supabase.from("propiedades").select("*", { count: "exact", head: true }).ilike("estado", "investig%")),
+    applyPropFilters(supabase.from("propiedades").select("*", { count: "exact", head: true }).ilike("estado", "encarg%")),
+    applyPedidoFilters(supabase.from("pedidos").select("*", { count: "exact", head: true })),
 
-    // Listings
-    supabase
-      .from("propiedades")
-      .select(
-        "id, planta, puerta, propietario, estado, fincas(id, numero, sectores(id, numero, zona_id)), usuarios:usuarios!propiedades_agente_asignado_fkey(nombre, apellidos)",
-      )
-      .order("id", { ascending: false })
-      .limit(50),
-    supabase
-      .from("propiedades")
-      .select(
-        "id, planta, puerta, propietario, estado, fincas(id, numero, sectores(id, numero, zona_id)), usuarios:usuarios!propiedades_agente_asignado_fkey(nombre, apellidos)",
-      )
-      .ilike("estado", "investig%")
-      .order("id", { ascending: false })
-      .limit(50),
-    supabase
-      .from("propiedades")
-      .select(
-        "id, planta, puerta, propietario, estado, fincas(id, numero, sectores(id, numero, zona_id)), usuarios:usuarios!propiedades_agente_asignado_fkey(nombre, apellidos)",
-      )
-      .ilike("estado", "encarg%")
-      .order("id", { ascending: false })
-      .limit(50),
-    supabase
-      .from("pedidos")
-      .select(
-        "id, nombre_cliente, tipo_propiedad, zona:zona_deseada(nombre), usuarios:usuarios!pedidos_owner_user_id_fkey(nombre, apellidos)",
-      )
-      .order("id", { ascending: false })
-      .limit(50),
+    applyPropFilters(
+      supabase.from("propiedades").select(propSelect).order("id", { ascending: false }).limit(50)
+    ),
+    applyPropFilters(
+      supabase.from("propiedades").select(propSelect).ilike("estado", "investig%").order("id", { ascending: false }).limit(50)
+    ),
+    applyPropFilters(
+      supabase.from("propiedades").select(propSelect).ilike("estado", "encarg%").order("id", { ascending: false }).limit(50)
+    ),
+    applyPedidoFilters(
+      supabase.from("pedidos").select(
+        "id, nombre_cliente, tipo_propiedad, zona:zona_deseada(nombre), usuarios:usuarios!pedidos_owner_user_id_fkey(nombre, apellidos)"
+      ).order("id", { ascending: false }).limit(50)
+    ),
 
-    // Agentes y rendimiento (anual: mes=0)
-    supabase
-      .from("usuarios")
-      .select("id, nombre, apellidos, rol")
-      .order("nombre"),
+    supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
     supabase.from("rendimiento").select("*").eq("anio", anioActual).eq("mes", 0),
     supabase
       .from("actividad_desarrollo")
@@ -131,23 +180,38 @@ export default async function DashboardPage() {
       .gte("occurred_at", periodRange.from)
       .lt("occurred_at", periodRange.to),
 
-    // Tareas del usuario (pendiente + en_progreso + completado)
     supabase
       .from("tareas")
       .select("id, titulo, prioridad, fecha, estado, owner_user_id")
       .in("estado", ["pendiente", "en_progreso", "completado"])
       .order("fecha", { ascending: true, nullsFirst: false }),
 
-    // Noticias con coordenadas para el mapa
-    supabase
-      .from("propiedades")
-      .select("id, propietario, planta, puerta, latitud, longitud, fincas(numero, sectores(numero))")
-      .ilike("estado", "noticia")
-      .not("latitud", "is", null)
-      .not("longitud", "is", null),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from("kanban_columnas")
+      .select("col_id, titulo, orden")
+      .eq("user_id", userId)
+      .order("orden", { ascending: true }),
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    yo?.empresaId
+      ? (supabase as any)
+          .from("agente_del_mes")
+          .select("id, mes, premio, agente_id, agente_nombre, anadido_por")
+          .eq("empresa_id", yo.empresaId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+
+    applyPropFilters(
+      supabase.from("propiedades")
+        .select("id, propietario, planta, puerta, latitud, longitud, fincas(numero, sectores(numero))")
+        .ilike("estado", "noticia")
+        .not("latitud", "is", null)
+        .not("longitud", "is", null)
+    ),
   ]);
 
-  // ─── 2. Map summary data ──────────────────────────────────────────────────
+  // ─── 2. Summary data ─────────────────────────────────────────────────────
   const summary: SummaryData = {
     noticias: noticiasCount ?? 0,
     investigaciones: investigacionesCount ?? 0,
@@ -155,7 +219,6 @@ export default async function DashboardPage() {
     pedidosActivos: pedidosCount ?? 0,
   };
 
-  // Helper: map propiedad row → PropertyListing
   type PropRow = {
     id: number;
     planta: string | null;
@@ -220,7 +283,7 @@ export default async function DashboardPage() {
     pedidosActivos: ((pedidosList ?? []) as unknown as PedidoRow[]).map(mapPedido),
   };
 
-  // ─── 3. Agents filtered by role ──────────────────────────────────────────
+  // ─── 3. Agentes filtrados por rol ────────────────────────────────────────
   let visibleAgentes = todosAgentes ?? [];
   if (role === "Responsable") {
     const allowed = new Set([userId, ...(yo?.supervisedAgentIds ?? [])]);
@@ -261,7 +324,7 @@ export default async function DashboardPage() {
   const ownMetrics =
     agentMetrics.find((a) => a.id === String(userId))?.rendimiento ?? emptyRendimiento();
 
-  // ─── 4. Kanban personal: 3 columnas (pendiente / en_progreso / completado) ──
+  // ─── 4. Kanban personal ──────────────────────────────────────────────────
   const myTareas = (tareasData ?? []).filter((t) => t.owner_user_id === userId);
 
   function toCard(t: (typeof myTareas)[0]) {
@@ -297,7 +360,7 @@ export default async function DashboardPage() {
     ],
   };
 
-  // ─── 5. Orden del día por agente (managers only) ─────────────────────────
+  // ─── 5. Orden del día por agente (managers) ──────────────────────────────
   const showOrdenDia =
     role === "Administrador" || role === "Director" || role === "Responsable";
 
@@ -316,12 +379,12 @@ export default async function DashboardPage() {
       }))
     : [];
 
-  // ─── 6. Role gates for sections ──────────────────────────────────────────
+  // ─── 6. Role gates ───────────────────────────────────────────────────────
   const showAgentPerformance =
     role === "Administrador" || role === "Director" || role === "Responsable";
   const showMyActivity = role === "Agente";
 
-  // ─── 7. Noticias con coordenadas para el mapa ─────────────────────────────
+  // ─── 7. Mapa de noticias ─────────────────────────────────────────────────
   type NoticiasMapRow = {
     id: number;
     propietario: string | null;
@@ -331,7 +394,9 @@ export default async function DashboardPage() {
     longitud: number;
     fincas: { numero: string; sectores: { numero: number } | null } | null;
   };
-  const noticiasMap: NoticiaMapPoint[] = ((noticiasMapData ?? []) as unknown as NoticiasMapRow[]).map((n) => ({
+  const noticiasMap: NoticiaMapPoint[] = (
+    (noticiasMapData ?? []) as unknown as NoticiasMapRow[]
+  ).map((n) => ({
     id: n.id,
     propietario: n.propietario,
     planta: n.planta,
@@ -356,7 +421,7 @@ export default async function DashboardPage() {
       <SummaryPanel summary={summary} listings={listings} />
 
       {/* 3 — Mapa de noticias */}
-      <MapaDashboard noticias={noticiasMap} />
+      <MapaDashboardLazy noticias={noticiasMap} />
 
       {/* 4 — Mis tareas (Kanban) */}
       <section className="min-w-0">
@@ -368,6 +433,7 @@ export default async function DashboardPage() {
         </div>
         <KanbanBoard
           initialData={kanbanData}
+          customColumns={(kanbanColsData ?? []).map((c: { col_id: string; titulo: string }) => ({ id: c.col_id, title: c.titulo }))}
           role={role}
           currentUserId={String(userId)}
           agents={agentMetrics.map((a) => ({ id: a.id, nombre: a.nombre }))}
@@ -379,7 +445,19 @@ export default async function DashboardPage() {
 
       {/* 6 — Agente del mes */}
       <AgentOfMonth
-        initialData={mockAgentOfMonth}
+        initialData={
+          agenteMesData
+            ? {
+                id: agenteMesData.id,
+                mes: agenteMesData.mes,
+                premio: agenteMesData.premio,
+                agente: agenteMesData.agente_nombre ?? null,
+                agenteId: agenteMesData.agente_id ?? null,
+                añadidoPor: agenteMesData.anadido_por,
+              }
+            : null
+        }
+        empresaId={yo?.empresaId ?? null}
         role={role}
         currentUserName={fullName}
         agents={agentMetrics.map((a) => ({ id: a.id, nombre: a.nombre }))}

@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Trophy, Plus, Award, Trash2 } from "lucide-react";
 import AgentOfMonthModal from "./AgentOfMonthModal";
 import type { AgentOfMonthData } from "@/lib/mock/dashboard";
 import type { UserRole } from "@/lib/roles";
+import {
+  clearAgentOfMonthAction,
+} from "@/app/(crm)/dashboard/actions";
 
 type AgentOfMonthProps = {
   initialData: AgentOfMonthData | null;
+  empresaId: number | null;
   role: UserRole;
   currentUserName: string;
   agents: Array<{ id: string; nombre: string }>;
@@ -15,20 +19,31 @@ type AgentOfMonthProps = {
 
 export default function AgentOfMonth({
   initialData,
+  empresaId,
   role,
   currentUserName,
   agents,
 }: AgentOfMonthProps) {
   const [data, setData] = useState<AgentOfMonthData | null>(initialData);
   const [modalMode, setModalMode] = useState<"prize" | "winner" | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const canManage =
     role === "Administrador" || role === "Director" || role === "Responsable";
 
-  // No premio + cannot manage → render nothing
+  function handleClear() {
+    startTransition(async () => {
+      try {
+        await clearAgentOfMonthAction();
+        setData(null);
+      } catch (err) {
+        console.warn("Error al quitar agente del mes:", err);
+      }
+    });
+  }
+
   if (!data && !canManage) return null;
 
-  // No premio + can manage → show CTA card
   if (!data && canManage) {
     return (
       <>
@@ -56,9 +71,10 @@ export default function AgentOfMonth({
         {modalMode === "prize" && (
           <AgentOfMonthModal
             mode="prize"
+            empresaId={empresaId}
             agents={agents}
             currentUserName={currentUserName}
-            onSave={setData}
+            onSave={(saved) => { setData(saved); setModalMode(null); }}
             onClose={() => setModalMode(null)}
           />
         )}
@@ -66,7 +82,6 @@ export default function AgentOfMonth({
     );
   }
 
-  // Premio configurado (con o sin premiado)
   return (
     <>
       <div className="overflow-hidden rounded-xl border border-accent/20 bg-accent/5 shadow-sm">
@@ -95,8 +110,7 @@ export default function AgentOfMonth({
           </div>
 
           {canManage && (
-            <div className="flex shrink-0 flex-col items-end gap-2 ml-4">
-              {/* Asignar premiado — solo si aún no tiene */}
+            <div className="ml-4 flex shrink-0 flex-col items-end gap-2">
               {!data!.agente && (
                 <button
                   onClick={() => setModalMode("winner")}
@@ -106,17 +120,16 @@ export default function AgentOfMonth({
                   Asignar premiado
                 </button>
               )}
-              {/* Cambiar premio */}
               <button
                 onClick={() => setModalMode("prize")}
                 className="rounded-lg border border-accent/30 bg-surface px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
               >
                 Cambiar premio
               </button>
-              {/* Quitar */}
               <button
-                onClick={() => setData(null)}
-                className="flex items-center gap-1.5 rounded-lg border border-danger/30 bg-surface px-3 py-1.5 text-sm font-medium text-danger transition-colors hover:bg-danger/10"
+                onClick={handleClear}
+                disabled={isPending}
+                className="flex items-center gap-1.5 rounded-lg border border-danger/30 bg-surface px-3 py-1.5 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-60"
               >
                 <Trash2 className="h-4 w-4" />
                 Quitar
@@ -129,10 +142,11 @@ export default function AgentOfMonth({
       {modalMode === "prize" && (
         <AgentOfMonthModal
           mode="prize"
+          empresaId={empresaId}
           agents={agents}
           currentUserName={currentUserName}
           existingData={data}
-          onSave={setData}
+          onSave={(saved) => { setData(saved); setModalMode(null); }}
           onClose={() => setModalMode(null)}
         />
       )}
@@ -140,10 +154,11 @@ export default function AgentOfMonth({
       {modalMode === "winner" && (
         <AgentOfMonthModal
           mode="winner"
+          empresaId={empresaId}
           agents={agents}
           currentUserName={currentUserName}
           existingData={data}
-          onSave={setData}
+          onSave={(saved) => { setData(saved); setModalMode(null); }}
           onClose={() => setModalMode(null)}
         />
       )}

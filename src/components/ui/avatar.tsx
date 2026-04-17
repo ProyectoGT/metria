@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const COLORS = [
   "bg-blue-600",
   "bg-emerald-600",
@@ -40,10 +42,14 @@ interface AvatarProps {
 
 export default function Avatar({ name, src, size = "md" }: AvatarProps) {
   if (src) {
+    const sizeMap = { sm: 24, md: 32, lg: 40 };
+    const px = sizeMap[size];
     return (
-      <img
+      <Image
         src={src}
         alt={name}
+        width={px}
+        height={px}
         className={`${SIZES[size]} shrink-0 rounded-full object-cover`}
       />
     );

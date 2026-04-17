@@ -33,6 +33,7 @@ export default async function FincaDetailPage({
       .from("propiedades")
       .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)")
       .eq("finca_id", Number(fincaId))
+      .order("posicion", { ascending: true, nullsFirst: false })
       .order("planta")
       .order("puerta"),
     supabase.from("usuarios").select("id, nombre, apellidos").order("nombre"),

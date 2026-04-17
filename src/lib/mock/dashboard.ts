@@ -40,7 +40,9 @@ export type AgentMetrics = {
 };
 
 export type AgentOfMonthData = {
+  id?: number;
   agente: string | null; // null = premio sin premiado asignado aún
+  agenteId?: number | null;
   premio: string;
   añadidoPor: string;
   mes: string;

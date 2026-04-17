@@ -63,6 +63,7 @@ function estadoBadge(estado: string) {
   if (s === "cerrado") return "bg-gray-500/15 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400";
   if (s === "reservado") return "bg-purple-500/15 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400";
   if (s === "pendiente") return "bg-yellow-500/15 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400";
+  if (s.startsWith("encarg")) return "bg-green-500/15 text-green-700 dark:bg-green-500/20 dark:text-green-400";
   return "bg-blue-500/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400";
 }
 
@@ -121,7 +122,7 @@ function PropertyTable({ listings }: { listings: PropertyListing[] }) {
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${estadoBadge(item.estado)}`}
                   >
-                    {item.estado}
+                    {item.estado.charAt(0).toUpperCase() + item.estado.slice(1)}
                   </span>
                 </td>
                 <td className="py-3 pr-4 text-text-secondary">{item.agente}</td>

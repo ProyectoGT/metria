@@ -5,8 +5,17 @@ import { createCrmUserAction } from "./actions";
 import { PASSWORD_RULES, isPasswordValid } from "@/lib/password";
 import { Mail, KeyRound } from "lucide-react";
 
+type SupervisorOption = {
+  id: number;
+  nombre: string;
+  apellidos: string;
+  rol: string;
+};
+
 type Props = {
   roles: readonly string[];
+  supervisors?: SupervisorOption[];
+  currentUserRole?: string;
   onSuccess?: (message: string) => void;
 };
 
@@ -15,15 +24,23 @@ const initialForm = {
   apellidos: "",
   correo: "",
   rol: "Agente",
+  supervisorId: null as number | null,
   password: "",
   confirmPassword: "",
 };
 
-export default function CreateUserForm({ roles, onSuccess }: Props) {
+const DIRECTOR_ALLOWED_ROLES = ["Responsable", "Agente"];
+
+export default function CreateUserForm({ roles, supervisors = [], currentUserRole, onSuccess }: Props) {
+  const availableRoles = currentUserRole === "Director"
+    ? roles.filter((r) => DIRECTOR_ALLOWED_ROLES.includes(r))
+    : roles;
   const [form, setForm] = useState(initialForm);
   const [sendInvite, setSendInvite] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const needsSupervisor = form.rol === "Agente" || form.rol === "Responsable";
 
   function updateField<K extends keyof typeof initialForm>(
     key: K,
@@ -37,7 +54,11 @@ export default function CreateUserForm({ roles, onSuccess }: Props) {
     setError(null);
 
     startTransition(async () => {
-      const result = await createCrmUserAction({ ...form, sendInvite });
+      const result = await createCrmUserAction({
+        ...form,
+        supervisorId: needsSupervisor ? form.supervisorId : null,
+        sendInvite,
+      });
 
       if (result.error) {
         setError(result.error);
@@ -92,7 +113,7 @@ export default function CreateUserForm({ roles, onSuccess }: Props) {
 
       <Field label="Rango">
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-          {roles.map((role) => (
+          {availableRoles.map((role) => (
             <button
               key={role}
               type="button"
@@ -108,6 +129,25 @@ export default function CreateUserForm({ roles, onSuccess }: Props) {
           ))}
         </div>
       </Field>
+
+      {needsSupervisor && supervisors.length > 0 && (
+        <Field label="Supervisor">
+          <select
+            value={form.supervisorId ?? ""}
+            onChange={(e) =>
+              updateField("supervisorId", e.target.value ? Number(e.target.value) : null)
+            }
+            className="input"
+          >
+            <option value="">Sin supervisor asignado</option>
+            {supervisors.map((s) => (
+              <option key={s.id} value={s.id}>
+                {`${s.nombre} ${s.apellidos}`.trim()} ({s.rol})
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
 
       {/* Toggle: contraseña manual vs invitación por correo */}
       <Field label="Contraseña">

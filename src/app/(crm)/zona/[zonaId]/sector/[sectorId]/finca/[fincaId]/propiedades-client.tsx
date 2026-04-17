@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { SlidersHorizontal, X } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deletePropiedadAction } from "@/app/actions/security";
 import { createTareaAction } from "@/app/(crm)/dashboard/actions";
+import { updatePropiedadesPosicionesAction } from "@/app/(crm)/zona/actions";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase-browser";
@@ -25,12 +27,13 @@ type Propiedad = {
   estado: string | null;
   fecha_visita: string | null;
   notas: string | null;
+  honorarios: number | null;
+  posicion: number | null;
   agente_asignado: number | null;
   finca_id: number | null;
   latitud?: number | null;
   longitud?: number | null;
   usuarios: { id: number; nombre: string; apellidos: string } | null;
-  // Orden local (no en BD, solo para UI)
   _order?: number;
 };
 
@@ -42,6 +45,7 @@ type FormData = {
   estado: string;
   fecha_visita: string;
   notas: string;
+  honorarios: string;
   agente_asignado: string;
   latitud: string;
   longitud: string;
@@ -103,6 +107,7 @@ const EMPTY_FORM: FormData = {
   estado: "neutral",
   fecha_visita: "",
   notas: "",
+  honorarios: "",
   agente_asignado: "",
   latitud: "",
   longitud: "",
@@ -139,8 +144,30 @@ export default function PropiedadesClient({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletePassword, setDeletePassword] = useState("");
 
-  // Filtro pendientes
+  // Filtros avanzados
+  const [filtrosOpen, setFiltrosOpen] = useState(false);
+  const [filtroEstados, setFiltroEstados] = useState<string[]>([]);
+  const [filtroAgente, setFiltroAgente] = useState("");
+  const [filtroFechaDesde, setFiltroFechaDesde] = useState("");
+  const [filtroFechaHasta, setFiltroFechaHasta] = useState("");
+  // Filtro pendientes (mantiene retrocompat.)
   const [filtroPendientes, setFiltroPendientes] = useState(false);
+
+  const hayFiltrosActivos =
+    filtroEstados.length > 0 || filtroAgente || filtroFechaDesde || filtroFechaHasta;
+
+  function limpiarFiltros() {
+    setFiltroEstados([]);
+    setFiltroAgente("");
+    setFiltroFechaDesde("");
+    setFiltroFechaHasta("");
+  }
+
+  function toggleEstado(estado: string) {
+    setFiltroEstados((prev) =>
+      prev.includes(estado) ? prev.filter((e) => e !== estado) : [...prev, estado]
+    );
+  }
 
   // Recordatorio modal
   const [reminderPropiedad, setReminderPropiedad] = useState<Propiedad | null>(null);
@@ -152,14 +179,24 @@ export default function PropiedadesClient({
   const { toasts, toast } = useToast();
 
   // Propiedades filtradas
-  const propiedadesFiltradas = filtroPendientes
-    ? propiedades.filter(isPendienteContactar)
-    : propiedades;
+  const propiedadesFiltradas = useMemo(() => {
+    let list = filtroPendientes ? propiedades.filter(isPendienteContactar) : propiedades;
+    if (filtroEstados.length > 0) {
+      list = list.filter((p) => filtroEstados.includes(p.estado ?? "neutral"));
+    }
+    if (filtroAgente) {
+      list = list.filter((p) => String(p.agente_asignado ?? "") === filtroAgente);
+    }
+    if (filtroFechaDesde) {
+      list = list.filter((p) => p.fecha_visita && p.fecha_visita >= filtroFechaDesde);
+    }
+    if (filtroFechaHasta) {
+      list = list.filter((p) => p.fecha_visita && p.fecha_visita <= filtroFechaHasta);
+    }
+    return list;
+  }, [propiedades, filtroPendientes, filtroEstados, filtroAgente, filtroFechaDesde, filtroFechaHasta]);
 
-  // Cuántas están pendientes de contactar (para badge del filtro)
   const pendientesCount = propiedades.filter(isPendienteContactar).length;
-
-  // Cuántas tienen overdue 90 días
   const overdueCount = propiedades.filter((p) => isOverdue(p.fecha_visita)).length;
 
   function openCreate() {
@@ -180,6 +217,7 @@ export default function PropiedadesClient({
       estado: propiedad.estado ?? "neutral",
       fecha_visita: propiedad.fecha_visita ?? "",
       notas: propiedad.notas ?? "",
+      honorarios: propiedad.honorarios != null ? propiedad.honorarios.toString() : "",
       agente_asignado: propiedad.agente_asignado?.toString() ?? "",
       latitud: propiedad.latitud != null ? propiedad.latitud.toString() : "",
       longitud: propiedad.longitud != null ? propiedad.longitud.toString() : "",
@@ -252,6 +290,7 @@ export default function PropiedadesClient({
       estado: form.estado || null,
       fecha_visita: form.fecha_visita || null,
       notas: form.notas || null,
+      honorarios: form.estado === "vendido" && form.honorarios ? parseFloat(form.honorarios) : null,
       agente_asignado: form.agente_asignado ? Number(form.agente_asignado) : null,
       latitud: form.latitud ? parseFloat(form.latitud) : null,
       longitud: form.longitud ? parseFloat(form.longitud) : null,
@@ -337,40 +376,44 @@ export default function PropiedadesClient({
     if (!destination) return;
     if (source.index === destination.index) return;
 
-    // Reordenar dentro de la lista filtrada o completa
     const lista = filtroPendientes ? propiedadesFiltradas : propiedades;
     const ids = lista.map((p) => p.id);
     const reordered = [...ids];
     const [moved] = reordered.splice(source.index, 1);
     reordered.splice(destination.index, 0, moved);
 
-    // Reconstruir el orden completo
-    setPropiedades((prev) => {
-      const orderMap = new Map<number, number>();
-      reordered.forEach((id, idx) => orderMap.set(id, idx));
+    let nextState: Propiedad[] = [];
 
+    setPropiedades((prev) => {
       if (filtroPendientes) {
-        // Mantener el orden de los no-filtrados intercalado
-        const allIds = prev.map((p) => p.id);
         const newOrder: Propiedad[] = [];
         let filtIdx = 0;
-        for (const id of allIds) {
+        for (const id of prev.map((p) => p.id)) {
           const p = prev.find((x) => x.id === id)!;
           if (isPendienteContactar(p)) {
-            const newId = reordered[filtIdx++];
-            newOrder.push(prev.find((x) => x.id === newId)!);
+            newOrder.push(prev.find((x) => x.id === reordered[filtIdx++])!);
           } else {
             newOrder.push(p);
           }
         }
-        return newOrder.map((p, i) => ({ ...p, _order: i }));
+        nextState = newOrder.map((p, i) => ({ ...p, _order: i, posicion: i }));
       } else {
-        return reordered.map((id, idx) => ({
+        nextState = reordered.map((id, idx) => ({
           ...prev.find((p) => p.id === id)!,
           _order: idx,
+          posicion: idx,
         }));
       }
+      return nextState;
     });
+
+    // Persistir en BD de forma optimista (fire-and-forget con aviso en error)
+    setTimeout(() => {
+      const positions = nextState.map((p) => ({ id: p.id, posicion: p.posicion ?? 0 }));
+      updatePropiedadesPosicionesAction(positions).then(({ error }) => {
+        if (error) console.warn("Error al guardar orden:", error);
+      });
+    }, 0);
   }
 
   return (
@@ -463,35 +506,132 @@ export default function PropiedadesClient({
             </span>
           )}
         </div>
-        <button
-          onClick={openCreate}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
-        >
-          + Nueva propiedad
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setFiltrosOpen((v) => !v)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+              filtrosOpen || hayFiltrosActivos
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-text-secondary hover:bg-background hover:text-text-primary"
+            }`}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filtros
+            {hayFiltrosActivos && (
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                {filtroEstados.length + (filtroAgente ? 1 : 0) + (filtroFechaDesde || filtroFechaHasta ? 1 : 0)}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={openCreate}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+          >
+            + Nueva propiedad
+          </button>
+        </div>
       </div>
+
+      {/* ── Barra de filtros avanzados ── */}
+      {filtrosOpen && (
+        <div className="mb-4 rounded-xl border border-border bg-surface p-4 space-y-4">
+          {/* Estados */}
+          <div>
+            <p className="mb-2 text-xs font-medium text-text-secondary">Estado</p>
+            <div className="flex flex-wrap gap-2">
+              {ESTADOS.map((e) => (
+                <button
+                  key={e.value}
+                  type="button"
+                  onClick={() => toggleEstado(e.value)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    filtroEstados.includes(e.value)
+                      ? e.classes + " ring-2 ring-offset-1 ring-current"
+                      : "border border-border text-text-secondary hover:bg-background"
+                  }`}
+                >
+                  {e.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {/* Agente */}
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-text-secondary">Agente asignado</p>
+              <select
+                value={filtroAgente}
+                onChange={(e) => setFiltroAgente(e.target.value)}
+                className="input text-sm"
+              >
+                <option value="">Todos los agentes</option>
+                {agentes.map((a) => (
+                  <option key={a.id} value={String(a.id)}>
+                    {a.nombre} {a.apellidos}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Fecha desde */}
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-text-secondary">Visita desde</p>
+              <input
+                type="date"
+                value={filtroFechaDesde}
+                onChange={(e) => setFiltroFechaDesde(e.target.value)}
+                className="input text-sm"
+              />
+            </div>
+
+            {/* Fecha hasta */}
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-text-secondary">Visita hasta</p>
+              <input
+                type="date"
+                value={filtroFechaHasta}
+                onChange={(e) => setFiltroFechaHasta(e.target.value)}
+                className="input text-sm"
+              />
+            </div>
+          </div>
+
+          {hayFiltrosActivos && (
+            <div className="flex justify-end border-t border-border pt-3">
+              <button
+                onClick={limpiarFiltros}
+                className="flex items-center gap-1.5 text-xs font-medium text-danger hover:underline"
+              >
+                <X className="h-3.5 w-3.5" />
+                Limpiar filtros
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {propiedadesFiltradas.length === 0 ? (
         <div className="rounded-xl border border-border bg-surface py-16 text-center">
           <p className="text-text-secondary">
-            {filtroPendientes
-              ? "No hay propiedades pendientes de contactar."
+            {hayFiltrosActivos || filtroPendientes
+              ? "No hay propiedades que coincidan con los filtros."
               : "No hay propiedades registradas."}
           </p>
-          {!filtroPendientes && (
+          {(hayFiltrosActivos || filtroPendientes) && (
+            <button
+              onClick={() => { limpiarFiltros(); setFiltroPendientes(false); }}
+              className="mt-4 text-sm font-medium text-primary hover:underline"
+            >
+              Quitar filtros
+            </button>
+          )}
+          {!hayFiltrosActivos && !filtroPendientes && (
             <button
               onClick={openCreate}
               className="mt-4 text-sm font-medium text-primary hover:underline"
             >
               Anadir la primera propiedad
-            </button>
-          )}
-          {filtroPendientes && (
-            <button
-              onClick={() => setFiltroPendientes(false)}
-              className="mt-4 text-sm font-medium text-primary hover:underline"
-            >
-              Ver todas las propiedades
             </button>
           )}
         </div>
@@ -891,6 +1031,20 @@ export default function PropiedadesClient({
                 </FormField>
               </div>
 
+              {form.estado === "vendido" && (
+                <FormField label="Honorarios (€)" hint="Comision o honorarios obtenidos en la venta. Se usa para calcular el facturado en Desarrollo.">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.honorarios}
+                    onChange={(e) => setField("honorarios", e.target.value)}
+                    placeholder="Ej: 5000"
+                    className="input"
+                  />
+                </FormField>
+              )}
+
               <FormField label="Agente asignado">
                 <select
                   value={form.agente_asignado}
@@ -1023,15 +1177,18 @@ export default function PropiedadesClient({
 
 function FormField({
   label,
+  hint,
   children,
 }: {
   label: string;
+  hint?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-xs font-medium text-text-secondary">{label}</label>
       {children}
+      {hint && <p className="text-xs text-text-secondary">{hint}</p>}
     </div>
   );
 }

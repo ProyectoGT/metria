@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { MoreVertical, Plus, Search } from "lucide-react";
+import { MoreVertical, Plus, Search, UserCheck, UserX } from "lucide-react";
 import Avatar from "@/components/ui/avatar";
 import { useToast, Toaster } from "@/components/ui/toast";
-import { deleteUserAction, updateUserRoleAction } from "./actions";
+import {
+  deleteUserAction,
+  updateUserRoleAction,
+  updateUserInfoAction,
+  toggleUserStatusAction,
+  updateUserSupervisorAction,
+} from "./actions";
 import CreateUserForm from "./create-user-form";
+import type { UserRole } from "@/lib/roles";
 
 type ManagedUser = {
   id: number;
@@ -15,20 +22,42 @@ type ManagedUser = {
   rol: string;
   estado: string;
   authId: string | null;
+  supervisorId: number | null;
+};
+
+type SupervisorOption = {
+  id: number;
+  nombre: string;
+  apellidos: string;
+  rol: string;
 };
 
 type Props = {
   users: ManagedUser[];
   roles: readonly string[];
+  supervisors: SupervisorOption[];
+  currentUserRole: UserRole;
+  currentUserId: number;
 };
 
-export default function UsersManagementPanel({ users, roles }: Props) {
+const DIRECTOR_ALLOWED_ROLES = ["Responsable", "Agente"];
+
+export default function UsersManagementPanel({
+  users: initialUsers,
+  roles,
+  supervisors,
+  currentUserRole,
+  currentUserId,
+}: Props) {
+  const [users, setUsers] = useState<ManagedUser[]>(initialUsers);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<ManagedUser | null>(null);
   const [deleteUser, setDeleteUser] = useState<ManagedUser | null>(null);
   const { toasts, toast } = useToast();
+
+  const isAdmin = currentUserRole === "Administrador";
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -39,6 +68,16 @@ export default function UsersManagementPanel({ users, roles }: Props) {
       return haystack.includes(query);
     });
   }, [users, search, roleFilter]);
+
+  function handleUserUpdated(updated: Partial<ManagedUser> & { id: number }) {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === updated.id ? { ...u, ...updated } : u))
+    );
+  }
+
+  function handleUserRemoved(userId: number) {
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
+  }
 
   return (
     <>
@@ -96,7 +135,13 @@ export default function UsersManagementPanel({ users, roles }: Props) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full table-fixed text-sm">
+              <colgroup>
+                <col style={{ width: "45%" }} />
+                <col style={{ width: "25%" }} />
+                <col style={{ width: "25%" }} />
+                <col style={{ width: "5%" }} />
+              </colgroup>
               <thead>
                 <tr className="border-b border-border bg-background">
                   <th className="px-5 py-3 text-left font-medium text-text-secondary">
@@ -108,7 +153,7 @@ export default function UsersManagementPanel({ users, roles }: Props) {
                   <th className="px-5 py-3 text-left font-medium text-text-secondary">
                     Estado
                   </th>
-                  <th className="w-12 px-5 py-3" />
+                  <th className="px-5 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -116,8 +161,12 @@ export default function UsersManagementPanel({ users, roles }: Props) {
                   <UserRow
                     key={user.id}
                     user={user}
+                    isCurrentUser={user.id === currentUserId}
+                    isAdmin={isAdmin}
                     onEdit={() => setEditUser(user)}
                     onDelete={() => setDeleteUser(user)}
+                    onToggleStatus={(updated) => handleUserUpdated(updated)}
+                    onToast={toast}
                   />
                 ))}
               </tbody>
@@ -127,12 +176,11 @@ export default function UsersManagementPanel({ users, roles }: Props) {
       </div>
 
       {createOpen && (
-        <FormModal
-          title="Nuevo usuario"
-          onClose={() => setCreateOpen(false)}
-        >
+        <FormModal title="Nuevo usuario" onClose={() => setCreateOpen(false)}>
           <CreateUserForm
             roles={roles}
+            supervisors={supervisors}
+            currentUserRole={currentUserRole}
             onSuccess={(message) => {
               toast(message);
               setCreateOpen(false);
@@ -142,12 +190,14 @@ export default function UsersManagementPanel({ users, roles }: Props) {
       )}
 
       {editUser && (
-        <EditRoleDialog
+        <EditUserDialog
           user={editUser}
           roles={roles}
+          supervisors={supervisors}
           onClose={() => setEditUser(null)}
-          onSuccess={(message) => {
+          onSuccess={(message, updated) => {
             toast(message);
+            handleUserUpdated({ id: editUser.id, ...updated });
             setEditUser(null);
           }}
         />
@@ -157,8 +207,13 @@ export default function UsersManagementPanel({ users, roles }: Props) {
         <DeleteUserDialog
           user={deleteUser}
           onClose={() => setDeleteUser(null)}
-          onSuccess={(message) => {
+          onSuccess={(message, removed) => {
             toast(message);
+            if (removed) {
+              handleUserRemoved(deleteUser.id);
+            } else {
+              handleUserUpdated({ id: deleteUser.id, estado: "disabled", authId: null });
+            }
             setDeleteUser(null);
           }}
         />
@@ -171,16 +226,28 @@ export default function UsersManagementPanel({ users, roles }: Props) {
 
 function UserRow({
   user,
+  isCurrentUser,
+  isAdmin,
   onEdit,
   onDelete,
+  onToggleStatus,
+  onToast,
 }: {
   user: ManagedUser;
+  isCurrentUser: boolean;
+  isAdmin: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleStatus: (updated: Partial<ManagedUser> & { id: number }) => void;
+  onToast: (msg: string, type?: "error") => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
+  const [isPending, startTransition] = useTransition();
+  const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const isAdmin = user.rol === "Administrador";
+  const isAdminUser = user.rol === "Administrador";
+  const isActive = user.estado === "active";
   const fullName = `${user.nombre} ${user.apellidos}`.trim();
 
   useEffect(() => {
@@ -194,8 +261,31 @@ function UserRow({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
+  function openMenu() {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    setMenuOpen((v) => !v);
+  }
+
+  function handleToggle() {
+    setMenuOpen(false);
+    startTransition(async () => {
+      const result = await toggleUserStatusAction({ userId: user.id });
+      if (result.error) {
+        onToast(result.error, "error");
+        return;
+      }
+      onToast(result.message ?? "Estado actualizado.");
+      onToggleStatus({ id: user.id, estado: result.status ?? (isActive ? "disabled" : "active") });
+    });
+  }
+
+  const canAct = isAdmin && !isCurrentUser && !isAdminUser;
+
   return (
-    <tr className="transition-colors hover:bg-background">
+    <tr className={`transition-colors hover:bg-background ${user.estado !== "active" ? "opacity-60" : ""}`}>
       <td className="px-5 py-3.5">
         <div className="flex items-center gap-3">
           <Avatar name={fullName || user.correo} size="lg" />
@@ -214,34 +304,51 @@ function UserRow({
         <StatusBadge status={user.estado} hasAccess={Boolean(user.authId)} />
       </td>
       <td className="w-12 px-5 py-3.5 text-right">
-        {!isAdmin && (
-          <div className="relative inline-block" ref={menuRef}>
+        {canAct && (
+          <div className="relative inline-block">
             <button
+              ref={btnRef}
               type="button"
-              onClick={() => setMenuOpen((v) => !v)}
-              className="rounded p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
+              onClick={openMenu}
+              disabled={isPending}
+              className="rounded p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary disabled:opacity-50"
               aria-label="Acciones"
             >
               <MoreVertical className="h-4 w-4" />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+              <div
+                ref={menuRef}
+                style={{ position: "fixed", top: menuPos.top, right: menuPos.right }}
+                className="z-50 w-44 overflow-hidden rounded-lg border border-border bg-surface shadow-lg"
+              >
                 <button
                   type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onEdit();
-                  }}
+                  onClick={() => { setMenuOpen(false); onEdit(); }}
                   className="block w-full px-3 py-2 text-left text-sm text-text-primary transition-colors hover:bg-background"
                 >
-                  Cambiar rango
+                  Editar informacion
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onDelete();
-                  }}
+                  onClick={handleToggle}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text-primary transition-colors hover:bg-background"
+                >
+                  {isActive ? (
+                    <>
+                      <UserX className="h-3.5 w-3.5 text-warning" />
+                      Desactivar acceso
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="h-3.5 w-3.5 text-success" />
+                      Activar acceso
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMenuOpen(false); onDelete(); }}
                   className="block w-full px-3 py-2 text-left text-sm text-danger transition-colors hover:bg-danger/10"
                 >
                   Eliminar
@@ -255,84 +362,161 @@ function UserRow({
   );
 }
 
-function EditRoleDialog({
+function EditUserDialog({
   user,
   roles,
+  supervisors,
   onClose,
   onSuccess,
 }: {
   user: ManagedUser;
   roles: readonly string[];
+  supervisors: SupervisorOption[];
   onClose: () => void;
-  onSuccess: (message: string) => void;
+  onSuccess: (message: string, updated: Partial<ManagedUser>) => void;
 }) {
-  const [selectedRole, setSelectedRole] = useState(user.rol);
+  const [form, setForm] = useState({
+    nombre: user.nombre,
+    apellidos: user.apellidos,
+    correo: user.correo,
+    rol: user.rol,
+    supervisorId: user.supervisorId,
+  });
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const needsSupervisor = form.rol === "Agente" || form.rol === "Responsable";
+  const availableSupervisors = supervisors.filter((s) => s.id !== user.id);
 
   function handleSave() {
     setError(null);
     startTransition(async () => {
-      const result = await updateUserRoleAction({
+      const result = await updateUserInfoAction({
         userId: user.id,
-        rol: selectedRole,
+        nombre: form.nombre,
+        apellidos: form.apellidos,
+        correo: form.correo,
+        rol: form.rol,
+        supervisorId: needsSupervisor ? form.supervisorId : null,
       });
       if (result.error) {
         setError(result.error);
         return;
       }
-      onSuccess(result.message ?? "Rango actualizado.");
+      onSuccess(result.message ?? "Usuario actualizado.", {
+        nombre: form.nombre,
+        apellidos: form.apellidos,
+        correo: form.correo,
+        rol: form.rol,
+        supervisorId: needsSupervisor ? form.supervisorId : null,
+      });
     });
   }
 
+  const editableRoles = roles.filter((r) => r !== "Administrador");
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
-        <h2 className="text-base font-semibold text-text-primary">
-          Cambiar rango
-        </h2>
-        <p className="mt-1 text-sm text-text-secondary">
-          {`${user.nombre} ${user.apellidos}`.trim()}
-        </p>
-
-        <div className="mt-4">
-          <label className="text-xs font-medium text-text-secondary">
-            Nuevo rango
-          </label>
-          <select
-            value={selectedRole}
-            onChange={(e) => setSelectedRole(e.target.value)}
-            disabled={isPending}
-            className="input mt-1.5"
-          >
-            {roles
-              .filter((role) => role !== "Administrador")
-              .map((role) => (
-                <option key={role} value={role}>{role}</option>
-              ))}
-          </select>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <h2 className="text-base font-semibold text-text-primary">Editar usuario</h2>
+          <button onClick={onClose} className="text-text-secondary hover:text-text-primary">×</button>
         </div>
+        <div className="space-y-4 p-6">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-text-secondary">Nombre</label>
+              <input
+                value={form.nombre}
+                onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
+                className="input"
+                placeholder="Nombre"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-text-secondary">Apellidos</label>
+              <input
+                value={form.apellidos}
+                onChange={(e) => setForm((f) => ({ ...f, apellidos: e.target.value }))}
+                className="input"
+                placeholder="Apellidos"
+              />
+            </div>
+          </div>
 
-        {error && (
-          <p className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
-            {error}
-          </p>
-        )}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-text-secondary">Correo</label>
+            <input
+              type="email"
+              value={form.correo}
+              onChange={(e) => setForm((f) => ({ ...f, correo: e.target.value }))}
+              className="input"
+              placeholder="usuario@empresa.com"
+            />
+          </div>
 
-        <div className="mt-5 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isPending || selectedRole === user.rol}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
-          >
-            {isPending ? "Guardando..." : "Guardar"}
-          </button>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-text-secondary">Rango</label>
+            <div className="grid grid-cols-3 gap-2">
+              {editableRoles.map((role) => (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, rol: role }))}
+                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                    form.rol === role
+                      ? "border-primary bg-primary text-white"
+                      : "border-border bg-background text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  {role}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {needsSupervisor && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-text-secondary">Supervisor</label>
+              <select
+                value={form.supervisorId ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    supervisorId: e.target.value ? Number(e.target.value) : null,
+                  }))
+                }
+                className="input"
+              >
+                <option value="">Sin supervisor asignado</option>
+                {availableSupervisors.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {`${s.nombre} ${s.apellidos}`.trim()} ({s.rol})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {error && (
+            <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>
+          )}
+
+          <div className="flex justify-end gap-3 border-t border-border pt-4">
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isPending}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
+            >
+              {isPending ? "Guardando..." : "Guardar cambios"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -346,7 +530,7 @@ function DeleteUserDialog({
 }: {
   user: ManagedUser;
   onClose: () => void;
-  onSuccess: (message: string) => void;
+  onSuccess: (message: string, removed: boolean) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -359,28 +543,24 @@ function DeleteUserDialog({
         setError(result.error);
         return;
       }
-      onSuccess(result.message ?? "Usuario eliminado.");
+      onSuccess(result.message ?? "Usuario eliminado.", result.removed ?? false);
     });
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
-        <h2 className="text-base font-semibold text-text-primary">
-          Eliminar usuario
-        </h2>
+        <h2 className="text-base font-semibold text-text-primary">Eliminar usuario</h2>
         <p className="mt-2 text-sm text-text-secondary">
-          Vas a eliminar o desactivar el acceso de{" "}
+          Vas a eliminar el perfil de{" "}
           <span className="font-medium text-text-primary">
             {`${user.nombre} ${user.apellidos}`.trim()}
           </span>
-          . Esta accion no se puede deshacer.
+          . Si tiene datos vinculados en el CRM, se desactivara su acceso en su lugar.
         </p>
 
         {error && (
-          <p className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
-            {error}
-          </p>
+          <p className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>
         )}
 
         <div className="mt-5 flex justify-end gap-3">
@@ -413,7 +593,7 @@ function FormModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-2xl rounded-2xl bg-surface shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h2 className="text-base font-semibold text-text-primary">{title}</h2>
@@ -442,21 +622,13 @@ function RoleBadge({ role }: { role: string }) {
           : "bg-success/15 text-success dark:bg-success/25";
 
   return (
-    <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${className}`}
-    >
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${className}`}>
       {role}
     </span>
   );
 }
 
-function StatusBadge({
-  status,
-  hasAccess,
-}: {
-  status: string;
-  hasAccess: boolean;
-}) {
+function StatusBadge({ status, hasAccess }: { status: string; hasAccess: boolean }) {
   const normalized = status.toLowerCase();
   const effectiveStatus = !hasAccess ? "disabled" : normalized;
 
@@ -471,13 +643,11 @@ function StatusBadge({
     effectiveStatus === "active"
       ? "Activo"
       : effectiveStatus === "disabled"
-        ? "Sin acceso"
+        ? "Desactivado"
         : "Invitado";
 
   return (
-    <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${className}`}
-    >
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${className}`}>
       {label}
     </span>
   );

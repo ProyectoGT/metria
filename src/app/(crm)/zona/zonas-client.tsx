@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Trash2, ShieldCheck, X, Loader2 } from "lucide-react";
 import { deleteZonaAction, deleteSectorAction } from "@/app/actions/security";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
@@ -27,19 +27,37 @@ type DeleteTarget =
   | { kind: "zona"; id: number }
   | { kind: "sector"; id: number; zonaId: number };
 
+type UsuarioAcceso = { id: number; nombre: string; apellidos: string; rol: string };
+
 export default function ZonasClient({
   initialZonas,
   canDeleteZonas,
   canDeleteSectores,
+  canManageAccess = false,
+  usuarios = [],
+  initialAccesos = [],
 }: {
   initialZonas: Zona[];
   canDeleteZonas: boolean;
   canDeleteSectores: boolean;
+  canManageAccess?: boolean;
+  usuarios?: UsuarioAcceso[];
+  initialAccesos?: { zona_id: number; usuario_id: number }[];
 }) {
   const [zonas, setZonas] = useState<Zona[]>(initialZonas);
-  const [openIds, setOpenIds] = useState<Set<number>>(
-    () => new Set(initialZonas.map((z) => z.id)) // todas abiertas por defecto
-  );
+  const [openIds, setOpenIds] = useState<Set<number>>(() => new Set());
+
+  // Accesos: mapa zona_id → Set<usuario_id>
+  const [accesos, setAccesos] = useState<Map<number, Set<number>>>(() => {
+    const m = new Map<number, Set<number>>();
+    for (const a of initialAccesos) {
+      if (!m.has(a.zona_id)) m.set(a.zona_id, new Set());
+      m.get(a.zona_id)!.add(a.usuario_id);
+    }
+    return m;
+  });
+  const [accesoModal, setAccesoModal] = useState<{ zonaId: number; zonaNombre: string } | null>(null);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   // Modal nueva zona
   const [zonaModalOpen, setZonaModalOpen] = useState(false);
@@ -169,6 +187,42 @@ export default function ZonasClient({
     setDeletePassword("");
   }
 
+  // ── Toggle acceso usuario/zona ───────────────────────────────────────────
+  async function handleToggleAcceso(zonaId: number, usuarioId: number) {
+    setTogglingId(usuarioId);
+    const tieneAcceso = accesos.get(zonaId)?.has(usuarioId) ?? false;
+
+    if (tieneAcceso) {
+      const { error } = await supabase
+        .from("zona_acceso")
+        .delete()
+        .eq("zona_id", zonaId)
+        .eq("usuario_id", usuarioId);
+      if (error) { toast(`Error: ${error.message}`, "error"); }
+      else {
+        setAccesos((prev) => {
+          const next = new Map(prev);
+          next.get(zonaId)?.delete(usuarioId);
+          return next;
+        });
+      }
+    } else {
+      const { error } = await supabase
+        .from("zona_acceso")
+        .insert({ zona_id: zonaId, usuario_id: usuarioId });
+      if (error) { toast(`Error: ${error.message}`, "error"); }
+      else {
+        setAccesos((prev) => {
+          const next = new Map(prev);
+          if (!next.has(zonaId)) next.set(zonaId, new Set());
+          next.get(zonaId)!.add(usuarioId);
+          return next;
+        });
+      }
+    }
+    setTogglingId(null);
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <>
@@ -246,6 +300,21 @@ export default function ZonasClient({
                     </div>
                   </button>
                   <div className="flex items-center gap-2">
+                    {canManageAccess && usuarios.length > 0 && (
+                      <button
+                        onClick={() => setAccesoModal({ zonaId: zona.id, zonaNombre: zona.nombre })}
+                        className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
+                        title="Gestionar acceso de usuarios"
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        Acceso
+                        {(accesos.get(zona.id)?.size ?? 0) > 0 && (
+                          <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 text-[10px] font-semibold text-primary">
+                            {accesos.get(zona.id)?.size}
+                          </span>
+                        )}
+                      </button>
+                    )}
                     <button
                       onClick={() => { setSectorModal({ zonaId: zona.id }); setSectorNumero(""); }}
                       className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
@@ -429,6 +498,98 @@ export default function ZonasClient({
           onCancel={() => { setDeleteTarget(null); setDeletePassword(""); setDeleteError(null); }}
           onConfirm={handleDelete}
         />
+      )}
+
+      {/* ── Modal gestión de accesos ── */}
+      {accesoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <div>
+                <h2 className="text-base font-semibold text-text-primary">
+                  Acceso a {accesoModal.zonaNombre}
+                </h2>
+                <p className="mt-0.5 text-xs text-text-secondary">
+                  Elige quién puede ver esta zona
+                </p>
+              </div>
+              <button
+                onClick={() => setAccesoModal(null)}
+                className="rounded-lg p-1.5 text-text-secondary hover:bg-background hover:text-text-primary"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto px-6 py-4">
+              {usuarios.length === 0 ? (
+                <p className="py-8 text-center text-sm text-text-secondary">
+                  No hay Responsables ni Agentes activos
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {/* Agrupar por rol */}
+                  {(["Responsable", "Agente"] as const).map((rol) => {
+                    const grupo = usuarios.filter((u) => u.rol === rol);
+                    if (grupo.length === 0) return null;
+                    return (
+                      <div key={rol}>
+                        <p className="mb-1 mt-3 text-[10px] font-semibold uppercase tracking-wide text-text-secondary first:mt-0">
+                          {rol}s
+                        </p>
+                        {grupo.map((u) => {
+                          const tiene = accesos.get(accesoModal.zonaId)?.has(u.id) ?? false;
+                          const toggling = togglingId === u.id;
+                          const initials = `${u.nombre[0]}${u.apellidos[0]}`.toUpperCase();
+                          return (
+                            <div
+                              key={u.id}
+                              className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-background"
+                            >
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+                                {initials}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-text-primary">
+                                  {u.nombre} {u.apellidos}
+                                </p>
+                                <p className="text-xs text-text-secondary">{u.rol}</p>
+                              </div>
+                              <button
+                                onClick={() => handleToggleAcceso(accesoModal.zonaId, u.id)}
+                                disabled={toggling}
+                                className={[
+                                  "relative h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none disabled:opacity-60",
+                                  tiene ? "bg-primary" : "bg-border",
+                                ].join(" ")}
+                                title={tiene ? "Quitar acceso" : "Dar acceso"}
+                              >
+                                {toggling ? (
+                                  <Loader2 className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 animate-spin text-white" />
+                                ) : (
+                                  <span
+                                    className={[
+                                      "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all",
+                                      tiene ? "left-[22px]" : "left-0.5",
+                                    ].join(" ")}
+                                  />
+                                )}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-border px-6 py-3 text-xs text-text-secondary">
+              Los usuarios sin acceso asignado no podran ver ninguna zona.
+            </div>
+          </div>
+        </div>
       )}
 
       <Toaster toasts={toasts} />

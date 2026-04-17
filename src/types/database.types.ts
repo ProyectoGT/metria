@@ -78,6 +78,7 @@ export interface Database {
           event_date: string;
           time: string | null;
           priority: string;
+          tipo: string;
           completed: boolean;
           result: string | null;
           gcal_event_id: string | null;
@@ -94,6 +95,7 @@ export interface Database {
           event_date: string;
           time?: string | null;
           priority?: string;
+          tipo?: string;
           completed?: boolean;
           result?: string | null;
           gcal_event_id?: string | null;
@@ -110,6 +112,7 @@ export interface Database {
           event_date?: string;
           time?: string | null;
           priority?: string;
+          tipo?: string;
           completed?: boolean;
           result?: string | null;
           gcal_event_id?: string | null;
@@ -154,6 +157,7 @@ export interface Database {
           propiedad_id: number | null;
           tipo: string;
           url: string | null;
+          storage_path: string | null;
           created_at: string;
         };
         Insert: {
@@ -162,6 +166,7 @@ export interface Database {
           propiedad_id?: number | null;
           tipo?: string;
           url?: string | null;
+          storage_path?: string | null;
           created_at?: string;
         };
         Update: {
@@ -170,6 +175,7 @@ export interface Database {
           propiedad_id?: number | null;
           tipo?: string;
           url?: string | null;
+          storage_path?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -207,6 +213,30 @@ export interface Database {
             referencedRelation: "propiedades";
             referencedColumns: ["id"];
           },
+        ];
+      };
+      zona_acceso: {
+        Row: {
+          id: number;
+          zona_id: number;
+          usuario_id: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          zona_id: number;
+          usuario_id: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          zona_id?: number;
+          usuario_id?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          { foreignKeyName: "zona_acceso_zona_id_fkey"; columns: ["zona_id"]; referencedRelation: "zona"; referencedColumns: ["id"] },
+          { foreignKeyName: "zona_acceso_usuario_id_fkey"; columns: ["usuario_id"]; referencedRelation: "usuarios"; referencedColumns: ["id"] },
         ];
       };
       configuracion_seguridad: {
@@ -403,6 +433,8 @@ export interface Database {
           estado: string | null;
           fecha_visita: string | null;
           notas: string | null;
+          honorarios: number | null;
+          posicion: number | null;
           agente_asignado: number | null;
           finca_id: number | null;
           owner_user_id: number | null;
@@ -419,6 +451,8 @@ export interface Database {
           estado?: string | null;
           fecha_visita?: string | null;
           notas?: string | null;
+          honorarios?: number | null;
+          posicion?: number | null;
           agente_asignado?: number | null;
           finca_id?: number | null;
           owner_user_id?: number | null;
@@ -435,6 +469,8 @@ export interface Database {
           estado?: string | null;
           fecha_visita?: string | null;
           notas?: string | null;
+          honorarios?: number | null;
+          posicion?: number | null;
           agente_asignado?: number | null;
           finca_id?: number | null;
           owner_user_id?: number | null;
