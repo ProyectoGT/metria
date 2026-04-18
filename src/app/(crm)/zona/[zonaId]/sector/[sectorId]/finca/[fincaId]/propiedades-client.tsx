@@ -1,15 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal, X, MapPin, Loader2, Navigation } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deletePropiedadAction } from "@/app/actions/security";
 import { createTareaAction } from "@/app/(crm)/dashboard/actions";
-import { updatePropiedadesPosicionesAction } from "@/app/(crm)/zona/actions";
+import { updatePropiedadesPosicionesAction, upsertPropiedadAction } from "@/app/(crm)/zona/actions";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
-import { createClient } from "@/lib/supabase-browser";
 import EncargoPanel from "@/components/propiedades/EncargoPanel";
 
 type Agente = {
@@ -99,6 +98,12 @@ function isPendienteContactar(propiedad: Propiedad): boolean {
   return sinEstado && sinVisita;
 }
 
+function nowLocalDatetime() {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
 const EMPTY_FORM: FormData = {
   planta: "",
   puerta: "",
@@ -174,7 +179,16 @@ export default function PropiedadesClient({
   const [reminderForm, setReminderForm] = useState<ReminderForm>(EMPTY_REMINDER);
   const [reminderSaving, setReminderSaving] = useState(false);
 
-  const supabase = useMemo(() => createClient(), []);
+  const [nowDisplay, setNowDisplay] = useState("");
+  useEffect(() => {
+    if (!modalOpen || editTarget) return;
+    setNowDisplay(new Date().toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }));
+    const interval = setInterval(() => {
+      setNowDisplay(new Date().toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [modalOpen, editTarget]);
+
   const router = useRouter();
   const { toasts, toast } = useToast();
 
@@ -201,7 +215,7 @@ export default function PropiedadesClient({
 
   function openCreate() {
     setEditTarget(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, fecha_visita: nowLocalDatetime() });
     setSaveError(null);
     setModalOpen(true);
   }
@@ -215,7 +229,7 @@ export default function PropiedadesClient({
       propietario: propiedad.propietario ?? "",
       telefono: propiedad.telefono ?? "",
       estado: propiedad.estado ?? "neutral",
-      fecha_visita: propiedad.fecha_visita ?? "",
+      fecha_visita: propiedad.fecha_visita ? propiedad.fecha_visita.slice(0, 16) : "",
       notas: propiedad.notas ?? "",
       honorarios: propiedad.honorarios != null ? propiedad.honorarios.toString() : "",
       agente_asignado: propiedad.agente_asignado?.toString() ?? "",
@@ -296,49 +310,29 @@ export default function PropiedadesClient({
       longitud: form.longitud ? parseFloat(form.longitud) : null,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const supabaseAny = supabase as any;
+    const { data, error } = await upsertPropiedadAction(
+      payload,
+      fincaId,
+      editTarget?.id
+    );
 
-    if (editTarget) {
-      const { data, error } = await supabaseAny
-        .from("propiedades")
-        .update(payload)
-        .eq("id", editTarget.id)
-        .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)")
-        .single();
+    if (error) {
+      setSaveError(error);
+      setSaving(false);
+      return;
+    }
 
-      if (error) {
-        setSaveError(error.message);
-        setSaving(false);
-        return;
-      }
-
-      if (data) {
+    if (data) {
+      if (editTarget) {
         setPropiedades((prev) =>
-          prev.map((propiedad) =>
-            propiedad.id === editTarget.id
-              ? { ...(data as Propiedad), _order: propiedad._order }
-              : propiedad
+          prev.map((p) =>
+            p.id === editTarget.id ? { ...(data as unknown as Propiedad), _order: p._order } : p
           )
         );
         toast("Propiedad actualizada correctamente");
-      }
-    } else {
-      const { data, error } = await supabaseAny
-        .from("propiedades")
-        .insert({ ...payload, finca_id: fincaId })
-        .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)")
-        .single();
-
-      if (error) {
-        setSaveError(error.message);
-        setSaving(false);
-        return;
-      }
-
-      if (data) {
+      } else {
         const newOrder = propiedades.length;
-        setPropiedades((prev) => [...prev, { ...(data as Propiedad), _order: newOrder }]);
+        setPropiedades((prev) => [...prev, { ...(data as unknown as Propiedad), _order: newOrder }]);
         toast("Propiedad creada correctamente");
       }
     }
@@ -1021,9 +1015,12 @@ export default function PropiedadesClient({
                     ))}
                   </select>
                 </FormField>
-                <FormField label="Fecha de visita">
+                <FormField
+                  label="Fecha de visita"
+                  hint={!editTarget && nowDisplay ? `Ahora: ${nowDisplay}` : undefined}
+                >
                   <input
-                    type="date"
+                    type="datetime-local"
                     value={form.fecha_visita}
                     onChange={(e) => setField("fecha_visita", e.target.value)}
                     className="input"
@@ -1070,46 +1067,15 @@ export default function PropiedadesClient({
                 />
               </FormField>
 
-              {form.estado === "noticia" && (
-                <div className="rounded-lg border border-border bg-background p-4 space-y-3">
-                  <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
-                    Ubicación en el mapa
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField label="Latitud">
-                      <input
-                        type="number"
-                        step="any"
-                        value={form.latitud}
-                        onChange={(e) => setField("latitud", e.target.value)}
-                        placeholder="Ej: 41.3851"
-                        className="input"
-                      />
-                    </FormField>
-                    <FormField label="Longitud">
-                      <input
-                        type="number"
-                        step="any"
-                        value={form.longitud}
-                        onChange={(e) => setField("longitud", e.target.value)}
-                        placeholder="Ej: 2.1734"
-                        className="input"
-                      />
-                    </FormField>
-                  </div>
-                  <p className="text-xs text-text-secondary">
-                    Abre{" "}
-                    <a
-                      href="https://maps.google.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary underline"
-                    >
-                      Google Maps
-                    </a>
-                    , haz clic derecho sobre la dirección → &quot;¿Qué hay aquí?&quot; y copia las coordenadas.
-                  </p>
-                </div>
+              {(form.estado === "noticia" || form.estado === "encargo") && (
+                <LocationPicker
+                  latitud={form.latitud}
+                  longitud={form.longitud}
+                  onChange={(lat, lng) => {
+                    setField("latitud", lat);
+                    setField("longitud", lng);
+                  }}
+                />
               )}
 
               {saveError && (
@@ -1172,6 +1138,173 @@ export default function PropiedadesClient({
 
       <Toaster toasts={toasts} />
     </>
+  );
+}
+
+function LocationPicker({
+  latitud,
+  longitud,
+  onChange,
+}: {
+  latitud: string;
+  longitud: string;
+  onChange: (lat: string, lng: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<{ place_id: string; description: string }[]>([]);
+  const [loadingGeo, setLoadingGeo] = useState(false);
+  const [loadingLoc, setLoadingLoc] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  function handleQueryChange(value: string) {
+    setQuery(value);
+    setGeoError(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!value.trim()) { setSuggestions([]); setOpen(false); return; }
+
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/maps/autocomplete?input=${encodeURIComponent(value)}`);
+        const data = await res.json();
+        if (data.error) { setGeoError(data.error); return; }
+        if (data.predictions?.length) {
+          setSuggestions(data.predictions);
+          setOpen(true);
+        } else {
+          setSuggestions([]);
+          setOpen(false);
+        }
+      } catch {
+        setGeoError("Error al buscar direcciones");
+      }
+    }, 350);
+  }
+
+  async function selectSuggestion(placeId: string, description: string) {
+    setQuery(description);
+    setOpen(false);
+    setSuggestions([]);
+    setLoadingGeo(true);
+    setGeoError(null);
+    try {
+      const res = await fetch(`/api/maps/geocode?place_id=${encodeURIComponent(placeId)}`);
+      const data = await res.json();
+      if (data.error) {
+        setGeoError(data.error);
+      } else if (data.location) {
+        onChange(String(data.location.lat), String(data.location.lng));
+      } else {
+        setGeoError("No se encontraron coordenadas para esta direccion");
+      }
+    } catch {
+      setGeoError("Error al obtener coordenadas");
+    }
+    setLoadingGeo(false);
+  }
+
+  function useCurrentLocation() {
+    if (!navigator.geolocation) {
+      setGeoError("Tu navegador no soporta geolocalización");
+      return;
+    }
+    setLoadingLoc(true);
+    setGeoError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        onChange(String(pos.coords.latitude), String(pos.coords.longitude));
+        setQuery("Ubicacion actual");
+        setLoadingLoc(false);
+      },
+      (err) => {
+        setLoadingLoc(false);
+        if (err.code === 1) setGeoError("Permiso de ubicacion denegado — actívalo en el navegador");
+        else if (err.code === 2) setGeoError("No se pudo obtener la ubicacion");
+        else setGeoError("Tiempo de espera agotado para la ubicacion");
+      },
+      { timeout: 10000 }
+    );
+  }
+
+  const hasCoords = latitud && longitud;
+
+  return (
+    <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+      <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
+        Ubicacion en el mapa
+      </p>
+
+      <div ref={wrapperRef} className="relative">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => handleQueryChange(e.target.value)}
+              onFocus={() => suggestions.length > 0 && setOpen(true)}
+              placeholder="Buscar direccion..."
+              className="input pl-9"
+            />
+            {loadingGeo && (
+              <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-text-secondary" />
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={useCurrentLocation}
+            disabled={loadingLoc}
+            title="Usar mi ubicacion actual"
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface hover:text-primary disabled:opacity-60"
+          >
+            {loadingLoc ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Navigation className="h-4 w-4" />
+            )}
+          </button>
+        </div>
+
+        {open && suggestions.length > 0 && (
+          <ul className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-surface shadow-lg">
+            {suggestions.map((s) => (
+              <li key={s.place_id}>
+                <button
+                  type="button"
+                  onClick={() => selectSuggestion(s.place_id, s.description)}
+                  className="flex w-full items-start gap-2 px-3 py-2.5 text-left text-sm text-text-primary hover:bg-background"
+                >
+                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-secondary" />
+                  {s.description}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {geoError && (
+        <p className="text-xs text-danger">{geoError}</p>
+      )}
+      {hasCoords && !geoError && (
+        <p className="flex items-center gap-1.5 text-xs text-success">
+          <MapPin className="h-3.5 w-3.5" />
+          Coordenadas: {parseFloat(latitud).toFixed(5)}, {parseFloat(longitud).toFixed(5)}
+        </p>
+      )}
+    </div>
   );
 }
 

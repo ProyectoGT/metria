@@ -151,14 +151,15 @@ export default async function DashboardPage() {
     { data: kanbanColsData },
     { data: agenteMesData },
     { data: noticiasMapData },
+    { data: encargosMapData },
   ] = await Promise.all([
-    applyPropFilters(supabase.from("propiedades").select("*", { count: "exact", head: true })),
+    applyPropFilters(supabase.from("propiedades").select("*", { count: "exact", head: true }).ilike("estado", "noticia")),
     applyPropFilters(supabase.from("propiedades").select("*", { count: "exact", head: true }).ilike("estado", "investig%")),
     applyPropFilters(supabase.from("propiedades").select("*", { count: "exact", head: true }).ilike("estado", "encarg%")),
     applyPedidoFilters(supabase.from("pedidos").select("*", { count: "exact", head: true })),
 
     applyPropFilters(
-      supabase.from("propiedades").select(propSelect).order("id", { ascending: false }).limit(50)
+      supabase.from("propiedades").select(propSelect).ilike("estado", "noticia").order("id", { ascending: false }).limit(50)
     ),
     applyPropFilters(
       supabase.from("propiedades").select(propSelect).ilike("estado", "investig%").order("id", { ascending: false }).limit(50)
@@ -206,6 +207,13 @@ export default async function DashboardPage() {
       supabase.from("propiedades")
         .select("id, propietario, planta, puerta, latitud, longitud, fincas(numero, sectores(numero))")
         .ilike("estado", "noticia")
+        .not("latitud", "is", null)
+        .not("longitud", "is", null)
+    ),
+    applyPropFilters(
+      supabase.from("propiedades")
+        .select("id, propietario, planta, puerta, latitud, longitud, fincas(numero, sectores(numero))")
+        .ilike("estado", "encargo")
         .not("latitud", "is", null)
         .not("longitud", "is", null)
     ),
@@ -394,9 +402,7 @@ export default async function DashboardPage() {
     longitud: number;
     fincas: { numero: string; sectores: { numero: number } | null } | null;
   };
-  const noticiasMap: NoticiaMapPoint[] = (
-    (noticiasMapData ?? []) as unknown as NoticiasMapRow[]
-  ).map((n) => ({
+  const mapRowToPoint = (n: NoticiasMapRow): NoticiaMapPoint => ({
     id: n.id,
     propietario: n.propietario,
     planta: n.planta,
@@ -405,7 +411,10 @@ export default async function DashboardPage() {
     longitud: n.longitud,
     finca: n.fincas?.numero ?? "—",
     sector: n.fincas?.sectores ? `Sector ${n.fincas.sectores.numero}` : "—",
-  }));
+  });
+
+  const noticiasMap: NoticiaMapPoint[] = ((noticiasMapData ?? []) as unknown as NoticiasMapRow[]).map(mapRowToPoint);
+  const encargosMap: NoticiaMapPoint[] = ((encargosMapData ?? []) as unknown as NoticiasMapRow[]).map(mapRowToPoint);
 
   return (
     <div className="flex flex-col gap-8">
@@ -421,7 +430,7 @@ export default async function DashboardPage() {
       <SummaryPanel summary={summary} listings={listings} />
 
       {/* 3 — Mapa de noticias */}
-      <MapaDashboardLazy noticias={noticiasMap} />
+      <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
 
       {/* 4 — Mis tareas (Kanban) */}
       <section className="min-w-0">

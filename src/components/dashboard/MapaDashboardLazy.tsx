@@ -12,6 +12,6 @@ const MapaDashboard = dynamic(() => import("./MapaDashboard"), {
   ),
 });
 
-export default function MapaDashboardLazy({ noticias }: { noticias: NoticiaMapPoint[] }) {
-  return <MapaDashboard noticias={noticias} />;
+export default function MapaDashboardLazy({ noticias, encargos }: { noticias: NoticiaMapPoint[]; encargos: NoticiaMapPoint[] }) {
+  return <MapaDashboard noticias={noticias} encargos={encargos} />;
 }
