@@ -337,33 +337,31 @@ export default function SoporteClient({
     if (!detailTicket) return;
     setUpdatingTicket(true);
 
-    const updates: Partial<TicketSoporte> & { updated_at?: string } = {
-      estado: estadoForm || detailTicket.estado,
-    };
+    try {
+      const res = await fetch(`/api/soporte/ticket/${detailTicket.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          estado: estadoForm || detailTicket.estado,
+          respuesta: respuestaForm.trim() || null,
+          respondido_por_nombre: currentUserNombre,
+        }),
+      });
 
-    if (respuestaForm.trim()) {
-      updates.respuesta = respuestaForm.trim();
-      updates.respondido_por_nombre = currentUserNombre;
-      updates.respondido_at = new Date().toISOString();
-    }
+      const json = await res.json();
 
-    const { data, error } = await supabase
-      .from("tickets_soporte")
-      .update(updates)
-      .eq("id", detailTicket.id)
-      .select()
-      .single();
-
-    if (error) {
-      toast(`Error: ${error.message}`, "error");
-    } else if (data) {
-      setAllTickets((prev) =>
-        prev.map((t) =>
-          t.id === detailTicket.id ? (data as TicketSoporte) : t
-        )
-      );
-      setDetailTicket(data as TicketSoporte);
-      toast("Ticket actualizado");
+      if (!res.ok) {
+        toast(json.error ?? "Error al actualizar el ticket", "error");
+      } else {
+        const updated = json.ticket as TicketSoporte;
+        setAllTickets((prev) =>
+          prev.map((t) => (t.id === detailTicket.id ? updated : t))
+        );
+        setDetailTicket(updated);
+        toast("Ticket actualizado");
+      }
+    } catch {
+      toast("Error de conexion", "error");
     }
 
     setUpdatingTicket(false);

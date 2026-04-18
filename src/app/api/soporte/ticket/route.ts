@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase-admin";
 import { createClient } from "@/lib/supabase";
 import { rateLimiter, getIp } from "@/lib/rate-limiter";
 import { CreateTicketSchema } from "@/lib/validations/ticket";
+import { sendTicketAdminEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
   try {
@@ -54,81 +55,26 @@ export async function POST(request: Request) {
       return Response.json({ error: insertError.message }, { status: 500 });
     }
 
-    // Enviar email a administradores (requiere RESEND_API_KEY y RESEND_FROM_EMAIL)
-    const resendKey = process.env.RESEND_API_KEY;
-    const fromEmail = process.env.RESEND_FROM_EMAIL;
-
-    if (resendKey && fromEmail) {
+    // Notificar a administradores de soporte
+    if (process.env.RESEND_API_KEY) {
       const { data: contactos } = await adminAny
         .from("contactos_soporte")
-        .select("email, nombre, apellidos")
+        .select("email")
         .not("email", "is", null);
 
       const adminEmails = (contactos ?? [])
         .filter((c: { email: string | null }) => c.email)
         .map((c: { email: string }) => c.email);
 
-      if (adminEmails.length > 0) {
-        const prioridadLabel =
-          { alta: "Alta", media: "Media", baja: "Baja" }[prioridad] ??
-          prioridad;
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "";
-
-        await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${resendKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: fromEmail,
-            to: adminEmails,
-            subject: `[Soporte Metria] #${ticket.id} – ${tipo}: ${asunto}`,
-            html: `
-              <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a1a;">
-                <div style="background: #2563eb; padding: 24px 32px; border-radius: 12px 12px 0 0;">
-                  <h1 style="margin: 0; color: white; font-size: 20px;">Nuevo ticket de soporte #${ticket.id}</h1>
-                </div>
-                <div style="background: #f9fafb; padding: 24px 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
-                  <table style="width: 100%; border-collapse: collapse;">
-                    <tr>
-                      <td style="padding: 8px 0; font-size: 13px; color: #6b7280; width: 120px; vertical-align: top;">De</td>
-                      <td style="padding: 8px 0; font-size: 14px; font-weight: 600;">${nombre_usuario || "Usuario desconocido"}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding: 8px 0; font-size: 13px; color: #6b7280; vertical-align: top;">Tipo</td>
-                      <td style="padding: 8px 0; font-size: 14px;">${tipo}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding: 8px 0; font-size: 13px; color: #6b7280; vertical-align: top;">Prioridad</td>
-                      <td style="padding: 8px 0; font-size: 14px;">${prioridadLabel}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding: 8px 0; font-size: 13px; color: #6b7280; vertical-align: top;">Asunto</td>
-                      <td style="padding: 8px 0; font-size: 14px; font-weight: 600;">${asunto}</td>
-                    </tr>
-                  </table>
-                  <div style="margin-top: 16px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px;">
-                    <p style="margin: 0 0 8px; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">Descripción</p>
-                    <p style="margin: 0; font-size: 14px; white-space: pre-wrap; color: #374151;">${descripcion}</p>
-                  </div>
-                  ${
-                    baseUrl
-                      ? `<div style="margin-top: 20px;">
-                    <a href="${baseUrl}/soporte" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 500;">
-                      Ver en Metria CRM →
-                    </a>
-                  </div>`
-                      : ""
-                  }
-                </div>
-              </div>
-            `,
-          }),
-        }).catch(() => {
-          // El email falla silenciosamente — el ticket ya está guardado en BD
-        });
-      }
+      sendTicketAdminEmail({
+        to: adminEmails,
+        ticketId: ticket.id,
+        nombreUsuario: nombre_usuario || "Usuario",
+        tipo,
+        asunto,
+        descripcion,
+        prioridad: prioridad ?? "media",
+      }).catch(() => {});
     }
 
     return Response.json({ ticket }, { status: 201 });

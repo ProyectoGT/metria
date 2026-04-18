@@ -5,6 +5,7 @@ import { getCurrentUserContext } from "@/lib/current-user";
 import { canManageUsers, canCreateUsers, USER_ROLES, type UserRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { validatePassword } from "@/lib/password";
+import { sendInviteEmail, sendBienvenidaGoogleEmail } from "@/lib/email";
 
 type CreateUserInput = {
   nombre: string;
@@ -203,6 +204,9 @@ export async function createCrmUserAction(
 
     if (insertError) return { error: insertError.message };
 
+    // Notificar al usuario que tiene acceso
+    sendBienvenidaGoogleEmail({ to: correo, nombre, correo }).catch(() => {});
+
     revalidatePath("/usuarios");
     return {
       success: true,
@@ -278,14 +282,19 @@ export async function createCrmUserAction(
   }
 
   if (sendInvite) {
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-    await adminClient.auth.admin.generateLink({
+    const siteUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+    const { data: linkData } = await adminClient.auth.admin.generateLink({
       type: "recovery",
       email: correo,
       options: {
         redirectTo: `${siteUrl}/auth/callback?next=/nueva-contrasena`,
       },
     });
+
+    const actionUrl = linkData?.properties?.action_link ?? `${siteUrl}/login`;
+    const invitadoPor = `${currentUser.nombre ?? ""} (${currentUser.email ?? "Administrador"})`.trim();
+
+    sendInviteEmail({ to: correo, nombre, invitadoPor, actionUrl }).catch(() => {});
   }
 
   revalidatePath("/usuarios");
