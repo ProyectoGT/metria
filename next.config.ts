@@ -23,7 +23,7 @@ const securityHeaders = [
       // Next.js requiere unsafe-inline/unsafe-eval; Google Maps carga scripts externos
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.googleapis.com maps.gstatic.com",
       "style-src 'self' 'unsafe-inline' *.googleapis.com",
-      `img-src 'self' blob: data: ${supabaseHostname} *.googleapis.com *.gstatic.com`,
+      `img-src 'self' blob: data: ${supabaseHostname} *.googleapis.com *.gstatic.com lh3.googleusercontent.com`,
       `connect-src 'self' ${supabaseHostname} wss://${supabaseHostname} maps.googleapis.com`,
       "font-src 'self' fonts.gstatic.com",
       "frame-src 'none'",
@@ -34,15 +34,21 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   images: {
-    remotePatterns: supabaseHostname
-      ? [
-          {
-            protocol: "https",
-            hostname: supabaseHostname,
-            pathname: "/storage/v1/object/public/**",
-          },
-        ]
-      : [],
+    remotePatterns: [
+      ...(supabaseHostname
+        ? [
+            {
+              protocol: "https" as const,
+              hostname: supabaseHostname,
+              pathname: "/storage/v1/object/public/**",
+            },
+          ]
+        : []),
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
+    ],
   },
   async headers() {
     return [
