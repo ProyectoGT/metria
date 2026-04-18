@@ -1,6 +1,6 @@
 {
-  "name": "Metria CRM",
-  "short_name": "Metria",
+  "name": "Master Iberica CRM",
+  "short_name": "Master Iberica",
   "description": "CRM inmobiliario de Master Iberica",
   "start_url": "/dashboard",
   "display": "standalone",

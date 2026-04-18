@@ -13,13 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Metria CRM",
+  title: "Master Iberica CRM",
   description: "CRM inmobiliario de Master Iberica",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Metria CRM",
+    title: "Master Iberica CRM",
   },
   icons: {
     icon: [
