@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase";
+import { rateLimiter, getIp } from "@/lib/rate-limiter";
+import { SearchSchema } from "@/lib/validations/search";
 
 export type SearchResult = {
   id: string;
@@ -10,12 +12,22 @@ export type SearchResult = {
 };
 
 export async function GET(request: NextRequest) {
-  const q = request.nextUrl.searchParams.get("q")?.trim();
-  const ctx = request.nextUrl.searchParams.get("ctx") ?? "general";
+  try {
+    await rateLimiter.consume(getIp(request.headers));
+  } catch {
+    return NextResponse.json({ error: "Demasiadas solicitudes" }, { status: 429 });
+  }
 
-  if (!q || q.length < 2) {
+  const parsed = SearchSchema.safeParse({
+    q: request.nextUrl.searchParams.get("q"),
+    ctx: request.nextUrl.searchParams.get("ctx") ?? "general",
+  });
+
+  if (!parsed.success) {
     return NextResponse.json({ results: [] });
   }
+
+  const { q, ctx } = parsed.data;
 
   const supabase = await createClient();
   const results: SearchResult[] = [];

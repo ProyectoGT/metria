@@ -28,22 +28,25 @@ export default async function AppShell({
   let userEmail: string | null = null;
   let userRole: ReturnType<typeof normalizeUserRole> | null = null;
   let userId: number | null = null;
+  let userAvatarUrl: string | null = null;
 
   if (user) {
     userEmail = user.email ?? null;
 
-    let { data: profile } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let { data: profile } = await (supabase as any)
       .from("usuarios")
-      .select("id, nombre, apellidos, rol")
+      .select("id, nombre, apellidos, rol, avatar_url")
       .eq("auth_id", user.id)
-      .maybeSingle();
+      .maybeSingle() as { data: { id: number; nombre: string; apellidos: string; rol: string; avatar_url: string | null } | null };
 
     if (!profile && user.email) {
-      const { data: byEmail } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: byEmail } = await (supabase as any)
         .from("usuarios")
-        .select("id, nombre, apellidos, rol")
+        .select("id, nombre, apellidos, rol, avatar_url")
         .eq("correo", user.email)
-        .maybeSingle();
+        .maybeSingle() as { data: { id: number; nombre: string; apellidos: string; rol: string; avatar_url: string | null } | null };
       profile = byEmail;
     }
 
@@ -52,8 +55,11 @@ export default async function AppShell({
     }
 
     userName = `${profile.nombre} ${profile.apellidos}`.trim() || "Usuario";
-    userRole = normalizeUserRole((profile as { rol?: string | null }).rol);
-    userId = (profile as { id?: number | null }).id ?? null;
+    userRole = normalizeUserRole(profile.rol);
+    userId = profile.id ?? null;
+    userAvatarUrl = profile.avatar_url
+      ?? (user.user_metadata?.avatar_url as string | undefined)
+      ?? null;
   }
 
   // Notificaciones: tareas pendientes del usuario actual
@@ -74,7 +80,7 @@ export default async function AppShell({
       <ThemeScript />
       <Sidebar userRole={userRole} />
       <div className="flex h-screen flex-col md:pl-[220px]">
-        <Header userName={userName} userEmail={userEmail} notifications={notifications} />
+        <Header userName={userName} userEmail={userEmail} avatarUrl={userAvatarUrl} notifications={notifications} />
         <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
           {children}
         </main>

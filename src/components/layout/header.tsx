@@ -58,10 +58,11 @@ function getContext(pathname: string): { ctx: string; placeholder: string } {
 interface HeaderProps {
   userName: string;
   userEmail?: string | null;
+  avatarUrl?: string | null;
   notifications?: NotificationItem[];
 }
 
-export default function Header({ userName, userEmail, notifications = [] }: HeaderProps) {
+export default function Header({ userName, userEmail, avatarUrl, notifications = [] }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { ctx, placeholder } = getContext(pathname);
@@ -290,7 +291,7 @@ export default function Header({ userName, userEmail, notifications = [] }: Head
           onClick={() => setMenuOpen(!menuOpen)}
           className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-background"
         >
-          <Avatar name={userName} size="md" />
+          <Avatar name={userName} src={avatarUrl ?? undefined} size="md" />
           <span className="hidden text-sm font-medium text-text-primary sm:block">
             {userName}
           </span>

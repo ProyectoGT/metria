@@ -5,6 +5,7 @@ import { getCurrentUserContext } from "@/lib/current-user";
 import { canManageUsers, canCreateUsers, USER_ROLES, type UserRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { validatePassword } from "@/lib/password";
+import { sendInviteEmail, sendBienvenidaGoogleEmail } from "@/lib/email";
 
 type CreateUserInput = {
   nombre: string;
@@ -15,6 +16,7 @@ type CreateUserInput = {
   password: string;
   confirmPassword: string;
   sendInvite?: boolean;
+  googleOnly?: boolean;
 };
 
 type ActionResult = {
@@ -128,6 +130,7 @@ export async function createCrmUserAction(
   const password = input.password;
   const confirmPassword = input.confirmPassword;
   const sendInvite = input.sendInvite ?? false;
+  const googleOnly = input.googleOnly ?? false;
 
   if (!nombre || !apellidos) {
     return { error: "Debes indicar nombre y apellidos." };
@@ -146,7 +149,7 @@ export async function createCrmUserAction(
     return { error: "Como Director solo puedes crear usuarios con rango Responsable o Agente." };
   }
 
-  if (!sendInvite) {
+  if (!sendInvite && !googleOnly) {
     const passwordError = validatePassword(password);
     if (passwordError) {
       return { error: `La contrasena no cumple los requisitos: ${passwordError}.` };
@@ -177,6 +180,37 @@ export async function createCrmUserAction(
     return {
       error:
         "Ya existe un perfil manual con este correo. Para evitar duplicados, elimina o actualiza primero ese perfil antes de crear la cuenta de acceso.",
+    };
+  }
+
+  // Modo Google: crear solo perfil en usuarios, sin cuenta auth
+  // El auth_id se vinculará automáticamente en el callback cuando haga login con Google
+  if (googleOnly) {
+    const profilePayloadGoogle = {
+      nombre,
+      apellidos,
+      rol,
+      correo,
+      auth_id: null,
+      empresa_id: currentUser.empresaId ?? 1,
+      equipo_id: currentUser.equipoId ?? 1,
+      estado: "active",
+      supervisor_id: input.supervisorId ?? null,
+    };
+
+    const { error: insertError } = await adminClient
+      .from("usuarios")
+      .insert(profilePayloadGoogle);
+
+    if (insertError) return { error: insertError.message };
+
+    // Notificar al usuario que tiene acceso
+    sendBienvenidaGoogleEmail({ to: correo, nombre, correo }).catch(() => {});
+
+    revalidatePath("/usuarios");
+    return {
+      success: true,
+      message: `Perfil creado. ${nombre} puede acceder iniciando sesion con Google usando ${correo}.`,
     };
   }
 
@@ -248,14 +282,19 @@ export async function createCrmUserAction(
   }
 
   if (sendInvite) {
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-    await adminClient.auth.admin.generateLink({
+    const siteUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+    const { data: linkData } = await adminClient.auth.admin.generateLink({
       type: "recovery",
       email: correo,
       options: {
         redirectTo: `${siteUrl}/auth/callback?next=/nueva-contrasena`,
       },
     });
+
+    const actionUrl = linkData?.properties?.action_link ?? `${siteUrl}/login`;
+    const invitadoPor = `${currentUser.nombre ?? ""} (${currentUser.email ?? "Administrador"})`.trim();
+
+    sendInviteEmail({ to: correo, nombre, invitadoPor, actionUrl }).catch(() => {});
   }
 
   revalidatePath("/usuarios");

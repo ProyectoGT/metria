@@ -86,16 +86,17 @@ export async function saveAvatarUrlAction(avatarUrl: string): Promise<ActionResu
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return { error: "Tu sesión no es válida." };
-  }
+  if (!user) return { error: "Tu sesión no es válida." };
 
-  const { error } = await supabase.auth.updateUser({
-    data: { avatar_url: avatarUrl },
-  });
+  const [authResult, dbResult] = await Promise.all([
+    supabase.auth.updateUser({ data: { avatar_url: avatarUrl } }),
+    supabase.from("usuarios").update({ avatar_url: avatarUrl } as never).eq("auth_id", user.id),
+  ]);
 
-  if (error) return { error: error.message };
+  if (authResult.error) return { error: authResult.error.message };
+  if (dbResult.error) return { error: dbResult.error.message };
 
   revalidatePath("/cuenta");
+  revalidatePath("/dashboard");
   return { success: true };
 }

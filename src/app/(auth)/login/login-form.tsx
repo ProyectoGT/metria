@@ -7,8 +7,18 @@ import { login, loginWithGoogle } from "./actions";
 const fieldClassName =
   "w-full border-0 border-b border-[#d8d3cb] bg-transparent px-0 py-3 text-sm text-[#171717] outline-none transition placeholder:text-[#b1aba3] focus:border-[#7ba4e0] focus:ring-0";
 
+const URL_ERRORS: Record<string, string> = {
+  auth: "Error al iniciar sesion con Google. Intentalo de nuevo.",
+  no_profile: "Tu cuenta de Google no esta registrada en el sistema. Contacta con el administrador.",
+  disabled: "Tu cuenta esta desactivada. Contacta con el administrador.",
+};
+
 export default function LoginForm() {
-  const [error, setError] = useState<string | null>(null);
+  const searchParams = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search)
+    : null;
+  const urlError = searchParams?.get("error") ? URL_ERRORS[searchParams.get("error")!] ?? null : null;
+  const [error, setError] = useState<string | null>(urlError);
   const [isPending, startTransition] = useTransition();
   const [isGooglePending, startGoogleTransition] = useTransition();
 
