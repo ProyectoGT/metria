@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { rateLimiter, getIp } from "@/lib/rate-limiter";
+import { CreateEventSchema, DeleteEventSchema } from "@/lib/validations/calendar";
 
 async function getAccessToken(): Promise<{ token: string; refreshed?: string } | null> {
   const cookieStore = await cookies();
@@ -37,6 +39,9 @@ function setRefreshedToken(response: NextResponse, token: string) {
 
 // GET — fetch events for a date range
 export async function GET(request: NextRequest) {
+  try { await rateLimiter.consume(getIp(request.headers)); }
+  catch { return NextResponse.json({ error: "Demasiadas solicitudes" }, { status: 429 }); }
+
   const auth = await getAccessToken();
   if (!auth) return NextResponse.json({ error: "not_connected" }, { status: 401 });
 
@@ -63,16 +68,25 @@ export async function GET(request: NextRequest) {
 
 // POST — create a new event
 export async function POST(request: NextRequest) {
+  try { await rateLimiter.consume(getIp(request.headers)); }
+  catch { return NextResponse.json({ error: "Demasiadas solicitudes" }, { status: 429 }); }
+
   const auth = await getAccessToken();
   if (!auth) return NextResponse.json({ error: "not_connected" }, { status: 401 });
 
-  const body = await request.json();
-  const startDateTime = new Date(`${body.date}T${body.time || "09:00"}:00`);
-  const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // +1 hour
+  const raw = await request.json();
+  const parsed = CreateEventSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
+  }
+
+  const body = parsed.data;
+  const startDateTime = new Date(`${body.date}T${body.time ?? "09:00"}:00`);
+  const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000);
 
   const event = {
     summary: body.summary,
-    description: body.description ?? "",
+    description: body.description,
     start: { dateTime: startDateTime.toISOString(), timeZone: "Europe/Madrid" },
     end: { dateTime: endDateTime.toISOString(), timeZone: "Europe/Madrid" },
   };
@@ -97,11 +111,18 @@ export async function POST(request: NextRequest) {
 
 // DELETE — remove an event by ID (passed in body)
 export async function DELETE(request: NextRequest) {
+  try { await rateLimiter.consume(getIp(request.headers)); }
+  catch { return NextResponse.json({ error: "Demasiadas solicitudes" }, { status: 429 }); }
+
   const auth = await getAccessToken();
   if (!auth) return NextResponse.json({ error: "not_connected" }, { status: 401 });
 
-  const body = await request.json();
-  const { eventId } = body;
+  const raw = await request.json();
+  const parsed = DeleteEventSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
+  }
+  const { eventId } = parsed.data;
 
   await fetch(
     `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,

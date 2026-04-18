@@ -3,16 +3,32 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase";
+import { authRateLimiter, getIp } from "@/lib/rate-limiter";
+import { LoginSchema } from "@/lib/validations/auth";
 
 export async function login(formData: FormData) {
+  const headersList = await headers();
+  const ip = getIp(headersList);
+
+  try {
+    await authRateLimiter.consume(ip);
+  } catch {
+    return { error: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo." };
+  }
+
+  const parsed = LoginSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+
+  if (!parsed.success) {
+    return { error: "Correo o contraseña no válidos." };
+  }
+
   const supabase = await createClient();
-
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-
   const { error, data } = await supabase.auth.signInWithPassword({
-    email,
-    password,
+    email: parsed.data.email,
+    password: parsed.data.password,
   });
 
   if (error) {
@@ -58,7 +74,6 @@ export async function loginWithGoogle() {
     options: {
       redirectTo: `${origin}/auth/callback`,
       queryParams: {
-        // Fuerza pantalla de selección de cuenta de Google (útil para Workspace)
         prompt: "select_account",
       },
     },

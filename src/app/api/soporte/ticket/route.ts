@@ -1,7 +1,15 @@
 import { createAdminClient } from "@/lib/supabase-admin";
 import { createClient } from "@/lib/supabase";
+import { rateLimiter, getIp } from "@/lib/rate-limiter";
+import { CreateTicketSchema } from "@/lib/validations/ticket";
 
 export async function POST(request: Request) {
+  try {
+    await rateLimiter.consume(getIp(request.headers as Headers));
+  } catch {
+    return Response.json({ error: "Demasiadas solicitudes" }, { status: 429 });
+  }
+
   try {
     // Verificar autenticación
     const supabase = await createClient();
@@ -14,23 +22,14 @@ export async function POST(request: Request) {
       return Response.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { tipo, asunto, descripcion, prioridad, nombre_usuario, user_id } =
-      body as {
-        tipo: string;
-        asunto: string;
-        descripcion: string;
-        prioridad: string;
-        nombre_usuario: string;
-        user_id: number | null;
-      };
+    const raw = await request.json();
+    const parsed = CreateTicketSchema.safeParse(raw);
 
-    if (!tipo || !asunto?.trim() || !descripcion?.trim()) {
-      return Response.json(
-        { error: "Faltan campos obligatorios" },
-        { status: 400 }
-      );
+    if (!parsed.success) {
+      return Response.json({ error: "Datos inválidos", details: parsed.error.flatten() }, { status: 400 });
     }
+
+    const { tipo, asunto, descripcion, prioridad, nombre_usuario, user_id } = parsed.data;
 
     const admin = createAdminClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
