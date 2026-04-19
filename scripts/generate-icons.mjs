@@ -8,37 +8,37 @@ mkdirSync("public/icons", { recursive: true });
 
 const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
 
-for (const size of sizes) {
+function roundedMask(size) {
+  const radius = Math.round(size * 0.34);
+  return Buffer.from(
+    `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" rx="${radius}" ry="${radius}" fill="white"/></svg>`
+  );
+}
+
+async function generateRoundedIcon(size, output) {
   await sharp(SOURCE)
-    .resize(size, size, { fit: "contain", background: TRANSPARENT })
+    .resize(size, size, { fit: "cover", background: TRANSPARENT })
+    .composite([{ input: roundedMask(size), blend: "dest-in" }])
     .png()
-    .toFile(`public/icons/icon-${size}x${size}.png`);
+    .toFile(output);
+}
+
+for (const size of sizes) {
+  await generateRoundedIcon(size, `public/icons/icon-${size}x${size}.png`);
   console.log(`Generated icon-${size}x${size}.png`);
 }
 
-await sharp(SOURCE)
-  .resize(180, 180, { fit: "contain", background: TRANSPARENT })
-  .png()
-  .toFile("public/apple-touch-icon.png");
+await generateRoundedIcon(180, "public/apple-touch-icon.png");
 console.log("Generated apple-touch-icon.png");
 
-await sharp(SOURCE)
-  .resize(32, 32, { fit: "contain", background: TRANSPARENT })
-  .png()
-  .toFile("public/favicon-32x32.png");
+await generateRoundedIcon(32, "public/favicon-32x32.png");
 console.log("Generated favicon-32x32.png");
 
-await sharp(SOURCE)
-  .resize(16, 16, { fit: "contain", background: TRANSPARENT })
-  .png()
-  .toFile("public/favicon-16x16.png");
+await generateRoundedIcon(16, "public/favicon-16x16.png");
 console.log("Generated favicon-16x16.png");
 
 // Next app favicon uses PNG data with .ico extension, matching the existing project setup.
-await sharp(SOURCE)
-  .resize(32, 32, { fit: "contain", background: TRANSPARENT })
-  .png()
-  .toFile("src/app/favicon.ico");
+await generateRoundedIcon(32, "src/app/favicon.ico");
 console.log("Generated src/app/favicon.ico");
 
 console.log("\nIconos generados correctamente.");

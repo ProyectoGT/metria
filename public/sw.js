@@ -1,4 +1,4 @@
-const CACHE_NAME = "metria-crm-v1.0.0";
+const CACHE_NAME = "metria-crm-v1.0.1";
 const OFFLINE_URL = "/offline";
 
 // Recursos que se cachean al instalar
