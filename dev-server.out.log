@@ -1,0 +1,18 @@
+
+> metria-crm@1.0.0 dev
+> next dev --hostname 127.0.0.1
+
+▲ Next.js 16.2.3 (Turbopack)
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+- Environments: .env.local
+✓ Ready in 385ms
+Creating turbopack project {
+  dir: 'C:\\Users\\marcm\\Desktop\\Repositorios\\Metria CRM\\metria',
+  testMode: true
+}
+
+ GET /login 200 in 1970ms (next.js: 1753ms, application-code: 216ms)
+ GET /recuperar 200 in 73ms (next.js: 42ms, application-code: 31ms)
+ GET /login 200 in 35ms (next.js: 4ms, application-code: 30ms)
+ GET /login 200 in 43ms (next.js: 2ms, application-code: 41ms)

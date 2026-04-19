@@ -239,7 +239,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
         </button>
 
         {bellOpen && (
-          <div className="absolute right-0 top-full mt-1 w-[calc(100vw-2rem)] max-w-80 rounded-xl border border-border bg-surface shadow-lg z-50 sm:w-80">
+          <div className="fixed left-4 right-4 top-16 z-50 rounded-xl border border-border bg-surface shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-1 sm:w-80">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <p className="text-sm font-semibold text-text-primary">Tareas pendientes</p>
               {unreadCount > 0 && (

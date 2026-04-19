@@ -103,8 +103,8 @@ export default function FincasClient({
         ]}
       />
 
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex items-center gap-3">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
           <button
             onClick={() => router.push(`/zona/${zonaId}`)}
             className="rounded-lg border border-border p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
@@ -126,7 +126,7 @@ export default function FincasClient({
             </svg>
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">
+            <h1 className="break-words text-2xl font-bold text-text-primary">
               Sector {sectorNumero}
             </h1>
             <p className="mt-1 text-sm text-text-secondary">
@@ -140,7 +140,7 @@ export default function FincasClient({
             setModalOpen(true);
             setNumero("");
           }}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+          className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark sm:w-auto"
         >
           + Nueva finca
         </button>
@@ -166,7 +166,62 @@ export default function FincasClient({
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-          <table className="w-full text-sm">
+          <div className="divide-y divide-border md:hidden">
+            {fincas.map((finca) => {
+              const propiedadCount = finca.propiedades?.length ?? 0;
+
+              return (
+                <div
+                  key={finca.id}
+                  onClick={() =>
+                    router.push(
+                      `/zona/${zonaId}/sector/${sectorId}/finca/${finca.id}`
+                    )
+                  }
+                  className="cursor-pointer px-4 py-4 transition-colors hover:bg-background"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-words font-medium text-text-primary">
+                        {finca.numero}
+                      </p>
+                      <p className="mt-1 text-xs text-text-secondary">
+                        {propiedadCount} {propiedadCount === 1 ? "propiedad" : "propiedades"}
+                      </p>
+                    </div>
+                    {canDeleteFincas && (
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setError(null);
+                          setDeletePassword("");
+                          setDeleteId(finca.id);
+                        }}
+                        className="rounded p-1 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
+                        title="Eliminar finca"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <table className="hidden w-full min-w-[420px] text-sm md:table">
             <thead>
               <tr className="border-b border-border bg-background">
                 <th className="px-5 py-3 text-left font-medium text-text-secondary">

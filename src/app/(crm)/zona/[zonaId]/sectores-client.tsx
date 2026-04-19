@@ -115,8 +115,8 @@ export default function SectoresClient({
         ]}
       />
 
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex items-center gap-3">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
           <button
             onClick={() => router.push("/zona")}
             className="rounded-lg border border-border p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
@@ -138,7 +138,7 @@ export default function SectoresClient({
             </svg>
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">
+            <h1 className="break-words text-2xl font-bold text-text-primary">
               {zonaNombre}
             </h1>
             <p className="mt-1 text-sm text-text-secondary">
@@ -151,7 +151,7 @@ export default function SectoresClient({
             setModalOpen(true);
             setNumero("");
           }}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+          className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark sm:w-auto"
         >
           + Nuevo sector
         </button>
@@ -177,7 +177,88 @@ export default function SectoresClient({
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-          <table className="w-full text-sm">
+          <div className="divide-y divide-border md:hidden">
+            {sectores.map((sector) => {
+              const fincaCount = sector.fincas?.length ?? 0;
+              const todasPropiedades: PropiedadResumen[] =
+                sector.fincas?.flatMap((f) => f.propiedades ?? []) ?? [];
+              const propiedadCount = todasPropiedades.length;
+              const contactadasCount = todasPropiedades.filter(estaContactada).length;
+              const pct =
+                propiedadCount > 0
+                  ? Math.round((contactadasCount / propiedadCount) * 100)
+                  : null;
+
+              return (
+                <div
+                  key={sector.id}
+                  onClick={() => router.push(`/zona/${zonaId}/sector/${sector.id}`)}
+                  className="cursor-pointer px-4 py-4 transition-colors hover:bg-background"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-text-primary">Sector {sector.numero}</p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-text-secondary">
+                        <span className="rounded-full bg-background px-2 py-0.5">
+                          {fincaCount} fincas
+                        </span>
+                        <span className="rounded-full bg-background px-2 py-0.5">
+                          {propiedadCount} propiedades
+                        </span>
+                      </div>
+                      {pct !== null && (
+                        <div className="mt-3 flex max-w-56 items-center gap-2">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
+                            <div
+                              className={`h-full rounded-full ${
+                                pct >= 80
+                                  ? "bg-green-500"
+                                  : pct >= 50
+                                    ? "bg-amber-400"
+                                    : "bg-red-400"
+                              }`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="w-10 shrink-0 text-right text-xs font-medium text-text-secondary">
+                            {pct}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {canDeleteSectores && (
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setError(null);
+                          setDeletePassword("");
+                          setDeleteId(sector.id);
+                        }}
+                        className="rounded p-1 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
+                        title="Eliminar sector"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <table className="hidden w-full min-w-[720px] text-sm md:table">
             <thead>
               <tr className="border-b border-border bg-background">
                 <th className="px-5 py-3 text-left font-medium text-text-secondary">
