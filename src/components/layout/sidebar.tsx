@@ -36,11 +36,9 @@ interface Props {
 
 export default function Sidebar({ userRole: _userRole }: Props) {
   const pathname = usePathname();
-  const [dark, setDark] = useState(false);
-
-  useEffect(() => {
-    setDark(document.documentElement.classList.contains("dark"));
-  }, []);
+  const [dark, setDark] = useState(() =>
+    typeof document !== "undefined" && document.documentElement.classList.contains("dark")
+  );
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const userRole = _userRole ? normalizeUserRole(_userRole) : null;
@@ -59,7 +57,8 @@ export default function Sidebar({ userRole: _userRole }: Props) {
 
   // Cerrar al navegar
   useEffect(() => {
-    setMobileOpen(false);
+    const id = window.requestAnimationFrame(() => setMobileOpen(false));
+    return () => window.cancelAnimationFrame(id);
   }, [pathname]);
 
   function toggleTheme() {
@@ -134,7 +133,7 @@ export default function Sidebar({ userRole: _userRole }: Props) {
       {/* Tema */}
       <div className="border-t border-border px-3 py-3 space-y-0.5">
         <p className="px-3 pb-1 text-[10px] font-medium text-text-secondary/50 tracking-widest uppercase">
-          v0.8.0 Beta
+          v1.0.0
         </p>
         <button
           onClick={toggleTheme}

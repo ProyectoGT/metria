@@ -412,8 +412,8 @@ export default function PropiedadesClient({
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <button
             onClick={() => router.back()}
             className="rounded-lg border border-border p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
@@ -448,7 +448,7 @@ export default function PropiedadesClient({
           {pendientesCount > 0 && (
             <button
               onClick={() => setFiltroPendientes((v) => !v)}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              className={`flex min-w-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                 filtroPendientes
                   ? "bg-amber-500 text-white"
                   : "bg-amber-100 text-amber-700 hover:bg-amber-200"
@@ -467,7 +467,7 @@ export default function PropiedadesClient({
                   clipRule="evenodd"
                 />
               </svg>
-              Pendientes de contactar
+              <span className="truncate">Pendientes de contactar</span>
               <span
                 className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${
                   filtroPendientes ? "bg-white/30 text-white" : "bg-amber-200 text-amber-800"
@@ -500,10 +500,10 @@ export default function PropiedadesClient({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <button
             onClick={() => setFiltrosOpen((v) => !v)}
-            className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors sm:flex-none ${
               filtrosOpen || hayFiltrosActivos
                 ? "border-primary bg-primary/10 text-primary"
                 : "border-border text-text-secondary hover:bg-background hover:text-text-primary"
@@ -519,7 +519,7 @@ export default function PropiedadesClient({
           </button>
           <button
             onClick={openCreate}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+            className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark sm:flex-none"
           >
             + Nueva propiedad
           </button>
@@ -630,8 +630,104 @@ export default function PropiedadesClient({
           )}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-          <table className="w-full text-sm">
+        <>
+        <div className="space-y-3 md:hidden">
+          {propiedadesFiltradas.map((propiedad) => {
+            const overdue = isOverdue(propiedad.fecha_visita);
+            const isEncargo = propiedad.estado === "encargo";
+            const pendiente = isPendienteContactar(propiedad);
+            const nombre =
+              propiedad.propietario ??
+              `Planta ${propiedad.planta ?? "-"} Puerta ${propiedad.puerta ?? "-"}`;
+
+            return (
+              <div
+                key={propiedad.id}
+                className={`rounded-xl border border-border bg-surface p-4 shadow-sm ${
+                  isEncargo ? "bg-green-50/40 dark:bg-green-950/10" : ""
+                } ${pendiente && !filtroPendientes ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-words font-semibold text-text-primary">{nombre}</p>
+                    <p className="mt-1 text-xs text-text-secondary">
+                      Planta {propiedad.planta ?? "-"} · Puerta {propiedad.puerta ?? "-"}
+                    </p>
+                  </div>
+                  {propiedad.estado ? (
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${estadoClasses(propiedad.estado)}`}
+                    >
+                      {estadoLabel(propiedad.estado)}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="mt-3 grid gap-2 text-xs text-text-secondary">
+                  <div className="flex justify-between gap-3">
+                    <span>Telefono</span>
+                    <span className="text-right font-medium text-text-primary">
+                      {propiedad.telefono ?? "-"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span>Ultima visita</span>
+                    <span className={`text-right font-medium ${overdue ? "text-amber-600" : "text-text-primary"}`}>
+                      {propiedad.fecha_visita
+                        ? new Date(propiedad.fecha_visita).toLocaleDateString("es-ES")
+                        : "-"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span>Agente</span>
+                    <span className="text-right font-medium text-text-primary">
+                      {propiedad.usuarios
+                        ? `${propiedad.usuarios.nombre} ${propiedad.usuarios.apellidos}`
+                        : "-"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <button
+                    onClick={() => openReminder(propiedad)}
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-primary"
+                  >
+                    Recordatorio
+                  </button>
+                  {isEncargo && (
+                    <button
+                      onClick={() => setEncargoPropiedad(propiedad)}
+                      className="rounded-lg border border-success/30 px-3 py-1.5 text-xs font-semibold text-success transition-colors hover:bg-success/10"
+                    >
+                      Encargo
+                    </button>
+                  )}
+                  <button
+                    onClick={() => openEdit(propiedad)}
+                    className="rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+                  >
+                    Editar
+                  </button>
+                  {canDeletePropiedades && (
+                    <button
+                      onClick={() => {
+                        setDeleteError(null);
+                        setDeletePassword("");
+                        setDeleteId(propiedad.id);
+                      }}
+                      className="rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger/10"
+                    >
+                      Eliminar
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface shadow-sm md:block">
+          <table className="w-full min-w-[980px] text-sm">
             <thead>
               <tr className="border-b border-border bg-background">
                 {/* Columna drag handle */}
@@ -839,12 +935,13 @@ export default function PropiedadesClient({
             </DragDropContext>
           </table>
         </div>
+        </>
       )}
 
       {/* Modal recordatorio */}
       {reminderPropiedad && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl">
+          <div className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-surface shadow-xl">
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <div>
                 <h2 className="text-base font-semibold text-text-primary">
@@ -884,7 +981,7 @@ export default function PropiedadesClient({
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField label="Fecha *">
                   <input
                     type="date"
@@ -946,7 +1043,7 @@ export default function PropiedadesClient({
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-surface shadow-xl">
+          <div className="max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface shadow-xl">
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <h2 className="text-base font-semibold text-text-primary">
                 {editTarget ? "Editar propiedad" : "Nueva propiedad"}
@@ -960,7 +1057,7 @@ export default function PropiedadesClient({
             </div>
 
             <div className="space-y-4 px-6 py-5">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField label="Planta">
                   <input
                     type="text"
@@ -1001,7 +1098,7 @@ export default function PropiedadesClient({
                 />
               </FormField>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField label="Estado">
                   <select
                     value={form.estado}
@@ -1247,7 +1344,7 @@ function LocationPicker({
       </p>
 
       <div ref={wrapperRef} className="relative">
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
             <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
             <input
@@ -1267,7 +1364,7 @@ function LocationPicker({
             onClick={useCurrentLocation}
             disabled={loadingLoc}
             title="Usar mi ubicacion actual"
-            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface hover:text-primary disabled:opacity-60"
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface hover:text-primary disabled:opacity-60"
           >
             {loadingLoc ? (
               <Loader2 className="h-4 w-4 animate-spin" />

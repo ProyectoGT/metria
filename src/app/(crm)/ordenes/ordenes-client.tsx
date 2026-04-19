@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { X, Trash2, CheckCircle2, Circle, Calendar, User, ChevronDown, Loader2, Plus, ClipboardList } from "lucide-react";
+import { X, Trash2, CheckCircle2, Calendar, User, ChevronDown, Loader2, Plus, ClipboardList } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 import type { UserRole } from "@/lib/roles";
 import { useToast, Toaster } from "@/components/ui/toast";
@@ -226,7 +226,7 @@ export default function OrdenesClient({ initialTareas, currentUserId, currentUse
       <Toaster toasts={toasts} />
 
       {/* ── Stat cards ── */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {PRIORIDADES.map((p) => {
           const count = countsByPrioridad[p.value as keyof typeof countsByPrioridad];
           const active = filterPrioridad === p.value;
@@ -235,7 +235,7 @@ export default function OrdenesClient({ initialTareas, currentUserId, currentUse
               key={p.value}
               onClick={() => setFilterPrioridad(active ? null : p.value)}
               className={[
-                "flex items-center gap-3 rounded-xl border p-4 text-left transition-all",
+                "flex min-w-0 items-center gap-2 rounded-xl border p-3 text-left transition-all sm:gap-3 sm:p-4",
                 active
                   ? `border-l-4 ${p.border} border-border bg-surface shadow-sm ring-1 ${p.ring}/30`
                   : "border-border bg-surface hover:bg-background",
@@ -255,11 +255,11 @@ export default function OrdenesClient({ initialTareas, currentUserId, currentUse
       <div className="flex flex-wrap items-center gap-3">
         {/* Dropdown de usuario */}
         {multiUser && (
-          <div className="relative">
+          <div className="relative min-w-0 flex-1 sm:flex-none">
             <select
               value={filterUserId ?? ""}
               onChange={(e) => setFilterUserId(e.target.value === "" ? null : Number(e.target.value))}
-              className="input h-9 appearance-none py-0 pl-3 pr-8 text-sm"
+              className="input h-9 min-w-0 appearance-none py-0 pl-3 pr-8 text-sm sm:w-auto"
             >
               <option value="">Todos los agentes</option>
               {usuarios.map((u) => (
@@ -285,7 +285,7 @@ export default function OrdenesClient({ initialTareas, currentUserId, currentUse
 
         <button
           onClick={() => { setForm(emptyForm(filterUserId ?? currentUserId)); setShowModal(true); }}
-          className="ml-auto flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+          className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
         >
           <Plus className="h-4 w-4" />
           Nueva tarea
@@ -293,7 +293,7 @@ export default function OrdenesClient({ initialTareas, currentUserId, currentUse
       </div>
 
       {/* ── Layout principal: lista + panel detalle (siempre visible) ── */}
-      <div className="flex min-h-0 flex-1 gap-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-5 lg:flex-row">
 
         {/* Lista */}
         <div className="min-w-0 flex-1 space-y-6 overflow-y-auto">
@@ -340,7 +340,7 @@ export default function OrdenesClient({ initialTareas, currentUserId, currentUse
                           key={tarea.id}
                           onClick={() => openDetail(tarea)}
                           className={[
-                            "group flex cursor-pointer items-center gap-3 rounded-xl border border-border border-l-4 bg-surface px-4 py-3 transition-all hover:shadow-sm",
+                            "group flex cursor-pointer items-start gap-3 rounded-xl border border-border border-l-4 bg-surface px-4 py-3 transition-all hover:shadow-sm sm:items-center",
                             p.border,
                             isSelected ? "ring-1 ring-primary/30 shadow-sm bg-primary/3" : "hover:bg-background",
                           ].join(" ")}
@@ -353,7 +353,7 @@ export default function OrdenesClient({ initialTareas, currentUserId, currentUse
 
                           {/* Contenido */}
                           <div className="min-w-0 flex-1">
-                            <p className={`text-sm font-medium leading-snug ${completada ? "line-through text-text-secondary" : "text-text-primary"}`}>
+                            <p className={`break-words text-sm font-medium leading-snug ${completada ? "line-through text-text-secondary" : "text-text-primary"}`}>
                               {tarea.titulo}
                             </p>
                             <div className="mt-0.5 flex flex-wrap items-center gap-2">
@@ -398,8 +398,8 @@ export default function OrdenesClient({ initialTareas, currentUserId, currentUse
         </div>
 
         {/* ── Panel detalle (siempre visible, ancho fijo) ── */}
-        <div className="w-72 shrink-0">
-          <div className="sticky top-0 rounded-2xl border border-border bg-surface shadow-sm">
+        <div className="w-full shrink-0 lg:w-72">
+          <div className="rounded-2xl border border-border bg-surface shadow-sm lg:sticky lg:top-0">
             {detailTarea ? (
               <>
                 {/* Header con color de prioridad */}

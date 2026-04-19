@@ -56,7 +56,12 @@ export default async function DesarrolloPage() {
       .select("agente_id, metric, value")
       .gte("occurred_at", periodRange.from)
       .lt("occurred_at", periodRange.to),
-    applyPropFilters(supabase.from("propiedades").select("*", { count: "exact", head: true })),
+    applyPropFilters(
+      supabase
+        .from("propiedades")
+        .select("*", { count: "exact", head: true })
+        .ilike("estado", "noticia"),
+    ),
   ]);
 
   // Filtrar agentes según rol — los Administradores no aparecen en desarrollo

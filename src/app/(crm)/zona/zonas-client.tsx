@@ -83,7 +83,11 @@ export default function ZonasClient({
   function toggle(id: number) {
     setOpenIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   }
@@ -227,7 +231,7 @@ export default function ZonasClient({
   return (
     <>
       {/* Cabecera */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Zona / Sectores</h1>
           <p className="mt-1 text-sm text-text-secondary">
@@ -238,7 +242,7 @@ export default function ZonasClient({
         {canDeleteZonas && (
           <button
             onClick={() => { setZonaModalOpen(true); setZonaName(""); }}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+            className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark sm:w-auto"
           >
             + Nueva zona
           </button>
@@ -274,20 +278,20 @@ export default function ZonasClient({
                 className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm"
               >
                 {/* ── Cabecera zona ── */}
-                <div className="flex items-center justify-between px-5 py-4">
+                <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                   <button
                     onClick={() => toggle(zona.id)}
-                    className="flex flex-1 items-center gap-3 text-left"
+                    className="flex min-w-0 flex-1 items-start gap-3 text-left sm:items-center"
                   >
                     <ChevronDown
                       className={`h-4 w-4 shrink-0 text-text-secondary transition-transform duration-200 ${
                         isOpen ? "rotate-180" : ""
                       }`}
                     />
-                    <span className="text-base font-semibold text-text-primary">
+                    <span className="min-w-0 break-words text-base font-semibold text-text-primary">
                       {zona.nombre}
                     </span>
-                    <div className="flex items-center gap-3 text-xs text-text-secondary">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary sm:gap-3">
                       <span className="rounded-full bg-background px-2 py-0.5">
                         {zona.sectores.length} sectores
                       </span>
@@ -299,7 +303,7 @@ export default function ZonasClient({
                       </span>
                     </div>
                   </button>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     {canManageAccess && usuarios.length > 0 && (
                       <button
                         onClick={() => setAccesoModal({ zonaId: zona.id, zonaNombre: zona.nombre })}
@@ -342,11 +346,64 @@ export default function ZonasClient({
                 {isOpen && (
                   <div className="border-t border-border">
                     {zona.sectores.length === 0 ? (
-                      <p className="px-12 py-6 text-sm italic text-text-secondary">
+                      <p className="px-4 py-6 text-sm italic text-text-secondary sm:px-12">
                         Esta zona no tiene sectores todavía.
                       </p>
                     ) : (
-                      <table className="w-full text-sm">
+                      <>
+                      <div className="divide-y divide-border md:hidden">
+                        {zona.sectores.map((sector) => {
+                          const fincaCount = sector.fincas?.length ?? 0;
+                          const propCount =
+                            sector.fincas?.reduce(
+                              (acc, f) => acc + (f.propiedades?.length ?? 0),
+                              0
+                            ) ?? 0;
+
+                          return (
+                            <div
+                              key={sector.id}
+                              onClick={() => router.push(`/zona/${zona.id}/sector/${sector.id}`)}
+                              className="cursor-pointer px-4 py-3 transition-colors hover:bg-background"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="font-medium text-text-primary">
+                                    Sector {sector.numero}
+                                  </p>
+                                  <div className="mt-1 flex flex-wrap gap-2 text-xs text-text-secondary">
+                                    <span className="rounded-full bg-background px-2 py-0.5">
+                                      {fincaCount} fincas
+                                    </span>
+                                    <span className="rounded-full bg-background px-2 py-0.5">
+                                      {propCount} propiedades
+                                    </span>
+                                  </div>
+                                </div>
+                                {canDeleteSectores && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteError(null);
+                                      setDeletePassword("");
+                                      setDeleteTarget({
+                                        kind: "sector",
+                                        id: sector.id,
+                                        zonaId: zona.id,
+                                      });
+                                    }}
+                                    className="rounded p-1 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
+                                    title="Eliminar sector"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <table className="hidden w-full min-w-[560px] text-sm md:table">
                         <thead>
                           <tr className="border-b border-border bg-background">
                             <th className="px-12 py-2.5 text-left text-xs font-medium text-text-secondary">
@@ -412,6 +469,7 @@ export default function ZonasClient({
                           })}
                         </tbody>
                       </table>
+                      </>
                     )}
                   </div>
                 )}
