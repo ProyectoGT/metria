@@ -9,6 +9,7 @@ import {
   Plus,
   Trash2,
   ExternalLink,
+  Download,
   Loader2,
   Upload,
   Paperclip,
@@ -66,6 +67,22 @@ function propLabel(p: Propiedad): string {
   if (p.propietario?.trim()) return p.propietario.trim();
   const parts = [p.planta && `Planta ${p.planta}`, p.puerta && `Puerta ${p.puerta}`].filter(Boolean);
   return parts.length ? parts.join(" · ") : `Propiedad #${p.id}`;
+}
+
+async function downloadFile(url: string, filename: string) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    // Fallback: open in new tab
+    window.open(url, "_blank");
+  }
 }
 
 function uniqueStorageName(filename: string): string {
@@ -429,15 +446,24 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
                           </div>
                           <div className="flex shrink-0 items-center gap-1">
                             {doc.url && (
-                              <a
-                                href={doc.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="rounded p-1 text-text-secondary transition-colors hover:bg-blue-50 hover:text-blue-600"
-                                title="Abrir"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </a>
+                              <>
+                                <button
+                                  onClick={() => downloadFile(doc.url!, doc.nombre)}
+                                  className="rounded p-1 text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
+                                  title="Descargar"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </button>
+                                <a
+                                  href={doc.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="rounded p-1 text-text-secondary transition-colors hover:bg-blue-50 hover:text-blue-600"
+                                  title="Abrir"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                              </>
                             )}
                             <button
                               onClick={() => handleDeleteArchivo(doc)}
@@ -564,14 +590,24 @@ export default function EncargoPanel({ propiedad, onClose, onEdit }: EncargoPane
                           </div>
                           <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                             {img.url && (
-                              <a
-                                href={img.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="rounded-lg bg-surface/90 p-1 shadow transition-colors hover:bg-surface"
-                              >
-                                <ExternalLink className="h-3.5 w-3.5 text-text-primary" />
-                              </a>
+                              <>
+                                <button
+                                  onClick={() => downloadFile(img.url!, img.nombre)}
+                                  className="rounded-lg bg-surface/90 p-1 shadow transition-colors hover:bg-surface"
+                                  title="Descargar"
+                                >
+                                  <Download className="h-3.5 w-3.5 text-text-primary" />
+                                </button>
+                                <a
+                                  href={img.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="rounded-lg bg-surface/90 p-1 shadow transition-colors hover:bg-surface"
+                                  title="Abrir"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5 text-text-primary" />
+                                </a>
+                              </>
                             )}
                             <button
                               onClick={() => handleDeleteArchivo(img)}

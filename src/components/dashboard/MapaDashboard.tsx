@@ -1,10 +1,10 @@
 "use client";
 
-import { APIProvider, Map, Marker, InfoWindow } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, AdvancedMarker, InfoWindow } from "@vis.gl/react-google-maps";
 import { useState } from "react";
-import { Navigation } from "lucide-react";
+import { Navigation, FileText } from "lucide-react";
 
-const OFICINA = { lat: 41.3697, lng: 2.0724 };
+const OFICINA = { lat: 41.365795, lng: 2.053508 };
 
 export type NoticiaMapPoint = {
   id: number;
@@ -15,6 +15,9 @@ export type NoticiaMapPoint = {
   sector: string;
   latitud: number;
   longitud: number;
+  fincaId: number | null;
+  sectorId: number | null;
+  zonaId: number | null;
 };
 
 type Selected = NoticiaMapPoint & { tipo: "noticia" | "encargo" };
@@ -23,30 +26,36 @@ function buildDirectionsUrl(lat: number, lng: number) {
   return `https://www.google.com/maps/dir/${OFICINA.lat},${OFICINA.lng}/${lat},${lng}`;
 }
 
-// SVG circle pin — fillColor cambia por tipo
-function pinIcon(fillColor: string, borderColor: string) {
-  return {
-    path: "M 0, 0 m -10, 0 a 10,10 0 1,0 20,0 a 10,10 0 1,0 -20,0",
-    fillColor,
-    fillOpacity: 1,
-    strokeColor: borderColor,
-    strokeWeight: 2.5,
-    scale: 1,
-    anchor: { x: 0, y: 0 } as google.maps.Point,
-  };
+function CirclePin({ bg, border }: { bg: string; border: string }) {
+  return (
+    <span
+      style={{
+        display: "block",
+        width: 18,
+        height: 18,
+        borderRadius: "50%",
+        background: bg,
+        border: `2.5px solid ${border}`,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+      }}
+    />
+  );
 }
 
-// SVG para la oficina: cuadrado negro con borde blanco
-function oficinaPinIcon() {
-  return {
-    path: "M -9,-9 L 9,-9 L 9,9 L -9,9 Z",
-    fillColor: "#111827",
-    fillOpacity: 1,
-    strokeColor: "#ffffff",
-    strokeWeight: 2,
-    scale: 1,
-    anchor: { x: 0, y: 0 } as google.maps.Point,
-  };
+function SquarePin() {
+  return (
+    <span
+      style={{
+        display: "block",
+        width: 16,
+        height: 16,
+        borderRadius: 3,
+        background: "#111827",
+        border: "2px solid #ffffff",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+      }}
+    />
+  );
 }
 
 export default function MapaDashboard({
@@ -77,34 +86,38 @@ export default function MapaDashboard({
             defaultCenter={{ lat: OFICINA.lat, lng: OFICINA.lng }}
             defaultZoom={13}
             gestureHandling="greedy"
+            mapId="metria-dashboard-map"
           >
             {/* Oficina */}
-            <Marker
+            <AdvancedMarker
               position={{ lat: OFICINA.lat, lng: OFICINA.lng }}
               title="Master Iberica — Rambla Josep Maria Jujol, 42"
-              icon={oficinaPinIcon()}
-            />
+            >
+              <SquarePin />
+            </AdvancedMarker>
 
             {/* Noticias — círculo azul */}
             {noticias.map((n) => (
-              <Marker
+              <AdvancedMarker
                 key={`n-${n.id}`}
                 position={{ lat: n.latitud, lng: n.longitud }}
                 title={n.propietario ?? `Propiedad #${n.id}`}
-                icon={pinIcon("#3b82f6", "#1d4ed8")}
                 onClick={() => setSelected({ ...n, tipo: "noticia" })}
-              />
+              >
+                <CirclePin bg="#3b82f6" border="#1d4ed8" />
+              </AdvancedMarker>
             ))}
 
             {/* Encargos — círculo verde */}
             {encargos.map((e) => (
-              <Marker
+              <AdvancedMarker
                 key={`e-${e.id}`}
                 position={{ lat: e.latitud, lng: e.longitud }}
                 title={e.propietario ?? `Propiedad #${e.id}`}
-                icon={pinIcon("#22c55e", "#15803d")}
                 onClick={() => setSelected({ ...e, tipo: "encargo" })}
-              />
+              >
+                <CirclePin bg="#22c55e" border="#15803d" />
+              </AdvancedMarker>
             ))}
 
             {selected && (
@@ -135,27 +148,49 @@ export default function MapaDashboard({
                   <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
                     {selected.sector} · Finca {selected.finca}
                   </p>
-                  <a
-                    href={buildDirectionsUrl(selected.latitud, selected.longitud)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      marginTop: 8,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      background: "#2563eb",
-                      color: "#fff",
-                      padding: "6px 12px",
-                      borderRadius: 6,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      textDecoration: "none",
-                    }}
-                  >
-                    <Navigation style={{ width: 13, height: 13 }} />
-                    Como llegar desde la oficina
-                  </a>
+                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                    <a
+                      href={buildDirectionsUrl(selected.latitud, selected.longitud)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        background: "#2563eb",
+                        color: "#fff",
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        textDecoration: "none",
+                      }}
+                    >
+                      <Navigation style={{ width: 13, height: 13 }} />
+                      Como llegar desde la oficina
+                    </a>
+                    {selected.zonaId && selected.sectorId && selected.fincaId && (
+                      <a
+                        href={`/zona/${selected.zonaId}/sector/${selected.sectorId}/finca/${selected.fincaId}`}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          background: selected.tipo === "noticia" ? "#eff6ff" : "#f0fdf4",
+                          color: selected.tipo === "noticia" ? "#1d4ed8" : "#15803d",
+                          border: `1px solid ${selected.tipo === "noticia" ? "#bfdbfe" : "#bbf7d0"}`,
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          textDecoration: "none",
+                        }}
+                      >
+                        <FileText style={{ width: 13, height: 13 }} />
+                        Ver ficha
+                      </a>
+                    )}
+                  </div>
                 </div>
               </InfoWindow>
             )}

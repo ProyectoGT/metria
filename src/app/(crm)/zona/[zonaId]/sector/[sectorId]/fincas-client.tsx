@@ -59,7 +59,12 @@ export default function FincasClient({
       toast(`Error al crear la finca: ${err.message}`, "error");
     } else if (data) {
       setFincas((prev) =>
-        [...prev, data as Finca].sort((a, b) => a.numero.localeCompare(b.numero))
+        [...prev, data as Finca].sort((a, b) => {
+          const na = parseFloat(a.numero);
+          const nb = parseFloat(b.numero);
+          if (!isNaN(na) && !isNaN(nb)) return na - nb;
+          return a.numero.localeCompare(b.numero, "es", { numeric: true });
+        })
       );
       toast("Finca creada correctamente");
     }

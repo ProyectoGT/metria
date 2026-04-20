@@ -43,11 +43,12 @@ export const METRIC_KEYS: MetricKey[] = [
   "contactos",
 ];
 
+// Defaults mensuales
 export const DEFAULT_OBJECTIVES = {
-  objetivo_facturado: 100000,
+  objetivo_facturado: 10000,
   objetivo_encargos: 10,
   objetivo_ventas: 5,
-  objetivo_contactos: 50,
+  objetivo_contactos: 600,
 };
 
 export function defaultRendimiento(
@@ -83,6 +84,64 @@ export function getPeriodRange(anio: number, mes: number) {
 
 function isMetricKey(value: string | null): value is MetricKey {
   return METRIC_KEYS.includes(value as MetricKey);
+}
+
+/**
+ * Para la vista anual (mes=0): suma los 12 registros mensuales por agente.
+ * Los objetivos anuales = suma de los objetivos de los 12 meses.
+ * Si un mes no tiene registro, se usa el default mensual.
+ */
+export function mergeRendimientoRowsAnual({
+  agentes,
+  objetivos,
+  actividades,
+  anio,
+}: {
+  agentes: AgentMetricRef[];
+  objetivos: RendimientoRow[];        // todos los meses del año (mes 1-12)
+  actividades: DesarrolloActivityRow[];
+  anio: number;
+}): Record<number, RendimientoPeriodo> {
+  const result: Record<number, RendimientoPeriodo> = {};
+
+  for (const agente of agentes) {
+    // Sumar objetivos de los 12 meses
+    let obj_facturado = 0;
+    let obj_encargos = 0;
+    let obj_ventas = 0;
+    let obj_contactos = 0;
+
+    for (let m = 1; m <= 12; m++) {
+      const row = objetivos.find((o) => o.agente_id === agente.id && o.mes === m);
+      obj_facturado += Number(row?.objetivo_facturado ?? DEFAULT_OBJECTIVES.objetivo_facturado);
+      obj_encargos  += Number(row?.objetivo_encargos  ?? DEFAULT_OBJECTIVES.objetivo_encargos);
+      obj_ventas    += Number(row?.objetivo_ventas    ?? DEFAULT_OBJECTIVES.objetivo_ventas);
+      obj_contactos += Number(row?.objetivo_contactos ?? DEFAULT_OBJECTIVES.objetivo_contactos);
+    }
+
+    result[agente.id] = {
+      agente_id: agente.id,
+      anio,
+      mes: 0,
+      facturado: 0,
+      encargos: 0,
+      ventas: 0,
+      contactos: 0,
+      objetivo_facturado: obj_facturado,
+      objetivo_encargos: obj_encargos,
+      objetivo_ventas: obj_ventas,
+      objetivo_contactos: obj_contactos,
+    };
+  }
+
+  // Sumar actividades reales del año completo
+  for (const activity of actividades) {
+    if (!activity.agente_id || !result[activity.agente_id]) continue;
+    if (!isMetricKey(activity.metric)) continue;
+    result[activity.agente_id][activity.metric] += Number(activity.value ?? 0);
+  }
+
+  return result;
 }
 
 export function mergeRendimientoRows({

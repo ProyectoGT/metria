@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
-import { getPeriodRange, mergeRendimientoRows } from "@/lib/desarrollo-metrics";
+import { getPeriodRange, mergeRendimientoRowsAnual } from "@/lib/desarrollo-metrics";
 import PageHeader from "@/components/layout/page-header";
 import DesarrolloClient from "./desarrollo-client";
 
@@ -50,7 +50,8 @@ export default async function DesarrolloPage() {
     { count: totalNoticias },
   ] = await Promise.all([
     supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
-    supabase.from("rendimiento").select("*").eq("anio", anioActual).eq("mes", 0),
+    // Cargar todos los meses del año para calcular objetivos anuales correctamente
+    supabase.from("rendimiento").select("*").eq("anio", anioActual).gte("mes", 1).lte("mes", 12),
     supabase
       .from("actividad_desarrollo")
       .select("agente_id, metric, value")
@@ -78,12 +79,11 @@ export default async function DesarrolloPage() {
 
   const canManageObjectives = (yo?.canViewAllAgents ?? false) && isManager;
 
-  const statsMap = mergeRendimientoRows({
+  const statsMap = mergeRendimientoRowsAnual({
     agentes,
     objetivos: rendimiento ?? [],
     actividades: actividad ?? [],
     anio: anioActual,
-    mes: 0,
   });
 
   const agentesConStats = agentes.map((a) => ({

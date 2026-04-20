@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ChevronDown, Calendar } from "lucide-react";
+import { ChevronDown, Calendar, AlertCircle } from "lucide-react";
 import type { OrdenDiaAgente, KanbanPriority } from "@/lib/mock/dashboard";
 
 type OrdenDiaPanelProps = {
@@ -15,9 +15,32 @@ const PRIORITY_BADGE: Record<KanbanPriority, { cls: string; label: string }> = {
 };
 
 function formatDate(iso: string) {
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
+  const datePart = iso.split("T")[0];
+  const [y, m, d] = datePart.split("-");
+  const timePart = iso.includes("T") ? iso.split("T")[1]?.slice(0, 5) : null;
+  return timePart ? `${d}/${m}/${y} ${timePart}` : `${d}/${m}/${y}`;
 }
+
+type DateStatus = "overdue" | "today" | "soon" | "normal";
+
+function getDateStatus(iso: string): DateStatus {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const date = new Date(iso.split("T")[0]);
+  date.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((date.getTime() - today.getTime()) / 86400000);
+  if (diffDays < 0) return "overdue";
+  if (diffDays === 0) return "today";
+  if (diffDays <= 2) return "soon";
+  return "normal";
+}
+
+const DATE_STYLES: Record<DateStatus, { cls: string; label?: string }> = {
+  overdue: { cls: "text-danger font-semibold", label: "Vencida" },
+  today:   { cls: "text-amber-600 dark:text-amber-400 font-semibold", label: "Hoy" },
+  soon:    { cls: "text-amber-500 dark:text-amber-400" },
+  normal:  { cls: "text-text-secondary" },
+};
 
 function initials(name: string) {
   return name
@@ -109,12 +132,22 @@ export default function OrdenDiaPanel({ agentes }: OrdenDiaPanelProps) {
                             >
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm text-text-primary">{t.titulo}</p>
-                                {t.fecha && (
-                                  <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary">
-                                    <Calendar className="h-3 w-3" />
-                                    {formatDate(t.fecha)}
-                                  </p>
-                                )}
+                                {t.fecha && (() => {
+                                  const status = getDateStatus(t.fecha);
+                                  const style = DATE_STYLES[status];
+                                  return (
+                                    <p className={`mt-0.5 flex items-center gap-1 text-xs ${style.cls}`}>
+                                      {status === "overdue"
+                                        ? <AlertCircle className="h-3 w-3" />
+                                        : <Calendar className="h-3 w-3" />
+                                      }
+                                      {style.label
+                                        ? <>{style.label} · {formatDate(t.fecha.split("T")[0])}</>
+                                        : formatDate(t.fecha.split("T")[0])
+                                      }
+                                    </p>
+                                  );
+                                })()}
                               </div>
                               {badge && (
                                 <span

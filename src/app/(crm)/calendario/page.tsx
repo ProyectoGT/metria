@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
-import PageHeader from "@/components/layout/page-header";
 import CalendarioClient from "./calendario-client";
 
 export default async function CalendarioPage() {
@@ -65,15 +64,27 @@ export default async function CalendarioPage() {
     return t.owner_user_id === userId;
   });
 
+  // Filtrar tareas según rol (tareas también respetan visibilidad)
+  // (ya filtradas arriba en filteredTareas)
+
   // Mapa id → nombre completo
   const usersMap: Record<number, string> = {};
   for (const u of usersData ?? []) {
     usersMap[u.id] = `${u.nombre} ${u.apellidos}`.trim();
   }
 
+  // Lista de usuarios filtrables según rol
+  const filterableUsers = (usersData ?? [])
+    .filter((u) => {
+      if (role === "Administrador" || role === "Director") return true;
+      if (role === "Responsable") return u.id === userId || supervisedIds.includes(u.id);
+      return false;
+    })
+    .map((u) => ({ id: u.id, name: `${u.nombre} ${u.apellidos}`.trim() }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   return (
     <>
-      <PageHeader title="Calendario" description="Gestiona tu agenda y actividades" />
       <CalendarioClient
         initialEvents={events ?? []}
         initialTareas={filteredTareas}
@@ -81,6 +92,7 @@ export default async function CalendarioPage() {
         role={role}
         currentUserId={userId}
         usersMap={usersMap}
+        filterableUsers={filterableUsers}
       />
     </>
   );
