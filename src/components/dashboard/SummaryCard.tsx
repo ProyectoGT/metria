@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { ChevronRight, type LucideIcon } from "lucide-react";
 
 type SummaryCardProps = {
@@ -14,7 +15,7 @@ type SummaryCardProps = {
   onClick: () => void;
 };
 
-export default function SummaryCard({
+const SummaryCard = memo(function SummaryCard({
   count,
   label,
   accentColor,
@@ -53,4 +54,6 @@ export default function SummaryCard({
       />
     </button>
   );
-}
+});
+
+export default SummaryCard;

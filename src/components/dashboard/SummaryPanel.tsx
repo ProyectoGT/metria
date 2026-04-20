@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Newspaper,
@@ -159,13 +159,12 @@ export default function SummaryPanel({ summary, listings }: SummaryPanelProps) {
 
   const activeCard = CARDS.find((c) => c.key === activeKey);
 
-  function handleCardClick(key: SummaryType) {
-    setActiveKey(key);
-  }
+  const cardHandlers = useMemo(
+    () => Object.fromEntries(CARDS.map((c) => [c.key, () => setActiveKey(c.key)])) as Record<SummaryType, () => void>,
+    [],
+  );
 
-  function handleClose() {
-    setActiveKey(null);
-  }
+  const handleClose = useCallback(() => setActiveKey(null), []);
 
   return (
     <>
@@ -180,7 +179,7 @@ export default function SummaryPanel({ summary, listings }: SummaryPanelProps) {
             activeBg={card.activeBg}
             icon={card.icon}
             isActive={activeKey === card.key}
-            onClick={() => handleCardClick(card.key)}
+            onClick={cardHandlers[card.key]}
           />
         ))}
       </div>

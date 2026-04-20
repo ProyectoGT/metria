@@ -338,7 +338,7 @@ export default function DesarrolloClient({
                         {canManageObjectives && (
                           <button
                             onClick={() => openEdit(agente)}
-                            className="ml-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
+                            className="ml-auto shrink-0 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
                           >
                             Objetivos
                           </button>
