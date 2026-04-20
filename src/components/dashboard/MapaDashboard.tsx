@@ -1,7 +1,7 @@
 "use client";
 
-import { APIProvider, Map, AdvancedMarker, InfoWindow } from "@vis.gl/react-google-maps";
-import { useState } from "react";
+import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from "@vis.gl/react-google-maps";
+import { useState, useEffect } from "react";
 import { Navigation, FileText } from "lucide-react";
 
 const OFICINA = { lat: 41.365795, lng: 2.053508 };
@@ -58,6 +58,30 @@ function SquarePin() {
   );
 }
 
+// Componente interno que ajusta el encuadre del mapa automáticamente
+function MapBoundsAdjuster({ points }: { points: { lat: number; lng: number }[] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || points.length === 0) return;
+
+    const bounds = new google.maps.LatLngBounds();
+    // Incluir la oficina siempre
+    bounds.extend(OFICINA);
+    points.forEach((p) => bounds.extend(p));
+
+    if (points.length === 1) {
+      // Un solo punto: centrar y zoom fijo
+      map.fitBounds(bounds, 80);
+      map.setZoom(14);
+    } else {
+      map.fitBounds(bounds, 60);
+    }
+  }, [map, points]);
+
+  return null;
+}
+
 export default function MapaDashboard({
   noticias,
   encargos,
@@ -68,29 +92,62 @@ export default function MapaDashboard({
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
   const [selected, setSelected] = useState<Selected | null>(null);
 
-  const totalConCoordenadas = noticias.length + encargos.length;
+  const allPoints = [
+    ...noticias.map((n) => ({ lat: n.latitud, lng: n.longitud })),
+    ...encargos.map((e) => ({ lat: e.latitud, lng: e.longitud })),
+  ];
 
   return (
-    <section>
-      <div className="mb-4">
-        <h2 className="font-semibold text-text-primary">Mapa de propiedades</h2>
-        <p className="text-sm text-text-secondary">
-          Noticias y encargos con ubicación registrada.{" "}
-          {totalConCoordenadas === 0 && "Sin propiedades con coordenadas aun."}
-        </p>
+    <section className="rounded-2xl border border-border bg-surface shadow-sm overflow-hidden">
+      {/* Header con título y leyenda */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-border">
+        <div>
+          <h2 className="font-semibold text-text-primary">Mapa de propiedades</h2>
+          <p className="text-xs text-text-secondary mt-0.5">
+            Noticias y encargos con ubicacion registrada.
+          </p>
+        </div>
+        <div className="flex items-center gap-4 text-xs text-text-secondary">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-sm bg-gray-900 dark:bg-gray-100" />
+            Oficina
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-full bg-blue-500" />
+            Noticia
+            {noticias.length > 0 && (
+              <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                {noticias.length}
+              </span>
+            )}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-full bg-green-500" />
+            Encargo
+            {encargos.length > 0 && (
+              <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">
+                {encargos.length}
+              </span>
+            )}
+          </span>
+        </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border" style={{ height: 420 }}>
+      {/* Mapa */}
+      <div style={{ height: 400 }}>
         <APIProvider apiKey={apiKey}>
           <Map
-            defaultCenter={{ lat: OFICINA.lat, lng: OFICINA.lng }}
+            defaultCenter={OFICINA}
             defaultZoom={13}
             gestureHandling="greedy"
             mapId="metria-dashboard-map"
+            style={{ width: "100%", height: "100%" }}
           >
+            <MapBoundsAdjuster points={allPoints} />
+
             {/* Oficina */}
             <AdvancedMarker
-              position={{ lat: OFICINA.lat, lng: OFICINA.lng }}
+              position={OFICINA}
               title="Master Iberica — Rambla Josep Maria Jujol, 42"
             >
               <SquarePin />
@@ -196,32 +253,6 @@ export default function MapaDashboard({
             )}
           </Map>
         </APIProvider>
-      </div>
-
-      {/* Leyenda */}
-      <div className="mt-3 flex items-center gap-5 text-xs text-text-secondary">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-sm bg-gray-900 dark:bg-gray-100" />
-          Oficina
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-full bg-blue-500" />
-          Noticia
-          {noticias.length > 0 && (
-            <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
-              {noticias.length}
-            </span>
-          )}
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-full bg-green-500" />
-          Encargo
-          {encargos.length > 0 && (
-            <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">
-              {encargos.length}
-            </span>
-          )}
-        </span>
       </div>
     </section>
   );

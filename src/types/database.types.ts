@@ -215,6 +215,32 @@ export interface Database {
           },
         ];
       };
+      usuario_orden: {
+        Row: {
+          id: number;
+          usuario_id: number;
+          tabla: string;
+          item_id: number;
+          posicion: number;
+        };
+        Insert: {
+          id?: number;
+          usuario_id: number;
+          tabla: string;
+          item_id: number;
+          posicion: number;
+        };
+        Update: {
+          id?: number;
+          usuario_id?: number;
+          tabla?: string;
+          item_id?: number;
+          posicion?: number;
+        };
+        Relationships: [
+          { foreignKeyName: "usuario_orden_usuario_id_fkey"; columns: ["usuario_id"]; referencedRelation: "usuarios"; referencedColumns: ["id"] },
+        ];
+      };
       zona_acceso: {
         Row: {
           id: number;
