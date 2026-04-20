@@ -318,16 +318,19 @@ export interface Database {
           id: number;
           numero: string;
           sector_id: number | null;
+          posicion: number | null;
         };
         Insert: {
           id?: number;
           numero: string;
           sector_id?: number | null;
+          posicion?: number | null;
         };
         Update: {
           id?: number;
           numero?: string;
           sector_id?: number | null;
+          posicion?: number | null;
         };
         Relationships: [
           {
@@ -520,16 +523,19 @@ export interface Database {
           id: number;
           numero: number;
           zona_id: number | null;
+          posicion: number | null;
         };
         Insert: {
           id?: number;
           numero: number;
           zona_id?: number | null;
+          posicion?: number | null;
         };
         Update: {
           id?: number;
           numero?: number;
           zona_id?: number | null;
+          posicion?: number | null;
         };
         Relationships: [
           {
@@ -726,14 +732,17 @@ export interface Database {
         Row: {
           id: number;
           nombre: string;
+          posicion: number | null;
         };
         Insert: {
           id?: number;
           nombre: string;
+          posicion?: number | null;
         };
         Update: {
           id?: number;
           nombre?: string;
+          posicion?: number | null;
         };
         Relationships: [];
       };

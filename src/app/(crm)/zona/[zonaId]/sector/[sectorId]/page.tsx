@@ -16,7 +16,7 @@ export default async function SectorDetailPage({
     supabase.from("zona").select("id, nombre").eq("id", Number(zonaId)).single(),
     supabase
       .from("sectores")
-      .select("id, numero, fincas(id, numero, propiedades(id))")
+      .select("id, numero, fincas(id, numero, posicion, propiedades(id))")
       .eq("id", Number(sectorId))
       .single(),
   ]);
@@ -24,6 +24,9 @@ export default async function SectorDetailPage({
   if (!zona || !sector) notFound();
 
   const fincas = (sector.fincas ?? []).sort((a, b) => {
+    if (a.posicion != null && b.posicion != null) return a.posicion - b.posicion;
+    if (a.posicion != null) return -1;
+    if (b.posicion != null) return 1;
     const na = parseFloat(String(a.numero));
     const nb = parseFloat(String(b.numero));
     if (!isNaN(na) && !isNaN(nb)) return na - nb;

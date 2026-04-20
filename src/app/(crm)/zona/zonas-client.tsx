@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Plus, Trash2, ShieldCheck, X, Loader2 } from "lucide-react";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deleteZonaAction, deleteSectorAction } from "@/app/actions/security";
+import { updateZonasPosicionesAction, updateSectoresPosicionesAction } from "@/app/(crm)/zona/actions";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase-browser";
@@ -11,6 +13,7 @@ import { createClient } from "@/lib/supabase-browser";
 type Sector = {
   id: number;
   numero: number;
+  posicion: number | null;
   fincas: Array<{
     id: number;
     propiedades: Array<{ id: number }>;
@@ -20,6 +23,7 @@ type Sector = {
 type Zona = {
   id: number;
   nombre: string;
+  posicion: number | null;
   sectores: Sector[];
 };
 
@@ -44,7 +48,9 @@ export default function ZonasClient({
   usuarios?: UsuarioAcceso[];
   initialAccesos?: { zona_id: number; usuario_id: number }[];
 }) {
-  const [zonas, setZonas] = useState<Zona[]>(initialZonas);
+  const [zonas, setZonas] = useState<Zona[]>(
+    initialZonas.map((z, i) => ({ ...z, posicion: z.posicion ?? i }))
+  );
   const [openIds, setOpenIds] = useState<Set<number>>(() => new Set());
 
   // Accesos: mapa zona_id → Set<usuario_id>
@@ -227,6 +233,52 @@ export default function ZonasClient({
     setTogglingId(null);
   }
 
+  // ── Drag & Drop ──────────────────────────────────────────────────────────
+  function handleDragEndZonas(result: DropResult) {
+    const { source, destination } = result;
+    if (!destination || source.index === destination.index) return;
+
+    let nextState: Zona[] = [];
+    setZonas((prev) => {
+      const reordered = [...prev];
+      const [moved] = reordered.splice(source.index, 1);
+      reordered.splice(destination.index, 0, moved);
+      nextState = reordered.map((z, i) => ({ ...z, posicion: i }));
+      return nextState;
+    });
+
+    setTimeout(() => {
+      const positions = nextState.map((z) => ({ id: z.id, posicion: z.posicion ?? 0 }));
+      updateZonasPosicionesAction(positions).then(({ error }) => {
+        if (error) console.warn("Error al guardar orden de zonas:", error);
+      });
+    }, 0);
+  }
+
+  function handleDragEndSectores(zonaId: number, result: DropResult) {
+    const { source, destination } = result;
+    if (!destination || source.index === destination.index) return;
+
+    let nextSectores: Sector[] = [];
+    setZonas((prev) =>
+      prev.map((z) => {
+        if (z.id !== zonaId) return z;
+        const reordered = [...z.sectores];
+        const [moved] = reordered.splice(source.index, 1);
+        reordered.splice(destination.index, 0, moved);
+        nextSectores = reordered.map((s, i) => ({ ...s, posicion: i }));
+        return { ...z, sectores: nextSectores };
+      })
+    );
+
+    setTimeout(() => {
+      const positions = nextSectores.map((s) => ({ id: s.id, posicion: s.posicion ?? 0 }));
+      updateSectoresPosicionesAction(positions).then(({ error }) => {
+        if (error) console.warn("Error al guardar orden de sectores:", error);
+      });
+    }, 0);
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <>
@@ -255,8 +307,11 @@ export default function ZonasClient({
           <p className="mt-1 text-sm text-text-secondary">Crea la primera zona para empezar</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {zonas.map((zona) => {
+        <DragDropContext onDragEnd={handleDragEndZonas}>
+        <Droppable droppableId="zonas-list" direction="vertical">
+          {(providedZonas) => (
+        <div className="space-y-3" ref={providedZonas.innerRef} {...providedZonas.droppableProps}>
+          {zonas.map((zona, zonaIndex) => {
             const isOpen = openIds.has(zona.id);
             const totalFincas = zona.sectores.reduce(
               (acc, s) => acc + (s.fincas?.length ?? 0),
@@ -273,12 +328,25 @@ export default function ZonasClient({
             );
 
             return (
+              <Draggable key={zona.id} draggableId={String(zona.id)} index={zonaIndex}>
+              {(dragZona, snapshotZona) => (
               <div
-                key={zona.id}
-                className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm"
+                ref={dragZona.innerRef}
+                {...dragZona.draggableProps}
+                className={`overflow-hidden rounded-xl border border-border bg-surface shadow-sm ${snapshotZona.isDragging ? "opacity-90 shadow-xl" : ""}`}
               >
                 {/* ── Cabecera zona ── */}
                 <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                  <div className="flex min-w-0 flex-1 items-start gap-2 sm:items-center">
+                  <div
+                    {...dragZona.dragHandleProps}
+                    className="mt-0.5 flex cursor-grab items-center justify-center text-text-secondary opacity-30 hover:opacity-70 active:cursor-grabbing sm:mt-0"
+                    title="Arrastrar para reordenar"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                    </svg>
+                  </div>
                   <button
                     onClick={() => toggle(zona.id)}
                     className="flex min-w-0 flex-1 items-start gap-3 text-left sm:items-center"
@@ -303,6 +371,7 @@ export default function ZonasClient({
                       </span>
                     </div>
                   </button>
+                  </div>
                   <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     {canManageAccess && usuarios.length > 0 && (
                       <button
@@ -351,132 +420,132 @@ export default function ZonasClient({
                       </p>
                     ) : (
                       <>
-                      <div className="divide-y divide-border md:hidden">
-                        {zona.sectores.map((sector) => {
-                          const fincaCount = sector.fincas?.length ?? 0;
-                          const propCount =
-                            sector.fincas?.reduce(
-                              (acc, f) => acc + (f.propiedades?.length ?? 0),
-                              0
-                            ) ?? 0;
-
-                          return (
-                            <div
-                              key={sector.id}
-                              onClick={() => router.push(`/zona/${zona.id}/sector/${sector.id}`)}
-                              className="cursor-pointer px-4 py-3 transition-colors hover:bg-background"
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="font-medium text-text-primary">
-                                    Sector {sector.numero}
-                                  </p>
-                                  <div className="mt-1 flex flex-wrap gap-2 text-xs text-text-secondary">
-                                    <span className="rounded-full bg-background px-2 py-0.5">
-                                      {fincaCount} fincas
-                                    </span>
-                                    <span className="rounded-full bg-background px-2 py-0.5">
-                                      {propCount} propiedades
-                                    </span>
-                                  </div>
-                                </div>
-                                {canDeleteSectores && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDeleteError(null);
-                                      setDeletePassword("");
-                                      setDeleteTarget({
-                                        kind: "sector",
-                                        id: sector.id,
-                                        zonaId: zona.id,
-                                      });
-                                    }}
-                                    className="rounded p-1 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
-                                    title="Eliminar sector"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                              </div>
+                      {/* Mobile sectores con DnD */}
+                      <DragDropContext onDragEnd={(r) => handleDragEndSectores(zona.id, r)}>
+                        <Droppable droppableId={`sectores-m-${zona.id}`} direction="vertical">
+                          {(provS) => (
+                            <div className="divide-y divide-border md:hidden" ref={provS.innerRef} {...provS.droppableProps}>
+                              {zona.sectores.map((sector, sIdx) => {
+                                const fincaCount = sector.fincas?.length ?? 0;
+                                const propCount = sector.fincas?.reduce((acc, f) => acc + (f.propiedades?.length ?? 0), 0) ?? 0;
+                                return (
+                                  <Draggable key={sector.id} draggableId={`sm-${sector.id}`} index={sIdx}>
+                                    {(dragS, snapS) => (
+                                      <div
+                                        ref={dragS.innerRef}
+                                        {...dragS.draggableProps}
+                                        className={`flex items-center gap-2 px-4 py-3 transition-colors hover:bg-background ${snapS.isDragging ? "opacity-90 shadow-lg" : ""}`}
+                                      >
+                                        <div {...dragS.dragHandleProps} className="flex cursor-grab items-center justify-center text-text-secondary opacity-30 hover:opacity-70 active:cursor-grabbing">
+                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                          </svg>
+                                        </div>
+                                        <div className="min-w-0 flex-1 cursor-pointer" onClick={() => router.push(`/zona/${zona.id}/sector/${sector.id}`)}>
+                                          <p className="font-medium text-text-primary">Sector {sector.numero}</p>
+                                          <div className="mt-1 flex flex-wrap gap-2 text-xs text-text-secondary">
+                                            <span className="rounded-full bg-background px-2 py-0.5">{fincaCount} fincas</span>
+                                            <span className="rounded-full bg-background px-2 py-0.5">{propCount} propiedades</span>
+                                          </div>
+                                        </div>
+                                        {canDeleteSectores && (
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); setDeleteError(null); setDeletePassword(""); setDeleteTarget({ kind: "sector", id: sector.id, zonaId: zona.id }); }}
+                                            className="rounded p-1 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
+                                            title="Eliminar sector"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
+                                  </Draggable>
+                                );
+                              })}
+                              {provS.placeholder}
                             </div>
-                          );
-                        })}
-                      </div>
+                          )}
+                        </Droppable>
+                      </DragDropContext>
+
+                      {/* Desktop sectores con DnD */}
                       <table className="hidden w-full min-w-[560px] text-sm md:table">
                         <thead>
                           <tr className="border-b border-border bg-background">
-                            <th className="px-12 py-2.5 text-left text-xs font-medium text-text-secondary">
-                              Sector
-                            </th>
-                            <th className="w-28 px-4 py-2.5 text-center text-xs font-medium text-text-secondary">
-                              Fincas
-                            </th>
-                            <th className="w-28 px-4 py-2.5 text-center text-xs font-medium text-text-secondary">
-                              Propiedades
-                            </th>
+                            <th className="w-8 px-2 py-2.5" />
+                            <th className="px-4 py-2.5 text-left text-xs font-medium text-text-secondary">Sector</th>
+                            <th className="w-28 px-4 py-2.5 text-center text-xs font-medium text-text-secondary">Fincas</th>
+                            <th className="w-28 px-4 py-2.5 text-center text-xs font-medium text-text-secondary">Propiedades</th>
                             <th className="w-10 px-4 py-2.5" />
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-border">
-                          {zona.sectores.map((sector) => {
-                            const fincaCount = sector.fincas?.length ?? 0;
-                            const propCount =
-                              sector.fincas?.reduce(
-                                (acc, f) => acc + (f.propiedades?.length ?? 0),
-                                0
-                              ) ?? 0;
-
-                            return (
-                              <tr
-                                key={sector.id}
-                                onClick={() =>
-                                  router.push(`/zona/${zona.id}/sector/${sector.id}`)
-                                }
-                                className="group cursor-pointer transition-colors hover:bg-background"
-                              >
-                                <td className="px-12 py-3 font-medium text-text-primary">
-                                  Sector {sector.numero}
-                                </td>
-                                <td className="w-28 px-4 py-3 text-center text-text-secondary">
-                                  {fincaCount}
-                                </td>
-                                <td className="w-28 px-4 py-3 text-center text-text-secondary">
-                                  {propCount}
-                                </td>
-                                <td className="w-10 px-4 py-3 text-right">
-                                  {canDeleteSectores && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDeleteError(null);
-                                        setDeletePassword("");
-                                        setDeleteTarget({
-                                          kind: "sector",
-                                          id: sector.id,
-                                          zonaId: zona.id,
-                                        });
-                                      }}
-                                      className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
-                                      title="Eliminar sector"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
+                        <DragDropContext onDragEnd={(r) => handleDragEndSectores(zona.id, r)}>
+                          <Droppable droppableId={`sectores-t-${zona.id}`} direction="vertical">
+                            {(provS) => (
+                              <tbody className="divide-y divide-border" ref={provS.innerRef} {...provS.droppableProps}>
+                                {zona.sectores.map((sector, sIdx) => {
+                                  const fincaCount = sector.fincas?.length ?? 0;
+                                  const propCount = sector.fincas?.reduce((acc, f) => acc + (f.propiedades?.length ?? 0), 0) ?? 0;
+                                  return (
+                                    <Draggable key={sector.id} draggableId={String(sector.id)} index={sIdx}>
+                                      {(dragS, snapS) => (
+                                        <tr
+                                          ref={dragS.innerRef}
+                                          {...dragS.draggableProps}
+                                          className={`group cursor-pointer transition-colors hover:bg-background ${snapS.isDragging ? "opacity-90 shadow-lg" : ""}`}
+                                        >
+                                          <td className="w-8 px-2 py-3">
+                                            <div {...dragS.dragHandleProps} className="flex cursor-grab items-center justify-center text-text-secondary opacity-30 hover:opacity-70 active:cursor-grabbing" title="Arrastrar para reordenar">
+                                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                              </svg>
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-3 font-medium text-text-primary" onClick={() => router.push(`/zona/${zona.id}/sector/${sector.id}`)}>
+                                            Sector {sector.numero}
+                                          </td>
+                                          <td className="w-28 px-4 py-3 text-center text-text-secondary" onClick={() => router.push(`/zona/${zona.id}/sector/${sector.id}`)}>
+                                            {fincaCount}
+                                          </td>
+                                          <td className="w-28 px-4 py-3 text-center text-text-secondary" onClick={() => router.push(`/zona/${zona.id}/sector/${sector.id}`)}>
+                                            {propCount}
+                                          </td>
+                                          <td className="w-10 px-4 py-3 text-right">
+                                            {canDeleteSectores && (
+                                              <button
+                                                onClick={(e) => { e.stopPropagation(); setDeleteError(null); setDeletePassword(""); setDeleteTarget({ kind: "sector", id: sector.id, zonaId: zona.id }); }}
+                                                className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
+                                                title="Eliminar sector"
+                                              >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                              </button>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </Draggable>
+                                  );
+                                })}
+                                {provS.placeholder}
+                              </tbody>
+                            )}
+                          </Droppable>
+                        </DragDropContext>
                       </table>
                       </>
                     )}
                   </div>
                 )}
               </div>
+              )}
+              </Draggable>
             );
           })}
+          {providedZonas.placeholder}
         </div>
+          )}
+        </Droppable>
+        </DragDropContext>
       )}
 
       {/* ── Modal nueva zona ── */}

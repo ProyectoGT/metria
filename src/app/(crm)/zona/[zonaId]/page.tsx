@@ -15,14 +15,19 @@ export default async function ZonaDetailPage({
     getCurrentUserContext(),
     supabase
       .from("zona")
-      .select("id, nombre, sectores(id, numero, fincas(id, propiedades(id, estado, fecha_visita)))")
+      .select("id, nombre, sectores(id, numero, posicion, fincas(id, propiedades(id, estado, fecha_visita)))")
       .eq("id", Number(zonaId))
       .single(),
   ]);
 
   if (!zona) notFound();
 
-  const sectores = (zona.sectores ?? []).sort((a, b) => a.numero - b.numero);
+  const sectores = (zona.sectores ?? []).sort((a, b) => {
+    if (a.posicion != null && b.posicion != null) return a.posicion - b.posicion;
+    if (a.posicion != null) return -1;
+    if (b.posicion != null) return 1;
+    return a.numero - b.numero;
+  });
 
   return (
     <SectoresClient
