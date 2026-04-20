@@ -451,11 +451,19 @@ export default async function DashboardPage() {
         />
       </section>
 
-      {/* 5 — Orden del día */}
-      {showOrdenDia && <OrdenDiaPanel agentes={ordenDiaAgentes} />}
-
-      {/* 6 — Mapa de noticias */}
-      <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
+      {/* 5 — Orden del día + Mapa (grid en desktop grande, mapa primero en móvil) */}
+      {showOrdenDia ? (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <div className="order-2 xl:order-1">
+            <OrdenDiaPanel agentes={ordenDiaAgentes} />
+          </div>
+          <div className="order-1 xl:order-2">
+            <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
+          </div>
+        </div>
+      ) : (
+        <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
+      )}
 
       {/* 7 — Agente del mes */}
       <AgentOfMonth
