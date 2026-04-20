@@ -33,6 +33,7 @@ type Propiedad = {
   finca_id: number | null;
   latitud?: number | null;
   longitud?: number | null;
+  created_at?: string | null;
   usuarios: { id: number; nombre: string; apellidos: string } | null;
   _order?: number;
 };
@@ -85,6 +86,11 @@ function estadoClasses(estado: string | null) {
 function estadoLabel(estado: string | null) {
   const found = ESTADOS.find((item) => item.value === estado);
   return found?.label ?? estado ?? "-";
+}
+
+function isNueva(createdAt: string | null | undefined): boolean {
+  if (!createdAt) return false;
+  return Date.now() - new Date(createdAt).getTime() < 90 * 24 * 60 * 60 * 1000;
 }
 
 function isOverdue(fechaVisita: string | null): boolean {
@@ -643,6 +649,7 @@ export default function PropiedadesClient({
             const overdue = isOverdue(propiedad.fecha_visita);
             const isEncargo = propiedad.estado === "encargo";
             const contactada = isContactada(propiedad);
+            const nueva = isNueva(propiedad.created_at);
             const nombre =
               propiedad.propietario ??
               `Planta ${propiedad.planta ?? "-"} Puerta ${propiedad.puerta ?? "-"}`;
@@ -655,11 +662,27 @@ export default function PropiedadesClient({
                 } ${filtroPendientes && contactada ? "ring-1 ring-primary/30" : ""}`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="break-words font-semibold text-text-primary">{nombre}</p>
-                    <p className="mt-1 text-xs text-text-secondary">
-                      Planta {propiedad.planta ?? "-"} · Puerta {propiedad.puerta ?? "-"}
-                    </p>
+                  <div className="flex min-w-0 items-start gap-2">
+                    <div className="mt-0.5 shrink-0">
+                      {nueva ? (
+                        <div
+                          title="Propiedad creada hace menos de 90 dias"
+                          className="h-4 w-4 rounded-sm border-2 border-primary bg-primary flex items-center justify-center"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      ) : (
+                        <div className="h-4 w-4 rounded-sm border-2 border-border" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="break-words font-semibold text-text-primary">{nombre}</p>
+                      <p className="mt-1 text-xs text-text-secondary">
+                        Planta {propiedad.planta ?? "-"} · Puerta {propiedad.puerta ?? "-"}
+                      </p>
+                    </div>
                   </div>
                   {propiedad.estado ? (
                     <span
@@ -737,6 +760,8 @@ export default function PropiedadesClient({
               <tr className="border-b border-border bg-background">
                 {/* Columna drag handle */}
                 <th className="w-8 px-2 py-3" />
+                {/* Columna nueva (90 días) */}
+                <th className="w-8 px-2 py-3" />
                 <th className="px-4 py-3 text-left font-medium text-text-secondary">
                   Planta
                 </th>
@@ -809,6 +834,35 @@ export default function PropiedadesClient({
                                     />
                                   </svg>
                                 </div>
+                              </td>
+                              {/* Indicador nueva propiedad (<90 días) */}
+                              <td className="w-8 px-2 py-3">
+                                {isNueva(propiedad.created_at) && (
+                                  <div
+                                    title="Propiedad creada hace menos de 90 dias"
+                                    className="flex items-center justify-center"
+                                  >
+                                    <div className="h-4 w-4 rounded-sm border-2 border-primary bg-primary flex items-center justify-center">
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className="h-2.5 w-2.5 text-white"
+                                        viewBox="0 0 20 20"
+                                        fill="currentColor"
+                                      >
+                                        <path
+                                          fillRule="evenodd"
+                                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                          clipRule="evenodd"
+                                        />
+                                      </svg>
+                                    </div>
+                                  </div>
+                                )}
+                                {!isNueva(propiedad.created_at) && (
+                                  <div className="flex items-center justify-center">
+                                    <div className="h-4 w-4 rounded-sm border-2 border-border" />
+                                  </div>
+                                )}
                               </td>
                               <td className="px-4 py-3 text-text-primary">
                                 {propiedad.planta ?? "-"}
