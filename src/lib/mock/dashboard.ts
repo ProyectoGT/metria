@@ -58,6 +58,7 @@ export type KanbanCardData = {
   dueDate?: string;
   assignedBy?: string | null;
   assignedTo?: string | null;
+  resultado?: string | null;
 };
 
 export type KanbanColumnData = {

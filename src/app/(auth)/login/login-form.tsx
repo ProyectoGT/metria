@@ -9,8 +9,15 @@ const fieldClassName =
 
 const URL_ERRORS: Record<string, string> = {
   auth: "Error al iniciar sesion con Google. Intentalo de nuevo.",
-  no_profile: "Tu cuenta de Google no esta registrada en el sistema. Contacta con el administrador.",
+  no_profile: "Esta cuenta de Google no tiene acceso al sistema. Contacta con el administrador.",
   disabled: "Tu cuenta esta desactivada. Contacta con el administrador.",
+  pending: "Tu cuenta aun no esta verificada. Revisa tu correo y haz clic en el enlace de verificacion.",
+  invalid_token: "El enlace de verificacion no es valido o ha caducado. Contacta con el administrador para que te reenvien el correo.",
+  verification_failed: "No se pudo activar tu cuenta. Intentalo de nuevo o contacta con el administrador.",
+};
+
+const URL_SUCCESS: Record<string, string> = {
+  verified: "Cuenta verificada correctamente. Ya puedes iniciar sesion con Google.",
 };
 
 export default function LoginForm() {
@@ -18,7 +25,9 @@ export default function LoginForm() {
     ? new URLSearchParams(window.location.search)
     : null;
   const urlError = searchParams?.get("error") ? URL_ERRORS[searchParams.get("error")!] ?? null : null;
+  const urlSuccess = searchParams?.get("verified") === "true" ? URL_SUCCESS.verified : null;
   const [error, setError] = useState<string | null>(urlError);
+  const [success] = useState<string | null>(urlSuccess);
   const [isPending, startTransition] = useTransition();
   const [isGooglePending, startGoogleTransition] = useTransition();
 
@@ -44,6 +53,11 @@ export default function LoginForm() {
 
   return (
     <div className="space-y-6">
+      {success && (
+        <div className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-3 text-sm text-[#15803d]">
+          {success}
+        </div>
+      )}
       {error && (
         <div className="rounded-2xl border border-[#f2c7c7] bg-[#fff3f3] px-4 py-3 text-sm text-[#b42318]">
           {error}

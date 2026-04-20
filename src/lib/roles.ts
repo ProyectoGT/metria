@@ -58,7 +58,7 @@ export function canManageConfirmationPassword(role: UserRole) {
 }
 
 export function canManageUsers(role: UserRole) {
-  return role === "Administrador";
+  return role === "Administrador" || role === "Director";
 }
 
 export function canCreateUsers(role: UserRole) {
@@ -71,4 +71,24 @@ export function canViewAllAgents(role: UserRole) {
 
 export function canViewSupervisedAgents(role: UserRole) {
   return role === "Responsable";
+}
+
+/**
+ * Determina si un usuario puede marcar una propiedad como "vendido".
+ * - Administrador y Director: siempre.
+ * - Responsable: solo si la propiedad está asignada a él mismo o a un agente que supervisa.
+ * - Agente: nunca.
+ */
+export function canSetVendido(
+  role: UserRole,
+  agenteAsignadoId: number | null,
+  currentUserId: number,
+  supervisedAgentIds: number[]
+): boolean {
+  if (role === "Administrador" || role === "Director") return true;
+  if (role === "Responsable") {
+    if (agenteAsignadoId === null) return true;
+    return agenteAsignadoId === currentUserId || supervisedAgentIds.includes(agenteAsignadoId);
+  }
+  return false;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { MoreVertical, Plus, Search, UserCheck, UserX } from "lucide-react";
+import { MoreVertical, Plus, Search, UserCheck, UserX, Mail } from "lucide-react";
 import Avatar from "@/components/ui/avatar";
 import { useToast, Toaster } from "@/components/ui/toast";
 import {
@@ -10,6 +10,7 @@ import {
   updateUserInfoAction,
   toggleUserStatusAction,
   updateUserSupervisorAction,
+  resendVerificationAction,
 } from "./actions";
 import CreateUserForm from "./create-user-form";
 import type { UserRole } from "@/lib/roles";
@@ -247,7 +248,10 @@ function UserRow({
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const isAdminUser = user.rol === "Administrador";
+  const isDirectorUser = user.rol === "Director";
   const isActive = user.estado === "active";
+  // Sin verificar = disabled + sin auth_id (nunca ha accedido, pendiente de verificar email)
+  const isPendiente = user.estado === "disabled" && !user.authId;
   const fullName = `${user.nombre} ${user.apellidos}`.trim();
 
   useEffect(() => {
@@ -282,7 +286,24 @@ function UserRow({
     });
   }
 
-  const canAct = isAdmin && !isCurrentUser && !isAdminUser;
+  function handleResendVerification() {
+    setMenuOpen(false);
+    startTransition(async () => {
+      const result = await resendVerificationAction({ userId: user.id });
+      if (result.error) {
+        onToast(result.error, "error");
+        return;
+      }
+      onToast(result.message ?? "Correo de verificacion reenviado.");
+    });
+  }
+
+  // Admin puede actuar sobre todos menos sobre sí mismo y otros admins
+  // Director puede actuar solo sobre Responsables y Agentes (no Admins ni otros Directores)
+  const canAct =
+    !isCurrentUser &&
+    !isAdminUser &&
+    (isAdmin || (!isDirectorUser));
 
   return (
     <tr className={`transition-colors hover:bg-background ${user.estado !== "active" ? "opacity-60" : ""}`}>
@@ -329,6 +350,17 @@ function UserRow({
                 >
                   Editar informacion
                 </button>
+                {isPendiente && (
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text-primary transition-colors hover:bg-background"
+                  >
+                    <Mail className="h-3.5 w-3.5 text-blue-500" />
+                    Reenviar verificacion
+                  </button>
+                )}
+                {!isPendiente && (
                 <button
                   type="button"
                   onClick={handleToggle}
@@ -346,6 +378,7 @@ function UserRow({
                     </>
                   )}
                 </button>
+                )}
                 <button
                   type="button"
                   onClick={() => { setMenuOpen(false); onDelete(); }}
@@ -630,21 +663,35 @@ function RoleBadge({ role }: { role: string }) {
 
 function StatusBadge({ status, hasAccess }: { status: string; hasAccess: boolean }) {
   const normalized = status.toLowerCase();
-  const effectiveStatus = !hasAccess ? "disabled" : normalized;
+
+  // disabled + sin authId = pendiente de verificación de email (creado con Google Only, nunca verificó)
+  // active + sin authId  = verificado, pendiente de primer login con Google
+  // active + con authId  = activo normal
+  // disabled + con authId = desactivado por admin
+  const effectiveStatus =
+    normalized === "disabled" && !hasAccess
+      ? "sin_verificar"
+      : normalized === "active" && !hasAccess
+        ? "pending_google"
+        : normalized;
 
   const className =
     effectiveStatus === "active"
       ? "bg-success/15 text-success dark:bg-success/25"
-      : effectiveStatus === "disabled"
-        ? "bg-danger/15 text-danger dark:bg-danger/25"
-        : "bg-accent/15 text-accent dark:bg-accent/25";
+      : effectiveStatus === "pending_google"
+        ? "bg-blue-500/15 text-blue-600 dark:bg-blue-500/25"
+        : effectiveStatus === "sin_verificar"
+          ? "bg-amber-500/15 text-amber-600 dark:bg-amber-500/25"
+          : "bg-danger/15 text-danger dark:bg-danger/25";
 
   const label =
     effectiveStatus === "active"
       ? "Activo"
-      : effectiveStatus === "disabled"
-        ? "Desactivado"
-        : "Invitado";
+      : effectiveStatus === "pending_google"
+        ? "Pendiente Google"
+        : effectiveStatus === "sin_verificar"
+          ? "Sin verificar"
+          : "Desactivado";
 
   return (
     <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${className}`}>

@@ -5,7 +5,8 @@ import { getCurrentUserContext } from "@/lib/current-user";
 import { canManageUsers, canCreateUsers, USER_ROLES, type UserRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { validatePassword } from "@/lib/password";
-import { sendInviteEmail, sendBienvenidaGoogleEmail } from "@/lib/email";
+import { sendInviteEmail, sendVerificacionGoogleEmail } from "@/lib/email";
+import { generateVerificationToken } from "@/lib/verification";
 
 type CreateUserInput = {
   nombre: string;
@@ -183,8 +184,9 @@ export async function createCrmUserAction(
     };
   }
 
-  // Modo Google: crear solo perfil en usuarios, sin cuenta auth
-  // El auth_id se vinculará automáticamente en el callback cuando haga login con Google
+  // Modo Google: crear perfil pendiente de verificación, sin cuenta auth.
+  // El usuario recibirá un email con enlace de verificación para activar su cuenta.
+  // El auth_id se vinculará automáticamente en el callback cuando haga login con Google por primera vez.
   if (googleOnly) {
     const profilePayloadGoogle = {
       nombre,
@@ -194,23 +196,28 @@ export async function createCrmUserAction(
       auth_id: null,
       empresa_id: currentUser.empresaId ?? 1,
       equipo_id: currentUser.equipoId ?? 1,
-      estado: "active",
+      estado: "disabled",
       supervisor_id: input.supervisorId ?? null,
     };
 
-    const { error: insertError } = await adminClient
+    const { data: inserted, error: insertError } = await adminClient
       .from("usuarios")
-      .insert(profilePayloadGoogle);
+      .insert(profilePayloadGoogle)
+      .select("id")
+      .single();
 
-    if (insertError) return { error: insertError.message };
+    if (insertError || !inserted) return { error: insertError?.message ?? "Error al crear el perfil." };
 
-    // Notificar al usuario que tiene acceso
-    sendBienvenidaGoogleEmail({ to: correo, nombre, correo }).catch(() => {});
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+    const token = generateVerificationToken(inserted.id, correo);
+    const verificationUrl = `${baseUrl}/auth/verificar?token=${token}`;
+
+    sendVerificacionGoogleEmail({ to: correo, nombre, correo, verificationUrl }).catch(() => {});
 
     revalidatePath("/usuarios");
     return {
       success: true,
-      message: `Perfil creado. ${nombre} puede acceder iniciando sesion con Google usando ${correo}.`,
+      message: `Perfil creado. Se ha enviado un correo de verificacion a ${correo}. El usuario debe hacer clic en el enlace para activar su cuenta.`,
     };
   }
 
@@ -344,7 +351,7 @@ export async function updateUserInfoAction(input: {
   }
 
   if (!canManageUsers(currentUser.role)) {
-    return { error: "Solo un Administrador puede editar usuarios." };
+    return { error: "No tienes permisos para editar usuarios." };
   }
 
   const nombre = input.nombre.trim();
@@ -375,6 +382,10 @@ export async function updateUserInfoAction(input: {
 
   if (targetResult.data.rol === "Administrador" && rol !== "Administrador") {
     return { error: "No puedes cambiar el rango de un Administrador." };
+  }
+
+  if (currentUser.role === "Director" && targetResult.data.rol === "Director") {
+    return { error: "Un Director no puede editar a otro Director." };
   }
 
   const adminClient = createAdminClient();
@@ -419,7 +430,7 @@ export async function toggleUserStatusAction(input: {
   }
 
   if (!canManageUsers(currentUser.role)) {
-    return { error: "Solo un Administrador puede activar o desactivar usuarios." };
+    return { error: "No tienes permisos para activar o desactivar usuarios." };
   }
 
   if (input.userId === currentUser.id) {
@@ -435,6 +446,10 @@ export async function toggleUserStatusAction(input: {
 
   if (target.rol === "Administrador") {
     return { error: "No puedes desactivar un Administrador." };
+  }
+
+  if (currentUser.role === "Director" && target.rol === "Director") {
+    return { error: "Un Director no puede desactivar a otro Director." };
   }
 
   const isActive = target.estado === "active";
@@ -605,4 +620,38 @@ export async function deleteUserAction(input: {
     status: "disabled",
     removed: false,
   };
+}
+
+export async function resendVerificationAction(input: {
+  userId: number;
+}): Promise<ActionResult> {
+  const currentUser = await getCurrentUserContext();
+
+  if (!currentUser) return { error: "Tu sesion no es valida." };
+  if (!canManageUsers(currentUser.role)) return { error: "No tienes permisos para esta accion." };
+
+  const adminClient = createAdminClient();
+  const { data: target } = await adminClient
+    .from("usuarios")
+    .select("id, nombre, correo, estado, auth_id")
+    .eq("id", input.userId)
+    .maybeSingle();
+
+  if (!target) return { error: "Usuario no encontrado." };
+  // Sin verificar = disabled + sin auth_id
+  const esSinVerificar = target.estado === "disabled" && target.auth_id === null;
+  if (!esSinVerificar) return { error: "Este usuario ya ha verificado su cuenta o no usa acceso Google." };
+
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+  const token = generateVerificationToken(target.id, target.correo);
+  const verificationUrl = `${baseUrl}/auth/verificar?token=${token}`;
+
+  await sendVerificacionGoogleEmail({
+    to: target.correo,
+    nombre: target.nombre,
+    correo: target.correo,
+    verificationUrl,
+  }).catch(() => {});
+
+  return { success: true, message: `Correo de verificacion reenviado a ${target.correo}.` };
 }

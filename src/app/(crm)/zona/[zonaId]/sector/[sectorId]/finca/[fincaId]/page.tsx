@@ -63,6 +63,9 @@ export default async function FincaDetailPage({
         initialPropiedades={propiedades ?? []}
         agentes={agentes ?? []}
         canDeletePropiedades={user?.canDeletePropiedades ?? false}
+        currentUserRole={user?.role ?? "Agente"}
+        currentUserId={user?.id ?? 0}
+        supervisedAgentIds={user?.supervisedAgentIds ?? []}
       />
     </>
   );
