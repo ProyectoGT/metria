@@ -18,6 +18,7 @@ type Tarea = {
   empresa_id: number | null;
   equipo_id: number | null;
   visibility: string;
+  resultado: string | null;
 };
 
 type Usuario = { id: number; nombre: string; apellidos: string };
@@ -110,6 +111,8 @@ export default function OrdenesClient({ initialTareas, currentUserId, currentUse
   const [detailSaving, setDetailSaving] = useState(false);
   const [estadoSaving, setEstadoSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [resultado, setResultado] = useState<string>("");
+  const [resultadoSaving, setResultadoSaving] = useState(false);
 
   const multiUser = usuarios.length > 1 && canCreateForOthers(currentUserRole);
 
@@ -176,12 +179,31 @@ export default function OrdenesClient({ initialTareas, currentUserId, currentUse
 
   async function handleSetEstado(tarea: Tarea, nuevoEstado: string) {
     setEstadoSaving(true);
-    const { data, error } = await supabase.from("tareas").update({ estado: nuevoEstado }).eq("id", tarea.id).select().single();
+    const payload =
+      nuevoEstado !== "completado"
+        ? { estado: nuevoEstado, resultado: null as string | null }
+        : { estado: nuevoEstado };
+    const { data, error } = await supabase.from("tareas").update(payload).eq("id", tarea.id).select().single();
     setEstadoSaving(false);
     if (error || !data) { showToast("Error al actualizar", "error"); return; }
     const updated = data as Tarea;
     setTareas((prev) => prev.map((t) => (t.id === tarea.id ? updated : t)));
-    if (detailTarea?.id === tarea.id) setDetailTarea(updated);
+    if (detailTarea?.id === tarea.id) {
+      setDetailTarea(updated);
+      setResultado(updated.resultado ?? "");
+    }
+  }
+
+  async function handleSaveResultado() {
+    if (!detailTarea) return;
+    setResultadoSaving(true);
+    const { data, error } = await supabase.from("tareas").update({ resultado: resultado.trim() || null }).eq("id", detailTarea.id).select().single();
+    setResultadoSaving(false);
+    if (error || !data) { showToast("Error al guardar resultado", "error"); return; }
+    const updated = data as Tarea;
+    setTareas((prev) => prev.map((t) => (t.id === detailTarea.id ? updated : t)));
+    setDetailTarea(updated);
+    showToast("Resultado guardado");
   }
 
   async function handleDelete(id: number) {
@@ -214,6 +236,7 @@ export default function OrdenesClient({ initialTareas, currentUserId, currentUse
     setDetailTarea(tarea);
     setDetailEditing(false);
     setDetailForm({ titulo: tarea.titulo, prioridad: tarea.prioridad ?? "media", fecha: tarea.fecha ? parseFechaKey(tarea.fecha) : "" });
+    setResultado(tarea.resultado ?? "");
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -366,6 +389,11 @@ export default function OrdenesClient({ initialTareas, currentUserId, currentUse
                                 </span>
                               )}
                             </div>
+                            {completada && tarea.resultado && (
+                              <p className="mt-1 text-xs italic text-text-secondary line-clamp-1">
+                                {tarea.resultado}
+                              </p>
+                            )}
                           </div>
 
                           <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium capitalize ${p.badge}`}>
@@ -482,6 +510,31 @@ export default function OrdenesClient({ initialTareas, currentUserId, currentUse
                           })}
                         </div>
                       </div>
+
+                      {/* Resultado — solo visible cuando completado */}
+                      {detailTarea.estado === "completado" && (
+                        <div className="rounded-xl border border-border bg-background p-3">
+                          <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                            Resultado / consecuencia
+                          </label>
+                          <textarea
+                            value={resultado}
+                            onChange={(e) => setResultado(e.target.value)}
+                            placeholder="¿Qué ocurrió? ¿Cuál fue el resultado?"
+                            rows={3}
+                            className="w-full resize-none bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary/60"
+                          />
+                          <div className="mt-2 flex justify-end">
+                            <button
+                              onClick={handleSaveResultado}
+                              disabled={resultadoSaving || resultado.trim() === (detailTarea.resultado ?? "")}
+                              className="rounded-lg bg-primary px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-50"
+                            >
+                              {resultadoSaving ? "Guardando..." : "Guardar resultado"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Info */}
                       <div className="space-y-2.5 border-t border-border pt-3">

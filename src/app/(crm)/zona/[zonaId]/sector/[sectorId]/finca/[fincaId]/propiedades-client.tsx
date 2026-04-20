@@ -219,8 +219,10 @@ export default function PropiedadesClient({
     return list;
   }, [propiedades, filtroPendientes, filtroEstados, filtroAgente, filtroFechaDesde, filtroFechaHasta]);
 
-  const contactadasCount = propiedades.filter(isContactada).length;
-  const overdueCount = propiedades.filter((p) => isOverdue(p.fecha_visita)).length;
+  const { contactadasCount, overdueCount } = useMemo(() => ({
+    contactadasCount: propiedades.filter(isContactada).length,
+    overdueCount: propiedades.filter((p) => isOverdue(p.fecha_visita)).length,
+  }), [propiedades]);
 
   function openCreate() {
     setEditTarget(null);
