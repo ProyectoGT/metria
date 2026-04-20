@@ -51,7 +51,7 @@ export async function completeTareaAction(id: number, resultado?: string): Promi
   const supabase = await createClient();
   const { error } = await supabase
     .from("tareas")
-    .update({ estado: "completado", resultado: resultado?.trim() || null })
+    .update({ estado: "completado", resultado: (resultado?.trim() || null) as string })
     .eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
