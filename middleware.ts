@@ -4,7 +4,10 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isPublicPage = pathname === "/login" || pathname === "/recuperar";
+  const isPublicPage =
+    pathname === "/login" ||
+    pathname === "/recuperar" ||
+    pathname.startsWith("/auth/");
 
   // Crear respuesta mutable para que Supabase pueda refrescar la cookie si hace falta
   let response = NextResponse.next({

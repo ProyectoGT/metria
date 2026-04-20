@@ -1,7 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
+import { canSetVendido } from "@/lib/roles";
 import { revalidatePath } from "next/cache";
 
 type PropiedadPayload = {
@@ -26,7 +28,15 @@ export async function upsertPropiedadAction(
   const yo = await getCurrentUserContext();
   if (!yo) return { error: "No autenticado" };
 
-  const supabase = await createClient();
+  // Validar permiso para marcar como vendido
+  if (payload.estado === "vendido") {
+    const agenteAsignado = payload.agente_asignado;
+    if (!canSetVendido(yo.role, agenteAsignado, yo.id, yo.supervisedAgentIds)) {
+      return { error: "No tienes permiso para marcar esta propiedad como vendida." };
+    }
+  }
+
+  const supabase = createAdminClient();
 
   if (propiedadId) {
     const { data, error } = await supabase

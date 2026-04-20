@@ -47,6 +47,14 @@ export default function KanbanBoard({
   });
   const [addingCardCol, setAddingCardCol] = useState<string | null>(null);
 
+  // ─── Modal resultado ─────────────────────────────────────────────────────────
+  const [resultadoModal, setResultadoModal] = useState<{
+    columnId: string;
+    cardId: string;
+    titulo: string;
+  } | null>(null);
+  const [resultadoText, setResultadoText] = useState("");
+
   // ─── Drag & drop ────────────────────────────────────────────────────────────
   function handleDragEnd(result: DropResult) {
     const { source, destination, draggableId } = result;
@@ -144,8 +152,21 @@ export default function KanbanBoard({
     }
   }
 
-  async function handleCompleteCard(columnId: string, cardId: string) {
-    // Mover la tarjeta a la columna "completado" en la UI
+  function handleCompleteCard(columnId: string, cardId: string) {
+    // Buscar el título para mostrarlo en el modal
+    const col = columns.find((c) => c.id === columnId);
+    const card = col?.cards.find((c) => c.id === cardId);
+    setResultadoText("");
+    setResultadoModal({ columnId, cardId, titulo: card?.title ?? "Tarea" });
+  }
+
+  async function handleConfirmResultado() {
+    if (!resultadoModal) return;
+    const { columnId, cardId } = resultadoModal;
+    const resultado = resultadoText.trim();
+    setResultadoModal(null);
+
+    // Mover la tarjeta a "completado" en la UI con el resultado
     setColumns((prev) => {
       const next = prev.map((col) => ({ ...col, cards: [...col.cards] }));
       const srcCol = next.find((c) => c.id === columnId);
@@ -154,14 +175,15 @@ export default function KanbanBoard({
       const idx = srcCol.cards.findIndex((c) => c.id === cardId);
       if (idx === -1) return prev;
       const [moved] = srcCol.cards.splice(idx, 1);
-      dstCol.cards.unshift(moved);
+      dstCol.cards.unshift({ ...moved, resultado: resultado || null });
       return next;
     });
+
     // Persistir en BD
     const numId = parseInt(cardId, 10);
     if (!isNaN(numId)) {
       try {
-        await completeTareaAction(numId);
+        await completeTareaAction(numId, resultado || undefined);
       } catch (err) {
         console.warn("Error al completar tarea:", err);
       }
@@ -195,6 +217,54 @@ export default function KanbanBoard({
           onAdd={(card) => handleAddCard(addingCardCol, card)}
           onClose={() => setAddingCardCol(null)}
         />
+      )}
+
+      {/* Modal de resultado al completar tarea */}
+      {resultadoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl">
+            <div className="border-b border-border px-6 py-4">
+              <h2 className="text-base font-semibold text-text-primary">¿Cómo ha ido?</h2>
+              <p className="mt-0.5 truncate text-sm text-text-secondary">{resultadoModal.titulo}</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-text-secondary">
+                  Consecuencia / nota de lo realizado
+                </label>
+                <textarea
+                  autoFocus
+                  value={resultadoText}
+                  onChange={(e) => setResultadoText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleConfirmResultado();
+                    if (e.key === "Escape") setResultadoModal(null);
+                  }}
+                  placeholder="Ej: Llamada realizada, cliente interesado. Próxima visita el martes."
+                  rows={4}
+                  className="input w-full resize-none text-sm"
+                />
+                <p className="text-xs text-text-secondary">Opcional · Ctrl+Enter para confirmar</p>
+              </div>
+              <div className="flex justify-end gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setResultadoModal(null)}
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmResultado}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+                >
+                  Marcar como realizada
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

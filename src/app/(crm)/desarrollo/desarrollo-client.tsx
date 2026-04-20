@@ -6,6 +6,7 @@ import {
   defaultRendimiento,
   getPeriodRange,
   mergeRendimientoRows,
+  mergeRendimientoRowsAnual,
   type ObjectiveKey,
   type RendimientoPeriodo,
 } from "@/lib/desarrollo-metrics";
@@ -113,11 +114,9 @@ export default function DesarrolloClient({
     async (newAnio: number, newMes: number) => {
       const range = getPeriodRange(newAnio, newMes);
       const [{ data: objetivos }, { data: actividades }] = await Promise.all([
-        supabase
-          .from("rendimiento")
-          .select("*")
-          .eq("anio", newAnio)
-          .eq("mes", newMes),
+        newMes === 0
+          ? supabase.from("rendimiento").select("*").eq("anio", newAnio).gte("mes", 1).lte("mes", 12)
+          : supabase.from("rendimiento").select("*").eq("anio", newAnio).eq("mes", newMes),
         supabase
           .from("actividad_desarrollo")
           .select("agente_id, metric, value")
@@ -125,15 +124,26 @@ export default function DesarrolloClient({
           .lt("occurred_at", range.to),
       ]);
 
-      setStatsMap(
-        mergeRendimientoRows({
-          agentes,
-          objetivos: objetivos ?? [],
-          actividades: actividades ?? [],
-          anio: newAnio,
-          mes: newMes,
-        }),
-      );
+      if (newMes === 0) {
+        setStatsMap(
+          mergeRendimientoRowsAnual({
+            agentes,
+            objetivos: objetivos ?? [],
+            actividades: actividades ?? [],
+            anio: newAnio,
+          }),
+        );
+      } else {
+        setStatsMap(
+          mergeRendimientoRows({
+            agentes,
+            objetivos: objetivos ?? [],
+            actividades: actividades ?? [],
+            anio: newAnio,
+            mes: newMes,
+          }),
+        );
+      }
     },
     [agentes, supabase],
   );
@@ -147,7 +157,19 @@ export default function DesarrolloClient({
   function openEdit(agente: Agente) {
     if (!canManageObjectives) return;
     setEditAgente(agente);
-    setEditForm(statsMap[agente.id] ?? defaultRendimiento(agente.id, anio, mes));
+    const current = statsMap[agente.id] ?? defaultRendimiento(agente.id, anio, mes);
+    if (mes === 0) {
+      // En vista anual, mostrar el objetivo mensual (anual / 12)
+      setEditForm({
+        ...current,
+        objetivo_facturado: Math.round(current.objetivo_facturado / 12),
+        objetivo_encargos:  Math.round(current.objetivo_encargos  / 12),
+        objetivo_ventas:    Math.round(current.objetivo_ventas    / 12),
+        objetivo_contactos: Math.round(current.objetivo_contactos / 12),
+      });
+    } else {
+      setEditForm(current);
+    }
     setSaveError(null);
   }
 
@@ -162,7 +184,8 @@ export default function DesarrolloClient({
     setSaving(true);
     setSaveError(null);
     try {
-      const data = await updateObjetivosRendimientoAction({
+      // En vista anual editForm contiene los valores mensuales que se aplicarán a cada mes
+      await updateObjetivosRendimientoAction({
         agenteId: editAgente.id,
         anio,
         mes,
@@ -171,17 +194,32 @@ export default function DesarrolloClient({
         objetivo_ventas: editForm.objetivo_ventas,
         objetivo_contactos: editForm.objetivo_contactos,
       });
-      setStatsMap((prev) => ({
-        ...prev,
-        [editAgente.id]: {
-          ...(prev[editAgente.id] ?? defaultRendimiento(editAgente.id, anio, mes)),
-          id: data.id,
-          objetivo_facturado: data.objetivo_facturado,
-          objetivo_encargos: data.objetivo_encargos,
-          objetivo_ventas: data.objetivo_ventas,
-          objetivo_contactos: data.objetivo_contactos,
-        },
-      }));
+
+      // Actualizar el statsMap local
+      if (mes === 0) {
+        // En anual: el objetivo mostrado = mensual × 12
+        setStatsMap((prev) => ({
+          ...prev,
+          [editAgente.id]: {
+            ...(prev[editAgente.id] ?? defaultRendimiento(editAgente.id, anio, mes)),
+            objetivo_facturado: editForm.objetivo_facturado * 12,
+            objetivo_encargos: editForm.objetivo_encargos * 12,
+            objetivo_ventas: editForm.objetivo_ventas * 12,
+            objetivo_contactos: editForm.objetivo_contactos * 12,
+          },
+        }));
+      } else {
+        setStatsMap((prev) => ({
+          ...prev,
+          [editAgente.id]: {
+            ...(prev[editAgente.id] ?? defaultRendimiento(editAgente.id, anio, mes)),
+            objetivo_facturado: editForm.objetivo_facturado,
+            objetivo_encargos: editForm.objetivo_encargos,
+            objetivo_ventas: editForm.objetivo_ventas,
+            objetivo_contactos: editForm.objetivo_contactos,
+          },
+        }));
+      }
       setEditAgente(null);
       setEditForm(null);
     } catch (error) {
@@ -355,8 +393,8 @@ export default function DesarrolloClient({
       {/* ── Modal de objetivos ──────────────────────────────────────── */}
       {editAgente && editForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl">
-            <div className="mb-5 flex items-center justify-between">
+          <div className="w-full max-w-lg rounded-xl border border-border bg-surface p-6 shadow-xl">
+            <div className="mb-1 flex items-center justify-between">
               <h2 className="text-base font-semibold text-text-primary">
                 Objetivos — {editAgente.nombre} {editAgente.apellidos}
               </h2>
@@ -371,31 +409,46 @@ export default function DesarrolloClient({
               </button>
             </div>
 
-            <div className="space-y-4">
+            {mes === 0 ? (
+              <p className="mb-4 rounded-lg bg-primary/8 px-3 py-2 text-xs text-primary">
+                Vista anual — los objetivos mensuales se aplicaran a los 12 meses del ano {anio}. El objetivo anual es la suma de los 12 meses.
+              </p>
+            ) : (
+              <p className="mb-4 text-xs text-text-secondary">
+                {MESES_LABEL[mes - 1]} {anio}
+              </p>
+            )}
+
+            {/* Cabeceras */}
+            <div className={`mb-2 grid gap-3 text-xs font-semibold uppercase tracking-wide text-text-secondary ${mes === 0 ? "grid-cols-4" : "grid-cols-3"}`}>
+              <span>Metrica</span>
+              <span className="text-center">Actual</span>
+              <span className="text-center">{mes === 0 ? "Obj. mensual" : "Objetivo"}</span>
+              {mes === 0 && <span className="text-center">Total anual</span>}
+            </div>
+
+            <div className="space-y-3">
               {METRICS.map(({ key, objKey, label, color, isCurrency }) => (
-                <div key={key}>
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-                    <span className="text-xs font-semibold text-text-primary">{label}</span>
+                <div key={key} className={`grid items-center gap-3 ${mes === 0 ? "grid-cols-4" : "grid-cols-3"}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                    <span className="text-sm font-medium text-text-primary">{label}</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="mb-1 block text-xs text-text-secondary">Actual</label>
-                      <div className="input flex items-center bg-background text-sm text-text-secondary">
-                        {fmtNum(editForm[key], isCurrency)}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-text-secondary">Objetivo</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={editForm[objKey]}
-                        onChange={(e) => updateObjective(objKey as ObjectiveKey, e.target.value)}
-                        className="input"
-                      />
-                    </div>
+                  <div className="input flex items-center justify-center bg-background text-sm text-text-secondary">
+                    {fmtNum(editForm[key], isCurrency)}
                   </div>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editForm[objKey]}
+                    onChange={(e) => updateObjective(objKey as ObjectiveKey, e.target.value)}
+                    className="input text-center"
+                  />
+                  {mes === 0 && (
+                    <div className="flex items-center justify-center rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-text-primary">
+                      {fmtNum(editForm[objKey] * 12, isCurrency)}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -418,7 +471,7 @@ export default function DesarrolloClient({
                 disabled={saving}
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
               >
-                {saving ? "Guardando..." : "Guardar"}
+                {saving ? "Guardando..." : mes === 0 ? "Aplicar a todos los meses" : "Guardar"}
               </button>
             </div>
           </div>

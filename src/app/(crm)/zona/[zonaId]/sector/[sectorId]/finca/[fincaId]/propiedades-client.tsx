@@ -7,6 +7,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import { deletePropiedadAction } from "@/app/actions/security";
 import { createTareaAction } from "@/app/(crm)/dashboard/actions";
 import { updatePropiedadesPosicionesAction, upsertPropiedadAction } from "@/app/(crm)/zona/actions";
+import { canSetVendido, type UserRole } from "@/lib/roles";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
 import EncargoPanel from "@/components/propiedades/EncargoPanel";
@@ -73,8 +74,8 @@ const ESTADOS = [
   { value: "vendido", label: "Vendido", classes: "bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400" },
 ] as const;
 
-// Estados que se consideran "sin contactar" (pendientes)
-const ESTADOS_SIN_CONTACTAR = ["neutral", "investigacion"];
+// Estados que indican que la propiedad ha sido contactada / está en seguimiento activo
+const ESTADOS_CONTACTADOS = ["seguimiento", "noticia", "encargo", "vendido"];
 
 function estadoClasses(estado: string | null) {
   const found = ESTADOS.find((item) => item.value === estado);
@@ -92,10 +93,10 @@ function isOverdue(fechaVisita: string | null): boolean {
   return diffMs > 90 * 24 * 60 * 60 * 1000;
 }
 
-function isPendienteContactar(propiedad: Propiedad): boolean {
-  const sinEstado = !propiedad.estado || ESTADOS_SIN_CONTACTAR.includes(propiedad.estado);
-  const sinVisita = !propiedad.fecha_visita;
-  return sinEstado && sinVisita;
+function isContactada(propiedad: Propiedad): boolean {
+  const estadoActivo = propiedad.estado && ESTADOS_CONTACTADOS.includes(propiedad.estado);
+  const tieneVisita = !!propiedad.fecha_visita;
+  return !!(estadoActivo || tieneVisita);
 }
 
 function nowLocalDatetime() {
@@ -129,11 +130,17 @@ export default function PropiedadesClient({
   initialPropiedades,
   agentes,
   canDeletePropiedades,
+  currentUserRole,
+  currentUserId,
+  supervisedAgentIds,
 }: {
   fincaId: number;
   initialPropiedades: Propiedad[];
   agentes: Agente[];
   canDeletePropiedades: boolean;
+  currentUserRole: UserRole;
+  currentUserId: number;
+  supervisedAgentIds: number[];
 }) {
   const [propiedades, setPropiedades] = useState<Propiedad[]>(
     initialPropiedades.map((p, i) => ({ ...p, _order: i }))
@@ -194,7 +201,7 @@ export default function PropiedadesClient({
 
   // Propiedades filtradas
   const propiedadesFiltradas = useMemo(() => {
-    let list = filtroPendientes ? propiedades.filter(isPendienteContactar) : propiedades;
+    let list = filtroPendientes ? propiedades.filter(isContactada) : propiedades;
     if (filtroEstados.length > 0) {
       list = list.filter((p) => filtroEstados.includes(p.estado ?? "neutral"));
     }
@@ -210,7 +217,7 @@ export default function PropiedadesClient({
     return list;
   }, [propiedades, filtroPendientes, filtroEstados, filtroAgente, filtroFechaDesde, filtroFechaHasta]);
 
-  const pendientesCount = propiedades.filter(isPendienteContactar).length;
+  const contactadasCount = propiedades.filter(isContactada).length;
   const overdueCount = propiedades.filter((p) => isOverdue(p.fecha_visita)).length;
 
   function openCreate() {
@@ -384,7 +391,7 @@ export default function PropiedadesClient({
         let filtIdx = 0;
         for (const id of prev.map((p) => p.id)) {
           const p = prev.find((x) => x.id === id)!;
-          if (isPendienteContactar(p)) {
+          if (isContactada(p)) {
             newOrder.push(prev.find((x) => x.id === reordered[filtIdx++])!);
           } else {
             newOrder.push(p);
@@ -437,23 +444,23 @@ export default function PropiedadesClient({
           <p className="text-sm text-text-secondary">
             {propiedadesFiltradas.length}{" "}
             {propiedadesFiltradas.length === 1 ? "propiedad" : "propiedades"}
-            {filtroPendientes && propiedades.length !== propiedadesFiltradas.length && (
+            {(filtroPendientes || hayFiltrosActivos) && propiedades.length !== propiedadesFiltradas.length && (
               <span className="ml-1 text-text-secondary">
                 de {propiedades.length}
               </span>
             )}
           </p>
 
-          {/* Filtro pendientes de contactar */}
-          {pendientesCount > 0 && (
+          {/* Filtro contactadas */}
+          {contactadasCount > 0 && (
             <button
               onClick={() => setFiltroPendientes((v) => !v)}
               className={`flex min-w-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                 filtroPendientes
-                  ? "bg-amber-500 text-white"
-                  : "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                  ? "bg-primary text-white"
+                  : "bg-primary/10 text-primary hover:bg-primary/20"
               }`}
-              title="Propiedades sin estado de seguimiento ni visita registrada"
+              title="Propiedades con visita o estado de seguimiento activo"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -463,17 +470,17 @@ export default function PropiedadesClient({
               >
                 <path
                   fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
                   clipRule="evenodd"
                 />
               </svg>
-              <span className="truncate">Pendientes de contactar</span>
+              <span className="truncate">Contactadas</span>
               <span
                 className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${
-                  filtroPendientes ? "bg-white/30 text-white" : "bg-amber-200 text-amber-800"
+                  filtroPendientes ? "bg-white/30 text-white" : "bg-primary/20 text-primary"
                 }`}
               >
-                {pendientesCount}
+                {contactadasCount}
               </span>
             </button>
           )}
@@ -609,7 +616,7 @@ export default function PropiedadesClient({
         <div className="rounded-xl border border-border bg-surface py-16 text-center">
           <p className="text-text-secondary">
             {hayFiltrosActivos || filtroPendientes
-              ? "No hay propiedades que coincidan con los filtros."
+              ? "No hay propiedades que coincidan con el filtro."
               : "No hay propiedades registradas."}
           </p>
           {(hayFiltrosActivos || filtroPendientes) && (
@@ -635,7 +642,7 @@ export default function PropiedadesClient({
           {propiedadesFiltradas.map((propiedad) => {
             const overdue = isOverdue(propiedad.fecha_visita);
             const isEncargo = propiedad.estado === "encargo";
-            const pendiente = isPendienteContactar(propiedad);
+            const contactada = isContactada(propiedad);
             const nombre =
               propiedad.propietario ??
               `Planta ${propiedad.planta ?? "-"} Puerta ${propiedad.puerta ?? "-"}`;
@@ -645,7 +652,7 @@ export default function PropiedadesClient({
                 key={propiedad.id}
                 className={`rounded-xl border border-border bg-surface p-4 shadow-sm ${
                   isEncargo ? "bg-green-50/40 dark:bg-green-950/10" : ""
-                } ${pendiente && !filtroPendientes ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`}
+                } ${filtroPendientes && contactada ? "ring-1 ring-primary/30" : ""}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -665,27 +672,25 @@ export default function PropiedadesClient({
 
                 <div className="mt-3 grid gap-2 text-xs text-text-secondary">
                   <div className="flex justify-between gap-3">
-                    <span>Telefono</span>
-                    <span className="text-right font-medium text-text-primary">
-                      {propiedad.telefono ?? "-"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-3">
                     <span>Ultima visita</span>
                     <span className={`text-right font-medium ${overdue ? "text-amber-600" : "text-text-primary"}`}>
                       {propiedad.fecha_visita
-                        ? new Date(propiedad.fecha_visita).toLocaleDateString("es-ES")
+                        ? new Date(propiedad.fecha_visita).toLocaleString("es-ES", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
                         : "-"}
                     </span>
                   </div>
-                  <div className="flex justify-between gap-3">
-                    <span>Agente</span>
-                    <span className="text-right font-medium text-text-primary">
-                      {propiedad.usuarios
-                        ? `${propiedad.usuarios.nombre} ${propiedad.usuarios.apellidos}`
-                        : "-"}
-                    </span>
-                  </div>
+                  {propiedad.notas && (
+                    <div className="flex flex-col gap-0.5">
+                      <span>Notas</span>
+                      <span className="font-medium text-text-primary line-clamp-2">{propiedad.notas}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4 flex flex-wrap justify-end gap-2">
@@ -742,16 +747,13 @@ export default function PropiedadesClient({
                   Propietario
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-text-secondary">
-                  Telefono
-                </th>
-                <th className="px-4 py-3 text-left font-medium text-text-secondary">
                   Estado
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-text-secondary">
                   Ultima visita
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-text-secondary">
-                  Agente
+                  Notas
                 </th>
                 <th className="px-4 py-3" />
               </tr>
@@ -767,7 +769,7 @@ export default function PropiedadesClient({
                     {propiedadesFiltradas.map((propiedad, index) => {
                       const overdue = isOverdue(propiedad.fecha_visita);
                       const isEncargo = propiedad.estado === "encargo";
-                      const pendiente = isPendienteContactar(propiedad);
+                      const contactada = isContactada(propiedad);
 
                       return (
                         <Draggable
@@ -781,7 +783,7 @@ export default function PropiedadesClient({
                               {...dragProvided.draggableProps}
                               className={`transition-colors hover:bg-background ${
                                 isEncargo ? "bg-green-50/40 dark:bg-green-950/10" : ""
-                              } ${pendiente && !filtroPendientes ? "bg-amber-50/30 dark:bg-amber-950/10" : ""} ${
+                              } ${filtroPendientes && contactada ? "bg-primary/5 dark:bg-primary/10" : ""} ${
                                 dragSnapshot.isDragging ? "opacity-90 shadow-lg" : ""
                               }`}
                             >
@@ -816,9 +818,6 @@ export default function PropiedadesClient({
                               </td>
                               <td className="px-4 py-3 font-medium text-text-primary">
                                 {propiedad.propietario ?? "-"}
-                              </td>
-                              <td className="px-4 py-3 text-text-secondary">
-                                {propiedad.telefono ?? "-"}
                               </td>
                               <td className="px-4 py-3">
                                 {propiedad.estado ? (
@@ -860,17 +859,25 @@ export default function PropiedadesClient({
                                     }
                                   >
                                     {propiedad.fecha_visita
-                                      ? new Date(propiedad.fecha_visita).toLocaleDateString(
-                                          "es-ES"
-                                        )
+                                      ? new Date(propiedad.fecha_visita).toLocaleString("es-ES", {
+                                          day: "2-digit",
+                                          month: "2-digit",
+                                          year: "numeric",
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })
                                       : "-"}
                                   </span>
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-text-secondary">
-                                {propiedad.usuarios
-                                  ? `${propiedad.usuarios.nombre} ${propiedad.usuarios.apellidos}`
-                                  : "-"}
+                              <td className="max-w-[200px] px-4 py-3">
+                                {propiedad.notas ? (
+                                  <p className="truncate text-xs text-text-secondary" title={propiedad.notas}>
+                                    {propiedad.notas}
+                                  </p>
+                                ) : (
+                                  <span className="text-text-secondary">-</span>
+                                )}
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center justify-end gap-2">
@@ -1105,7 +1112,11 @@ export default function PropiedadesClient({
                     onChange={(e) => setField("estado", e.target.value)}
                     className="input"
                   >
-                    {ESTADOS.map((estado) => (
+                    {ESTADOS.filter((estado) => {
+                      if (estado.value !== "vendido") return true;
+                      const agenteId = form.agente_asignado ? parseInt(form.agente_asignado) : null;
+                      return canSetVendido(currentUserRole, agenteId, currentUserId, supervisedAgentIds);
+                    }).map((estado) => (
                       <option key={estado.value} value={estado.value}>
                         {estado.label}
                       </option>

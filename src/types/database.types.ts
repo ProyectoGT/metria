@@ -376,6 +376,7 @@ export interface Database {
           empresa_id?: number | null;
           equipo_id?: number | null;
           visibility?: string;
+          resultado?: string | null;
         };
         Update: {
           id?: number;
@@ -548,6 +549,7 @@ export interface Database {
           empresa_id: number | null;
           equipo_id: number | null;
           visibility: string;
+          resultado: string | null;
         };
         Insert: {
           id?: number;
@@ -572,6 +574,7 @@ export interface Database {
           empresa_id?: number | null;
           equipo_id?: number | null;
           visibility?: string;
+          resultado?: string | null;
         };
         Relationships: [
           {

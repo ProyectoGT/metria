@@ -1,35 +1,53 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase";
+import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 import { createAdminClient } from "@/lib/supabase-admin";
 
-function redirectToLogin(origin: string, error: string, request: Request) {
-  const url = new URL(`/login?error=${error}`, origin);
-  const response = NextResponse.redirect(url);
-  // Limpiar todas las cookies de sesión de Supabase
-  const cookies = request.headers.get("cookie") ?? "";
-  cookies.split(";").forEach((c) => {
-    const name = c.trim().split("=")[0];
-    if (name.startsWith("sb-")) {
-      response.cookies.delete(name);
-    }
-  });
-  return response;
-}
-
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/dashboard";
 
-  if (!code) {
-    return redirectToLogin(origin, "auth", request);
+  function redirectToLogin(error: string) {
+    const url = new URL(`/login?error=${error}`, origin);
+    const resp = NextResponse.redirect(url);
+    // Limpiar cookies de sesión para evitar estado inconsistente
+    request.cookies.getAll().forEach(({ name }) => {
+      if (name.startsWith("sb-")) resp.cookies.delete(name);
+    });
+    return resp;
   }
 
-  const supabase = await createClient();
+  if (!code) {
+    return redirectToLogin("auth");
+  }
+
+  // Crear la respuesta de redirección ANTES de crear el cliente,
+  // para que las cookies de sesión se escriban directamente sobre ella.
+  const successResponse = NextResponse.redirect(new URL(next, origin));
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          // Las cookies se escriben sobre la respuesta que el navegador recibe
+          cookiesToSet.forEach(({ name, value, options }) => {
+            successResponse.cookies.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
+
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error || !data.user) {
-    return redirectToLogin(origin, "auth", request);
+    console.error("[auth/callback] exchangeCodeForSession error:", error?.message);
+    return redirectToLogin("auth");
   }
 
   const adminClient = createAdminClient();
@@ -37,43 +55,56 @@ export async function GET(request: Request) {
   // Buscar perfil por auth_id
   const { data: byAuthId } = await adminClient
     .from("usuarios")
-    .select("id, auth_id, estado")
+    .select("id, auth_id, estado, correo")
     .eq("auth_id", data.user.id)
     .maybeSingle();
 
   let profile = byAuthId;
 
-  // Si no hay perfil por auth_id, buscar por correo
+  // Si no hay perfil por auth_id, buscar por correo (insensible a mayúsculas)
   if (!profile && data.user.email) {
-    const { data: byEmail } = await adminClient
+    const { data: byEmail, error: emailErr } = await adminClient
       .from("usuarios")
-      .select("id, auth_id, estado")
-      .eq("correo", data.user.email)
+      .select("id, auth_id, estado, correo")
+      .ilike("correo", data.user.email)
       .maybeSingle();
 
+    if (emailErr) {
+      console.error("[auth/callback] Error buscando por email:", emailErr.message, "email:", data.user.email);
+    }
+
     if (byEmail) {
-      // Vincular auth_id si el perfil existe sin él (modo "Solo Google")
+      // Vincular auth_id (modo "Solo Google" — primer acceso)
       if (!byEmail.auth_id) {
-        await adminClient
+        const { error: updateErr } = await adminClient
           .from("usuarios")
           .update({ auth_id: data.user.id })
           .eq("id", byEmail.id);
+
+        if (updateErr) {
+          console.error("[auth/callback] Error vinculando auth_id:", updateErr.message);
+        }
       }
       profile = byEmail;
+    } else {
+      console.error("[auth/callback] No se encontró perfil para email:", data.user.email);
     }
   }
 
   // Sin perfil en el CRM → bloquear
   if (!profile) {
-    await supabase.auth.signOut();
-    return redirectToLogin(origin, "no_profile", request);
+    await supabase.auth.signOut().catch(() => {});
+    return redirectToLogin("no_profile");
   }
 
-  // Cuenta desactivada → bloquear
+  // Cuenta desactivada → distinguir entre "sin verificar" y "desactivada por admin"
   if (profile.estado === "disabled") {
-    await supabase.auth.signOut();
-    return redirectToLogin(origin, "disabled", request);
+    await supabase.auth.signOut().catch(() => {});
+    // disabled + sin auth_id = pendiente de verificación de email
+    // disabled + con auth_id = desactivada explícitamente por el administrador
+    const esPendienteVerificacion = !profile.auth_id;
+    return redirectToLogin(esPendienteVerificacion ? "pending" : "disabled");
   }
 
-  return NextResponse.redirect(new URL(next, origin));
+  return successResponse;
 }

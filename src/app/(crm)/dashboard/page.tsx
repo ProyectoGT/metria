@@ -205,14 +205,14 @@ export default async function DashboardPage() {
 
     applyPropFilters(
       supabase.from("propiedades")
-        .select("id, propietario, planta, puerta, latitud, longitud, fincas(numero, sectores(numero))")
+        .select("id, propietario, planta, puerta, latitud, longitud, finca_id, fincas(id, numero, sector_id, sectores(id, numero, zona_id))")
         .ilike("estado", "noticia")
         .not("latitud", "is", null)
         .not("longitud", "is", null)
     ),
     applyPropFilters(
       supabase.from("propiedades")
-        .select("id, propietario, planta, puerta, latitud, longitud, fincas(numero, sectores(numero))")
+        .select("id, propietario, planta, puerta, latitud, longitud, finca_id, fincas(id, numero, sector_id, sectores(id, numero, zona_id))")
         .ilike("estado", "encargo")
         .not("latitud", "is", null)
         .not("longitud", "is", null)
@@ -342,6 +342,7 @@ export default async function DashboardPage() {
       priority: normalizePriority(t.prioridad),
       dueDate: t.fecha ?? undefined,
       assignedBy: null,
+      resultado: (t as unknown as { resultado?: string | null }).resultado ?? null,
     };
   }
 
@@ -400,7 +401,8 @@ export default async function DashboardPage() {
     puerta: string | null;
     latitud: number;
     longitud: number;
-    fincas: { numero: string; sectores: { numero: number } | null } | null;
+    finca_id: number | null;
+    fincas: { id: number; numero: string; sector_id: number | null; sectores: { id: number; numero: number; zona_id: number | null } | null } | null;
   };
   const mapRowToPoint = (n: NoticiasMapRow): NoticiaMapPoint => ({
     id: n.id,
@@ -411,6 +413,9 @@ export default async function DashboardPage() {
     longitud: n.longitud,
     finca: n.fincas?.numero ?? "—",
     sector: n.fincas?.sectores ? `Sector ${n.fincas.sectores.numero}` : "—",
+    fincaId: n.fincas?.id ?? null,
+    sectorId: n.fincas?.sectores?.id ?? null,
+    zonaId: n.fincas?.sectores?.zona_id ?? null,
   });
 
   const noticiasMap: NoticiaMapPoint[] = ((noticiasMapData ?? []) as unknown as NoticiasMapRow[]).map(mapRowToPoint);
@@ -428,9 +433,6 @@ export default async function DashboardPage() {
 
       {/* 2 — Summary panel */}
       <SummaryPanel summary={summary} listings={listings} />
-
-      {/* 3 — Mapa de noticias */}
-      <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
 
       {/* 4 — Mis tareas (Kanban) */}
       <section className="min-w-0">
@@ -452,7 +454,10 @@ export default async function DashboardPage() {
       {/* 5 — Orden del día */}
       {showOrdenDia && <OrdenDiaPanel agentes={ordenDiaAgentes} />}
 
-      {/* 6 — Agente del mes */}
+      {/* 6 — Mapa de noticias */}
+      <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
+
+      {/* 7 — Agente del mes */}
       <AgentOfMonth
         initialData={
           agenteMesData
@@ -472,7 +477,7 @@ export default async function DashboardPage() {
         agents={agentMetrics.map((a) => ({ id: a.id, nombre: a.nombre }))}
       />
 
-      {/* 7 — Rendimiento / Mi actividad */}
+      {/* 8 — Rendimiento / Mi actividad */}
       {showAgentPerformance && <AgentPerformanceTable agents={agentMetrics} />}
       {showMyActivity && <MyActivity rendimiento={ownMetrics} />}
     </div>

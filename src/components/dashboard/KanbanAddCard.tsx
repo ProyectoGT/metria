@@ -119,13 +119,13 @@ export default function KanbanAddCard({ onAdd, onClose, role, agents = [] }: Kan
             </div>
           </div>
 
-          {/* Due date */}
+          {/* Due date + time */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-text-primary">
-              Fecha límite
+              Fecha y hora límite
             </label>
             <input
-              type="date"
+              type="datetime-local"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               className="input"

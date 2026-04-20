@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, User, Trash2, CheckCircle2, Circle, ExternalLink } from "lucide-react";
+import { Calendar, User, Trash2, CheckCircle2, Circle, ExternalLink, AlertCircle } from "lucide-react";
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 
 // ─── Priority styles ──────────────────────────────────────────────────────────
@@ -13,9 +13,32 @@ const priorityBadge: Record<KanbanPriority, { cls: string; label: string }> = {
 };
 
 function formatDate(iso: string) {
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
+  const datePart = iso.split("T")[0];
+  const [y, m, d] = datePart.split("-");
+  const timePart = iso.includes("T") ? iso.split("T")[1]?.slice(0, 5) : null;
+  return timePart ? `${d}/${m}/${y} ${timePart}` : `${d}/${m}/${y}`;
 }
+
+type DateStatus = "overdue" | "today" | "soon" | "normal";
+
+function getDateStatus(iso: string): DateStatus {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const date = new Date(iso.split("T")[0]);
+  date.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((date.getTime() - today.getTime()) / 86400000);
+  if (diffDays < 0) return "overdue";
+  if (diffDays === 0) return "today";
+  if (diffDays <= 2) return "soon";
+  return "normal";
+}
+
+const DATE_STYLES: Record<DateStatus, { cls: string; label?: string }> = {
+  overdue: { cls: "text-danger font-semibold", label: "Vencida" },
+  today:   { cls: "text-amber-600 dark:text-amber-400 font-semibold", label: "Hoy" },
+  soon:    { cls: "text-amber-500 dark:text-amber-400" },
+  normal:  { cls: "text-text-secondary" },
+};
 
 // Genera un link de Google Calendar para añadir el evento
 function googleCalendarUrl(title: string, dateIso: string) {
@@ -154,25 +177,42 @@ export default function KanbanCard({
         <p className="mt-1 line-clamp-2 text-xs text-text-secondary">{card.description}</p>
       )}
 
+      {/* Resultado — solo en tarjetas completadas */}
+      {isCompleted && card.resultado && (
+        <p className="mt-2 rounded-md bg-success/10 px-2 py-1.5 text-xs text-success dark:bg-success/15 leading-relaxed">
+          {card.resultado}
+        </p>
+      )}
+
       {/* Footer: date + assigned badge */}
       {!done && (card.dueDate || card.assignedBy) && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {card.dueDate && (
-            <span className="flex items-center gap-1 text-xs text-text-secondary">
-              <Calendar className="h-3 w-3" />
-              {formatDate(card.dueDate.split("T")[0])}
-              <a
-                href={googleCalendarUrl(card.title, card.dueDate)}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                title="Añadir al calendario"
-                className="ml-0.5 text-text-secondary transition-colors hover:text-primary"
-              >
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </span>
-          )}
+          {card.dueDate && (() => {
+            const status = getDateStatus(card.dueDate);
+            const style = DATE_STYLES[status];
+            return (
+              <span className={`flex items-center gap-1 text-xs ${style.cls}`}>
+                {status === "overdue"
+                  ? <AlertCircle className="h-3 w-3" />
+                  : <Calendar className="h-3 w-3" />
+                }
+                {style.label
+                  ? <>{style.label} · {formatDate(card.dueDate)}</>
+                  : formatDate(card.dueDate)
+                }
+                <a
+                  href={googleCalendarUrl(card.title, card.dueDate)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  title="Añadir al calendario"
+                  className="ml-0.5 text-text-secondary transition-colors hover:text-primary"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </span>
+            );
+          })()}
           {card.assignedBy && (
             <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary dark:bg-primary/20">
               <User className="h-3 w-3" />

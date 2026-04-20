@@ -66,13 +66,12 @@ export async function login(formData: FormData) {
 
 export async function loginWithGoogle() {
   const supabase = await createClient();
-  const headersList = await headers();
-  const origin = headersList.get("origin") ?? headersList.get("x-forwarded-host") ?? "http://localhost:3000";
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${origin}/auth/callback`,
+      redirectTo: `${baseUrl}/auth/callback`,
       queryParams: {
         prompt: "select_account",
       },
