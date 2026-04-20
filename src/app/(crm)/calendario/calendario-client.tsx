@@ -781,7 +781,8 @@ export default function CalendarioClient({
           </div>
 
           {/* Week columns header */}
-          <div className="grid grid-cols-7 divide-x divide-border border-b border-border">
+          <div className="overflow-x-auto">
+          <div className="grid grid-cols-7 divide-x divide-border border-b border-border min-w-[560px]">
             {weekDays.map((date, i) => {
               const dateStr    = toDateStr(date);
               const isToday    = dateStr === todayStr;
@@ -816,7 +817,7 @@ export default function CalendarioClient({
           </div>
 
           {/* Week event rows — show all days side by side */}
-          <div className="grid grid-cols-7 divide-x divide-border min-h-[400px]">
+          <div className="grid grid-cols-7 divide-x divide-border min-h-[400px] min-w-[560px]">
             {weekDays.map((date, i) => {
               const dateStr   = toDateStr(date);
               const localEvs  = [...(eventsByDate[dateStr] ?? [])].sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
@@ -909,6 +910,8 @@ export default function CalendarioClient({
               );
             })}
           </div>
+
+          </div>{/* end overflow-x-auto */}
 
           {/* Week day detail panel */}
           <div className="border-t border-border">
