@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
+import { getUserOrdenAction } from "@/app/(crm)/zona/actions";
 import ZonasClient from "./zonas-client";
 
 export default async function ZonaPage() {
@@ -9,7 +10,7 @@ export default async function ZonaPage() {
   const userId = user?.id ?? 0;
   const isManager = role === "Administrador" || role === "Director";
 
-  const [{ data: allZonas }, { data: usuariosData }, { data: accesosData }] = await Promise.all([
+  const [{ data: allZonas }, { data: usuariosData }, { data: accesosData }, ordenZonas, ordenSectores] = await Promise.all([
     supabase
       .from("zona")
       .select("id, nombre, sectores(id, numero, fincas(id, propiedades(id)))")
@@ -25,10 +26,31 @@ export default async function ZonaPage() {
       : Promise.resolve({ data: [] }),
     // Todos necesitan los accesos para filtrar (Responsable/Agente) o gestionar (Admin/Director)
     supabase.from("zona_acceso").select("zona_id, usuario_id"),
+    getUserOrdenAction("zona"),
+    getUserOrdenAction("sectores"),
   ]);
 
-  // Filtrar zonas según rol
-  let zonas = allZonas ?? [];
+  // Filtrar zonas según rol y aplicar orden personal
+  let zonas = (allZonas ?? []).map((z) => ({
+    ...z,
+    posicion: ordenZonas[z.id] ?? null,
+    sectores: (z.sectores ?? []).map((s) => ({ ...s, posicion: ordenSectores[s.id] ?? null })),
+  }));
+  zonas.sort((a, b) => {
+    if (a.posicion != null && b.posicion != null) return a.posicion - b.posicion;
+    if (a.posicion != null) return -1;
+    if (b.posicion != null) return 1;
+    return a.nombre.localeCompare(b.nombre);
+  });
+  zonas = zonas.map((z) => ({
+    ...z,
+    sectores: [...z.sectores].sort((a, b) => {
+      if (a.posicion != null && b.posicion != null) return a.posicion - b.posicion;
+      if (a.posicion != null) return -1;
+      if (b.posicion != null) return 1;
+      return a.numero - b.numero;
+    }),
+  }));
   if (!isManager) {
     const zonasPermitidas = new Set(
       (accesosData ?? [])

@@ -417,6 +417,9 @@ export default function PedidosClient({
                 <th className="px-5 py-3 text-left font-medium text-text-secondary">
                   Cliente
                 </th>
+                <th className="w-36 px-5 py-3 text-left font-medium text-text-secondary">
+                  Telefono
+                </th>
                 <th className="px-5 py-3 text-left font-medium text-text-secondary">
                   Tipo
                 </th>
@@ -452,11 +455,9 @@ export default function PedidosClient({
                     <p className="font-medium text-text-primary">
                       {pedido.nombre_cliente}
                     </p>
-                    {pedido.telefono && (
-                      <p className="text-xs text-text-secondary">
-                        {pedido.telefono}
-                      </p>
-                    )}
+                  </td>
+                  <td className="w-36 px-5 py-3.5 text-text-secondary">
+                    {pedido.telefono ?? "-"}
                   </td>
                   <td className="px-5 py-3.5 text-text-secondary">
                     {pedido.tipo_propiedad ?? "-"}

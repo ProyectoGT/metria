@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
+import { getUserOrdenAction } from "@/app/(crm)/zona/actions";
 import FincasClient from "./fincas-client";
 import { notFound } from "next/navigation";
 
@@ -11,7 +12,7 @@ export default async function SectorDetailPage({
   const { zonaId, sectorId } = await params;
   const supabase = await createClient();
 
-  const [user, { data: zona }, { data: sector }] = await Promise.all([
+  const [user, { data: zona }, { data: sector }, ordenFincas] = await Promise.all([
     getCurrentUserContext(),
     supabase.from("zona").select("id, nombre").eq("id", Number(zonaId)).single(),
     supabase
@@ -19,16 +20,22 @@ export default async function SectorDetailPage({
       .select("id, numero, fincas(id, numero, propiedades(id))")
       .eq("id", Number(sectorId))
       .single(),
+    getUserOrdenAction("fincas"),
   ]);
 
   if (!zona || !sector) notFound();
 
-  const fincas = (sector.fincas ?? []).sort((a, b) => {
-    const na = parseFloat(String(a.numero));
-    const nb = parseFloat(String(b.numero));
-    if (!isNaN(na) && !isNaN(nb)) return na - nb;
-    return String(a.numero).localeCompare(String(b.numero), "es", { numeric: true });
-  });
+  const fincas = (sector.fincas ?? [])
+    .map((f) => ({ ...f, posicion: ordenFincas[f.id] ?? null }))
+    .sort((a, b) => {
+      const ap = a.posicion, bp = b.posicion;
+      if (ap != null && bp != null) return ap - bp;
+      if (ap != null) return -1;
+      if (bp != null) return 1;
+      const na = parseFloat(String(a.numero)), nb = parseFloat(String(b.numero));
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return String(a.numero).localeCompare(String(b.numero), "es", { numeric: true });
+    });
 
   return (
     <FincasClient

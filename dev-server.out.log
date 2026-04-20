@@ -16,3 +16,7 @@ Creating turbopack project {
  GET /recuperar 200 in 73ms (next.js: 42ms, application-code: 31ms)
  GET /login 200 in 35ms (next.js: 4ms, application-code: 30ms)
  GET /login 200 in 43ms (next.js: 2ms, application-code: 41ms)
+ GET /login 200 in 47ms (next.js: 3ms, application-code: 44ms)
+ GET /dashboard 200 in 4.5s (next.js: 51ms, application-code: 4.4s)
+ POST /login 303 in 6.5s (next.js: 3ms, application-code: 6.5s)
+  └─ ƒ login({}) in 1920ms src/app/(auth)/login/actions.ts

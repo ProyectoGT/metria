@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deleteSectorAction } from "@/app/actions/security";
+import { updateSectoresPosicionesAction, resetSectoresPosicionesAction } from "@/app/(crm)/zona/actions";
 import Breadcrumb from "@/components/ui/breadcrumb";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
@@ -17,13 +19,13 @@ type PropiedadResumen = {
 type Sector = {
   id: number;
   numero: number;
+  posicion: number | null;
   fincas: Array<{
     id: number;
     propiedades: PropiedadResumen[];
   }>;
 };
 
-// Una propiedad se considera "contactada" si tiene estado distinto de neutral/null o tiene fecha de visita
 function estaContactada(p: PropiedadResumen): boolean {
   const tieneEstadoActivo =
     p.estado !== null && p.estado !== "neutral" && p.estado !== "investigacion";
@@ -43,7 +45,9 @@ export default function SectoresClient({
   initialSectores,
   canDeleteSectores,
 }: Props) {
-  const [sectores, setSectores] = useState<Sector[]>(initialSectores);
+  const [sectores, setSectores] = useState<Sector[]>(
+    initialSectores.map((s, i) => ({ ...s, posicion: s.posicion ?? i }))
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [numero, setNumero] = useState("");
   const [saving, setSaving] = useState(false);
@@ -65,15 +69,13 @@ export default function SectoresClient({
     const { data, error: err } = await supabase
       .from("sectores")
       .insert({ numero: num, zona_id: zonaId })
-      .select("id, numero, fincas(id, propiedades(id))")
+      .select("id, numero, posicion, fincas(id, propiedades(id))")
       .single();
 
     if (err) {
       toast(`Error al crear el sector: ${err.message}`, "error");
     } else if (data) {
-      setSectores((prev) =>
-        [...prev, data as Sector].sort((a, b) => a.numero - b.numero)
-      );
+      setSectores((prev) => [...prev, data as Sector]);
       toast("Sector creado correctamente");
     }
 
@@ -106,6 +108,42 @@ export default function SectoresClient({
     toast("Sector eliminado");
   }
 
+  const hayOrdenManual = sectores.some((s) => s.posicion != null);
+
+  async function handleAutoSort() {
+    const sorted = [...sectores].sort((a, b) => a.numero - b.numero)
+      .map((s) => ({ ...s, posicion: null as number | null }));
+    setSectores(sorted);
+    await resetSectoresPosicionesAction(sorted.map((s) => s.id));
+  }
+
+  function handleDragEnd(result: DropResult) {
+    const { source, destination } = result;
+    if (!destination || source.index === destination.index) return;
+
+    let nextState: Sector[] = [];
+    setSectores((prev) => {
+      const reordered = [...prev];
+      const [moved] = reordered.splice(source.index, 1);
+      reordered.splice(destination.index, 0, moved);
+      nextState = reordered.map((s, i) => ({ ...s, posicion: i }));
+      return nextState;
+    });
+
+    setTimeout(() => {
+      const positions = nextState.map((s) => ({ id: s.id, posicion: s.posicion ?? 0 }));
+      updateSectoresPosicionesAction(positions).then(({ error }) => {
+        if (error) console.warn("Error al guardar orden:", error);
+      });
+    }, 0);
+  }
+
+  const DragHandle = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+    </svg>
+  );
+
   return (
     <>
       <Breadcrumb
@@ -122,54 +160,42 @@ export default function SectoresClient({
             className="rounded-lg border border-border p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
             title="Volver a zonas"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <div>
-            <h1 className="break-words text-2xl font-bold text-text-primary">
-              {zonaNombre}
-            </h1>
+            <h1 className="break-words text-2xl font-bold text-text-primary">{zonaNombre}</h1>
             <p className="mt-1 text-sm text-text-secondary">
               {sectores.length} {sectores.length === 1 ? "sector" : "sectores"}
             </p>
           </div>
         </div>
-        <button
-          onClick={() => {
-            setModalOpen(true);
-            setNumero("");
-          }}
-          className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark sm:w-auto"
-        >
-          + Nuevo sector
-        </button>
+        <div className="flex w-full gap-2 sm:w-auto">
+          {hayOrdenManual && (
+            <button
+              onClick={handleAutoSort}
+              className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background hover:text-text-primary sm:flex-none"
+              title="Restablecer orden automatico por numero de sector"
+            >
+              Ordenar automaticamente
+            </button>
+          )}
+          <button
+            onClick={() => { setModalOpen(true); setNumero(""); }}
+            className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark sm:flex-none"
+          >
+            + Nuevo sector
+          </button>
+        </div>
       </div>
 
       {sectores.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-surface py-20 text-center">
-          <p className="text-base font-medium text-text-primary">
-            No hay sectores todavia
-          </p>
-          <p className="mt-1 text-sm text-text-secondary">
-            Anade el primer sector a esta zona
-          </p>
+          <p className="text-base font-medium text-text-primary">No hay sectores todavia</p>
+          <p className="mt-1 text-sm text-text-secondary">Anade el primer sector a esta zona</p>
           <button
-            onClick={() => {
-              setModalOpen(true);
-              setNumero("");
-            }}
+            onClick={() => { setModalOpen(true); setNumero(""); }}
             className="mt-5 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
           >
             + Nuevo sector
@@ -177,196 +203,178 @@ export default function SectoresClient({
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-          <div className="divide-y divide-border md:hidden">
-            {sectores.map((sector) => {
-              const fincaCount = sector.fincas?.length ?? 0;
-              const todasPropiedades: PropiedadResumen[] =
-                sector.fincas?.flatMap((f) => f.propiedades ?? []) ?? [];
-              const propiedadCount = todasPropiedades.length;
-              const contactadasCount = todasPropiedades.filter(estaContactada).length;
-              const pct =
-                propiedadCount > 0
-                  ? Math.round((contactadasCount / propiedadCount) * 100)
-                  : null;
-
-              return (
+          {/* Mobile */}
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="sectores-mobile" direction="vertical">
+              {(provided) => (
                 <div
-                  key={sector.id}
-                  onClick={() => router.push(`/zona/${zonaId}/sector/${sector.id}`)}
-                  className="cursor-pointer px-4 py-4 transition-colors hover:bg-background"
+                  className="divide-y divide-border md:hidden"
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-text-primary">Sector {sector.numero}</p>
-                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-text-secondary">
-                        <span className="rounded-full bg-background px-2 py-0.5">
-                          {fincaCount} fincas
-                        </span>
-                        <span className="rounded-full bg-background px-2 py-0.5">
-                          {propiedadCount} propiedades
-                        </span>
-                      </div>
-                      {pct !== null && (
-                        <div className="mt-3 flex max-w-56 items-center gap-2">
-                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
+                  {sectores.map((sector, index) => {
+                    const fincaCount = sector.fincas?.length ?? 0;
+                    const todasPropiedades: PropiedadResumen[] =
+                      sector.fincas?.flatMap((f) => f.propiedades ?? []) ?? [];
+                    const propiedadCount = todasPropiedades.length;
+                    const contactadasCount = todasPropiedades.filter(estaContactada).length;
+                    const pct = propiedadCount > 0
+                      ? Math.round((contactadasCount / propiedadCount) * 100)
+                      : null;
+
+                    return (
+                      <Draggable key={sector.id} draggableId={`m-${sector.id}`} index={index}>
+                        {(drag, snapshot) => (
+                          <div
+                            ref={drag.innerRef}
+                            {...drag.draggableProps}
+                            className={`flex items-center gap-2 px-4 py-4 transition-colors hover:bg-background ${snapshot.isDragging ? "opacity-90 shadow-lg" : ""}`}
+                          >
                             <div
-                              className={`h-full rounded-full ${
-                                pct >= 80
-                                  ? "bg-green-500"
-                                  : pct >= 50
-                                    ? "bg-amber-400"
-                                    : "bg-red-400"
-                              }`}
-                              style={{ width: `${pct}%` }}
-                            />
+                              {...drag.dragHandleProps}
+                              className="flex cursor-grab items-center justify-center text-text-secondary opacity-30 hover:opacity-70 active:cursor-grabbing"
+                            >
+                              <DragHandle />
+                            </div>
+                            <div
+                              className="min-w-0 flex-1 cursor-pointer"
+                              onClick={() => router.push(`/zona/${zonaId}/sector/${sector.id}`)}
+                            >
+                              <p className="font-medium text-text-primary">Sector {sector.numero}</p>
+                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-text-secondary">
+                                <span className="rounded-full bg-background px-2 py-0.5">{fincaCount} fincas</span>
+                                <span className="rounded-full bg-background px-2 py-0.5">{propiedadCount} propiedades</span>
+                              </div>
+                              {pct !== null && (
+                                <div className="mt-3 flex max-w-56 items-center gap-2">
+                                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
+                                    <div
+                                      className={`h-full rounded-full ${pct >= 80 ? "bg-green-500" : pct >= 50 ? "bg-amber-400" : "bg-red-400"}`}
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                  <span className="w-10 shrink-0 text-right text-xs font-medium text-text-secondary">{pct}%</span>
+                                </div>
+                              )}
+                            </div>
+                            {canDeleteSectores && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setError(null); setDeletePassword(""); setDeleteId(sector.id); }}
+                                className="rounded p-1 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
+                                title="Eliminar sector"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            )}
                           </div>
-                          <span className="w-10 shrink-0 text-right text-xs font-medium text-text-secondary">
-                            {pct}%
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    {canDeleteSectores && (
-                      <button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setError(null);
-                          setDeletePassword("");
-                          setDeleteId(sector.id);
-                        }}
-                        className="rounded p-1 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
-                        title="Eliminar sector"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
+                        )}
+                      </Draggable>
+                    );
+                  })}
+                  {provided.placeholder}
                 </div>
-              );
-            })}
-          </div>
+              )}
+            </Droppable>
+          </DragDropContext>
+
+          {/* Desktop */}
           <table className="hidden w-full min-w-[720px] text-sm md:table">
             <thead>
               <tr className="border-b border-border bg-background">
-                <th className="px-5 py-3 text-left font-medium text-text-secondary">
-                  Sector
-                </th>
-                <th className="w-32 px-5 py-3 text-center font-medium text-text-secondary">
-                  Fincas
-                </th>
-                <th className="w-32 px-5 py-3 text-center font-medium text-text-secondary">
-                  Propiedades
-                </th>
-                <th className="w-44 px-5 py-3 text-center font-medium text-text-secondary">
-                  Contactados
-                </th>
+                <th className="w-8 px-2 py-3" />
+                <th className="px-5 py-3 text-left font-medium text-text-secondary">Sector</th>
+                <th className="w-32 px-5 py-3 text-center font-medium text-text-secondary">Fincas</th>
+                <th className="w-32 px-5 py-3 text-center font-medium text-text-secondary">Propiedades</th>
+                <th className="w-44 px-5 py-3 text-center font-medium text-text-secondary">Contactados</th>
                 <th className="w-12 px-5 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {sectores.map((sector) => {
-                const fincaCount = sector.fincas?.length ?? 0;
-                const todasPropiedades: PropiedadResumen[] =
-                  sector.fincas?.flatMap((f) => f.propiedades ?? []) ?? [];
-                const propiedadCount = todasPropiedades.length;
-                const contactadasCount = todasPropiedades.filter(estaContactada).length;
-                const pct =
-                  propiedadCount > 0
-                    ? Math.round((contactadasCount / propiedadCount) * 100)
-                    : null;
-
-                return (
-                  <tr
-                    key={sector.id}
-                    onClick={() => router.push(`/zona/${zonaId}/sector/${sector.id}`)}
-                    className="group cursor-pointer transition-colors hover:bg-background"
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Droppable droppableId="sectores-table" direction="vertical">
+                {(provided) => (
+                  <tbody
+                    className="divide-y divide-border"
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
                   >
-                    <td className="px-5 py-3.5 font-medium text-text-primary">
-                      Sector {sector.numero}
-                    </td>
-                    <td className="w-32 px-5 py-3.5 text-center text-text-secondary">
-                      {fincaCount}
-                    </td>
-                    <td className="w-32 px-5 py-3.5 text-center text-text-secondary">
-                      {propiedadCount}
-                    </td>
-                    <td className="w-44 px-5 py-3.5">
-                      {pct === null ? (
-                        <span className="block text-center text-text-secondary">-</span>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 overflow-hidden rounded-full bg-gray-100">
-                            <div
-                              className={`h-1.5 rounded-full transition-all ${
-                                pct >= 80
-                                  ? "bg-green-500"
-                                  : pct >= 50
-                                    ? "bg-amber-400"
-                                    : "bg-red-400"
-                              }`}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <span
-                            className={`w-10 shrink-0 text-right text-xs font-medium ${
-                              pct >= 80
-                                ? "text-green-600"
-                                : pct >= 50
-                                  ? "text-amber-600"
-                                  : "text-red-500"
-                            }`}
-                          >
-                            {pct}%
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="w-12 px-5 py-3.5 text-right">
-                      {canDeleteSectores && (
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setError(null);
-                            setDeletePassword("");
-                            setDeleteId(sector.id);
-                          }}
-                          className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
-                          title="Eliminar sector"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
+                    {sectores.map((sector, index) => {
+                      const fincaCount = sector.fincas?.length ?? 0;
+                      const todasPropiedades: PropiedadResumen[] =
+                        sector.fincas?.flatMap((f) => f.propiedades ?? []) ?? [];
+                      const propiedadCount = todasPropiedades.length;
+                      const contactadasCount = todasPropiedades.filter(estaContactada).length;
+                      const pct = propiedadCount > 0
+                        ? Math.round((contactadasCount / propiedadCount) * 100)
+                        : null;
+
+                      return (
+                        <Draggable key={sector.id} draggableId={String(sector.id)} index={index}>
+                          {(drag, snapshot) => (
+                            <tr
+                              ref={drag.innerRef}
+                              {...drag.draggableProps}
+                              className={`group cursor-pointer transition-colors hover:bg-background ${snapshot.isDragging ? "opacity-90 shadow-lg" : ""}`}
+                            >
+                              <td className="w-8 px-2 py-3">
+                                <div
+                                  {...drag.dragHandleProps}
+                                  className="flex cursor-grab items-center justify-center text-text-secondary opacity-30 hover:opacity-70 active:cursor-grabbing"
+                                  title="Arrastrar para reordenar"
+                                >
+                                  <DragHandle />
+                                </div>
+                              </td>
+                              <td className="px-5 py-3.5 font-medium text-text-primary" onClick={() => router.push(`/zona/${zonaId}/sector/${sector.id}`)}>
+                                Sector {sector.numero}
+                              </td>
+                              <td className="w-32 px-5 py-3.5 text-center text-text-secondary" onClick={() => router.push(`/zona/${zonaId}/sector/${sector.id}`)}>
+                                {fincaCount}
+                              </td>
+                              <td className="w-32 px-5 py-3.5 text-center text-text-secondary" onClick={() => router.push(`/zona/${zonaId}/sector/${sector.id}`)}>
+                                {propiedadCount}
+                              </td>
+                              <td className="w-44 px-5 py-3.5" onClick={() => router.push(`/zona/${zonaId}/sector/${sector.id}`)}>
+                                {pct === null ? (
+                                  <span className="block text-center text-text-secondary">-</span>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 overflow-hidden rounded-full bg-gray-100">
+                                      <div
+                                        className={`h-1.5 rounded-full transition-all ${pct >= 80 ? "bg-green-500" : pct >= 50 ? "bg-amber-400" : "bg-red-400"}`}
+                                        style={{ width: `${pct}%` }}
+                                      />
+                                    </div>
+                                    <span className={`w-10 shrink-0 text-right text-xs font-medium ${pct >= 80 ? "text-green-600" : pct >= 50 ? "text-amber-600" : "text-red-500"}`}>
+                                      {pct}%
+                                    </span>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="w-12 px-5 py-3.5 text-right">
+                                {canDeleteSectores && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setError(null); setDeletePassword(""); setDeleteId(sector.id); }}
+                                    className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
+                                    title="Eliminar sector"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </Draggable>
+                      );
+                    })}
+                    {provided.placeholder}
+                  </tbody>
+                )}
+              </Droppable>
+            </DragDropContext>
           </table>
         </div>
       )}
@@ -375,20 +383,11 @@ export default function SectoresClient({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-surface shadow-xl">
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">
-                Nuevo sector
-              </h2>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="text-text-secondary transition-colors hover:text-text-primary"
-              >
-                ×
-              </button>
+              <h2 className="text-base font-semibold text-text-primary">Nuevo sector</h2>
+              <button onClick={() => setModalOpen(false)} className="text-text-secondary transition-colors hover:text-text-primary">×</button>
             </div>
             <div className="px-6 py-5">
-              <label className="text-xs font-medium text-text-secondary">
-                Numero de sector
-              </label>
+              <label className="text-xs font-medium text-text-secondary">Numero de sector</label>
               <input
                 type="number"
                 value={numero}
@@ -401,17 +400,8 @@ export default function SectoresClient({
               />
             </div>
             <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
-              <button
-                onClick={() => setModalOpen(false)}
-                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={saving || !numero.trim()}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
-              >
+              <button onClick={() => setModalOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">Cancelar</button>
+              <button onClick={handleCreate} disabled={saving || !numero.trim()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60">
                 {saving ? "Creando..." : "Crear sector"}
               </button>
             </div>
@@ -427,11 +417,7 @@ export default function SectoresClient({
           error={error}
           pending={deleting}
           onPasswordChange={setDeletePassword}
-          onCancel={() => {
-            setDeleteId(null);
-            setDeletePassword("");
-            setError(null);
-          }}
+          onCancel={() => { setDeleteId(null); setDeletePassword(""); setError(null); }}
           onConfirm={handleDelete}
         />
       )}

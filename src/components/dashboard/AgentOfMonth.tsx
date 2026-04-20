@@ -37,7 +37,7 @@ export default function AgentOfMonth({
         await clearAgentOfMonthAction();
         setData(null);
       } catch (err) {
-        console.warn("Error al quitar agente del mes:", err);
+        void err;
       }
     });
   }

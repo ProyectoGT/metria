@@ -62,22 +62,107 @@ export async function upsertPropiedadAction(
   }
 }
 
-export async function updatePropiedadesPosicionesAction(
+export async function toggleContactadoAction(
+  propiedadId: number,
+  contactado: boolean
+): Promise<{ error?: string }> {
+  const yo = await getCurrentUserContext();
+  if (!yo) return { error: "No autenticado" };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("propiedades")
+    .update({ contactado } as never)
+    .eq("id", propiedadId);
+  if (error) return { error: error.message };
+  return {};
+}
+
+// ── Orden personalizado por usuario ─────────────────────────────────────────
+// Todas las posiciones se guardan en usuario_orden, no en las tablas originales.
+// Así cada usuario tiene su propio orden sin afectar al resto.
+
+type Tabla = "zona" | "sectores" | "fincas" | "propiedades";
+
+async function upsertUserOrden(
+  tabla: Tabla,
   positions: Array<{ id: number; posicion: number }>
 ): Promise<{ error?: string }> {
   const yo = await getCurrentUserContext();
   if (!yo) return { error: "No autenticado" };
-
   const supabase = await createClient();
-
-  const updates = await Promise.all(
-    positions.map(({ id, posicion }) =>
-      supabase.from("propiedades").update({ posicion }).eq("id", id)
-    )
-  );
-
-  const failed = updates.find((r) => r.error);
-  if (failed?.error) return { error: failed.error.message };
-
+  const rows = positions.map(({ id, posicion }) => ({
+    usuario_id: yo.id,
+    tabla,
+    item_id: id,
+    posicion,
+  }));
+  const { error } = await supabase
+    .from("usuario_orden")
+    .upsert(rows, { onConflict: "usuario_id,tabla,item_id" }) as { error: { message: string } | null };
+  if (error) return { error: error.message };
   return {};
+}
+
+async function deleteUserOrden(tabla: Tabla, ids: number[]): Promise<{ error?: string }> {
+  const yo = await getCurrentUserContext();
+  if (!yo) return { error: "No autenticado" };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("usuario_orden")
+    .delete()
+    .eq("usuario_id", yo.id)
+    .eq("tabla", tabla)
+    .in("item_id", ids) as { error: { message: string } | null };
+  if (error) return { error: error.message };
+  return {};
+}
+
+export async function getUserOrdenAction(tabla: Tabla): Promise<Record<number, number>> {
+  const yo = await getCurrentUserContext();
+  if (!yo) return {};
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("usuario_orden")
+    .select("item_id, posicion")
+    .eq("usuario_id", yo.id)
+    .eq("tabla", tabla) as { data: { item_id: number; posicion: number }[] | null };
+  const map: Record<number, number> = {};
+  for (const row of data ?? []) map[row.item_id] = row.posicion;
+  return map;
+}
+
+export async function updateZonasPosicionesAction(
+  positions: Array<{ id: number; posicion: number }>
+): Promise<{ error?: string }> {
+  return upsertUserOrden("zona", positions);
+}
+
+export async function updateSectoresPosicionesAction(
+  positions: Array<{ id: number; posicion: number }>
+): Promise<{ error?: string }> {
+  return upsertUserOrden("sectores", positions);
+}
+
+export async function updateFincasPosicionesAction(
+  positions: Array<{ id: number; posicion: number }>
+): Promise<{ error?: string }> {
+  return upsertUserOrden("fincas", positions);
+}
+
+export async function updatePropiedadesPosicionesAction(
+  positions: Array<{ id: number; posicion: number }>
+): Promise<{ error?: string }> {
+  return upsertUserOrden("propiedades", positions);
+}
+
+export async function resetZonasPosicionesAction(ids: number[]): Promise<{ error?: string }> {
+  return deleteUserOrden("zona", ids);
+}
+
+export async function resetSectoresPosicionesAction(ids: number[]): Promise<{ error?: string }> {
+  return deleteUserOrden("sectores", ids);
+}
+
+export async function resetFincasPosicionesAction(ids: number[]): Promise<{ error?: string }> {
+  return deleteUserOrden("fincas", ids);
 }

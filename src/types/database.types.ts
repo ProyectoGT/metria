@@ -215,6 +215,32 @@ export interface Database {
           },
         ];
       };
+      usuario_orden: {
+        Row: {
+          id: number;
+          usuario_id: number;
+          tabla: string;
+          item_id: number;
+          posicion: number;
+        };
+        Insert: {
+          id?: number;
+          usuario_id: number;
+          tabla: string;
+          item_id: number;
+          posicion: number;
+        };
+        Update: {
+          id?: number;
+          usuario_id?: number;
+          tabla?: string;
+          item_id?: number;
+          posicion?: number;
+        };
+        Relationships: [
+          { foreignKeyName: "usuario_orden_usuario_id_fkey"; columns: ["usuario_id"]; referencedRelation: "usuarios"; referencedColumns: ["id"] },
+        ];
+      };
       zona_acceso: {
         Row: {
           id: number;
@@ -318,16 +344,19 @@ export interface Database {
           id: number;
           numero: string;
           sector_id: number | null;
+          posicion: number | null;
         };
         Insert: {
           id?: number;
           numero: string;
           sector_id?: number | null;
+          posicion?: number | null;
         };
         Update: {
           id?: number;
           numero?: string;
           sector_id?: number | null;
+          posicion?: number | null;
         };
         Relationships: [
           {
@@ -442,6 +471,8 @@ export interface Database {
           empresa_id: number | null;
           equipo_id: number | null;
           visibility: string;
+          created_at: string;
+          contactado: boolean;
         };
         Insert: {
           id?: number;
@@ -460,6 +491,8 @@ export interface Database {
           empresa_id?: number | null;
           equipo_id?: number | null;
           visibility?: string;
+          created_at?: string;
+          contactado?: boolean;
         };
         Update: {
           id?: number;
@@ -478,6 +511,8 @@ export interface Database {
           empresa_id?: number | null;
           equipo_id?: number | null;
           visibility?: string;
+          created_at?: string;
+          contactado?: boolean;
         };
         Relationships: [
           {
@@ -517,16 +552,19 @@ export interface Database {
           id: number;
           numero: number;
           zona_id: number | null;
+          posicion: number | null;
         };
         Insert: {
           id?: number;
           numero: number;
           zona_id?: number | null;
+          posicion?: number | null;
         };
         Update: {
           id?: number;
           numero?: number;
           zona_id?: number | null;
+          posicion?: number | null;
         };
         Relationships: [
           {
@@ -723,14 +761,17 @@ export interface Database {
         Row: {
           id: number;
           nombre: string;
+          posicion: number | null;
         };
         Insert: {
           id?: number;
           nombre: string;
+          posicion?: number | null;
         };
         Update: {
           id?: number;
           nombre?: string;
+          posicion?: number | null;
         };
         Relationships: [];
       };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import KanbanColumn from "./KanbanColumn";
 import KanbanAddColumn from "./KanbanAddColumn";
@@ -82,44 +82,34 @@ export default function KanbanBoard({
       const nuevoEstado = COL_TO_ESTADO[destination.droppableId];
       const numId = parseInt(draggableId, 10);
       if (nuevoEstado && !isNaN(numId)) {
-        updateTareaEstadoAction(numId, nuevoEstado).catch((err) =>
-          console.warn("Error al mover tarea:", err),
-        );
+        updateTareaEstadoAction(numId, nuevoEstado).catch(() => {});
       }
     }
   }
 
   // ─── Column ops ─────────────────────────────────────────────────────────────
-  async function handleAddColumn(title: string) {
+  const handleAddColumn = useCallback(async (title: string) => {
     const id = `col-${Date.now()}`;
-    setColumns((prev) => [...prev, { id, title, fixed: false, cards: [] }]);
-    try {
-      const orden = columns.filter((c) => !c.fixed).length;
-      await addKanbanColumnAction({ col_id: id, titulo: title, orden });
-    } catch (err) {
-      console.warn("Error al guardar columna:", err);
-    }
-  }
+    setColumns((prev) => {
+      const orden = prev.filter((c) => !c.fixed).length;
+      addKanbanColumnAction({ col_id: id, titulo: title, orden }).catch(() => {});
+      return [...prev, { id, title, fixed: false, cards: [] }];
+    });
+  }, []);
 
-  async function handleDeleteColumn(columnId: string) {
+  const handleDeleteColumn = useCallback(async (columnId: string) => {
     setColumns((prev) => prev.filter((c) => c.id !== columnId || c.fixed));
-    try {
-      await deleteKanbanColumnAction(columnId);
-    } catch (err) {
-      console.warn("Error al eliminar columna:", err);
-    }
-  }
+    deleteKanbanColumnAction(columnId).catch(() => {});
+  }, []);
 
   // ─── Card ops ───────────────────────────────────────────────────────────────
-  async function handleAddCard(columnId: string, newCard: Omit<KanbanCardData, "id">) {
+  const handleAddCard = useCallback(async (columnId: string, newCard: Omit<KanbanCardData, "id">) => {
     try {
-      // Guardar en BD y obtener el ID real
       const { id: dbId } = await createTareaAction({
         titulo: newCard.title,
         prioridad: newCard.priority,
         fecha: newCard.dueDate,
       });
-
       setColumns((prev) =>
         prev.map((col) =>
           col.id === columnId
@@ -127,13 +117,12 @@ export default function KanbanBoard({
             : col,
         ),
       );
-    } catch (err) {
-      console.warn("Error al crear tarea:", err);
+    } catch {
+      // fallo silencioso — la UI ya está actualizada optimistamente
     }
-  }
+  }, []);
 
-  async function handleDeleteCard(columnId: string, cardId: string) {
-    // Quitar de UI inmediatamente (optimista)
+  const handleDeleteCard = useCallback(async (columnId: string, cardId: string) => {
     setColumns((prev) =>
       prev.map((col) =>
         col.id === columnId
@@ -141,32 +130,28 @@ export default function KanbanBoard({
           : col,
       ),
     );
-    // Persistir si es un ID numérico (viene de la BD)
     const numId = parseInt(cardId, 10);
     if (!isNaN(numId)) {
-      try {
-        await deleteTareaAction(numId);
-      } catch (err) {
-        console.warn("Error al eliminar tarea:", err);
-      }
+      deleteTareaAction(numId).catch(() => {});
     }
-  }
+  }, []);
 
-  function handleCompleteCard(columnId: string, cardId: string) {
-    // Buscar el título para mostrarlo en el modal
-    const col = columns.find((c) => c.id === columnId);
-    const card = col?.cards.find((c) => c.id === cardId);
-    setResultadoText("");
-    setResultadoModal({ columnId, cardId, titulo: card?.title ?? "Tarea" });
-  }
+  const handleCompleteCard = useCallback((columnId: string, cardId: string) => {
+    setColumns((prev) => {
+      const col = prev.find((c) => c.id === columnId);
+      const card = col?.cards.find((c) => c.id === cardId);
+      setResultadoText("");
+      setResultadoModal({ columnId, cardId, titulo: card?.title ?? "Tarea" });
+      return prev;
+    });
+  }, []);
 
-  async function handleConfirmResultado() {
+  const handleConfirmResultado = useCallback(async () => {
     if (!resultadoModal) return;
     const { columnId, cardId } = resultadoModal;
     const resultado = resultadoText.trim();
     setResultadoModal(null);
 
-    // Mover la tarjeta a "completado" en la UI con el resultado
     setColumns((prev) => {
       const next = prev.map((col) => ({ ...col, cards: [...col.cards] }));
       const srcCol = next.find((c) => c.id === columnId);
@@ -179,16 +164,11 @@ export default function KanbanBoard({
       return next;
     });
 
-    // Persistir en BD
     const numId = parseInt(cardId, 10);
     if (!isNaN(numId)) {
-      try {
-        await completeTareaAction(numId, resultado || undefined);
-      } catch (err) {
-        console.warn("Error al completar tarea:", err);
-      }
+      completeTareaAction(numId, resultado || undefined).catch(() => {});
     }
-  }
+  }, [resultadoModal, resultadoText]);
 
   return (
     <>
