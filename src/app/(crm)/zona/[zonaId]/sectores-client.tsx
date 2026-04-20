@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deleteSectorAction } from "@/app/actions/security";
-import { updateSectoresPosicionesAction } from "@/app/(crm)/zona/actions";
+import { updateSectoresPosicionesAction, resetSectoresPosicionesAction } from "@/app/(crm)/zona/actions";
 import Breadcrumb from "@/components/ui/breadcrumb";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
@@ -108,6 +108,15 @@ export default function SectoresClient({
     toast("Sector eliminado");
   }
 
+  const hayOrdenManual = sectores.some((s) => s.posicion != null);
+
+  async function handleAutoSort() {
+    const sorted = [...sectores].sort((a, b) => a.numero - b.numero)
+      .map((s) => ({ ...s, posicion: null as number | null }));
+    setSectores(sorted);
+    await resetSectoresPosicionesAction(sorted.map((s) => s.id));
+  }
+
   function handleDragEnd(result: DropResult) {
     const { source, destination } = result;
     if (!destination || source.index === destination.index) return;
@@ -162,12 +171,23 @@ export default function SectoresClient({
             </p>
           </div>
         </div>
-        <button
-          onClick={() => { setModalOpen(true); setNumero(""); }}
-          className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark sm:w-auto"
-        >
-          + Nuevo sector
-        </button>
+        <div className="flex w-full gap-2 sm:w-auto">
+          {hayOrdenManual && (
+            <button
+              onClick={handleAutoSort}
+              className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background hover:text-text-primary sm:flex-none"
+              title="Restablecer orden automatico por numero de sector"
+            >
+              Ordenar automaticamente
+            </button>
+          )}
+          <button
+            onClick={() => { setModalOpen(true); setNumero(""); }}
+            className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark sm:flex-none"
+          >
+            + Nuevo sector
+          </button>
+        </div>
       </div>
 
       {sectores.length === 0 ? (

@@ -23,9 +23,10 @@ export default async function ZonaDetailPage({
   if (!zona) notFound();
 
   const sectores = (zona.sectores ?? []).sort((a, b) => {
-    if (a.posicion != null && b.posicion != null) return a.posicion - b.posicion;
-    if (a.posicion != null) return -1;
-    if (b.posicion != null) return 1;
+    const ap = a.posicion, bp = b.posicion;
+    if (ap != null && bp != null) return ap - bp;
+    if (ap != null) return -1;
+    if (bp != null) return 1;
     return a.numero - b.numero;
   });
 

@@ -446,6 +446,7 @@ export interface Database {
           equipo_id: number | null;
           visibility: string;
           created_at: string;
+          contactado: boolean;
         };
         Insert: {
           id?: number;
@@ -465,6 +466,7 @@ export interface Database {
           equipo_id?: number | null;
           visibility?: string;
           created_at?: string;
+          contactado?: boolean;
         };
         Update: {
           id?: number;
@@ -484,6 +486,7 @@ export interface Database {
           equipo_id?: number | null;
           visibility?: string;
           created_at?: string;
+          contactado?: boolean;
         };
         Relationships: [
           {

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, Plus, Trash2, ShieldCheck, X, Loader2 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deleteZonaAction, deleteSectorAction } from "@/app/actions/security";
-import { updateZonasPosicionesAction, updateSectoresPosicionesAction } from "@/app/(crm)/zona/actions";
+import { updateZonasPosicionesAction, updateSectoresPosicionesAction, resetZonasPosicionesAction, resetSectoresPosicionesAction } from "@/app/(crm)/zona/actions";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase-browser";
@@ -279,6 +279,24 @@ export default function ZonasClient({
     }, 0);
   }
 
+  const hayOrdenManualZonas = zonas.some((z) => z.posicion != null);
+
+  async function handleAutoSortZonas() {
+    const sorted = [...zonas].sort((a, b) => a.nombre.localeCompare(b.nombre))
+      .map((z) => ({ ...z, posicion: null as number | null }));
+    setZonas(sorted);
+    await resetZonasPosicionesAction(sorted.map((z) => z.id));
+  }
+
+  async function handleAutoSortSectores(zonaId: number) {
+    const zona = zonas.find((z) => z.id === zonaId);
+    if (!zona) return;
+    const sorted = [...zona.sectores].sort((a, b) => a.numero - b.numero)
+      .map((s) => ({ ...s, posicion: null as number | null }));
+    setZonas((prev) => prev.map((z) => z.id === zonaId ? { ...z, sectores: sorted } : z));
+    await resetSectoresPosicionesAction(sorted.map((s) => s.id));
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <>
@@ -291,14 +309,25 @@ export default function ZonasClient({
             {zonas.reduce((acc, z) => acc + z.sectores.length, 0)} sectores en total
           </p>
         </div>
-        {canDeleteZonas && (
-          <button
-            onClick={() => { setZonaModalOpen(true); setZonaName(""); }}
-            className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark sm:w-auto"
-          >
-            + Nueva zona
-          </button>
-        )}
+        <div className="flex w-full gap-2 sm:w-auto">
+          {hayOrdenManualZonas && (
+            <button
+              onClick={handleAutoSortZonas}
+              className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background hover:text-text-primary sm:flex-none"
+              title="Restablecer orden automatico alfabetico"
+            >
+              Ordenar automaticamente
+            </button>
+          )}
+          {canDeleteZonas && (
+            <button
+              onClick={() => { setZonaModalOpen(true); setZonaName(""); }}
+              className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark sm:flex-none"
+            >
+              + Nueva zona
+            </button>
+          )}
+        </div>
       </div>
 
       {zonas.length === 0 ? (
@@ -386,6 +415,15 @@ export default function ZonasClient({
                             {accesos.get(zona.id)?.size}
                           </span>
                         )}
+                      </button>
+                    )}
+                    {zona.sectores.some((s) => s.posicion != null) && (
+                      <button
+                        onClick={() => handleAutoSortSectores(zona.id)}
+                        className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
+                        title="Restablecer orden automatico por numero de sector"
+                      >
+                        Ordenar auto
                       </button>
                     )}
                     <button

@@ -62,6 +62,48 @@ export async function upsertPropiedadAction(
   }
 }
 
+export async function toggleContactadoAction(
+  propiedadId: number,
+  contactado: boolean
+): Promise<{ error?: string }> {
+  const yo = await getCurrentUserContext();
+  if (!yo) return { error: "No autenticado" };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("propiedades")
+    .update({ contactado } as never)
+    .eq("id", propiedadId);
+  if (error) return { error: error.message };
+  return {};
+}
+
+export async function resetZonasPosicionesAction(ids: number[]): Promise<{ error?: string }> {
+  const yo = await getCurrentUserContext();
+  if (!yo) return { error: "No autenticado" };
+  const supabase = await createClient();
+  const { error } = await supabase.from("zona").update({ posicion: null } as never).in("id", ids);
+  if (error) return { error: error.message };
+  return {};
+}
+
+export async function resetSectoresPosicionesAction(ids: number[]): Promise<{ error?: string }> {
+  const yo = await getCurrentUserContext();
+  if (!yo) return { error: "No autenticado" };
+  const supabase = await createClient();
+  const { error } = await supabase.from("sectores").update({ posicion: null } as never).in("id", ids);
+  if (error) return { error: error.message };
+  return {};
+}
+
+export async function resetFincasPosicionesAction(ids: number[]): Promise<{ error?: string }> {
+  const yo = await getCurrentUserContext();
+  if (!yo) return { error: "No autenticado" };
+  const supabase = await createClient();
+  const { error } = await supabase.from("fincas").update({ posicion: null } as never).in("id", ids);
+  if (error) return { error: error.message };
+  return {};
+}
+
 export async function updateZonasPosicionesAction(
   positions: Array<{ id: number; posicion: number }>
 ): Promise<{ error?: string }> {

@@ -24,11 +24,12 @@ export default async function SectorDetailPage({
   if (!zona || !sector) notFound();
 
   const fincas = (sector.fincas ?? []).sort((a, b) => {
-    if (a.posicion != null && b.posicion != null) return a.posicion - b.posicion;
-    if (a.posicion != null) return -1;
-    if (b.posicion != null) return 1;
-    const na = parseFloat(String(a.numero));
-    const nb = parseFloat(String(b.numero));
+    const ap = a.posicion, bp = b.posicion;
+    if (ap != null && bp != null) return ap - bp;
+    if (ap != null) return -1;
+    if (bp != null) return 1;
+    // orden natural: numérico primero, luego alfanumérico
+    const na = parseFloat(String(a.numero)), nb = parseFloat(String(b.numero));
     if (!isNaN(na) && !isNaN(nb)) return na - nb;
     return String(a.numero).localeCompare(String(b.numero), "es", { numeric: true });
   });

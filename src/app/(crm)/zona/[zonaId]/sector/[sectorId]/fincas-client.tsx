@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deleteFincaAction } from "@/app/actions/security";
-import { updateFincasPosicionesAction } from "@/app/(crm)/zona/actions";
+import { updateFincasPosicionesAction, resetFincasPosicionesAction } from "@/app/(crm)/zona/actions";
 import Breadcrumb from "@/components/ui/breadcrumb";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
@@ -96,6 +96,18 @@ export default function FincasClient({
     toast("Finca eliminada");
   }
 
+  const hayOrdenManual = fincas.some((f) => f.posicion != null);
+
+  async function handleAutoSort() {
+    const sorted = [...fincas].sort((a, b) => {
+      const na = parseFloat(a.numero), nb = parseFloat(b.numero);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return a.numero.localeCompare(b.numero, "es", { numeric: true });
+    }).map((f) => ({ ...f, posicion: null as number | null }));
+    setFincas(sorted);
+    await resetFincasPosicionesAction(sorted.map((f) => f.id));
+  }
+
   function handleDragEnd(result: DropResult) {
     const { source, destination } = result;
     if (!destination || source.index === destination.index) return;
@@ -159,12 +171,23 @@ export default function FincasClient({
             </p>
           </div>
         </div>
-        <button
-          onClick={() => { setModalOpen(true); setNumero(""); }}
-          className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark sm:w-auto"
-        >
-          + Nueva finca
-        </button>
+        <div className="flex w-full gap-2 sm:w-auto">
+          {hayOrdenManual && (
+            <button
+              onClick={handleAutoSort}
+              className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background hover:text-text-primary sm:flex-none"
+              title="Restablecer orden automatico por numero de finca"
+            >
+              Ordenar automaticamente
+            </button>
+          )}
+          <button
+            onClick={() => { setModalOpen(true); setNumero(""); }}
+            className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark sm:flex-none"
+          >
+            + Nueva finca
+          </button>
+        </div>
       </div>
 
       {fincas.length === 0 ? (

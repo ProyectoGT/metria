@@ -6,7 +6,7 @@ import { SlidersHorizontal, X, MapPin, Loader2, Navigation } from "lucide-react"
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deletePropiedadAction } from "@/app/actions/security";
 import { createTareaAction } from "@/app/(crm)/dashboard/actions";
-import { updatePropiedadesPosicionesAction, upsertPropiedadAction } from "@/app/(crm)/zona/actions";
+import { updatePropiedadesPosicionesAction, upsertPropiedadAction, toggleContactadoAction } from "@/app/(crm)/zona/actions";
 import { canSetVendido, type UserRole } from "@/lib/roles";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
@@ -34,6 +34,7 @@ type Propiedad = {
   latitud?: number | null;
   longitud?: number | null;
   created_at?: string | null;
+  contactado?: boolean;
   usuarios: { id: number; nombre: string; apellidos: string } | null;
   _order?: number;
 };
@@ -86,11 +87,6 @@ function estadoClasses(estado: string | null) {
 function estadoLabel(estado: string | null) {
   const found = ESTADOS.find((item) => item.value === estado);
   return found?.label ?? estado ?? "-";
-}
-
-function isNueva(createdAt: string | null | undefined): boolean {
-  if (!createdAt) return false;
-  return Date.now() - new Date(createdAt).getTime() < 90 * 24 * 60 * 60 * 1000;
 }
 
 function isOverdue(fechaVisita: string | null): boolean {
@@ -649,7 +645,6 @@ export default function PropiedadesClient({
             const overdue = isOverdue(propiedad.fecha_visita);
             const isEncargo = propiedad.estado === "encargo";
             const contactada = isContactada(propiedad);
-            const nueva = isNueva(propiedad.created_at);
             const nombre =
               propiedad.propietario ??
               `Planta ${propiedad.planta ?? "-"} Puerta ${propiedad.puerta ?? "-"}`;
@@ -663,20 +658,35 @@ export default function PropiedadesClient({
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-2">
-                    <div className="mt-0.5 shrink-0">
-                      {nueva ? (
-                        <div
-                          title="Propiedad creada hace menos de 90 dias"
-                          className="h-4 w-4 rounded-sm border-2 border-primary bg-primary flex items-center justify-center"
-                        >
+                    <button
+                      className="mt-0.5 shrink-0"
+                      title={propiedad.contactado ? "Marcar como no contactado" : "Marcar como contactado"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const next = !propiedad.contactado;
+                        setPropiedades((prev) =>
+                          prev.map((p) => p.id === propiedad.id ? { ...p, contactado: next } : p)
+                        );
+                        toggleContactadoAction(propiedad.id, next).then(({ error }) => {
+                          if (error) {
+                            setPropiedades((prev) =>
+                              prev.map((p) => p.id === propiedad.id ? { ...p, contactado: !next } : p)
+                            );
+                            toast("Error al guardar", "error");
+                          }
+                        });
+                      }}
+                    >
+                      {propiedad.contactado ? (
+                        <div className="h-4 w-4 rounded-sm border-2 border-primary bg-primary flex items-center justify-center">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5 text-white" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
                         </div>
                       ) : (
-                        <div className="h-4 w-4 rounded-sm border-2 border-border" />
+                        <div className="h-4 w-4 rounded-sm border-2 border-border hover:border-primary transition-colors" />
                       )}
-                    </div>
+                    </button>
                     <div className="min-w-0">
                       <p className="break-words font-semibold text-text-primary">{nombre}</p>
                       <p className="mt-1 text-xs text-text-secondary">
@@ -835,34 +845,37 @@ export default function PropiedadesClient({
                                   </svg>
                                 </div>
                               </td>
-                              {/* Indicador nueva propiedad (<90 días) */}
+                              {/* Casilla contactado */}
                               <td className="w-8 px-2 py-3">
-                                {isNueva(propiedad.created_at) && (
-                                  <div
-                                    title="Propiedad creada hace menos de 90 dias"
-                                    className="flex items-center justify-center"
-                                  >
+                                <button
+                                  title={propiedad.contactado ? "Marcar como no contactado" : "Marcar como contactado"}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const next = !propiedad.contactado;
+                                    setPropiedades((prev) =>
+                                      prev.map((p) => p.id === propiedad.id ? { ...p, contactado: next } : p)
+                                    );
+                                    toggleContactadoAction(propiedad.id, next).then(({ error }) => {
+                                      if (error) {
+                                        setPropiedades((prev) =>
+                                          prev.map((p) => p.id === propiedad.id ? { ...p, contactado: !next } : p)
+                                        );
+                                        toast("Error al guardar", "error");
+                                      }
+                                    });
+                                  }}
+                                  className="flex items-center justify-center"
+                                >
+                                  {propiedad.contactado ? (
                                     <div className="h-4 w-4 rounded-sm border-2 border-primary bg-primary flex items-center justify-center">
-                                      <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        className="h-2.5 w-2.5 text-white"
-                                        viewBox="0 0 20 20"
-                                        fill="currentColor"
-                                      >
-                                        <path
-                                          fillRule="evenodd"
-                                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                          clipRule="evenodd"
-                                        />
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                       </svg>
                                     </div>
-                                  </div>
-                                )}
-                                {!isNueva(propiedad.created_at) && (
-                                  <div className="flex items-center justify-center">
-                                    <div className="h-4 w-4 rounded-sm border-2 border-border" />
-                                  </div>
-                                )}
+                                  ) : (
+                                    <div className="h-4 w-4 rounded-sm border-2 border-border hover:border-primary transition-colors" />
+                                  )}
+                                </button>
                               </td>
                               <td className="px-4 py-3 text-text-primary">
                                 {propiedad.planta ?? "-"}
