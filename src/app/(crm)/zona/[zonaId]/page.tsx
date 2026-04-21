@@ -16,7 +16,7 @@ export default async function ZonaDetailPage({
     getCurrentUserContext(),
     supabase
       .from("zona")
-      .select("id, nombre, sectores(id, numero, fincas(id, propiedades(id, estado, fecha_visita)))")
+      .select("id, nombre, sectores(id, numero, fincas(id, propiedades(id, contactado)))")
       .eq("id", Number(zonaId))
       .single(),
     getUserOrdenAction("sectores"),
