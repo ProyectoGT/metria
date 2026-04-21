@@ -307,13 +307,16 @@ export default function PropiedadesClient({
     setSaving(true);
     setSaveError(null);
 
+    const today = new Date();
+    const todayDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
     const payload = {
       planta: form.planta || null,
       puerta: form.puerta || null,
       propietario: form.propietario || null,
       telefono: form.telefono || null,
       estado: form.estado || null,
-      fecha_visita: form.fecha_visita || null,
+      fecha_visita: form.notas ? todayDate : (form.fecha_visita || null),
       notas: form.notas || null,
       honorarios: form.estado === "vendido" && form.honorarios ? parseFloat(form.honorarios) : null,
       agente_asignado: form.agente_asignado ? Number(form.agente_asignado) : null,
@@ -774,25 +777,25 @@ export default function PropiedadesClient({
                 <th className="w-8 px-2 py-3" />
                 {/* Columna nueva (90 días) */}
                 <th className="w-8 px-2 py-3" />
-                <th className="px-4 py-3 text-left font-medium text-text-secondary">
+                <th className="w-16 px-2 py-3 text-left font-medium text-text-secondary">
                   Planta
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-text-secondary">
+                <th className="w-16 px-2 py-3 text-left font-medium text-text-secondary">
                   Puerta
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-text-secondary">
+                <th className="w-32 px-2 py-3 text-left font-medium text-text-secondary">
                   Propietario
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-text-secondary">
+                <th className="w-28 px-2 py-3 text-left font-medium text-text-secondary">
                   Estado
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-text-secondary">
+                <th className="w-24 px-2 py-3 text-left font-medium text-text-secondary">
                   Ultima visita
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-text-secondary">
+                <th className="px-3 py-3 text-left font-medium text-text-secondary">
                   Notas
                 </th>
-                <th className="px-4 py-3" />
+                <th className="px-3 py-3" />
               </tr>
             </thead>
             <DragDropContext onDragEnd={handleDragEnd}>
@@ -879,16 +882,16 @@ export default function PropiedadesClient({
                                   )}
                                 </button>
                               </td>
-                              <td className="px-4 py-3 text-text-primary">
+                              <td className="px-2 py-3 text-text-primary">
                                 {propiedad.planta ?? "-"}
                               </td>
-                              <td className="px-4 py-3 text-text-primary">
+                              <td className="px-2 py-3 text-text-primary">
                                 {propiedad.puerta ?? "-"}
                               </td>
-                              <td className="px-4 py-3 font-medium text-text-primary">
+                              <td className="px-2 py-3 font-medium text-text-primary">
                                 {propiedad.propietario ?? "-"}
                               </td>
-                              <td className="px-4 py-3">
+                              <td className="px-2 py-3">
                                 {propiedad.estado ? (
                                   <span
                                     className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${estadoClasses(propiedad.estado)}`}
@@ -899,7 +902,7 @@ export default function PropiedadesClient({
                                   <span className="text-text-secondary">-</span>
                                 )}
                               </td>
-                              <td className="px-4 py-3">
+                              <td className="px-2 py-3">
                                 <div className="flex items-center gap-1.5">
                                   {overdue && (
                                     <span
@@ -928,20 +931,18 @@ export default function PropiedadesClient({
                                     }
                                   >
                                     {propiedad.fecha_visita
-                                      ? new Date(propiedad.fecha_visita).toLocaleString("es-ES", {
+                                      ? new Date(propiedad.fecha_visita).toLocaleDateString("es-ES", {
                                           day: "2-digit",
                                           month: "2-digit",
                                           year: "numeric",
-                                          hour: "2-digit",
-                                          minute: "2-digit",
                                         })
                                       : "-"}
                                   </span>
                                 </div>
                               </td>
-                              <td className="max-w-[200px] px-4 py-3">
+                              <td className="px-3 py-3">
                                 {propiedad.notas ? (
-                                  <p className="truncate text-xs text-text-secondary" title={propiedad.notas}>
+                                  <p className="whitespace-pre-wrap text-xs text-text-secondary">
                                     {propiedad.notas}
                                   </p>
                                 ) : (
