@@ -181,9 +181,10 @@ export default async function DashboardPage() {
       .gte("occurred_at", periodRange.from)
       .lt("occurred_at", periodRange.to),
 
-    supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
       .from("tareas")
-      .select("id, titulo, prioridad, fecha, estado, owner_user_id")
+      .select("id, titulo, prioridad, fecha, estado, resultado, from_orden_dia, owner_user_id")
       .in("estado", ["pendiente", "en_progreso", "completado"])
       .order("fecha", { ascending: true, nullsFirst: false }),
 
@@ -292,7 +293,10 @@ export default async function DashboardPage() {
   };
 
   // ─── 3. Agentes filtrados por rol ────────────────────────────────────────
-  let visibleAgentes = todosAgentes ?? [];
+  // Los administradores no aparecen en el Orden del día ni en el panel de rendimiento
+  let visibleAgentes = (todosAgentes ?? []).filter(
+    (a) => a.rol?.toLowerCase() !== "administrador" && a.rol?.toLowerCase() !== "admin",
+  );
   if (role === "Responsable") {
     const allowed = new Set([userId, ...(yo?.supervisedAgentIds ?? [])]);
     visibleAgentes = visibleAgentes.filter((a) => allowed.has(a.id));
@@ -333,16 +337,29 @@ export default async function DashboardPage() {
     agentMetrics.find((a) => a.id === String(userId))?.rendimiento ?? emptyRendimiento();
 
   // ─── 4. Kanban personal ──────────────────────────────────────────────────
-  const myTareas = (tareasData ?? []).filter((t) => t.owner_user_id === userId);
+  type TareaDbRow = {
+    id: number;
+    titulo: string;
+    prioridad: string | null;
+    fecha: string | null;
+    estado: string;
+    resultado?: string | null;
+    from_orden_dia?: boolean | null;
+    owner_user_id: number;
+  };
+  const tareas: TareaDbRow[] = (tareasData ?? []) as TareaDbRow[];
+  const myTareas = tareas.filter((t) => t.owner_user_id === userId);
 
-  function toCard(t: (typeof myTareas)[0]) {
+  function toCard(t: TareaDbRow) {
     return {
       id: String(t.id),
       title: t.titulo,
       priority: normalizePriority(t.prioridad),
       dueDate: t.fecha ?? undefined,
       assignedBy: null,
-      resultado: (t as unknown as { resultado?: string | null }).resultado ?? null,
+      resultado: t.resultado ?? null,
+      isCompleted: t.estado === "completado",
+      fromOrdenDia: t.from_orden_dia ?? false,
     };
   }
 
@@ -352,19 +369,17 @@ export default async function DashboardPage() {
         id: "pendientes",
         title: "Pendientes",
         fixed: true,
-        cards: myTareas.filter((t) => t.estado === "pendiente").map(toCard),
+        // Pendientes primero, luego completadas al final con tachado
+        cards: [
+          ...myTareas.filter((t) => t.estado === "pendiente").map(toCard),
+          ...myTareas.filter((t) => t.estado === "completado").map(toCard),
+        ],
       },
       {
         id: "en_progreso",
-        title: "Orden del día",
+        title: "Orden del dia",
         fixed: true,
         cards: myTareas.filter((t) => t.estado === "en_progreso").map(toCard),
-      },
-      {
-        id: "completado",
-        title: "Realizado",
-        fixed: true,
-        cards: myTareas.filter((t) => t.estado === "completado").map(toCard),
       },
     ],
   };
@@ -377,7 +392,7 @@ export default async function DashboardPage() {
     ? visibleAgentes.map((a) => ({
         id: a.id,
         nombre: `${a.nombre} ${a.apellidos}`.trim(),
-        tareas: (tareasData ?? [])
+        tareas: tareas
           .filter((t) => t.owner_user_id === a.id && t.estado !== "completado")
           .map((t) => ({
             id: t.id,
@@ -486,7 +501,7 @@ export default async function DashboardPage() {
       />
 
       {/* 8 — Rendimiento / Mi actividad */}
-      {showAgentPerformance && <AgentPerformanceTable agents={agentMetrics} />}
+      {showAgentPerformance && <AgentPerformanceTable agents={agentMetrics} role={role} />}
       {showMyActivity && <MyActivity rendimiento={ownMetrics} />}
     </div>
   );

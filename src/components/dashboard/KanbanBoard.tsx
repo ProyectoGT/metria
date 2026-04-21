@@ -5,13 +5,15 @@ import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import KanbanColumn from "./KanbanColumn";
 import KanbanAddColumn from "./KanbanAddColumn";
 import KanbanAddCard from "./KanbanAddCard";
-import type { KanbanData, KanbanColumnData, KanbanCardData } from "@/lib/mock/dashboard";
+import KanbanEditCard from "./KanbanEditCard";
+import type { KanbanData, KanbanColumnData, KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import type { UserRole } from "@/lib/roles";
 import {
   createTareaAction,
   deleteTareaAction,
   completeTareaAction,
   updateTareaEstadoAction,
+  updateTareaAction,
   addKanbanColumnAction,
   deleteKanbanColumnAction,
 } from "@/app/(crm)/dashboard/actions";
@@ -25,11 +27,16 @@ type KanbanBoardProps = {
 };
 
 // Mapa columna-id → estado en BD
-const COL_TO_ESTADO: Record<string, "pendiente" | "en_progreso" | "completado"> = {
+const COL_TO_ESTADO: Record<string, "pendiente" | "en_progreso"> = {
   pendientes: "pendiente",
   en_progreso: "en_progreso",
-  completado: "completado",
 };
+
+function isFutureDate(dateStr: string | undefined): boolean {
+  if (!dateStr) return false;
+  const today = new Date().toISOString().split("T")[0];
+  return dateStr.split("T")[0] > today;
+}
 
 export default function KanbanBoard({
   initialData,
@@ -46,6 +53,7 @@ export default function KanbanBoard({
     return [...initialData.columns, ...extra];
   });
   const [addingCardCol, setAddingCardCol] = useState<string | null>(null);
+  const [editingCard, setEditingCard] = useState<{ columnId: string; card: KanbanCardData } | null>(null);
 
   // ─── Modal resultado ─────────────────────────────────────────────────────────
   const [resultadoModal, setResultadoModal] = useState<{
@@ -77,7 +85,6 @@ export default function KanbanBoard({
       return next;
     });
 
-    // Si cambió de columna, persistir el nuevo estado en BD
     if (source.droppableId !== destination.droppableId) {
       const nuevoEstado = COL_TO_ESTADO[destination.droppableId];
       const numId = parseInt(draggableId, 10);
@@ -104,21 +111,35 @@ export default function KanbanBoard({
 
   // ─── Card ops ───────────────────────────────────────────────────────────────
   const handleAddCard = useCallback(async (columnId: string, newCard: Omit<KanbanCardData, "id">) => {
+    // Si se añade en "Orden del día" con fecha futura → redirigir a "Pendientes"
+    const future = isFutureDate(newCard.dueDate);
+    const fromOrdenDia = columnId === "en_progreso" && future;
+    const targetColId = fromOrdenDia ? "pendientes" : columnId;
+    const estado = targetColId === "en_progreso" ? "en_progreso" : "pendiente";
+
     try {
       const { id: dbId } = await createTareaAction({
         titulo: newCard.title,
         prioridad: newCard.priority,
         fecha: newCard.dueDate,
+        estado,
+        fromOrdenDia,
       });
+      const finalCard: KanbanCardData = {
+        ...newCard,
+        id: String(dbId),
+        isCompleted: false,
+        fromOrdenDia,
+      };
       setColumns((prev) =>
         prev.map((col) =>
-          col.id === columnId
-            ? { ...col, cards: [...col.cards, { id: String(dbId), ...newCard }] }
+          col.id === targetColId
+            ? { ...col, cards: [...col.cards, finalCard] }
             : col,
         ),
       );
     } catch {
-      // fallo silencioso — la UI ya está actualizada optimistamente
+      // fallo silencioso
     }
   }, []);
 
@@ -136,14 +157,47 @@ export default function KanbanBoard({
     }
   }, []);
 
-  const handleCompleteCard = useCallback((columnId: string, cardId: string) => {
-    setColumns((prev) => {
-      const col = prev.find((c) => c.id === columnId);
-      const card = col?.cards.find((c) => c.id === cardId);
+  const handleOpenEdit = useCallback((columnId: string, card: KanbanCardData) => {
+    setEditingCard({ columnId, card });
+  }, []);
+
+  const handleSaveEdit = useCallback((updates: { title: string; priority: KanbanPriority; dueDate?: string }) => {
+    if (!editingCard) return;
+    const { columnId, card } = editingCard;
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === columnId
+          ? { ...col, cards: col.cards.map((c) => c.id === card.id ? { ...c, ...updates } : c) }
+          : col,
+      ),
+    );
+    const numId = parseInt(card.id, 10);
+    if (!isNaN(numId)) {
+      updateTareaAction(numId, { titulo: updates.title, prioridad: updates.priority, fecha: updates.dueDate || null }).catch(() => {});
+    }
+  }, [editingCard]);
+
+  const handleCompleteCard = useCallback((columnId: string, cardId: string, card: KanbanCardData) => {
+
+    const needsResultado = card.fromOrdenDia || columnId === "en_progreso";
+
+    if (needsResultado) {
       setResultadoText("");
-      setResultadoModal({ columnId, cardId, titulo: card?.title ?? "Tarea" });
-      return prev;
-    });
+      setResultadoModal({ columnId, cardId, titulo: card.title });
+    } else {
+      // Completar en sitio sin modal
+      setColumns((prev) =>
+        prev.map((col) =>
+          col.id === columnId
+            ? { ...col, cards: col.cards.map((c) => c.id === cardId ? { ...c, isCompleted: true } : c) }
+            : col,
+        ),
+      );
+      const numId = parseInt(cardId, 10);
+      if (!isNaN(numId)) {
+        completeTareaAction(numId).catch(() => {});
+      }
+    }
   }, []);
 
   const handleConfirmResultado = useCallback(async () => {
@@ -152,17 +206,19 @@ export default function KanbanBoard({
     const resultado = resultadoText.trim();
     setResultadoModal(null);
 
-    setColumns((prev) => {
-      const next = prev.map((col) => ({ ...col, cards: [...col.cards] }));
-      const srcCol = next.find((c) => c.id === columnId);
-      const dstCol = next.find((c) => c.id === "completado");
-      if (!srcCol || !dstCol) return prev;
-      const idx = srcCol.cards.findIndex((c) => c.id === cardId);
-      if (idx === -1) return prev;
-      const [moved] = srcCol.cards.splice(idx, 1);
-      dstCol.cards.unshift({ ...moved, resultado: resultado || null });
-      return next;
-    });
+    // Marcar en su columna actual como completada (sin mover)
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === columnId
+          ? {
+              ...col,
+              cards: col.cards.map((c) =>
+                c.id === cardId ? { ...c, isCompleted: true, resultado: resultado || null } : c
+              ),
+            }
+          : col,
+      ),
+    );
 
     const numId = parseInt(cardId, 10);
     if (!isNaN(numId)) {
@@ -181,9 +237,10 @@ export default function KanbanBoard({
               role={role}
               currentUserId={_currentUserId}
               onDeleteColumn={handleDeleteColumn}
-              onAddCard={column.id === "completado" ? undefined : (colId) => setAddingCardCol(colId)}
+              onAddCard={(colId) => setAddingCardCol(colId)}
               onDeleteCard={handleDeleteCard}
-              onCompleteCard={column.id === "completado" ? undefined : handleCompleteCard}
+              onEditCard={handleOpenEdit}
+              onCompleteCard={handleCompleteCard}
             />
           ))}
           <KanbanAddColumn onAdd={handleAddColumn} />
@@ -199,12 +256,20 @@ export default function KanbanBoard({
         />
       )}
 
-      {/* Modal de resultado al completar tarea */}
+      {editingCard && (
+        <KanbanEditCard
+          card={editingCard.card}
+          onSave={(updates: { title: string; priority: KanbanPriority; dueDate?: string }) => { handleSaveEdit(updates); setEditingCard(null); }}
+          onClose={() => setEditingCard(null)}
+        />
+      )}
+
+      {/* Modal de resultado al completar tarea de Orden del día */}
       {resultadoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl">
             <div className="border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">¿Cómo ha ido?</h2>
+              <h2 className="text-base font-semibold text-text-primary">¿Como ha ido?</h2>
               <p className="mt-0.5 truncate text-sm text-text-secondary">{resultadoModal.titulo}</p>
             </div>
             <div className="p-6 space-y-4">
@@ -220,7 +285,7 @@ export default function KanbanBoard({
                     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleConfirmResultado();
                     if (e.key === "Escape") setResultadoModal(null);
                   }}
-                  placeholder="Ej: Llamada realizada, cliente interesado. Próxima visita el martes."
+                  placeholder="Ej: Llamada realizada, cliente interesado. Proxima visita el martes."
                   rows={4}
                   className="input w-full resize-none text-sm"
                 />
