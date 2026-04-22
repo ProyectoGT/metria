@@ -131,7 +131,7 @@ function getWeekDays(weekStart: Date): Date[] {
   });
 }
 
-function emptyForm(date?: Date): FormState {
+function emptyForm(date?: Date, syncToGcal = false): FormState {
   return {
     description: "",
     event_date: toDateStr(date ?? new Date()),
@@ -140,7 +140,7 @@ function emptyForm(date?: Date): FormState {
     tipo: "actividad",
     completed: false,
     result: "",
-    syncToGcal: false,
+    syncToGcal,
   };
 }
 
@@ -182,8 +182,7 @@ export default function CalendarioClient({
 
   const [modalOpen, setModalOpen]   = useState(false);
   const [editId, setEditId]         = useState<number | null>(null);
-  const [form, setForm]             = useState<FormState>(emptyForm);
-  const [saving, setSaving]         = useState(false);
+  const [form, setForm] = useState<FormState>(() => emptyForm(undefined, isConnected));  const [saving, setSaving]         = useState(false);
   const [saveError, setSaveError]   = useState<string | null>(null);
   const [deleteId, setDeleteId]     = useState<number | null>(null);
   const [deleting, setDeleting]     = useState(false);
@@ -221,14 +220,32 @@ export default function CalendarioClient({
     return map;
   }, [filteredEvents]);
 
+  const syncedGcalIds = useMemo(
+    () =>
+      new Set(
+        events
+          .filter((e) => e.owner_user_id === currentUserId)
+          .map((e) => e.gcal_event_id)
+          .filter((id): id is string => Boolean(id))
+      ),
+    [events, currentUserId]
+  );
+
   const gcalByDate = useMemo(() => {
     const map: Record<string, GCalEvent[]> = {};
+
     for (const ev of gcalEvents) {
-      const d = ev.start.dateTime ? ev.start.dateTime.split("T")[0] : (ev.start.date ?? "");
+      if (syncedGcalIds.has(ev.id)) continue;
+
+      const d = ev.start.dateTime
+        ? ev.start.dateTime.split("T")[0]
+        : (ev.start.date ?? "");
+
       (map[d] ??= []).push(ev);
     }
+
     return map;
-  }, [gcalEvents]);
+  }, [gcalEvents, syncedGcalIds]);
 
   const tareasByDate = useMemo(() => {
     const map: Record<string, TareaEvent[]> = {};
@@ -290,7 +307,10 @@ export default function CalendarioClient({
   // ── Modal ──────────────────────────────────────────────────────────────────
 
   function openCreate(date?: Date) {
-    setEditId(null); setForm(emptyForm(date ?? selectedDate)); setSaveError(null); setModalOpen(true);
+    setEditId(null);
+    setForm(emptyForm(date ?? selectedDate, isConnected));
+    setSaveError(null);
+    setModalOpen(true);
   }
 
   function openEdit(ev: AgendaEvent) {
@@ -344,7 +364,7 @@ export default function CalendarioClient({
       if (error) setSaveError(error.message);
       else if (data) {
         let saved = data as AgendaEvent;
-        if (form.syncToGcal && isConnected) {
+        if (isConnected) {
           const gcalRes = await fetch("/api/google/events", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
