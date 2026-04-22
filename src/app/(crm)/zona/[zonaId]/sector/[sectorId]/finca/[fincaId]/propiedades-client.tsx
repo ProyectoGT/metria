@@ -96,9 +96,11 @@ function isOverdue(fechaVisita: string | null): boolean {
 }
 
 function isContactada(propiedad: Propiedad): boolean {
-  const estadoActivo = propiedad.estado && ESTADOS_CONTACTADOS.includes(propiedad.estado);
-  const tieneVisita = !!propiedad.fecha_visita;
-  return !!(estadoActivo || tieneVisita);
+  return !!propiedad.contactado;
+}
+
+function isContactadaCaducada(propiedad: Propiedad): boolean {
+  return !!propiedad.contactado && isOverdue(propiedad.fecha_visita);
 }
 
 function nowLocalDatetime() {
@@ -200,6 +202,25 @@ export default function PropiedadesClient({
 
   const router = useRouter();
   const { toasts, toast } = useToast();
+
+  useEffect(() => {
+    const expiradas = propiedades.filter(isContactadaCaducada);
+    if (expiradas.length === 0) return;
+
+    setPropiedades((prev) =>
+      prev.map((p) =>
+        isContactadaCaducada(p) ? { ...p, contactado: false } : p
+      )
+    );
+
+    expiradas.forEach((p) => {
+      toggleContactadoAction(p.id, false).then(({ error }) => {
+        if (error) {
+          console.warn("Error al desmarcar contactado caducado:", p.id, error);
+        }
+      });
+    });
+  }, [propiedades]);
 
   // Propiedades filtradas
   const propiedadesFiltradas = useMemo(() => {
@@ -377,6 +398,32 @@ export default function PropiedadesClient({
     setDeleteId(null);
     setDeletePassword("");
     toast("Propiedad eliminada");
+  }
+
+  async function handleToggleContactado(propiedad: Propiedad) {
+    const next = !propiedad.contactado;
+    const nextFechaVisita = next ? nowLocalDatetime() : propiedad.fecha_visita;
+
+    setPropiedades((prev) =>
+      prev.map((p) =>
+        p.id === propiedad.id
+          ? { ...p, contactado: next, fecha_visita: nextFechaVisita }
+          : p
+      )
+    );
+
+    const { error } = await toggleContactadoAction(propiedad.id, next);
+
+    if (error) {
+      setPropiedades((prev) =>
+        prev.map((p) =>
+          p.id === propiedad.id
+            ? { ...p, contactado: !next, fecha_visita: propiedad.fecha_visita }
+            : p
+        )
+      );
+      toast("Error al guardar", "error");
+    }
   }
 
   function handleDragEnd(result: DropResult) {
@@ -668,18 +715,7 @@ export default function PropiedadesClient({
                       title={propiedad.contactado ? "Marcar como no contactado" : "Marcar como contactado"}
                       onClick={(e) => {
                         e.stopPropagation();
-                        const next = !propiedad.contactado;
-                        setPropiedades((prev) =>
-                          prev.map((p) => p.id === propiedad.id ? { ...p, contactado: next } : p)
-                        );
-                        toggleContactadoAction(propiedad.id, next).then(({ error }) => {
-                          if (error) {
-                            setPropiedades((prev) =>
-                              prev.map((p) => p.id === propiedad.id ? { ...p, contactado: !next } : p)
-                            );
-                            toast("Error al guardar", "error");
-                          }
-                        });
+                        handleToggleContactado(propiedad);
                       }}
                     >
                       {propiedad.contactado ? (

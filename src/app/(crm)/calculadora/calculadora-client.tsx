@@ -245,25 +245,64 @@ function ComisionCalc() {
   const [precioFinal, setPrecioFinal] = useState("");
   const [pct, setPct] = useState("5");
   const [modo, setModo] = useState<"base_a_final" | "final_a_base">("base_a_final");
+  const [incluirIva, setIncluirIva] = useState(false);
 
-  const p = parseFloat(pct) / 100;
+  const IVA = 0.21;
+
+  const pctNum = parseFloat(pct.replace(",", "."));
+  const p = isNaN(pctNum) ? NaN : pctNum / 100;
+
   const base = parseFloat(precioBase.replace(/\./g, "").replace(",", "."));
-  const final = parseFloat(precioFinal.replace(/\./g, "").replace(",", "."));
+  const totalFinal = parseFloat(precioFinal.replace(/\./g, "").replace(",", "."));
 
-  const finalCalc = isNaN(base) ? null : base / (1 - p);
-  const comEuros = finalCalc !== null ? finalCalc - base : null;
-  const baseVerif = finalCalc !== null ? finalCalc * (1 - p) : null;
+  const porcentajeValido = !isNaN(p) && p >= 0 && p < 1;
 
-  const baseFromFinal = isNaN(final) ? null : final * (1 - p);
-  const comFromFinal = baseFromFinal !== null ? final - baseFromFinal : null;
+  // ── Base → Final ──────────────────────────────────────────────────────────
+  // Precio sin IVA sobre comisión
+  const finalSinIvaCalc = !porcentajeValido || isNaN(base) ? null : base / (1 - p);
+  const comEuros = finalSinIvaCalc !== null ? finalSinIvaCalc - base : null;
+  const ivaComision = incluirIva && comEuros !== null ? comEuros * IVA : null;
+  const finalCalc = finalSinIvaCalc !== null ? finalSinIvaCalc + (ivaComision ?? 0) : null;
+  const baseVerif = finalSinIvaCalc !== null ? finalSinIvaCalc * (1 - p) : null;
+
+  // ── Final → Base ──────────────────────────────────────────────────────────
+  // Si hay IVA activado, el precio introducido es el total con IVA incluido
+  const factorIva = porcentajeValido && incluirIva ? 1 + p * IVA : 1;
+  const finalSinIvaFromFinal =
+    !porcentajeValido || isNaN(totalFinal) ? null : totalFinal / factorIva;
+
+  const baseFromFinal =
+    finalSinIvaFromFinal !== null ? finalSinIvaFromFinal * (1 - p) : null;
+
+  const comFromFinal =
+    finalSinIvaFromFinal !== null && baseFromFinal !== null
+      ? finalSinIvaFromFinal - baseFromFinal
+      : null;
+
+  const ivaFromFinal =
+    incluirIva && comFromFinal !== null ? comFromFinal * IVA : null;
+
+  const labelPrecioComprador = incluirIva
+    ? "Precio al comprador (IVA incl.)"
+    : "Precio al comprador";
+
+  const labelComision = incluirIva
+    ? `Comisión (${pct}% s/final sin IVA)`
+    : `Comisión (${pct}% s/final)`;
 
   return (
     <div className="space-y-6">
       <InfoBox>
-        La comisión se calcula <strong className="text-text-primary">sobre el precio final</strong>,
-        no sobre el base. La operación inversa siempre devuelve exactamente el precio original.
+        La comisión se calcula <strong className="text-text-primary">sobre el precio final</strong>.
+        {incluirIva && (
+          <>
+            {" "}Si activas el IVA, se suma el <strong className="text-text-primary">21%</strong> solo sobre la comisión.
+          </>
+        )}
         <span className="mt-2 block font-mono text-xs text-text-primary">
-          Precio final = Base ÷ (1 − %) · Verificación: Final × (1 − %) = Base ✓
+          {incluirIva
+            ? "Precio comprador = [Base ÷ (1 − %)] + IVA sobre la comisión"
+            : "Precio final = Base ÷ (1 − %) · Verificación: Final × (1 − %) = Base ✓"}
         </span>
       </InfoBox>
 
@@ -323,6 +362,32 @@ function ComisionCalc() {
         </div>
       </div>
 
+      {/* Toggle IVA */}
+      <div>
+        <SectionLabel>IVA sobre la comisión</SectionLabel>
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            onClick={() => setIncluirIva((v) => !v)}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              incluirIva
+                ? "bg-primary text-white"
+                : "border border-border bg-surface text-text-secondary hover:bg-background"
+            }`}
+          >
+            {incluirIva ? "IVA 21% activado" : "Añadir IVA 21%"}
+          </button>
+          <span className="text-xs text-text-secondary">
+            Se aplica solo sobre la comisión
+          </span>
+        </div>
+      </div>
+
+      {!porcentajeValido && pct !== "" && (
+        <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
+          La comisión debe estar entre 0% y 99,99%.
+        </p>
+      )}
+
       {modo === "base_a_final" ? (
         <>
           <div>
@@ -343,16 +408,30 @@ function ComisionCalc() {
             <div className="space-y-2">
               <SectionLabel>Resultado</SectionLabel>
               <ResultsCard>
-                <ResultRow label="Precio al comprador" value={fmtEur(finalCalc)} highlight />
-                <ResultRow label={`Comisión (${pct}% s/final)`} value={fmtEur(comEuros!)} />
+                <ResultRow label={labelPrecioComprador} value={fmtEur(finalCalc)} highlight />
+                {incluirIva && (
+                  <ResultRow label="Precio sin IVA" value={fmtEur(finalSinIvaCalc!)} />
+                )}
+                <ResultRow label={labelComision} value={fmtEur(comEuros!)} />
+                {incluirIva && (
+                  <ResultRow label="IVA 21% sobre comisión" value={fmtEur(ivaComision!)} />
+                )}
                 <ResultRow label="Neto para el vendedor" value={fmtEur(base)} />
               </ResultsCard>
+
               <div className="rounded-xl border border-success/30 bg-success/8 px-4 py-3">
-                <p className="text-xs font-semibold text-success">Verificación inversa</p>
-                <p className="mt-1 text-xs text-success/80">
-                  {fmtEur(finalCalc)} × (1 − {pct}%) ={" "}
-                  <strong className="text-success">{fmtEur(baseVerif!)}</strong> ✓
-                </p>
+                <p className="text-xs font-semibold text-success">Verificación</p>
+                {incluirIva ? (
+                  <p className="mt-1 text-xs text-success/80">
+                    {fmtEur(base)} + {fmtEur(comEuros!)} + {fmtEur(ivaComision!)} ={" "}
+                    <strong className="text-success">{fmtEur(finalCalc)}</strong> ✓
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-success/80">
+                    {fmtEur(finalSinIvaCalc!)} × (1 − {pct}%) ={" "}
+                    <strong className="text-success">{fmtEur(baseVerif!)}</strong> ✓
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -361,14 +440,16 @@ function ComisionCalc() {
         <>
           <div>
             <label className="text-xs font-medium text-text-secondary">
-              Precio final al comprador (€)
+              {incluirIva
+                ? "Precio final al comprador (€) (IVA incluido)"
+                : "Precio final al comprador (€)"}
             </label>
             <input
               type="text"
               inputMode="decimal"
               value={precioFinal}
               onChange={(e) => setPrecioFinal(e.target.value)}
-              placeholder="Ej: 315.789"
+              placeholder={incluirIva ? "Ej: 319.105" : "Ej: 315.789"}
               className="input mt-1.5"
             />
           </div>
@@ -378,15 +459,29 @@ function ComisionCalc() {
               <SectionLabel>Resultado</SectionLabel>
               <ResultsCard>
                 <ResultRow label="Neto para el vendedor" value={fmtEur(baseFromFinal)} highlight />
-                <ResultRow label={`Comisión (${pct}% s/final)`} value={fmtEur(comFromFinal!)} />
-                <ResultRow label="Precio al comprador" value={fmtEur(final)} />
+                {incluirIva && (
+                  <ResultRow label="Precio sin IVA" value={fmtEur(finalSinIvaFromFinal!)} />
+                )}
+                <ResultRow label={labelComision} value={fmtEur(comFromFinal!)} />
+                {incluirIva && (
+                  <ResultRow label="IVA 21% sobre comisión" value={fmtEur(ivaFromFinal!)} />
+                )}
+                <ResultRow label={labelPrecioComprador} value={fmtEur(totalFinal)} />
               </ResultsCard>
+
               <div className="rounded-xl border border-success/30 bg-success/8 px-4 py-3">
                 <p className="text-xs font-semibold text-success">Verificación</p>
-                <p className="mt-1 text-xs text-success/80">
-                  {fmtEur(baseFromFinal)} + {fmtEur(comFromFinal!)} ={" "}
-                  <strong className="text-success">{fmtEur(final)}</strong> ✓
-                </p>
+                {incluirIva ? (
+                  <p className="mt-1 text-xs text-success/80">
+                    {fmtEur(baseFromFinal)} + {fmtEur(comFromFinal!)} + {fmtEur(ivaFromFinal!)} ={" "}
+                    <strong className="text-success">{fmtEur(totalFinal)}</strong> ✓
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-success/80">
+                    {fmtEur(baseFromFinal)} + {fmtEur(comFromFinal!)} ={" "}
+                    <strong className="text-success">{fmtEur(totalFinal)}</strong> ✓
+                  </p>
+                )}
               </div>
             </div>
           )}
