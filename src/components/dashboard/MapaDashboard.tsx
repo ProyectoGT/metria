@@ -1,10 +1,50 @@
 "use client";
 
-import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from "@vis.gl/react-google-maps";
+
+import { APIProvider, Map, AdvancedMarker, InfoWindow, Polygon, useMap } from "@vis.gl/react-google-maps";
 import { useState, useEffect } from "react";
 import { Navigation, FileText } from "lucide-react";
 
 const OFICINA = { lat: 41.365795, lng: 2.053508 };
+
+// Polígonos de zonas hardcodeados — ajustados visualmente sobre el mapa
+type ZonaPoligono = { id: number; nombre: string; color: string; paths: { lat: number; lng: number }[] };
+const ZONA_POLIGONOS: ZonaPoligono[] = [
+  {
+    id: 1,
+    nombre: "Zona 1",
+    color: "#2563eb",
+    paths: [
+      { lat: 41.372227, lng: 2.057209 }, // esquina NO
+      { lat: 41.369529, lng: 2.059394 }, // esquina NE
+      { lat: 41.367684, lng: 2.056071 }, // esquina SE
+      { lat: 41.366279, lng: 2.052893 }, // quiebre sur — inicio indentación
+      { lat: 41.367486, lng: 2.051755 }, // indentación sur
+      { lat: 41.369068, lng: 2.054410 }, // indentación SO
+      { lat: 41.370150, lng: 2.053546 }, // esquina SO
+    ],
+  },
+  {
+    id: 2,
+    nombre: "Zona 2",
+    color: "#dc2626",
+    paths: [
+      { lat: 41.368875, lng: 2.058310 }, // conexión con zona 1 — NO
+      { lat: 41.367201, lng: 2.059675 }, // conexión con zona 1 — NE
+      { lat: 41.366874, lng: 2.059194 }, // esquina NE
+      { lat: 41.366600, lng: 2.059543 }, // quiebre este
+      { lat: 41.365473, lng: 2.058526 }, // quiebre SE
+      { lat: 41.365731, lng: 2.057657 }, // esquina SE
+      { lat: 41.365223, lng: 2.057274 }, // quiebre sur
+      { lat: 41.364945, lng: 2.056917 }, // quiebre sur-oeste
+      { lat: 41.365728, lng: 2.055925 }, // esquina SO
+      { lat: 41.364154, lng: 2.053344 }, // conexión con zona 1 — SO
+      { lat: 41.365756, lng: 2.051767 },
+      { lat: 41.367656, lng: 2.056016 }, // cierre
+      { lat: 41.368875, lng: 2.058310 },
+    ],
+  },
+];
 
 export type NoticiaMapPoint = {
   id: number;
@@ -107,7 +147,7 @@ export default function MapaDashboard({
             Noticias y encargos con ubicacion registrada.
           </p>
         </div>
-        <div className="flex items-center gap-4 text-xs text-text-secondary">
+        <div className="flex flex-wrap items-center gap-4 text-xs text-text-secondary">
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-3 w-3 rounded-sm bg-gray-900 dark:bg-gray-100" />
             Oficina
@@ -130,6 +170,15 @@ export default function MapaDashboard({
               </span>
             )}
           </span>
+          {ZONA_POLIGONOS.map((z) => (
+            <span key={z.id} className="flex items-center gap-1.5">
+              <span
+                className="inline-block h-3 w-3 rounded-sm opacity-70"
+                style={{ background: z.color }}
+              />
+              {z.nombre}
+            </span>
+          ))}
         </div>
       </div>
 
@@ -144,6 +193,19 @@ export default function MapaDashboard({
             style={{ width: "100%", height: "100%" }}
           >
             <MapBoundsAdjuster points={allPoints} />
+
+            {/* Polígonos de zonas */}
+            {ZONA_POLIGONOS.map((z) => (
+              <Polygon
+                key={`zona-${z.id}`}
+                paths={z.paths}
+                strokeColor={z.color}
+                strokeOpacity={0.85}
+                strokeWeight={2}
+                fillColor={z.color}
+                fillOpacity={0.12}
+              />
+            ))}
 
             {/* Oficina */}
             <AdvancedMarker
