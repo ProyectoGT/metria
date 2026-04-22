@@ -11,6 +11,8 @@ export async function createTareaAction(data: {
   titulo: string;
   prioridad: string;
   fecha?: string;
+  estado?: "pendiente" | "en_progreso";
+  fromOrdenDia?: boolean;
 }): Promise<{ id: number }> {
   const supabase = await createClient();
   const yo = await getCurrentUserContext();
@@ -22,15 +24,28 @@ export async function createTareaAction(data: {
       titulo: data.titulo,
       prioridad: data.prioridad,
       fecha: data.fecha || null,
-      estado: "pendiente",
+      estado: data.estado ?? "pendiente",
+      from_orden_dia: data.fromOrdenDia ?? false,
       owner_user_id: yo.id,
-    })
+    } as never)
     .select("id")
     .single();
 
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
   return { id: row.id };
+}
+
+// ─── Actualizar titulo de tarea ───────────────────────────────────────────────
+
+export async function updateTareaAction(
+  id: number,
+  updates: { titulo?: string; prioridad?: string; fecha?: string | null },
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("tareas").update(updates as never).eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard");
 }
 
 // ─── Cambiar estado de tarea ──────────────────────────────────────────────────

@@ -12,8 +12,7 @@ import { createClient } from "@/lib/supabase-browser";
 
 type PropiedadResumen = {
   id: number;
-  estado: string | null;
-  fecha_visita: string | null;
+  contactado?: boolean | null;
 };
 
 type Sector = {
@@ -27,9 +26,7 @@ type Sector = {
 };
 
 function estaContactada(p: PropiedadResumen): boolean {
-  const tieneEstadoActivo =
-    p.estado !== null && p.estado !== "neutral" && p.estado !== "investigacion";
-  return tieneEstadoActivo || !!p.fecha_visita;
+  return p.contactado === true;
 }
 
 type Props = {

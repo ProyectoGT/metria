@@ -69,11 +69,37 @@ export async function toggleContactadoAction(
   const yo = await getCurrentUserContext();
   if (!yo) return { error: "No autenticado" };
   const supabase = await createClient();
+
   const { error } = await supabase
     .from("propiedades")
     .update({ contactado } as never)
     .eq("id", propiedadId);
   if (error) return { error: error.message };
+
+  const admin = createAdminClient();
+  if (contactado) {
+    await admin.from("actividad_desarrollo").insert({
+      agente_id: yo.id,
+      actor_user_id: yo.id,
+      empresa_id: yo.empresaId ?? null,
+      equipo_id: yo.equipoId ?? null,
+      metric: "contactos",
+      action: "contactado",
+      source_table: "propiedades",
+      source_id: propiedadId,
+      value: 1,
+      occurred_at: new Date().toISOString(),
+      metadata: {},
+    } as never);
+  } else {
+    await admin
+      .from("actividad_desarrollo")
+      .delete()
+      .eq("source_table", "propiedades")
+      .eq("source_id", propiedadId)
+      .eq("metric", "contactos");
+  }
+
   return {};
 }
 

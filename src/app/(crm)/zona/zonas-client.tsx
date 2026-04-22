@@ -16,7 +16,7 @@ type Sector = {
   posicion: number | null;
   fincas: Array<{
     id: number;
-    propiedades: Array<{ id: number }>;
+    propiedades: Array<{ id: number; contactado?: boolean | null }>;
   }>;
 };
 
@@ -303,7 +303,7 @@ export default function ZonasClient({
       {/* Cabecera */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Zona / Sectores</h1>
+          <h1 className="text-2xl font-bold text-text-primary">Zona</h1>
           <p className="mt-1 text-sm text-text-secondary">
             {zonas.length} {zonas.length === 1 ? "zona" : "zonas"} ·{" "}
             {zonas.reduce((acc, z) => acc + z.sectores.length, 0)} sectores en total
@@ -512,8 +512,9 @@ export default function ZonasClient({
                           <tr className="border-b border-border bg-background">
                             <th className="w-8 px-2 py-2.5" />
                             <th className="px-4 py-2.5 text-left text-xs font-medium text-text-secondary">Sector</th>
-                            <th className="w-28 px-4 py-2.5 text-center text-xs font-medium text-text-secondary">Fincas</th>
-                            <th className="w-28 px-4 py-2.5 text-center text-xs font-medium text-text-secondary">Propiedades</th>
+                            <th className="w-24 px-4 py-2.5 text-center text-xs font-medium text-text-secondary">Fincas</th>
+                            <th className="w-24 px-4 py-2.5 text-center text-xs font-medium text-text-secondary">Propiedades</th>
+                            <th className="w-44 px-4 py-2.5 text-center text-xs font-medium text-text-secondary">Contactados</th>
                             <th className="w-10 px-4 py-2.5" />
                           </tr>
                         </thead>
@@ -523,7 +524,10 @@ export default function ZonasClient({
                               <tbody className="divide-y divide-border" ref={provS.innerRef} {...provS.droppableProps}>
                                 {zona.sectores.map((sector, sIdx) => {
                                   const fincaCount = sector.fincas?.length ?? 0;
-                                  const propCount = sector.fincas?.reduce((acc, f) => acc + (f.propiedades?.length ?? 0), 0) ?? 0;
+                                  const todasProps = sector.fincas?.flatMap((f) => f.propiedades ?? []) ?? [];
+                                  const propCount = todasProps.length;
+                                  const contactCount = todasProps.filter((p) => p.contactado === true).length;
+                                  const pct = propCount > 0 ? Math.round((contactCount / propCount) * 100) : null;
                                   return (
                                     <Draggable key={sector.id} draggableId={String(sector.id)} index={sIdx}>
                                       {(dragS, snapS) => (
@@ -542,11 +546,26 @@ export default function ZonasClient({
                                           <td className="px-4 py-3 font-medium text-text-primary" onClick={() => router.push(`/zona/${zona.id}/sector/${sector.id}`)}>
                                             Sector {sector.numero}
                                           </td>
-                                          <td className="w-28 px-4 py-3 text-center text-text-secondary" onClick={() => router.push(`/zona/${zona.id}/sector/${sector.id}`)}>
+                                          <td className="w-24 px-4 py-3 text-center text-text-secondary" onClick={() => router.push(`/zona/${zona.id}/sector/${sector.id}`)}>
                                             {fincaCount}
                                           </td>
-                                          <td className="w-28 px-4 py-3 text-center text-text-secondary" onClick={() => router.push(`/zona/${zona.id}/sector/${sector.id}`)}>
+                                          <td className="w-24 px-4 py-3 text-center text-text-secondary" onClick={() => router.push(`/zona/${zona.id}/sector/${sector.id}`)}>
                                             {propCount}
+                                          </td>
+                                          <td className="w-44 px-4 py-3" onClick={() => router.push(`/zona/${zona.id}/sector/${sector.id}`)}>
+                                            {pct !== null ? (
+                                              <div className="flex items-center gap-2">
+                                                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
+                                                  <div
+                                                    className={`h-full rounded-full ${pct >= 80 ? "bg-green-500" : pct >= 50 ? "bg-amber-400" : "bg-red-400"}`}
+                                                    style={{ width: `${pct}%` }}
+                                                  />
+                                                </div>
+                                                <span className={`w-9 shrink-0 text-right text-xs font-medium ${pct >= 80 ? "text-green-600" : pct >= 50 ? "text-amber-600" : "text-red-500"}`}>{pct}%</span>
+                                              </div>
+                                            ) : (
+                                              <span className="text-text-secondary">-</span>
+                                            )}
                                           </td>
                                           <td className="w-10 px-4 py-3 text-right">
                                             {canDeleteSectores && (
