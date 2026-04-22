@@ -59,6 +59,8 @@ export type KanbanCardData = {
   assignedBy?: string | null;
   assignedTo?: string | null;
   resultado?: string | null;
+  isCompleted?: boolean;
+  fromOrdenDia?: boolean;
 };
 
 export type KanbanColumnData = {

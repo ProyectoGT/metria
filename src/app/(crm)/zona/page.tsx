@@ -13,7 +13,7 @@ export default async function ZonaPage() {
   const [{ data: allZonas }, { data: usuariosData }, { data: accesosData }, ordenZonas, ordenSectores] = await Promise.all([
     supabase
       .from("zona")
-      .select("id, nombre, sectores(id, numero, fincas(id, propiedades(id)))")
+      .select("id, nombre, sectores(id, numero, fincas(id, propiedades(id, contactado)))")
       .order("nombre"),
     // Solo admins/directores necesitan la lista de usuarios para gestionar accesos
     isManager

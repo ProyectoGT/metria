@@ -94,14 +94,14 @@ export default function UsersManagementPanel({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
+            <div className="relative min-w-[140px] flex-1 md:flex-none">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar"
-                className="input h-9 pl-9 pr-3 md:w-64"
+                className="input h-9 w-full pl-9 pr-3 md:w-64"
               />
             </div>
             <select
@@ -136,25 +136,19 @@ export default function UsersManagementPanel({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full table-fixed text-sm">
-              <colgroup>
-                <col style={{ width: "45%" }} />
-                <col style={{ width: "25%" }} />
-                <col style={{ width: "25%" }} />
-                <col style={{ width: "5%" }} />
-              </colgroup>
+            <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-background">
                   <th className="px-5 py-3 text-left font-medium text-text-secondary">
                     Usuario
                   </th>
-                  <th className="px-5 py-3 text-left font-medium text-text-secondary">
+                  <th className="hidden sm:table-cell px-5 py-3 text-left font-medium text-text-secondary">
                     Rango
                   </th>
                   <th className="px-5 py-3 text-left font-medium text-text-secondary">
                     Estado
                   </th>
-                  <th className="px-5 py-3" />
+                  <th className="w-12 px-5 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -318,7 +312,7 @@ function UserRow({
           </div>
         </div>
       </td>
-      <td className="px-5 py-3.5">
+      <td className="hidden sm:table-cell px-5 py-3.5">
         <RoleBadge role={user.rol} />
       </td>
       <td className="px-5 py-3.5">
@@ -664,10 +658,6 @@ function RoleBadge({ role }: { role: string }) {
 function StatusBadge({ status, hasAccess }: { status: string; hasAccess: boolean }) {
   const normalized = status.toLowerCase();
 
-  // disabled + sin authId = pendiente de verificación de email (creado con Google Only, nunca verificó)
-  // active + sin authId  = verificado, pendiente de primer login con Google
-  // active + con authId  = activo normal
-  // disabled + con authId = desactivado por admin
   const effectiveStatus =
     normalized === "disabled" && !hasAccess
       ? "sin_verificar"
@@ -675,7 +665,7 @@ function StatusBadge({ status, hasAccess }: { status: string; hasAccess: boolean
         ? "pending_google"
         : normalized;
 
-  const className =
+  const badgeClass =
     effectiveStatus === "active"
       ? "bg-success/15 text-success dark:bg-success/25"
       : effectiveStatus === "pending_google"
@@ -683,6 +673,15 @@ function StatusBadge({ status, hasAccess }: { status: string; hasAccess: boolean
         : effectiveStatus === "sin_verificar"
           ? "bg-amber-500/15 text-amber-600 dark:bg-amber-500/25"
           : "bg-danger/15 text-danger dark:bg-danger/25";
+
+  const dotClass =
+    effectiveStatus === "active"
+      ? "bg-success"
+      : effectiveStatus === "pending_google"
+        ? "bg-blue-500"
+        : effectiveStatus === "sin_verificar"
+          ? "bg-amber-500"
+          : "bg-danger";
 
   const label =
     effectiveStatus === "active"
@@ -694,8 +693,11 @@ function StatusBadge({ status, hasAccess }: { status: string; hasAccess: boolean
           : "Desactivado";
 
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${className}`}>
-      {label}
-    </span>
+    <>
+      <span className={`sm:hidden inline-block h-2.5 w-2.5 rounded-full ${dotClass}`} title={label} />
+      <span className={`hidden sm:inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${badgeClass}`}>
+        {label}
+      </span>
+    </>
   );
 }

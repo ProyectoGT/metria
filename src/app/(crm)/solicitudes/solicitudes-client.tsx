@@ -411,7 +411,7 @@ export default function PedidosClient({
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-surface shadow-sm">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[780px] text-sm">
             <thead>
               <tr className="border-b border-border bg-background">
                 <th className="px-5 py-3 text-left font-medium text-text-secondary">

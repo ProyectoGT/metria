@@ -2,16 +2,17 @@ import type { AgentMetrics } from "@/lib/mock/dashboard";
 
 type AgentPerformanceTableProps = {
   agents: AgentMetrics[];
+  role: string;
 };
 
 const RADIUS = 18;
 const CIRC = 2 * Math.PI * RADIUS;
 
-const METRICS = [
-  { key: "facturado", obj: "objetivo_facturado", label: "Facturado", color: "var(--color-primary)", isCurrency: true },
-  { key: "encargos", obj: "objetivo_encargos", label: "Encargos", color: "#7c3aed", isCurrency: false },
-  { key: "ventas", obj: "objetivo_ventas", label: "Ventas", color: "var(--color-success)", isCurrency: false },
-  { key: "contactos", obj: "objetivo_contactos", label: "Contactos", color: "var(--color-accent)", isCurrency: false },
+const ALL_METRICS = [
+  { key: "contactos", obj: "objetivo_contactos", label: "Contactos", color: "var(--color-accent)", isCurrency: false, adminOnly: false },
+  { key: "encargos", obj: "objetivo_encargos", label: "Encargos", color: "#7c3aed", isCurrency: false, adminOnly: false },
+  { key: "ventas", obj: "objetivo_ventas", label: "Ventas", color: "var(--color-success)", isCurrency: false, adminOnly: false },
+  { key: "facturado", obj: "objetivo_facturado", label: "Facturado", color: "var(--color-primary)", isCurrency: true, adminOnly: true },
 ] as const;
 
 function fmtNum(v: number, isCurrency: boolean) {
@@ -50,7 +51,9 @@ function MiniRing({ value, objetivo, color }: { value: number; objetivo: number;
   );
 }
 
-export default function AgentPerformanceTable({ agents }: AgentPerformanceTableProps) {
+export default function AgentPerformanceTable({ agents, role }: AgentPerformanceTableProps) {
+  const canSeeFacturado = role === "Administrador" || role === "Director";
+  const METRICS = ALL_METRICS.filter((m) => !m.adminOnly || canSeeFacturado);
   return (
     <div className="rounded-xl bg-surface p-6 shadow-sm">
       <div className="mb-5">

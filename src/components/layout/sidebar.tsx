@@ -22,7 +22,7 @@ import {
 
 const baseNavItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Zona / Sectores", href: "/zona", icon: MapPin },
+  { label: "Zona", href: "/zona", icon: MapPin },
   { label: "Solicitudes", href: "/solicitudes", icon: ClipboardList },
   { label: "Desarrollo", href: "/desarrollo", icon: TrendingUp },
   { label: "Calendario", href: "/calendario", icon: Calendar },

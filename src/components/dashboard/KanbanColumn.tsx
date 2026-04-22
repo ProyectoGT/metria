@@ -14,7 +14,8 @@ type KanbanColumnProps = {
   onDeleteColumn: (columnId: string) => void;
   onAddCard?: (columnId: string) => void;
   onDeleteCard: (columnId: string, cardId: string) => void;
-  onCompleteCard?: (columnId: string, cardId: string) => void;
+  onEditCard: (columnId: string, card: KanbanCardData) => void;
+  onCompleteCard?: (columnId: string, cardId: string, card: KanbanCardData) => void;
 };
 
 export default function KanbanColumn({
@@ -22,9 +23,14 @@ export default function KanbanColumn({
   onDeleteColumn,
   onAddCard,
   onDeleteCard,
+  onEditCard,
   onCompleteCard,
 }: KanbanColumnProps) {
   const [hovered, setHovered] = useState(false);
+
+  const activeCount = column.cards.filter((c) => !c.isCompleted).length;
+  const totalCount = column.cards.length;
+  const countLabel = activeCount === totalCount ? String(activeCount) : `${activeCount}/${totalCount}`;
 
   return (
     <div
@@ -32,20 +38,17 @@ export default function KanbanColumn({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-text-primary">{column.title}</h3>
           <span className="rounded-full bg-background px-2 py-0.5 text-xs font-medium text-text-secondary">
-            {column.cards.length}
+            {countLabel}
           </span>
         </div>
         {!column.fixed && (
           <button
             onClick={() => onDeleteColumn(column.id)}
-            className={`rounded p-1 text-text-secondary transition-all hover:bg-danger/10 hover:text-danger ${
-              hovered ? "opacity-100" : "opacity-0"
-            }`}
+            className={`rounded p-1 text-text-secondary transition-all hover:bg-danger/10 hover:text-danger ${hovered ? "opacity-100" : "opacity-0"}`}
             aria-label="Eliminar columna"
           >
             <X className="h-4 w-4" />
@@ -53,7 +56,6 @@ export default function KanbanColumn({
         )}
       </div>
 
-      {/* Cards (droppable area) */}
       <Droppable droppableId={column.id}>
         {(provided, snapshot) => (
           <div
@@ -74,9 +76,10 @@ export default function KanbanColumn({
                     <KanbanCard
                       card={card}
                       canDelete={!card.assignedBy}
-                      isCompleted={column.id === "completado"}
+                      isCompleted={card.isCompleted ?? false}
                       onDelete={(id) => onDeleteCard(column.id, id)}
-                      onComplete={(id) => onCompleteCard?.(column.id, id)}
+                      onEdit={(id) => { const c = column.cards.find((x) => x.id === id); if (c) onEditCard(column.id, c); }}
+                      onComplete={onCompleteCard ? (id) => onCompleteCard(column.id, id, card) : undefined}
                       dragHandleProps={dragProvided.dragHandleProps ?? undefined}
                       isDragging={dragSnapshot.isDragging}
                     />
@@ -89,7 +92,6 @@ export default function KanbanColumn({
         )}
       </Droppable>
 
-      {/* Footer: add card (oculto en columna Realizado) */}
       {onAddCard && (
         <div className="border-t border-border p-2">
           <button

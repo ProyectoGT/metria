@@ -106,6 +106,7 @@ export default async function DesarrolloPage() {
         totalNoticias={totalNoticias ?? 0}
         canManageObjectives={canManageObjectives}
         defaultAnio={anioActual}
+        role={role}
       />
     </>
   );

@@ -25,6 +25,7 @@ type Props = {
   totalNoticias: number;
   canManageObjectives: boolean;
   defaultAnio: number;
+  role: string;
 };
 
 const MESES_LABEL = [
@@ -32,13 +33,14 @@ const MESES_LABEL = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-const METRICS = [
+const ALL_METRICS = [
   {
-    key: "facturado" as const,
-    objKey: "objetivo_facturado" as const,
-    label: "Facturado",
-    color: "var(--color-accent)",
-    isCurrency: true,
+    key: "contactos" as const,
+    objKey: "objetivo_contactos" as const,
+    label: "Contactos",
+    color: "var(--color-primary)",
+    isCurrency: false,
+    adminOnly: false,
   },
   {
     key: "encargos" as const,
@@ -46,6 +48,7 @@ const METRICS = [
     label: "Encargos",
     color: "#7c3aed",
     isCurrency: false,
+    adminOnly: false,
   },
   {
     key: "ventas" as const,
@@ -53,13 +56,15 @@ const METRICS = [
     label: "Ventas",
     color: "var(--color-success)",
     isCurrency: false,
+    adminOnly: false,
   },
   {
-    key: "contactos" as const,
-    objKey: "objetivo_contactos" as const,
-    label: "Contactos",
-    color: "var(--color-primary)",
-    isCurrency: false,
+    key: "facturado" as const,
+    objKey: "objetivo_facturado" as const,
+    label: "Facturado",
+    color: "var(--color-accent)",
+    isCurrency: true,
+    adminOnly: true,
   },
 ] as const;
 
@@ -92,7 +97,10 @@ export default function DesarrolloClient({
   totalNoticias,
   canManageObjectives,
   defaultAnio,
+  role,
 }: Props) {
+  const canSeeFacturado = role === "Administrador" || role === "Director";
+  const METRICS = ALL_METRICS.filter((m) => !m.adminOnly || canSeeFacturado);
   const supabase = useMemo(() => createClient(), []);
 
   const [anio, setAnio] = useState(defaultAnio);
@@ -246,21 +254,23 @@ export default function DesarrolloClient({
     { label: "Noticias", value: String(totalNoticias), color: "var(--color-primary)" },
     { label: "Encargos", value: String(totals.encargos), color: "#7c3aed" },
     { label: "Ventas", value: String(totals.ventas), color: "var(--color-success)" },
-    { label: "Facturado", value: fmtNum(totals.facturado, true), color: "var(--color-accent)" },
+    ...(canSeeFacturado
+      ? [{ label: "Facturado", value: fmtNum(totals.facturado, true), color: "var(--color-accent)" }]
+      : []),
   ];
 
   return (
     <div className="space-y-6">
 
       {/* ── Resumen de rendimiento ─────────────────────────────────── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-3 sm:gap-4 ${canSeeFacturado ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
         {summaryCards.map(({ label, value, color }) => (
-          <div key={label} className="rounded-xl border border-border bg-surface p-5">
+          <div key={label} className="rounded-xl border border-border bg-surface p-3 sm:p-5">
             <div className="mb-2 flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
               <p className="text-xs font-medium text-text-secondary">{label}</p>
             </div>
-            <p className="text-2xl font-bold text-text-primary">{value}</p>
+            <p className="text-xl font-bold text-text-primary sm:text-2xl">{value}</p>
           </div>
         ))}
       </div>
