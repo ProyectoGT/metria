@@ -64,16 +64,32 @@ export async function upsertPropiedadAction(
 
 export async function toggleContactadoAction(
   propiedadId: number,
-  contactado: boolean
+  contactado: boolean,
+  contactadoHasta?: string | null
 ): Promise<{ error?: string }> {
   const yo = await getCurrentUserContext();
   if (!yo) return { error: "No autenticado" };
   const supabase = await createClient();
 
-  const { error } = await supabase
+  const patch: Record<string, unknown> = { contactado };
+  if (contactado && contactadoHasta) patch.contactado_hasta = contactadoHasta;
+  if (!contactado) patch.contactado_hasta = null;
+
+  let { error } = await supabase
     .from("propiedades")
-    .update({ contactado } as never)
+    .update(patch as never)
     .eq("id", propiedadId);
+
+  // Si falla por columna inexistente (migración pendiente), reintenta sin ella
+  if (error && error.message?.includes("contactado_hasta")) {
+    const { contactado_hasta: _ignored, ...patchSinColumna } = patch as Record<string, unknown> & { contactado_hasta?: unknown };
+    const retry = await supabase
+      .from("propiedades")
+      .update(patchSinColumna as never)
+      .eq("id", propiedadId);
+    error = retry.error;
+  }
+
   if (error) return { error: error.message };
 
   const admin = createAdminClient();

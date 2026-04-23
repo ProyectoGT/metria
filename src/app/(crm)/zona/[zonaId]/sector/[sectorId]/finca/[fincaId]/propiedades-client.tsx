@@ -35,6 +35,7 @@ type Propiedad = {
   longitud?: number | null;
   created_at?: string | null;
   contactado?: boolean;
+  contactado_hasta?: string | null;
   usuarios: { id: number; nombre: string; apellidos: string } | null;
   _order?: number;
 };
@@ -100,7 +101,24 @@ function isContactada(propiedad: Propiedad): boolean {
 }
 
 function isContactadaCaducada(propiedad: Propiedad): boolean {
-  return !!propiedad.contactado && isOverdue(propiedad.fecha_visita);
+  if (!propiedad.contactado) return false;
+  // Si tiene fecha de desmarque explícita, usarla
+  if (propiedad.contactado_hasta) {
+    return Date.now() > new Date(propiedad.contactado_hasta).getTime();
+  }
+  // Fallback: 90 días desde fecha_visita
+  return isOverdue(propiedad.fecha_visita);
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function toDatetimeLocal(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function nowLocalDatetime() {
@@ -184,6 +202,11 @@ export default function PropiedadesClient({
       prev.includes(estado) ? prev.filter((e) => e !== estado) : [...prev, estado]
     );
   }
+
+  // Modal de confirmación de contactado
+  const [contactadoModal, setContactadoModal] = useState<Propiedad | null>(null);
+  const [contactadoDias, setContactadoDias] = useState(90);
+  const [contactadoSaving, setContactadoSaving] = useState(false);
 
   // Recordatorio modal
   const [reminderPropiedad, setReminderPropiedad] = useState<Propiedad | null>(null);
@@ -400,30 +423,57 @@ export default function PropiedadesClient({
     toast("Propiedad eliminada");
   }
 
-  async function handleToggleContactado(propiedad: Propiedad) {
-    const next = !propiedad.contactado;
-    const nextFechaVisita = next ? nowLocalDatetime() : propiedad.fecha_visita;
+  function handleToggleContactado(propiedad: Propiedad) {
+    if (propiedad.contactado) {
+      // Desmarcar: directo, sin modal
+      handleConfirmDesmarcar(propiedad);
+    } else {
+      // Marcar: mostrar modal para confirmar días
+      setContactadoDias(90);
+      setContactadoModal(propiedad);
+    }
+  }
+
+  async function handleConfirmDesmarcar(propiedad: Propiedad) {
+    setPropiedades((prev) =>
+      prev.map((p) => p.id === propiedad.id ? { ...p, contactado: false, contactado_hasta: null } : p)
+    );
+    const { error } = await toggleContactadoAction(propiedad.id, false);
+    if (error) {
+      setPropiedades((prev) =>
+        prev.map((p) => p.id === propiedad.id ? { ...p, contactado: true, contactado_hasta: propiedad.contactado_hasta } : p)
+      );
+      toast("Error al guardar", "error");
+    }
+  }
+
+  async function handleConfirmContactado() {
+    if (!contactadoModal) return;
+    setContactadoSaving(true);
+    const hasta = addDays(new Date(), contactadoDias).toISOString();
+    const nextFechaVisita = nowLocalDatetime();
 
     setPropiedades((prev) =>
       prev.map((p) =>
-        p.id === propiedad.id
-          ? { ...p, contactado: next, fecha_visita: nextFechaVisita }
+        p.id === contactadoModal.id
+          ? { ...p, contactado: true, contactado_hasta: hasta, fecha_visita: nextFechaVisita }
           : p
       )
     );
 
-    const { error } = await toggleContactadoAction(propiedad.id, next);
-
+    const { error } = await toggleContactadoAction(contactadoModal.id, true, hasta);
     if (error) {
       setPropiedades((prev) =>
         prev.map((p) =>
-          p.id === propiedad.id
-            ? { ...p, contactado: !next, fecha_visita: propiedad.fecha_visita }
+          p.id === contactadoModal.id
+            ? { ...p, contactado: false, contactado_hasta: null, fecha_visita: contactadoModal.fecha_visita }
             : p
         )
       );
       toast("Error al guardar", "error");
     }
+    setContactadoSaving(false);
+    setContactadoModal(null);
   }
 
   function handleDragEnd(result: DropResult) {
@@ -892,18 +942,7 @@ export default function PropiedadesClient({
                                   title={propiedad.contactado ? "Marcar como no contactado" : "Marcar como contactado"}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const next = !propiedad.contactado;
-                                    setPropiedades((prev) =>
-                                      prev.map((p) => p.id === propiedad.id ? { ...p, contactado: next } : p)
-                                    );
-                                    toggleContactadoAction(propiedad.id, next).then(({ error }) => {
-                                      if (error) {
-                                        setPropiedades((prev) =>
-                                          prev.map((p) => p.id === propiedad.id ? { ...p, contactado: !next } : p)
-                                        );
-                                        toast("Error al guardar", "error");
-                                      }
-                                    });
+                                    handleToggleContactado(propiedad);
                                   }}
                                   className="flex items-center justify-center"
                                 >
@@ -1049,6 +1088,85 @@ export default function PropiedadesClient({
           </table>
         </div>
         </>
+      )}
+
+      {/* ── Modal confirmar contactado ── */}
+      {contactadoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-surface shadow-xl">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <div>
+                <h2 className="text-base font-semibold text-text-primary">Marcar como contactado</h2>
+                <p className="mt-0.5 text-xs text-text-secondary">
+                  {contactadoModal.propietario ?? `Planta ${contactadoModal.planta ?? "-"} Puerta ${contactadoModal.puerta ?? "-"}`}
+                </p>
+              </div>
+              <button
+                onClick={() => setContactadoModal(null)}
+                className="rounded-lg p-1.5 text-text-secondary hover:bg-background hover:text-text-primary"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <p className="text-sm text-text-secondary">
+                La casilla se desmarcara automaticamente tras el periodo indicado.
+              </p>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+                  Dias hasta el desmarque automatico
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min={1}
+                    max={730}
+                    value={contactadoDias}
+                    onChange={(e) => setContactadoDias(Math.max(1, Math.min(730, Number(e.target.value))))}
+                    className="input w-24 text-center text-sm"
+                  />
+                  <span className="text-sm text-text-secondary">dias</span>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border bg-background px-4 py-3">
+                <p className="text-xs text-text-secondary">Se desmarcara el</p>
+                <p className="mt-0.5 text-sm font-semibold text-text-primary">
+                  {addDays(new Date(), contactadoDias).toLocaleDateString("es-ES", {
+                    weekday: "long", day: "numeric", month: "long", year: "numeric",
+                  })}
+                </p>
+              </div>
+
+              {contactadoDias !== 90 && (
+                <button
+                  onClick={() => setContactadoDias(90)}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Restablecer a 90 dias
+                </button>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+              <button
+                onClick={() => setContactadoModal(null)}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmContactado}
+                disabled={contactadoSaving}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60"
+              >
+                {contactadoSaving ? "Guardando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal recordatorio */}

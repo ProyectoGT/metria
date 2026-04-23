@@ -9,29 +9,53 @@ export default async function OrdenesPage() {
   const yo = await getCurrentUserContext();
 
   if (!yo) {
-    return (
-      <div className="p-6 text-text-secondary">No autenticado.</div>
-    );
+    return <div className="p-6 text-text-secondary">No autenticado.</div>;
   }
 
-  // ── Determinar qué user IDs puede ver este usuario ──────────────────
-  let allowedUserIds: number[] | null = null; // null = todos (Admin/Director)
+  const today = new Date().toISOString().split("T")[0];
+
+  let allowedUserIds: number[] | null = null;
 
   if (canViewAllAgents(yo.role)) {
-    allowedUserIds = null; // sin filtro
+    allowedUserIds = null;
   } else if (canViewSupervisedAgents(yo.role)) {
-    // Responsable: sus propias tareas + las de sus supervisados
     allowedUserIds = [yo.id, ...yo.supervisedAgentIds];
   } else {
-    // Agente: solo las suyas
     allowedUserIds = [yo.id];
   }
 
-  // ── Query de tareas ─────────────────────────────────────────────────
+  // Mover tareas de dias pasados no completadas a pendientes (sin fecha)
+  {
+    let q = supabase
+      .from("tareas")
+      .update({ fecha: null })
+      .lt("fecha", today)
+      .neq("estado", "completado");
+    if (allowedUserIds !== null) q = q.in("owner_user_id", allowedUserIds);
+    await q;
+  }
+
+  // Eliminar tareas de dias pasados ya completadas
+  {
+    let q = supabase
+      .from("tareas")
+      .delete()
+      .lt("fecha", today)
+      .eq("estado", "completado");
+    if (allowedUserIds !== null) q = q.in("owner_user_id", allowedUserIds);
+    await q;
+  }
+
+  // Obtener tareas de hoy + pendientes (sin fecha)
+  // Usamos rango completo del dia para capturar timestamps con hora (ej: 2026-04-23T20:00:00)
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
   let tareasQuery = supabase
     .from("tareas")
     .select("*")
-    .order("fecha", { ascending: true, nullsFirst: false })
+    .or(`fecha.is.null,and(fecha.gte.${today}T00:00:00,fecha.lt.${tomorrowStr}T00:00:00)`)
     .order("id", { ascending: false });
 
   if (allowedUserIds !== null) {
@@ -40,7 +64,6 @@ export default async function OrdenesPage() {
 
   const { data: tareas } = await tareasQuery;
 
-  // ── Query de usuarios visibles (para mostrar nombre y crear tareas para ellos) ─
   let usuariosQuery = supabase
     .from("usuarios")
     .select("id, nombre, apellidos")
@@ -52,17 +75,24 @@ export default async function OrdenesPage() {
 
   const { data: usuarios } = await usuariosQuery;
 
+  const fechaHoy = new Date().toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
   return (
     <>
       <PageHeader
-        title="Órdenes del día"
-        description="Gestiona las tareas diarias"
+        title="Orden del dia"
+        description={`Tareas de hoy — ${fechaHoy}`}
       />
       <OrdenesClient
         initialTareas={tareas ?? []}
         currentUserId={yo.id}
         currentUserRole={yo.role}
         usuarios={usuarios ?? []}
+        today={today}
       />
     </>
   );

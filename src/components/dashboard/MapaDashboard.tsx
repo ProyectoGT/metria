@@ -138,7 +138,7 @@ export default function MapaDashboard({
   ];
 
   return (
-    <section className="rounded-2xl border border-border bg-surface shadow-sm overflow-hidden">
+    <section className="flex h-full w-full flex-col rounded-2xl border border-border bg-surface shadow-sm overflow-hidden">
       {/* Header con título y leyenda */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-border">
         <div>
@@ -183,7 +183,7 @@ export default function MapaDashboard({
       </div>
 
       {/* Mapa */}
-      <div style={{ height: 400 }}>
+      <div className="min-h-[300px] flex-1">
         <APIProvider apiKey={apiKey}>
           <Map
             defaultCenter={OFICINA}

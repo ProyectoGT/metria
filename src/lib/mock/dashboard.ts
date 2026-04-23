@@ -79,6 +79,8 @@ export type OrdenDiaTarea = {
   titulo: string;
   prioridad: KanbanPriority | null;
   fecha: string | null;
+  estado: "pendiente" | "en_progreso" | "completado";
+  resultado: string | null;
 };
 
 export type OrdenDiaAgente = {

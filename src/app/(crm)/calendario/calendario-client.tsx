@@ -22,6 +22,7 @@ type AgendaEvent = {
   completed: boolean;
   result: string | null;
   gcal_event_id: string | null;
+  tarea_id?: number | null;
   owner_user_id: number | null;
   created_at: string;
 };
@@ -168,7 +169,7 @@ export default function CalendarioClient({
 }: Props) {
   const today = useMemo(() => new Date(), []);
 
-  const [viewMode, setViewMode]       = useState<ViewMode>("month");
+  const [viewMode, setViewMode]       = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [weekStart, setWeekStart]     = useState(() => getWeekStart(today));
   const [selectedDate, setSelectedDate] = useState<Date>(today);
@@ -177,8 +178,8 @@ export default function CalendarioClient({
   const [tareas, setTareas]         = useState<TareaEvent[]>(initialTareas);
   const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
 
-  // Filter by user
-  const [filterUserId, setFilterUserId] = useState<number | "all">("all");
+  // Filter by user — default al usuario actual
+  const [filterUserId, setFilterUserId] = useState<number | "all">(currentUserId);
 
   const [modalOpen, setModalOpen]   = useState(false);
   const [editId, setEditId]         = useState<number | null>(null);
@@ -356,14 +357,44 @@ export default function CalendarioClient({
       const { data, error } = await insertOrUpdate(payload);
       if (error) setSaveError(error.message);
       else if (data) {
-        setEvents((prev) => prev.map((e) => e.id === editId ? (data as AgendaEvent) : e));
+        setEvents((prev) => prev.map((e) => e.id === editId ? (data as unknown as AgendaEvent) : e));
         toast("Actividad actualizada"); setModalOpen(false);
       }
     } else {
       const { data, error } = await insertOrUpdate(payload);
       if (error) setSaveError(error.message);
       else if (data) {
-        let saved = data as AgendaEvent;
+        let saved = data as unknown as AgendaEvent;
+
+        // Si el evento es para hoy, crear también una tarea en ordenes del día
+        if (form.event_date === todayStr) {
+          const horaDefault = form.time ? `${form.event_date}T${form.time}:00` : `${form.event_date}T20:00:00`;
+          const { data: tareaData } = await supabase
+            .from("tareas")
+            .insert({
+              titulo: form.description.trim(),
+              prioridad: form.priority,
+              fecha: horaDefault,
+              estado: "pendiente",
+              visibility: "private",
+              owner_user_id: currentUserId,
+            })
+            .select()
+            .single();
+          if (tareaData) {
+            const tareaId = (tareaData as unknown as { id: number }).id;
+            // Vincular tarea al evento de agenda
+            const { data: upd } = await supabase
+              .from("agenda")
+              .update({ tarea_id: tareaId } as never)
+              .eq("id", saved.id)
+              .select()
+              .single();
+            if (upd) saved = upd as unknown as AgendaEvent;
+            setTareas((prev) => [...prev, tareaData as unknown as TareaEvent]);
+          }
+        }
+
         if (isConnected) {
           const gcalRes = await fetch("/api/google/events", {
             method: "POST",
@@ -374,7 +405,7 @@ export default function CalendarioClient({
             const gcalData = await gcalRes.json();
             if (gcalData.id) {
               const { data: upd } = await supabase.from("agenda").update({ gcal_event_id: gcalData.id }).eq("id", saved.id).select().single();
-              if (upd) { saved = upd as AgendaEvent; await fetchGcalEvents(); }
+              if (upd) { saved = upd as unknown as AgendaEvent; await fetchGcalEvents(); }
             }
           }
         }
@@ -393,6 +424,11 @@ export default function CalendarioClient({
     const target = events.find((e) => e.id === deleteId);
     if (target?.gcal_event_id && isConnected) {
       await fetch("/api/google/events", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventId: target.gcal_event_id }) });
+    }
+    // Si tiene tarea vinculada, eliminarla también
+    if (target?.tarea_id) {
+      await supabase.from("tareas").delete().eq("id", target.tarea_id);
+      setTareas((prev) => prev.filter((t) => t.id !== target.tarea_id));
     }
     const { error } = await supabase.from("agenda").delete().eq("id", deleteId);
     if (error) toast("Error al eliminar: " + error.message, "error");

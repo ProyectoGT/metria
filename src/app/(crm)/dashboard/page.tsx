@@ -388,17 +388,25 @@ export default async function DashboardPage() {
   const showOrdenDia =
     role === "Administrador" || role === "Director" || role === "Responsable";
 
+  const today = new Date().toISOString().split("T")[0];
   const ordenDiaAgentes: OrdenDiaAgente[] = showOrdenDia
     ? visibleAgentes.map((a) => ({
         id: a.id,
         nombre: `${a.nombre} ${a.apellidos}`.trim(),
         tareas: tareas
-          .filter((t) => t.owner_user_id === a.id && t.estado !== "completado")
+          .filter((t) => {
+            if (t.owner_user_id !== a.id) return false;
+            // solo tareas de hoy o sin fecha (pendientes)
+            const fechaKey = t.fecha ? t.fecha.split("T")[0] : null;
+            return fechaKey === today || fechaKey === null;
+          })
           .map((t) => ({
             id: t.id,
             titulo: t.titulo,
             prioridad: normalizeNullablePriority(t.prioridad),
             fecha: t.fecha,
+            estado: t.estado as "pendiente" | "en_progreso" | "completado",
+            resultado: t.resultado ?? null,
           })),
       }))
     : [];
@@ -468,11 +476,11 @@ export default async function DashboardPage() {
 
       {/* 5 — Orden del día + Mapa (grid en desktop grande, mapa primero en móvil) */}
       {showOrdenDia ? (
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-          <div className="order-2 xl:order-1">
+        <div className="grid grid-cols-1 items-stretch gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" style={{ minHeight: 480 }}>
+          <div className="order-2 flex xl:order-1">
             <OrdenDiaPanel agentes={ordenDiaAgentes} />
           </div>
-          <div className="order-1 xl:order-2">
+          <div className="order-1 flex xl:order-2">
             <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
           </div>
         </div>
@@ -502,7 +510,7 @@ export default async function DashboardPage() {
 
       {/* 8 — Rendimiento / Mi actividad */}
       {showAgentPerformance && <AgentPerformanceTable agents={agentMetrics} role={role} />}
-      {showMyActivity && <MyActivity rendimiento={ownMetrics} />}
+      {showMyActivity && <MyActivity rendimiento={ownMetrics} role={role} />}
     </div>
   );
 }
