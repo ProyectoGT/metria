@@ -245,7 +245,7 @@ function ComisionCalc() {
   const [precioFinal, setPrecioFinal] = useState("");
   const [pct, setPct] = useState("5");
   const [modo, setModo] = useState<"base_a_final" | "final_a_base">("base_a_final");
-  const [incluirIva, setIncluirIva] = useState(false);
+  const [incluirIva, setIncluirIva] = useState(true);
 
   const IVA = 0.21;
 
