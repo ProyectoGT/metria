@@ -3,6 +3,7 @@ import type { Rendimiento } from "@/lib/mock/dashboard";
 
 type MyActivityProps = {
   rendimiento: Rendimiento;
+  role?: string;
 };
 
 type Stat = {
@@ -22,7 +23,7 @@ function fmtNum(v: number, isCurrency = false) {
   return `${v} €`;
 }
 
-export default function MyActivity({ rendimiento }: MyActivityProps) {
+export default function MyActivity({ rendimiento, role }: MyActivityProps) {
   const stats: Stat[] = [
     {
       label: "Facturado",
@@ -69,7 +70,7 @@ export default function MyActivity({ rendimiento }: MyActivityProps) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => {
+        {stats.filter((s) => !(s.label === "Facturado" && role === "Agente")).map((stat) => {
           const pct = stat.objetivo > 0 ? Math.min(Math.round((stat.value / stat.objetivo) * 100), 100) : 0;
           return (
             <div key={stat.label} className="rounded-lg border border-border p-4">

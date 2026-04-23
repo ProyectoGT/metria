@@ -86,7 +86,7 @@ export default async function CalendarioPage() {
   return (
     <>
       <CalendarioClient
-        initialEvents={events ?? []}
+        initialEvents={(events ?? []) as unknown as Parameters<typeof CalendarioClient>[0]["initialEvents"]}
         initialTareas={filteredTareas}
         isConnected={isConnected}
         role={role}
