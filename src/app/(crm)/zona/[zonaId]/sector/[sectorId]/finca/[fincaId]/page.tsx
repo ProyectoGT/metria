@@ -43,6 +43,25 @@ export default async function FincaDetailPage({
 
   if (!zona || !sector || !finca) notFound();
 
+  // Convierte el valor de planta en un número de orden semántico para edificios:
+  // sótano < bajo < entresuelo < 1 < 2 ... < ático
+  function plantaRank(planta: string | null): number {
+    const s = (planta ?? "").trim().toLowerCase();
+    if (!s) return 500;
+    if (/^s[oó]t/.test(s) || s === "ss" || s === "sb" || s === "s") return -200;
+    if (/^(b[aá]j|baj[ao]|b\.?j\.?$|bj$|b$|bajo$|bajos$|baixo$)/.test(s)) return -100;
+    if (/^(e\.?n\.?$|en$|entre|entres)/.test(s)) return 0;
+    if (/^(at[ií]|[áa]t\.?$|[áa]tico|penthouse|ph$)/.test(s)) return 9000;
+    // número puro o con sufijo (1, 2, 3A, 10...)
+    const num = parseFloat(s);
+    if (!isNaN(num)) return num * 100;
+    // intenta extraer primer número del string (ej. "3B" → 300)
+    const match = s.match(/^(\d+)/);
+    if (match) return parseFloat(match[1]) * 100;
+    // fallback alfabético desplazado al final
+    return 5000 + s.charCodeAt(0);
+  }
+
   const propiedades = (propiedadesRaw ?? [])
     .map((p) => ({ ...p, posicion: ordenPropiedades[p.id] ?? null }))
     .sort((a, b) => {
@@ -50,8 +69,8 @@ export default async function FincaDetailPage({
       if (ap != null && bp != null) return ap - bp;
       if (ap != null) return -1;
       if (bp != null) return 1;
-      const pa = String(a.planta ?? ""), pb = String(b.planta ?? "");
-      if (pa !== pb) return pa.localeCompare(pb, "es", { numeric: true });
+      const ra = plantaRank(a.planta), rb = plantaRank(b.planta);
+      if (ra !== rb) return ra - rb;
       return String(a.puerta ?? "").localeCompare(String(b.puerta ?? ""), "es", { numeric: true });
     });
 

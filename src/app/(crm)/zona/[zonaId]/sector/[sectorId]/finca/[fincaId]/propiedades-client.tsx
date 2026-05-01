@@ -425,10 +425,16 @@ export default function PropiedadesClient({
 
   function handleToggleContactado(propiedad: Propiedad) {
     if (propiedad.contactado) {
-      // Desmarcar: directo, sin modal
       handleConfirmDesmarcar(propiedad);
     } else {
-      // Marcar: mostrar modal para confirmar días
+      // Marcar directamente con 90 días por defecto
+      handleConfirmMarcar(propiedad, 90);
+    }
+  }
+
+  function handleToggleContactadoContextMenu(e: React.MouseEvent, propiedad: Propiedad) {
+    e.preventDefault();
+    if (!propiedad.contactado) {
       setContactadoDias(90);
       setContactadoModal(propiedad);
     }
@@ -447,31 +453,35 @@ export default function PropiedadesClient({
     }
   }
 
-  async function handleConfirmContactado() {
-    if (!contactadoModal) return;
-    setContactadoSaving(true);
-    const hasta = addDays(new Date(), contactadoDias).toISOString();
+  async function handleConfirmMarcar(propiedad: Propiedad, dias: number) {
+    const hasta = addDays(new Date(), dias).toISOString();
     const nextFechaVisita = nowLocalDatetime();
 
     setPropiedades((prev) =>
       prev.map((p) =>
-        p.id === contactadoModal.id
+        p.id === propiedad.id
           ? { ...p, contactado: true, contactado_hasta: hasta, fecha_visita: nextFechaVisita }
           : p
       )
     );
 
-    const { error } = await toggleContactadoAction(contactadoModal.id, true, hasta);
+    const { error } = await toggleContactadoAction(propiedad.id, true, hasta);
     if (error) {
       setPropiedades((prev) =>
         prev.map((p) =>
-          p.id === contactadoModal.id
-            ? { ...p, contactado: false, contactado_hasta: null, fecha_visita: contactadoModal.fecha_visita }
+          p.id === propiedad.id
+            ? { ...p, contactado: false, contactado_hasta: null, fecha_visita: propiedad.fecha_visita }
             : p
         )
       );
       toast("Error al guardar", "error");
     }
+  }
+
+  async function handleConfirmContactado() {
+    if (!contactadoModal) return;
+    setContactadoSaving(true);
+    await handleConfirmMarcar(contactadoModal, contactadoDias);
     setContactadoSaving(false);
     setContactadoModal(null);
   }
@@ -762,10 +772,14 @@ export default function PropiedadesClient({
                   <div className="flex min-w-0 items-start gap-2">
                     <button
                       className="mt-0.5 shrink-0"
-                      title={propiedad.contactado ? "Marcar como no contactado" : "Marcar como contactado"}
+                      title={propiedad.contactado ? "Marcar como no contactado" : "Clic: marcar 90 dias · Clic derecho: personalizar dias"}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleToggleContactado(propiedad);
+                      }}
+                      onContextMenu={(e) => {
+                        e.stopPropagation();
+                        handleToggleContactadoContextMenu(e, propiedad);
                       }}
                     >
                       {propiedad.contactado ? (
@@ -939,10 +953,14 @@ export default function PropiedadesClient({
                               {/* Casilla contactado */}
                               <td className="w-8 px-2 py-3">
                                 <button
-                                  title={propiedad.contactado ? "Marcar como no contactado" : "Marcar como contactado"}
+                                  title={propiedad.contactado ? "Marcar como no contactado" : "Clic: marcar 90 dias · Clic derecho: personalizar dias"}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleToggleContactado(propiedad);
+                                  }}
+                                  onContextMenu={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleContactadoContextMenu(e, propiedad);
                                   }}
                                   className="flex items-center justify-center"
                                 >
