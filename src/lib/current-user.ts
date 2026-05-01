@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase";
 import {
   canDeleteFincas,
@@ -29,15 +30,17 @@ export type CurrentUserContext = {
   supervisedAgentIds: number[];
 };
 
-export async function getCurrentUserContext(): Promise<CurrentUserContext | null> {
+// cache() deduplicates calls within the same render request — no extra DB queries
+// when multiple Server Components call getCurrentUserContext() on the same page.
+export const getCurrentUserContext = cache(async (): Promise<CurrentUserContext | null> => {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
+
+  const profileSelect = "id, nombre, apellidos, rol, correo, auth_id, empresa_id, equipo_id";
 
   let profile:
     | {
@@ -53,55 +56,28 @@ export async function getCurrentUserContext(): Promise<CurrentUserContext | null
     | null
     | undefined = null;
 
-  const profileSelect =
-    "id, nombre, apellidos, rol, correo, auth_id, empresa_id, equipo_id";
-  const fallbackSelect = "id, nombre, apellidos, correo, auth_id";
-
-  const byAuthId = await supabase
+  const { data: byAuthId } = await supabase
     .from("usuarios")
     .select(profileSelect)
     .eq("auth_id", user.id)
     .maybeSingle();
 
-  if (byAuthId.error && byAuthId.error.message.includes("column")) {
-    const fallbackByAuthId = await supabase
-      .from("usuarios")
-      .select(fallbackSelect)
-      .eq("auth_id", user.id)
-      .maybeSingle();
-
-    profile = fallbackByAuthId.data as typeof profile;
-  } else {
-    profile = byAuthId.data;
-  }
+  profile = byAuthId;
 
   if (!profile && user.email) {
-    const byEmail = await supabase
+    const { data: byEmail } = await supabase
       .from("usuarios")
       .select(profileSelect)
       .eq("correo", user.email)
       .maybeSingle();
 
-    if (byEmail.error && byEmail.error.message.includes("column")) {
-      const fallbackByEmail = await supabase
-        .from("usuarios")
-        .select(fallbackSelect)
-        .eq("correo", user.email)
-        .maybeSingle();
-
-      profile = fallbackByEmail.data as typeof profile;
-    } else {
-      profile = byEmail.data;
-    }
+    profile = byEmail;
   }
 
-  if (!profile) {
-    return null;
-  }
+  if (!profile) return null;
 
   const role = normalizeUserRole(profile.rol);
 
-  // Para Responsable: obtener IDs de los agentes que supervisa
   let supervisedAgentIds: number[] = [];
   if (canViewSupervisedAgents(role)) {
     const { data: supervised } = await supabase
@@ -128,4 +104,4 @@ export async function getCurrentUserContext(): Promise<CurrentUserContext | null
     canViewAllAgents: canViewAllAgents(role),
     supervisedAgentIds,
   };
-}
+});
