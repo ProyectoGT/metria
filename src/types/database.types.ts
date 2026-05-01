@@ -187,6 +187,49 @@ export interface Database {
           },
         ];
       };
+      encargo_visitas: {
+        Row: {
+          id: number;
+          propiedad_id: number;
+          agente_id: number | null;
+          agente_nombre: string;
+          fecha_visita: string;
+          observaciones: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          propiedad_id: number;
+          agente_id?: number | null;
+          agente_nombre: string;
+          fecha_visita?: string;
+          observaciones?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          propiedad_id?: number;
+          agente_id?: number | null;
+          agente_nombre?: string;
+          fecha_visita?: string;
+          observaciones?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "encargo_visitas_propiedad_id_fkey";
+            columns: ["propiedad_id"];
+            referencedRelation: "propiedades";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "encargo_visitas_agente_id_fkey";
+            columns: ["agente_id"];
+            referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       encargo_notas: {
         Row: {
           id: number;

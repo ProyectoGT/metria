@@ -1478,6 +1478,8 @@ export default function PropiedadesClient({
       {encargoPropiedad && (
         <EncargoPanel
           propiedad={encargoPropiedad}
+          agentes={agentes}
+          currentUserId={currentUserId}
           onClose={() => setEncargoPropiedad(null)}
           onEdit={() => {
             setEncargoPropiedad(null);
