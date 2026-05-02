@@ -123,8 +123,8 @@ export default function DesarrolloClient({
       const range = getPeriodRange(newAnio, newMes);
       const [{ data: objetivos }, { data: actividades }] = await Promise.all([
         newMes === 0
-          ? supabase.from("rendimiento").select("*").eq("anio", newAnio).gte("mes", 1).lte("mes", 12)
-          : supabase.from("rendimiento").select("*").eq("anio", newAnio).eq("mes", newMes),
+          ? supabase.from("rendimiento").select("agente_id, anio, mes, facturado, objetivo_facturado, encargos, objetivo_encargos, ventas, objetivo_ventas, contactos, objetivo_contactos").eq("anio", newAnio).gte("mes", 1).lte("mes", 12)
+          : supabase.from("rendimiento").select("agente_id, anio, mes, facturado, objetivo_facturado, encargos, objetivo_encargos, ventas, objetivo_ventas, contactos, objetivo_contactos").eq("anio", newAnio).eq("mes", newMes),
         supabase
           .from("actividad_desarrollo")
           .select("agente_id, metric, value")

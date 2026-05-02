@@ -153,10 +153,10 @@ export default async function DashboardPage() {
     { data: noticiasMapData },
     { data: encargosMapData },
   ] = await Promise.all([
-    applyPropFilters(supabase.from("propiedades").select("*", { count: "exact", head: true }).ilike("estado", "noticia")),
-    applyPropFilters(supabase.from("propiedades").select("*", { count: "exact", head: true }).ilike("estado", "investig%")),
-    applyPropFilters(supabase.from("propiedades").select("*", { count: "exact", head: true }).ilike("estado", "encarg%")),
-    applyPedidoFilters(supabase.from("pedidos").select("*", { count: "exact", head: true })),
+    applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "noticia")),
+    applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "investig%")),
+    applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "encarg%")),
+    applyPedidoFilters(supabase.from("pedidos").select("id", { count: "exact", head: true })),
 
     applyPropFilters(
       supabase.from("propiedades").select(propSelect).ilike("estado", "noticia").order("id", { ascending: false }).limit(50)
@@ -174,7 +174,7 @@ export default async function DashboardPage() {
     ),
 
     supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
-    supabase.from("rendimiento").select("*").eq("anio", anioActual).eq("mes", 0),
+    supabase.from("rendimiento").select("agente_id, anio, mes, facturado, objetivo_facturado, encargos, objetivo_encargos, ventas, objetivo_ventas, contactos, objetivo_contactos").eq("anio", anioActual).eq("mes", 0),
     supabase
       .from("actividad_desarrollo")
       .select("agente_id, metric, value")

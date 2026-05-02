@@ -187,6 +187,90 @@ export interface Database {
           },
         ];
       };
+      idealista_leads: {
+        Row: {
+          id: number;
+          gmail_message_id: string;
+          nombre: string | null;
+          email_contacto: string | null;
+          telefono: string | null;
+          mensaje: string | null;
+          referencia: string | null;
+          url_propiedad: string | null;
+          titulo_propiedad: string | null;
+          asunto: string | null;
+          fecha_contacto: string | null;
+          estado: string;
+          notas: string | null;
+          empresa_id: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          gmail_message_id: string;
+          nombre?: string | null;
+          email_contacto?: string | null;
+          telefono?: string | null;
+          mensaje?: string | null;
+          referencia?: string | null;
+          url_propiedad?: string | null;
+          titulo_propiedad?: string | null;
+          asunto?: string | null;
+          fecha_contacto?: string | null;
+          estado?: string;
+          notas?: string | null;
+          empresa_id?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          estado?: string;
+          notas?: string | null;
+        };
+        Relationships: [];
+      };
+      encargo_visitas: {
+        Row: {
+          id: number;
+          propiedad_id: number;
+          agente_id: number | null;
+          agente_nombre: string;
+          fecha_visita: string;
+          observaciones: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          propiedad_id: number;
+          agente_id?: number | null;
+          agente_nombre: string;
+          fecha_visita?: string;
+          observaciones?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          propiedad_id?: number;
+          agente_id?: number | null;
+          agente_nombre?: string;
+          fecha_visita?: string;
+          observaciones?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "encargo_visitas_propiedad_id_fkey";
+            columns: ["propiedad_id"];
+            referencedRelation: "propiedades";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "encargo_visitas_agente_id_fkey";
+            columns: ["agente_id"];
+            referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       encargo_notas: {
         Row: {
           id: number;
@@ -374,9 +458,13 @@ export interface Database {
           telefono: string | null;
           tipo_propiedad: string | null;
           zona_deseada: number | null;
+          zona_busqueda: string | null;
           presupuesto: number | null;
           compra_alquiler: boolean | null;
+          modalidad: string | null;
           habitaciones: number | null;
+          banos: number | null;
+          altura_deseada: string | null;
           garaje: boolean | null;
           origen: string | null;
           referencia: string | null;
@@ -386,6 +474,7 @@ export interface Database {
           empresa_id: number | null;
           equipo_id: number | null;
           visibility: string;
+          visibility_agente_ids: number[] | null;
         };
         Insert: {
           id?: number;
@@ -393,9 +482,13 @@ export interface Database {
           telefono?: string | null;
           tipo_propiedad?: string | null;
           zona_deseada?: number | null;
+          zona_busqueda?: string | null;
           presupuesto?: number | null;
           compra_alquiler?: boolean | null;
+          modalidad?: string | null;
           habitaciones?: number | null;
+          banos?: number | null;
+          altura_deseada?: string | null;
           garaje?: boolean | null;
           origen?: string | null;
           referencia?: string | null;
@@ -405,6 +498,7 @@ export interface Database {
           empresa_id?: number | null;
           equipo_id?: number | null;
           visibility?: string;
+          visibility_agente_ids?: number[] | null;
           resultado?: string | null;
         };
         Update: {
@@ -413,9 +507,13 @@ export interface Database {
           telefono?: string | null;
           tipo_propiedad?: string | null;
           zona_deseada?: number | null;
+          zona_busqueda?: string | null;
           presupuesto?: number | null;
           compra_alquiler?: boolean | null;
+          modalidad?: string | null;
           habitaciones?: number | null;
+          banos?: number | null;
+          altura_deseada?: string | null;
           garaje?: boolean | null;
           origen?: string | null;
           referencia?: string | null;
@@ -425,6 +523,7 @@ export interface Database {
           empresa_id?: number | null;
           equipo_id?: number | null;
           visibility?: string;
+          visibility_agente_ids?: number[] | null;
         };
         Relationships: [
           {

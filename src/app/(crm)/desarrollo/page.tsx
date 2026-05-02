@@ -51,7 +51,7 @@ export default async function DesarrolloPage() {
   ] = await Promise.all([
     supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
     // Cargar todos los meses del año para calcular objetivos anuales correctamente
-    supabase.from("rendimiento").select("*").eq("anio", anioActual).gte("mes", 1).lte("mes", 12),
+    supabase.from("rendimiento").select("agente_id, anio, mes, facturado, objetivo_facturado, encargos, objetivo_encargos, ventas, objetivo_ventas, contactos, objetivo_contactos").eq("anio", anioActual).gte("mes", 1).lte("mes", 12),
     supabase
       .from("actividad_desarrollo")
       .select("agente_id, metric, value")
@@ -61,7 +61,7 @@ export default async function DesarrolloPage() {
       let q = applyPropFilters(
         supabase
           .from("propiedades")
-          .select("*", { count: "exact", head: true })
+          .select("id", { count: "exact", head: true })
           .ilike("estado", "noticia"),
       );
       if (role === "Agente") q = q.eq("agente_asignado", userId);

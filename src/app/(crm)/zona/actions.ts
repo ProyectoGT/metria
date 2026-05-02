@@ -48,6 +48,7 @@ export async function upsertPropiedadAction(
 
     if (error) return { error: error.message };
     revalidatePath(`/zona`);
+    revalidatePath(`/dashboard`);
     return { data: data as Record<string, unknown> };
   } else {
     const { data, error } = await supabase
@@ -58,6 +59,7 @@ export async function upsertPropiedadAction(
 
     if (error) return { error: error.message };
     revalidatePath(`/zona`);
+    revalidatePath(`/dashboard`);
     return { data: data as Record<string, unknown> };
   }
 }

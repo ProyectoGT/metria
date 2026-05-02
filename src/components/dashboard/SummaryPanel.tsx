@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import {
   Newspaper,
@@ -159,11 +159,6 @@ export default function SummaryPanel({ summary, listings }: SummaryPanelProps) {
 
   const activeCard = CARDS.find((c) => c.key === activeKey);
 
-  const cardHandlers = useMemo(
-    () => Object.fromEntries(CARDS.map((c) => [c.key, () => setActiveKey(c.key)])) as Record<SummaryType, () => void>,
-    [],
-  );
-
   const handleClose = useCallback(() => setActiveKey(null), []);
 
   return (
@@ -179,7 +174,7 @@ export default function SummaryPanel({ summary, listings }: SummaryPanelProps) {
             activeBg={card.activeBg}
             icon={card.icon}
             isActive={activeKey === card.key}
-            onClick={cardHandlers[card.key]}
+            onClick={() => setActiveKey(card.key)}
           />
         ))}
       </div>
@@ -200,7 +195,10 @@ export default function SummaryPanel({ summary, listings }: SummaryPanelProps) {
             <div className="h-4 w-px bg-border" />
             <h2 className="font-semibold text-text-primary">{activeCard.label}</h2>
             <span className="ml-1 text-sm text-text-secondary">
-              — {listings[activeKey].length} propiedades
+              — {summary[activeKey]} {activeKey === "pedidosActivos" ? "pedidos" : "propiedades"}
+              {listings[activeKey].length < summary[activeKey] && (
+                <span className="ml-1 text-xs opacity-60">(mostrando {listings[activeKey].length})</span>
+              )}
             </span>
           </div>
 

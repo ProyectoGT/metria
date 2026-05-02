@@ -98,28 +98,48 @@ function SquarePin() {
   );
 }
 
-// Componente interno que ajusta el encuadre del mapa automáticamente
-function MapBoundsAdjuster({ points }: { points: { lat: number; lng: number }[] }) {
+// Zoom aproximado para un radio de 10 km
+const ZOOM_10KM = 12;
+
+// Centra el mapa en la ubicación del usuario (radio ~10 km).
+// Si el usuario no da permiso, hace fitBounds sobre los puntos como antes.
+function MapLocationInit({ points }: { points: { lat: number; lng: number }[] }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!map || points.length === 0) return;
+    if (!map) return;
 
-    const bounds = new google.maps.LatLngBounds();
-    // Incluir la oficina siempre
-    bounds.extend(OFICINA);
-    points.forEach((p) => bounds.extend(p));
-
-    if (points.length === 1) {
-      // Un solo punto: centrar y zoom fijo
-      map.fitBounds(bounds, 80);
-      map.setZoom(14);
-    } else {
-      map.fitBounds(bounds, 60);
+    if (!navigator.geolocation) {
+      fallbackFit(map, points);
+      return;
     }
-  }, [map, points]);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        map.setZoom(ZOOM_10KM);
+      },
+      () => fallbackFit(map, points),
+      { timeout: 5000 }
+    );
+  // Solo al montar — no queremos re-centrar si los puntos cambian
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map]);
 
   return null;
+}
+
+function fallbackFit(map: google.maps.Map, points: { lat: number; lng: number }[]) {
+  if (points.length === 0) {
+    map.setCenter(OFICINA);
+    map.setZoom(ZOOM_10KM);
+    return;
+  }
+  const bounds = new google.maps.LatLngBounds();
+  bounds.extend(OFICINA);
+  points.forEach((p) => bounds.extend(p));
+  map.fitBounds(bounds, points.length === 1 ? 80 : 60);
+  if (points.length === 1) map.setZoom(14);
 }
 
 export default function MapaDashboard({
@@ -192,7 +212,7 @@ export default function MapaDashboard({
             mapId="metria-dashboard-map"
             style={{ width: "100%", height: "100%" }}
           >
-            <MapBoundsAdjuster points={allPoints} />
+            <MapLocationInit points={allPoints} />
 
             {/* Polígonos de zonas */}
             {ZONA_POLIGONOS.map((z) => (
@@ -243,70 +263,89 @@ export default function MapaDashboard({
               <InfoWindow
                 position={{ lat: selected.latitud, lng: selected.longitud }}
                 onCloseClick={() => setSelected(null)}
+                pixelOffset={[0, -10]}
               >
-                <div className="min-w-[190px] space-y-1.5 p-1 font-sans">
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      style={{
-                        display: "inline-block",
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
+                <div style={{ fontFamily: "inherit", minWidth: 220, maxWidth: 280, padding: "2px 2px 4px" }}>
+                  {/* Badge tipo */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                    <span style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
+                      background: selected.tipo === "noticia" ? "#eff6ff" : "#f0fdf4",
+                      color: selected.tipo === "noticia" ? "#1d4ed8" : "#15803d",
+                      border: `1px solid ${selected.tipo === "noticia" ? "#bfdbfe" : "#bbf7d0"}`,
+                      borderRadius: 999,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}>
+                      <span style={{
+                        width: 7, height: 7, borderRadius: "50%",
                         background: selected.tipo === "noticia" ? "#3b82f6" : "#22c55e",
                         flexShrink: 0,
-                      }}
-                    />
-                    <span style={{ fontSize: 10, fontWeight: 600, color: selected.tipo === "noticia" ? "#1d4ed8" : "#15803d", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                      }} />
                       {selected.tipo === "noticia" ? "Noticia" : "Encargo"}
                     </span>
                   </div>
-                  <p style={{ fontWeight: 600, color: "#111827", margin: 0 }}>
-                    {selected.propietario?.trim() ||
-                      `Planta ${selected.planta ?? "-"} Puerta ${selected.puerta ?? "-"}`}
+
+                  {/* Nombre grande */}
+                  <p style={{ fontSize: 16, fontWeight: 700, color: "#111827", margin: "0 0 4px", lineHeight: 1.3 }}>
+                    {selected.propietario?.trim() || `Propiedad #${selected.id}`}
                   </p>
-                  <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
-                    {selected.sector} · Finca {selected.finca}
+
+                  {/* Planta / puerta si hay propietario */}
+                  {selected.propietario?.trim() && (selected.planta || selected.puerta) && (
+                    <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 4px" }}>
+                      Planta {selected.planta ?? "-"} · Puerta {selected.puerta ?? "-"}
+                    </p>
+                  )}
+
+                  {/* Ubicación */}
+                  <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 2px" }}>
+                    {selected.sector}
                   </p>
-                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px" }}>
+                    Finca {selected.finca}
+                  </p>
+
+                  {/* Coordenadas */}
+                  <p style={{ fontSize: 11, color: "#9ca3af", margin: "0 0 12px", fontVariantNumeric: "tabular-nums" }}>
+                    {selected.latitud.toFixed(5)}, {selected.longitud.toFixed(5)}
+                  </p>
+
+                  {/* Acciones */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <a
                       href={buildDirectionsUrl(selected.latitud, selected.longitud)}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        background: "#2563eb",
-                        color: "#fff",
-                        padding: "6px 12px",
-                        borderRadius: 6,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        textDecoration: "none",
+                        display: "flex", alignItems: "center", gap: 6,
+                        background: "#2563eb", color: "#fff",
+                        padding: "7px 12px", borderRadius: 7,
+                        fontSize: 12, fontWeight: 600, textDecoration: "none",
                       }}
                     >
-                      <Navigation style={{ width: 13, height: 13 }} />
+                      <Navigation style={{ width: 13, height: 13, flexShrink: 0 }} />
                       Como llegar desde la oficina
                     </a>
                     {selected.zonaId && selected.sectorId && selected.fincaId && (
                       <a
                         href={`/zona/${selected.zonaId}/sector/${selected.sectorId}/finca/${selected.fincaId}`}
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
+                          display: "flex", alignItems: "center", gap: 6,
                           background: selected.tipo === "noticia" ? "#eff6ff" : "#f0fdf4",
                           color: selected.tipo === "noticia" ? "#1d4ed8" : "#15803d",
                           border: `1px solid ${selected.tipo === "noticia" ? "#bfdbfe" : "#bbf7d0"}`,
-                          padding: "6px 12px",
-                          borderRadius: 6,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          textDecoration: "none",
+                          padding: "7px 12px", borderRadius: 7,
+                          fontSize: 12, fontWeight: 600, textDecoration: "none",
                         }}
                       >
-                        <FileText style={{ width: 13, height: 13 }} />
-                        Ver ficha
+                        <FileText style={{ width: 13, height: 13, flexShrink: 0 }} />
+                        Ver ficha de la finca
                       </a>
                     )}
                   </div>
