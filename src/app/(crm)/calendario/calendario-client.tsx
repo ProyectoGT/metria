@@ -446,7 +446,7 @@ export default function CalendarioClient({
           p_priority: p.priority,
           p_tipo: p.tipo,
           p_completed: p.completed,
-          p_result: p.result,
+          p_result: p.result ?? undefined,
           p_assigned_user_ids: assignedUserIds,
         });
       }
@@ -457,7 +457,7 @@ export default function CalendarioClient({
         p_priority: p.priority,
         p_tipo: p.tipo,
         p_completed: p.completed,
-        p_result: p.result,
+        p_result: p.result ?? undefined,
         p_assigned_user_ids: assignedUserIds,
         p_visibility: "private",
       });

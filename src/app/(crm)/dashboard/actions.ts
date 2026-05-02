@@ -58,7 +58,7 @@ export async function createAgendaAction(data: {
     p_priority: normalizeActivityPriority(data.priority),
     p_tipo: normalizeActivityType(data.tipo),
     p_completed: data.completed ?? false,
-    p_result: data.result ?? null,
+    p_result: data.result ?? undefined,
     p_assigned_user_ids: assignedUserIds,
     p_visibility: "private",
   });
@@ -101,7 +101,7 @@ export async function updateAgendaAction(
     p_priority: normalizeActivityPriority(updates.priority ?? existing.priority),
     p_tipo: normalizeActivityType(updates.tipo ?? existing.tipo),
     p_completed: updates.completed ?? existing.completed,
-    p_result: updates.result ?? existing.result ?? null,
+    p_result: updates.result ?? existing.result ?? undefined,
     p_assigned_user_ids: updates.assignedUserIds?.length ? updates.assignedUserIds : currentAssigned,
   });
   if (error) throw new Error(error.message);
@@ -138,7 +138,7 @@ export async function updateTareaAction(
     p_titulo: updates.titulo ?? existing.titulo,
     p_prioridad: updates.prioridad ?? existing.prioridad ?? "media",
     p_completed: updates.completed ?? existing.estado === "completado",
-    p_resultado: updates.resultado ?? existing.resultado ?? null,
+    p_resultado: updates.resultado ?? existing.resultado ?? undefined,
     p_assigned_user_ids: updates.assignedUserIds?.length ? updates.assignedUserIds : currentAssigned,
   });
   if (error) throw new Error(error.message);
@@ -156,7 +156,7 @@ export async function updateTareaEstadoAction(
   const { error } = await supabase.rpc("set_tarea_completed", {
     p_tarea_id: id,
     p_completed: estado === "completado",
-    p_resultado: null,
+    p_resultado: undefined,
   });
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
@@ -170,7 +170,7 @@ export async function completeTareaAction(id: number, resultado?: string): Promi
   const { error } = await supabase.rpc("set_tarea_completed", {
     p_tarea_id: id,
     p_completed: true,
-    p_resultado: resultado?.trim() || null,
+    p_resultado: resultado?.trim() || undefined,
   });
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
@@ -195,7 +195,7 @@ export async function completeAgendaAction(id: number, completed: boolean, resul
   const { error } = await supabase.rpc("set_agenda_completed", {
     p_agenda_id: id,
     p_completed: completed,
-    p_result: result?.trim() || null,
+    p_result: result?.trim() || undefined,
   });
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
@@ -212,7 +212,7 @@ export async function convertTareaToAgendaAction(
     p_tarea_id: id,
     p_event_date: normalizeDateKey(options?.date ?? localDateKey()),
     p_time: normalizeTime(options?.time, DEFAULT_ACTIVITY_TIME),
-    p_assigned_user_ids: options?.assignedUserIds ?? null,
+    p_assigned_user_ids: options?.assignedUserIds ?? undefined,
   });
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
@@ -225,7 +225,7 @@ export async function convertAgendaToTareaAction(id: number, assignedUserIds?: n
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("convert_agenda_to_tarea", {
     p_agenda_id: id,
-    p_assigned_user_ids: assignedUserIds ?? null,
+    p_assigned_user_ids: assignedUserIds ?? undefined,
   });
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");

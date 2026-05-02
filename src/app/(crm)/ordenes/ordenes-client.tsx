@@ -160,7 +160,7 @@ export default function OrdenesClient({
       p_time: normalizeTime(form.time, DEFAULT_ACTIVITY_TIME),
       p_priority: priority,
       p_tipo: tipo,
-      p_result: form.result.trim() || null,
+      p_result: form.result.trim() || undefined,
       p_completed: form.completed,
       p_assigned_user_ids: form.assignedUserIds,
     };
@@ -197,7 +197,7 @@ export default function OrdenesClient({
     const { data, error } = await supabase.rpc("set_agenda_completed", {
       p_agenda_id: actividad.id,
       p_completed: completed,
-      p_result: completed ? actividad.result : null,
+      p_result: completed ? (actividad.result ?? undefined) : undefined,
     });
     setCompletingId(null);
     if (error || !data) {

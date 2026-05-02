@@ -17,17 +17,19 @@ import {
   Moon,
   Sun,
   Users,
+  BookUser,
   X,
 } from "lucide-react";
 
 const baseNavItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Zona", href: "/zona", icon: MapPin },
-  { label: "Solicitudes", href: "/solicitudes", icon: ClipboardList },
-  { label: "Desarrollo", href: "/desarrollo", icon: TrendingUp },
-  { label: "Calendario", href: "/calendario", icon: Calendar },
-  { label: "Órdenes del día", href: "/ordenes", icon: FileText },
-  { label: "Calculadora", href: "/calculadora", icon: Calculator },
+  { label: "Dashboard",      href: "/dashboard",  icon: LayoutDashboard },
+  { label: "Zona",           href: "/zona",        icon: MapPin },
+  { label: "Solicitudes",    href: "/solicitudes", icon: ClipboardList },
+  { label: "Contactos",      href: "/contactos",   icon: BookUser },
+  { label: "Desarrollo",     href: "/desarrollo",  icon: TrendingUp },
+  { label: "Calendario",     href: "/calendario",  icon: Calendar },
+  { label: "Ordenes del dia",href: "/ordenes",     icon: FileText },
+  { label: "Calculadora",    href: "/calculadora", icon: Calculator },
 ];
 
 interface Props {

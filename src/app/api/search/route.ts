@@ -5,7 +5,7 @@ import { SearchSchema } from "@/lib/validations/search";
 
 export type SearchResult = {
   id: string;
-  type: "propiedad" | "finca" | "sector" | "zona" | "solicitud" | "usuario" | "ticket" | "tarea";
+  type: "propiedad" | "finca" | "sector" | "zona" | "solicitud" | "usuario" | "ticket" | "tarea" | "contacto";
   label: string;
   sublabel?: string;
   href: string;
@@ -169,6 +169,28 @@ export async function GET(request: NextRequest) {
         label: t.asunto || `Ticket #${t.id}`,
         sublabel: [t.tipo, t.estado, t.nombre_usuario].filter(Boolean).join(" · ") || undefined,
         href: "/soporte",
+      });
+    }
+  }
+
+  // ── Contactos ────────────────────────────────────────────────────
+  if (ctx === "contactos" || ctx === "general") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: contactos } = await (supabase as any)
+      .from("contactos")
+      .select("id, nombre, apellidos, empresa, tipo, email, telefono")
+      .is("archived_at", null)
+      .or(`nombre.ilike.%${q}%,apellidos.ilike.%${q}%,empresa.ilike.%${q}%,email.ilike.%${q}%,telefono.ilike.%${q}%`)
+      .limit(ctx === "contactos" ? 10 : 5);
+
+    for (const c of (contactos ?? []) as Array<{ id: number; nombre: string; apellidos: string | null; empresa: string | null; tipo: string | null; email: string | null; telefono: string | null }>) {
+      const nombre = [c.nombre, c.apellidos].filter(Boolean).join(" ");
+      results.push({
+        id: `contacto-${c.id}`,
+        type: "contacto",
+        label: nombre || `Contacto #${c.id}`,
+        sublabel: [c.tipo, c.empresa ?? c.email ?? c.telefono].filter(Boolean).join(" · ") || undefined,
+        href: "/contactos",
       });
     }
   }
