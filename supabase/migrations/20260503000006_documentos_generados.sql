@@ -1,0 +1,101 @@
+-- Registro de documentos generados desde plantillas del CRM.
+-- El contenido HTML se genera en servidor y se imprime/descarga en cliente.
+-- No almacenamos el HTML completo, solo metadatos del documento generado.
+
+create table if not exists public.documentos_generados (
+  id bigserial primary key,
+  empresa_id bigint references public.empresas (id) on delete cascade,
+
+  -- Sujeto (al menos uno obligatorio)
+  propiedad_id bigint references public.propiedades (id) on delete set null,
+  pedido_id    bigint references public.pedidos (id) on delete set null,
+  contacto_id  bigint references public.contactos (id) on delete set null,
+
+  -- Tipo de plantilla usada
+  -- ficha_propiedad | resumen_pedido | encargo_venta | encargo_alquiler
+  tipo_documento varchar(60) not null,
+
+  -- Agente que generó el documento
+  generado_por bigint references public.usuarios (id) on delete set null,
+
+  created_at timestamptz not null default now(),
+
+  constraint documento_subject_check check (
+    propiedad_id is not null or pedido_id is not null or contacto_id is not null
+  )
+);
+
+create index if not exists idx_documentos_empresa
+  on public.documentos_generados (empresa_id, created_at desc);
+
+create index if not exists idx_documentos_propiedad
+  on public.documentos_generados (propiedad_id)
+  where propiedad_id is not null;
+
+create index if not exists idx_documentos_pedido
+  on public.documentos_generados (pedido_id)
+  where pedido_id is not null;
+
+-- Trigger: rellena empresa_id desde contexto de sesión
+create or replace function public.apply_documento_generado_defaults()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.empresa_id is null then
+    new.empresa_id := public.current_empresa_id();
+  end if;
+  if new.generado_por is null then
+    new.generado_por := public.current_usuario_id();
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_documento_generado_defaults on public.documentos_generados;
+create trigger trg_documento_generado_defaults
+before insert on public.documentos_generados
+for each row execute function public.apply_documento_generado_defaults();
+
+-- RLS
+alter table public.documentos_generados enable row level security;
+
+create or replace function public.can_access_documento_generado(
+  row_empresa_id bigint,
+  row_generado_por bigint
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when auth.uid() is null then false
+    when row_empresa_id is distinct from public.current_empresa_id() then false
+    when public.current_user_role() in ('Administrador', 'Director') then true
+    when row_generado_por = public.current_usuario_id() then true
+    when public.current_user_role() = 'Responsable'
+      and row_generado_por in (select * from public.get_supervised_user_ids()) then true
+    else false
+  end
+$$;
+
+drop policy if exists documentos_select on public.documentos_generados;
+create policy documentos_select
+on public.documentos_generados
+for select
+using (public.can_access_documento_generado(empresa_id, generado_por));
+
+drop policy if exists documentos_insert on public.documentos_generados;
+create policy documentos_insert
+on public.documentos_generados
+for insert
+with check (
+  auth.uid() is not null
+  and empresa_id = public.current_empresa_id()
+);
+
+notify pgrst, 'reload schema';
