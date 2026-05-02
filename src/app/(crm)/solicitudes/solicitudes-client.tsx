@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { History, X } from "lucide-react";
+import { FileText, History, X } from "lucide-react";
+import DocumentGeneratorModal from "@/components/documents/DocumentGeneratorModal";
 import { createClient } from "@/lib/supabase-browser";
 import {
   ACCESS_SCOPE_BADGES,
@@ -127,6 +128,7 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<PedidoForm>(emptyForm());
   const [timelinePedido, setTimelinePedido] = useState<Pedido | null>(null);
+  const [docPedido, setDocPedido] = useState<Pedido | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -413,17 +415,30 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
               </h2>
               <div className="flex items-center gap-1">
                 {editId !== null && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const pedido = pedidos.find((p) => p.id === editId);
-                      if (pedido) setTimelinePedido(pedido);
-                    }}
-                    className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-primary"
-                    title="Timeline"
-                  >
-                    <History className="h-4 w-4" />
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pedido = pedidos.find((p) => p.id === editId);
+                        if (pedido) setDocPedido(pedido);
+                      }}
+                      className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-primary"
+                      title="Generar documento"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pedido = pedidos.find((p) => p.id === editId);
+                        if (pedido) setTimelinePedido(pedido);
+                      }}
+                      className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-primary"
+                      title="Timeline"
+                    >
+                      <History className="h-4 w-4" />
+                    </button>
+                  </>
                 )}
                 <button onClick={() => setModalOpen(false)} className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"><X className="h-4 w-4" /></button>
               </div>
@@ -666,6 +681,17 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
             </div>
           </div>
         </div>
+      )}
+
+      {docPedido && (
+        <DocumentGeneratorModal
+          subject={{
+            type: "pedido",
+            id: docPedido.id,
+            label: docPedido.nombre_cliente,
+          }}
+          onClose={() => setDocPedido(null)}
+        />
       )}
 
       <Toaster toasts={toasts} />

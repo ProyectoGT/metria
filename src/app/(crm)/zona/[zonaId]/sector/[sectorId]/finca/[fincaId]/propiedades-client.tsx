@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { SlidersHorizontal, X, MapPin, Loader2, Navigation } from "lucide-react";
+import { SlidersHorizontal, X, MapPin, Loader2, Navigation, FileText } from "lucide-react";
+import DocumentGeneratorModal from "@/components/documents/DocumentGeneratorModal";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deletePropiedadAction } from "@/app/actions/security";
 import { createAgendaAction } from "@/app/(crm)/dashboard/actions";
@@ -170,6 +171,7 @@ export default function PropiedadesClient({
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Propiedad | null>(null);
   const [encargoPropiedad, setEncargoPropiedad] = useState<Propiedad | null>(null);
+  const [docPropiedad, setDocPropiedad] = useState<Propiedad | null>(null);
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -853,6 +855,13 @@ export default function PropiedadesClient({
                   >
                     Recordatorio
                   </button>
+                  <button
+                    onClick={() => setDocPropiedad(propiedad)}
+                    className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-primary"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Documento
+                  </button>
                   {isEncargo && (
                     <button
                       onClick={() => setEncargoPropiedad(propiedad)}
@@ -1088,6 +1097,13 @@ export default function PropiedadesClient({
                                       Ver encargo
                                     </button>
                                   )}
+                                  <button
+                                    onClick={() => setDocPropiedad(propiedad)}
+                                    className="rounded px-2 py-1 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-primary"
+                                    title="Generar documento"
+                                  >
+                                    <FileText className="h-3.5 w-3.5" />
+                                  </button>
                                   <button
                                     onClick={() => openEdit(propiedad)}
                                     className="rounded px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
@@ -1487,6 +1503,18 @@ export default function PropiedadesClient({
             setDeleteError(null);
           }}
           onConfirm={handleDelete}
+        />
+      )}
+
+      {docPropiedad && (
+        <DocumentGeneratorModal
+          subject={{
+            type: "propiedad",
+            id: docPropiedad.id,
+            label: docPropiedad.propietario?.trim()
+              || `Planta ${docPropiedad.planta ?? "-"} Puerta ${docPropiedad.puerta ?? "-"}`,
+          }}
+          onClose={() => setDocPropiedad(null)}
         />
       )}
 
