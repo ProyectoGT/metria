@@ -20,6 +20,7 @@ import AgentPerformanceTable from "@/components/dashboard/AgentPerformanceTable"
 import MyActivity from "@/components/dashboard/MyActivity";
 import MapaDashboardLazy from "@/components/dashboard/MapaDashboardLazy";
 import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
+import { combineLocalDateTime, localDateKey, normalizeTime } from "@/lib/local-date-time";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -148,6 +149,7 @@ export default async function DashboardPage() {
     { data: rendimientoData },
     { data: actividadData },
     { data: tareasData },
+    { data: agendaData },
     { data: kanbanColsData },
     { data: agenteMesData },
     { data: noticiasMapData },
@@ -184,9 +186,19 @@ export default async function DashboardPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
       .from("tareas")
-      .select("id, titulo, prioridad, fecha, estado, resultado, from_orden_dia, owner_user_id")
-      .in("estado", ["pendiente", "en_progreso", "completado"])
-      .order("fecha", { ascending: true, nullsFirst: false }),
+      .select("id, titulo, prioridad, fecha, estado, resultado, from_orden_dia, owner_user_id, tarea_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .is("archived_at", null)
+      .is("fecha", null)
+      .in("estado", ["pendiente", "completado"])
+      .order("id", { ascending: false }),
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from("agenda")
+      .select("id, description, event_date, time, priority, completed, result, owner_user_id, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .is("archived_at", null)
+      .eq("event_date", localDateKey())
+      .order("time", { ascending: true, nullsFirst: false }),
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
@@ -195,9 +207,9 @@ export default async function DashboardPage() {
       .eq("user_id", userId)
       .order("orden", { ascending: true }),
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     yo?.empresaId
-      ? (supabase as any)
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any)
           .from("agente_del_mes")
           .select("id, mes, premio, agente_id, agente_nombre, anadido_por")
           .eq("empresa_id", yo.empresaId)
@@ -346,20 +358,69 @@ export default async function DashboardPage() {
     resultado?: string | null;
     from_orden_dia?: boolean | null;
     owner_user_id: number;
+    tarea_usuarios?: Array<{ usuario_id: number; usuarios?: { nombre: string | null; apellidos: string | null } | null }>;
   };
+
+  type AgendaDbRow = {
+    id: number;
+    description: string;
+    event_date: string;
+    time: string | null;
+    priority: string | null;
+    completed: boolean;
+    result: string | null;
+    owner_user_id: number | null;
+    agenda_usuarios?: Array<{ usuario_id: number; usuarios?: { nombre: string | null; apellidos: string | null } | null }>;
+  };
+
+  function assignedIdsFromRows(rows?: Array<{ usuario_id: number }>) {
+    return rows?.map((r) => r.usuario_id) ?? [];
+  }
+
+  function assignedNamesFromRows(rows?: Array<{ usuarios?: { nombre: string | null; apellidos: string | null } | null }>) {
+    return (rows ?? [])
+      .map((r) => `${r.usuarios?.nombre ?? ""} ${r.usuarios?.apellidos ?? ""}`.trim())
+      .filter(Boolean);
+  }
+
   const tareas: TareaDbRow[] = (tareasData ?? []) as TareaDbRow[];
-  const myTareas = tareas.filter((t) => t.owner_user_id === userId);
+  const agendaHoy: AgendaDbRow[] = (agendaData ?? []) as AgendaDbRow[];
+  const myTareas = tareas.filter((t) => assignedIdsFromRows(t.tarea_usuarios).includes(userId) || t.owner_user_id === userId);
+  const myAgendaHoy = agendaHoy.filter((a) => assignedIdsFromRows(a.agenda_usuarios).includes(userId) || a.owner_user_id === userId);
 
   function toCard(t: TareaDbRow) {
     return {
-      id: String(t.id),
+      id: `tarea-${t.id}`,
+      source: "tarea" as const,
+      dbId: t.id,
       title: t.titulo,
       priority: normalizePriority(t.prioridad),
       dueDate: t.fecha ?? undefined,
+      time: null,
       assignedBy: null,
+      assignedUserIds: assignedIdsFromRows(t.tarea_usuarios),
+      assignedUsers: assignedNamesFromRows(t.tarea_usuarios),
       resultado: t.resultado ?? null,
       isCompleted: t.estado === "completado",
       fromOrdenDia: t.from_orden_dia ?? false,
+    };
+  }
+
+  function agendaToCard(a: AgendaDbRow) {
+    return {
+      id: `agenda-${a.id}`,
+      source: "agenda" as const,
+      dbId: a.id,
+      title: a.description,
+      priority: normalizePriority(a.priority),
+      dueDate: combineLocalDateTime(a.event_date, normalizeTime(a.time, "09:00")),
+      time: normalizeTime(a.time, "09:00"),
+      assignedBy: null,
+      assignedUserIds: assignedIdsFromRows(a.agenda_usuarios),
+      assignedUsers: assignedNamesFromRows(a.agenda_usuarios),
+      resultado: a.result ?? null,
+      isCompleted: a.completed,
+      fromOrdenDia: true,
     };
   }
 
@@ -379,7 +440,10 @@ export default async function DashboardPage() {
         id: "en_progreso",
         title: "Orden del dia",
         fixed: true,
-        cards: myTareas.filter((t) => t.estado === "en_progreso").map(toCard),
+        cards: [
+          ...myAgendaHoy.filter((a) => !a.completed).map(agendaToCard),
+          ...myAgendaHoy.filter((a) => a.completed).map(agendaToCard),
+        ],
       },
     ],
   };
@@ -388,25 +452,24 @@ export default async function DashboardPage() {
   const showOrdenDia =
     role === "Administrador" || role === "Director" || role === "Responsable";
 
-  const today = new Date().toISOString().split("T")[0];
   const ordenDiaAgentes: OrdenDiaAgente[] = showOrdenDia
     ? visibleAgentes.map((a) => ({
         id: a.id,
         nombre: `${a.nombre} ${a.apellidos}`.trim(),
-        tareas: tareas
+        tareas: agendaHoy
           .filter((t) => {
-            if (t.owner_user_id !== a.id) return false;
-            // solo tareas de hoy o sin fecha (pendientes)
-            const fechaKey = t.fecha ? t.fecha.split("T")[0] : null;
-            return fechaKey === today || fechaKey === null;
+            const assigned = assignedIdsFromRows(t.agenda_usuarios);
+            return assigned.includes(a.id) || t.owner_user_id === a.id;
           })
           .map((t) => ({
             id: t.id,
-            titulo: t.titulo,
-            prioridad: normalizeNullablePriority(t.prioridad),
-            fecha: t.fecha,
-            estado: t.estado as "pendiente" | "en_progreso" | "completado",
-            resultado: t.resultado ?? null,
+            titulo: t.description,
+            prioridad: normalizeNullablePriority(t.priority),
+            fecha: t.event_date,
+            time: normalizeTime(t.time, "09:00"),
+            estado: t.completed ? "completado" : "en_progreso",
+            resultado: t.result ?? null,
+            assignedUsers: assignedNamesFromRows(t.agenda_usuarios),
           })),
       }))
     : [];

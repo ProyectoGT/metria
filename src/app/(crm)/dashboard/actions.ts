@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { revalidatePath } from "next/cache";
+import { DEFAULT_ACTIVITY_TIME, localDateKey, normalizeDateKey, normalizeTime } from "@/lib/local-date-time";
+import { normalizeActivityPriority, normalizeActivityType } from "@/lib/activity-options";
 
 // ─── Crear tarea ──────────────────────────────────────────────────────────────
 
@@ -11,41 +13,137 @@ export async function createTareaAction(data: {
   titulo: string;
   prioridad: string;
   fecha?: string;
-  estado?: "pendiente" | "en_progreso";
+  estado?: "pendiente" | "en_progreso" | "completado";
   fromOrdenDia?: boolean;
+  assignedUserIds?: number[];
 }): Promise<{ id: number }> {
   const supabase = await createClient();
   const yo = await getCurrentUserContext();
   if (!yo) throw new Error("No autenticado");
 
-  const { data: row, error } = await supabase
-    .from("tareas")
-    .insert({
-      titulo: data.titulo,
-      prioridad: data.prioridad,
-      fecha: data.fecha || null,
-      estado: data.estado ?? "pendiente",
-      from_orden_dia: data.fromOrdenDia ?? false,
-      owner_user_id: yo.id,
-    } as never)
-    .select("id")
-    .single();
+  const assignedUserIds = data.assignedUserIds?.length ? data.assignedUserIds : [yo.id];
+  const { data: row, error } = await supabase.rpc("create_pending_tarea", {
+    p_titulo: data.titulo,
+    p_prioridad: data.prioridad,
+    p_completed: data.estado === "completado",
+    p_assigned_user_ids: assignedUserIds,
+    p_visibility: "private",
+  });
 
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
+  revalidatePath("/ordenes");
   return { id: row.id };
+}
+
+export async function createAgendaAction(data: {
+  description: string;
+  eventDate: string;
+  time?: string | null;
+  priority?: string;
+  tipo?: string;
+  completed?: boolean;
+  result?: string | null;
+  assignedUserIds?: number[];
+}): Promise<{ id: number }> {
+  const supabase = await createClient();
+  const yo = await getCurrentUserContext();
+  if (!yo) throw new Error("No autenticado");
+
+  const assignedUserIds = data.assignedUserIds?.length ? data.assignedUserIds : [yo.id];
+  const { data: row, error } = await supabase.rpc("create_agenda_activity", {
+    p_description: data.description,
+    p_event_date: normalizeDateKey(data.eventDate),
+    p_time: normalizeTime(data.time, DEFAULT_ACTIVITY_TIME),
+    p_priority: normalizeActivityPriority(data.priority),
+    p_tipo: normalizeActivityType(data.tipo),
+    p_completed: data.completed ?? false,
+    p_result: data.result ?? undefined,
+    p_assigned_user_ids: assignedUserIds,
+    p_visibility: "private",
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard");
+  revalidatePath("/ordenes");
+  revalidatePath("/calendario");
+  return { id: row.id };
+}
+
+export async function updateAgendaAction(
+  id: number,
+  updates: {
+    description?: string;
+    eventDate?: string;
+    time?: string | null;
+    priority?: string;
+    tipo?: string;
+    completed?: boolean;
+    result?: string | null;
+    assignedUserIds?: number[];
+  },
+): Promise<void> {
+  const supabase = await createClient();
+  const { data: existing, error: readError } = await supabase
+    .from("agenda")
+    .select("description, event_date, time, priority, tipo, completed, result, agenda_usuarios(usuario_id)")
+    .eq("id", id)
+    .single();
+  if (readError) throw new Error(readError.message);
+
+  const currentAssigned = ((existing as unknown as { agenda_usuarios?: { usuario_id: number }[] }).agenda_usuarios ?? [])
+    .map((u) => u.usuario_id);
+  const { error } = await supabase.rpc("update_agenda_activity", {
+    p_agenda_id: id,
+    p_description: updates.description ?? existing.description,
+    p_event_date: normalizeDateKey(updates.eventDate ?? existing.event_date),
+    p_time: normalizeTime(updates.time ?? existing.time, DEFAULT_ACTIVITY_TIME),
+    p_priority: normalizeActivityPriority(updates.priority ?? existing.priority),
+    p_tipo: normalizeActivityType(updates.tipo ?? existing.tipo),
+    p_completed: updates.completed ?? existing.completed,
+    p_result: updates.result ?? existing.result ?? undefined,
+    p_assigned_user_ids: updates.assignedUserIds?.length ? updates.assignedUserIds : currentAssigned,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard");
+  revalidatePath("/ordenes");
+  revalidatePath("/calendario");
 }
 
 // ─── Actualizar titulo de tarea ───────────────────────────────────────────────
 
 export async function updateTareaAction(
   id: number,
-  updates: { titulo?: string; prioridad?: string; fecha?: string | null },
+  updates: {
+    titulo?: string;
+    prioridad?: string;
+    fecha?: string | null;
+    assignedUserIds?: number[];
+    completed?: boolean;
+    resultado?: string | null;
+  },
 ): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase.from("tareas").update(updates as never).eq("id", id);
+  const { data: existing, error: readError } = await supabase
+    .from("tareas")
+    .select("titulo, prioridad, estado, resultado, tarea_usuarios(usuario_id)")
+    .eq("id", id)
+    .single();
+  if (readError) throw new Error(readError.message);
+
+  const currentAssigned = ((existing as unknown as { tarea_usuarios?: { usuario_id: number }[] }).tarea_usuarios ?? [])
+    .map((u) => u.usuario_id);
+  const { error } = await supabase.rpc("update_pending_tarea", {
+    p_tarea_id: id,
+    p_titulo: updates.titulo ?? existing.titulo,
+    p_prioridad: updates.prioridad ?? existing.prioridad ?? "media",
+    p_completed: updates.completed ?? existing.estado === "completado",
+    p_resultado: updates.resultado ?? existing.resultado ?? undefined,
+    p_assigned_user_ids: updates.assignedUserIds?.length ? updates.assignedUserIds : currentAssigned,
+  });
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
+  revalidatePath("/ordenes");
 }
 
 // ─── Cambiar estado de tarea ──────────────────────────────────────────────────
@@ -55,30 +153,85 @@ export async function updateTareaEstadoAction(
   estado: "pendiente" | "en_progreso" | "completado",
 ): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase.from("tareas").update({ estado }).eq("id", id);
+  const { error } = await supabase.rpc("set_tarea_completed", {
+    p_tarea_id: id,
+    p_completed: estado === "completado",
+    p_resultado: undefined,
+  });
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
+  revalidatePath("/ordenes");
 }
 
 // ─── Completar tarea con resultado ───────────────────────────────────────────
 
 export async function completeTareaAction(id: number, resultado?: string): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("tareas")
-    .update({ estado: "completado", resultado: resultado?.trim() || null })
-    .eq("id", id);
+  const { error } = await supabase.rpc("set_tarea_completed", {
+    p_tarea_id: id,
+    p_completed: true,
+    p_resultado: resultado?.trim() || undefined,
+  });
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
+  revalidatePath("/ordenes");
 }
 
 // ─── Eliminar tarea ───────────────────────────────────────────────────────────
 
 export async function deleteTareaAction(id: number): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase.from("tareas").delete().eq("id", id);
+  const { error } = await supabase.rpc("archive_tarea", {
+    p_tarea_id: id,
+    p_reason: "archived_from_dashboard",
+  });
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
+  revalidatePath("/ordenes");
+}
+
+export async function completeAgendaAction(id: number, completed: boolean, result?: string | null): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_agenda_completed", {
+    p_agenda_id: id,
+    p_completed: completed,
+    p_result: result?.trim() || undefined,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard");
+  revalidatePath("/ordenes");
+  revalidatePath("/calendario");
+}
+
+export async function convertTareaToAgendaAction(
+  id: number,
+  options?: { date?: string; time?: string; assignedUserIds?: number[] },
+): Promise<{ id: number }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("convert_tarea_to_agenda", {
+    p_tarea_id: id,
+    p_event_date: normalizeDateKey(options?.date ?? localDateKey()),
+    p_time: normalizeTime(options?.time, DEFAULT_ACTIVITY_TIME),
+    p_assigned_user_ids: options?.assignedUserIds ?? undefined,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard");
+  revalidatePath("/ordenes");
+  revalidatePath("/calendario");
+  return { id: data.id };
+}
+
+export async function convertAgendaToTareaAction(id: number, assignedUserIds?: number[]): Promise<{ id: number }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("convert_agenda_to_tarea", {
+    p_agenda_id: id,
+    p_assigned_user_ids: assignedUserIds ?? undefined,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard");
+  revalidatePath("/ordenes");
+  revalidatePath("/calendario");
+  return { id: data.id };
 }
 
 // ─── Columnas Kanban personalizadas ───────────────────────────────────────────

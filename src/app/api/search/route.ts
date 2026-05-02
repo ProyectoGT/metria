@@ -5,7 +5,7 @@ import { SearchSchema } from "@/lib/validations/search";
 
 export type SearchResult = {
   id: string;
-  type: "propiedad" | "finca" | "sector" | "zona" | "solicitud" | "usuario" | "ticket" | "tarea";
+  type: "propiedad" | "finca" | "sector" | "zona" | "solicitud" | "usuario" | "ticket" | "tarea" | "contacto";
   label: string;
   sublabel?: string;
   href: string;
@@ -162,7 +162,7 @@ export async function GET(request: NextRequest) {
       .or(`asunto.ilike.%${q}%,tipo.ilike.%${q}%,nombre_usuario.ilike.%${q}%,descripcion.ilike.%${q}%`)
       .limit(ctx === "soporte" ? 10 : 5);
 
-    for (const t of (tickets ?? []) as any[]) {
+    for (const t of (tickets ?? []) as Array<{ id: number; asunto: string | null; estado: string | null; tipo: string | null; nombre_usuario: string | null }>) {
       results.push({
         id: `ticket-${t.id}`,
         type: "ticket",
@@ -173,12 +173,36 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // ── Contactos ────────────────────────────────────────────────────
+  if (ctx === "contactos" || ctx === "general") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: contactos } = await (supabase as any)
+      .from("contactos")
+      .select("id, nombre, apellidos, empresa, tipo, email, telefono")
+      .is("archived_at", null)
+      .or(`nombre.ilike.%${q}%,apellidos.ilike.%${q}%,empresa.ilike.%${q}%,email.ilike.%${q}%,telefono.ilike.%${q}%`)
+      .limit(ctx === "contactos" ? 10 : 5);
+
+    for (const c of (contactos ?? []) as Array<{ id: number; nombre: string; apellidos: string | null; empresa: string | null; tipo: string | null; email: string | null; telefono: string | null }>) {
+      const nombre = [c.nombre, c.apellidos].filter(Boolean).join(" ");
+      results.push({
+        id: `contacto-${c.id}`,
+        type: "contacto",
+        label: nombre || `Contacto #${c.id}`,
+        sublabel: [c.tipo, c.empresa ?? c.email ?? c.telefono].filter(Boolean).join(" · ") || undefined,
+        href: "/contactos",
+      });
+    }
+  }
+
   // ── Tareas / Órdenes del día ────────────────────────────────────
   if (ctx === "general") {
     const { data: tareas } = await supabase
       .from("tareas")
       .select("id, titulo, fecha, prioridad")
       .ilike("titulo", `%${q}%`)
+      .is("fecha", null)
+      .is("archived_at", null)
       .limit(4);
 
     for (const t of tareas ?? []) {

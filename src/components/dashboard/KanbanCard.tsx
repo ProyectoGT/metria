@@ -192,10 +192,10 @@ export default function KanbanCard({
               </span>
             );
           })()}
-          {card.assignedBy && (
+          {(card.assignedUsers?.length || card.assignedBy) && (
             <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary dark:bg-primary/20">
               <User className="h-3 w-3" />
-              por {card.assignedBy}
+              {card.assignedUsers?.length ? card.assignedUsers.join(", ") : `por ${card.assignedBy}`}
             </span>
           )}
         </div>

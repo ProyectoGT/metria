@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { rateLimiter, getIp } from "@/lib/rate-limiter";
 import { CreateEventSchema, DeleteEventSchema } from "@/lib/validations/calendar";
+import { googleCalendarDateTime, normalizeTime } from "@/lib/local-date-time";
 
 async function getAccessToken(): Promise<{ token: string; refreshed?: string } | null> {
   const cookieStore = await cookies();
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = parsed.data;
-  const startDateTime = new Date(`${body.date}T${body.time ?? "09:00"}:00`);
+  const startDateTime = new Date(googleCalendarDateTime(body.date, normalizeTime(body.time, "09:00")));
   const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000);
 
   const event = {
@@ -89,6 +90,15 @@ export async function POST(request: NextRequest) {
     description: body.description,
     start: { dateTime: startDateTime.toISOString(), timeZone: "Europe/Madrid" },
     end: { dateTime: endDateTime.toISOString(), timeZone: "Europe/Madrid" },
+    extendedProperties: body.agendaId
+      ? {
+          private: {
+            source: "metria",
+            entity: "agenda",
+            agendaId: String(body.agendaId),
+          },
+        }
+      : undefined,
   };
 
   const gcalRes = await fetch(
@@ -124,13 +134,18 @@ export async function DELETE(request: NextRequest) {
   }
   const { eventId } = parsed.data;
 
-  await fetch(
+  const gcalRes = await fetch(
     `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
     {
       method: "DELETE",
       headers: { Authorization: `Bearer ${auth.token}` },
     }
   );
+
+  if (!gcalRes.ok && gcalRes.status !== 404 && gcalRes.status !== 410) {
+    const data = await gcalRes.json().catch(() => null);
+    return NextResponse.json({ error: data?.error?.message ?? "No se pudo eliminar el evento" }, { status: gcalRes.status });
+  }
 
   const response = NextResponse.json({ success: true });
   if (auth.refreshed) setRefreshedToken(response, auth.refreshed);

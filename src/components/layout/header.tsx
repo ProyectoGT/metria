@@ -32,6 +32,7 @@ const TYPE_LABELS: Record<SearchResult["type"], string> = {
   usuario: "Usuario",
   ticket: "Soporte",
   tarea: "Tarea",
+  contacto: "Contacto",
 };
 
 const TYPE_COLORS: Record<SearchResult["type"], string> = {
@@ -43,6 +44,7 @@ const TYPE_COLORS: Record<SearchResult["type"], string> = {
   usuario: "bg-blue-500/10 text-blue-500",
   ticket: "bg-danger/10 text-danger",
   tarea: "bg-secondary/10 text-secondary",
+  contacto: "bg-teal-500/10 text-teal-600",
 };
 
 function getContext(pathname: string): { ctx: string; placeholder: string } {
@@ -50,6 +52,7 @@ function getContext(pathname: string): { ctx: string; placeholder: string } {
   if (pathname.startsWith("/solicitudes")) return { ctx: "solicitudes", placeholder: "Buscar solicitudes…" };
   if (pathname.startsWith("/usuarios")) return { ctx: "usuarios", placeholder: "Buscar por nombre, correo o rango…" };
   if (pathname.startsWith("/soporte")) return { ctx: "soporte", placeholder: "Buscar tickets de soporte…" };
+  if (pathname.startsWith("/contactos")) return { ctx: "contactos", placeholder: "Buscar contactos por nombre, empresa, email…" };
   return { ctx: "general", placeholder: "Buscar en todo el programa…" };
 }
 

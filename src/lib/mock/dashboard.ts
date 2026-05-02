@@ -52,12 +52,18 @@ export type KanbanPriority = "alta" | "media" | "baja";
 
 export type KanbanCardData = {
   id: string;
+  source: "tarea" | "agenda";
+  dbId: number;
   title: string;
   description?: string;
   priority: KanbanPriority;
+  tipo?: string;
   dueDate?: string;
+  time?: string | null;
   assignedBy?: string | null;
   assignedTo?: string | null;
+  assignedUserIds?: number[];
+  assignedUsers?: string[];
   resultado?: string | null;
   isCompleted?: boolean;
   fromOrdenDia?: boolean;
@@ -76,11 +82,13 @@ export type KanbanData = {
 
 export type OrdenDiaTarea = {
   id: number;
+  time?: string | null;
   titulo: string;
   prioridad: KanbanPriority | null;
   fecha: string | null;
   estado: "pendiente" | "en_progreso" | "completado";
   resultado: string | null;
+  assignedUsers?: string[];
 };
 
 export type OrdenDiaAgente = {

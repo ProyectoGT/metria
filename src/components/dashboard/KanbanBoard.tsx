@@ -1,22 +1,28 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
+import { Calendar, Clock } from "lucide-react";
 import KanbanColumn from "./KanbanColumn";
-import KanbanAddColumn from "./KanbanAddColumn";
 import KanbanAddCard from "./KanbanAddCard";
 import KanbanEditCard from "./KanbanEditCard";
 import type { KanbanData, KanbanColumnData, KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import type { UserRole } from "@/lib/roles";
 import {
+  completeAgendaAction,
+  completeTareaAction,
+  convertAgendaToTareaAction,
+  convertTareaToAgendaAction,
+  createAgendaAction,
   createTareaAction,
   deleteTareaAction,
-  completeTareaAction,
-  updateTareaEstadoAction,
+  updateAgendaAction,
   updateTareaAction,
-  addKanbanColumnAction,
-  deleteKanbanColumnAction,
 } from "@/app/(crm)/dashboard/actions";
+import { DEFAULT_ACTIVITY_TIME, localDateKey, splitLocalDateTime } from "@/lib/local-date-time";
+
+type NewKanbanCard = Omit<KanbanCardData, "id" | "source" | "dbId">;
 
 type KanbanBoardProps = {
   initialData: KanbanData;
@@ -26,51 +32,51 @@ type KanbanBoardProps = {
   agents?: Array<{ id: string; nombre: string }>;
 };
 
-// Mapa columna-id → estado en BD
-const COL_TO_ESTADO: Record<string, "pendiente" | "en_progreso"> = {
-  pendientes: "pendiente",
-  en_progreso: "en_progreso",
-};
-
-function isFutureDate(dateStr: string | undefined): boolean {
-  if (!dateStr) return false;
-  const today = new Date().toISOString().split("T")[0];
-  return dateStr.split("T")[0] > today;
-}
-
 export default function KanbanBoard({
   initialData,
-  customColumns = [],
   role,
   currentUserId: _currentUserId,
   agents = [],
 }: KanbanBoardProps) {
-  const [columns, setColumns] = useState<KanbanColumnData[]>(() => {
-    const existingIds = new Set(initialData.columns.map((c) => c.id));
-    const extra = customColumns
-      .filter((c) => !existingIds.has(c.id))
-      .map((c) => ({ ...c, fixed: false, cards: [] }));
-    return [...initialData.columns, ...extra];
-  });
+  const router = useRouter();
+  const [columns, setColumns] = useState<KanbanColumnData[]>(initialData.columns);
   const [addingCardCol, setAddingCardCol] = useState<string | null>(null);
   const [editingCard, setEditingCard] = useState<{ columnId: string; card: KanbanCardData } | null>(null);
-
-  // ─── Modal resultado ─────────────────────────────────────────────────────────
-  const [resultadoModal, setResultadoModal] = useState<{
-    columnId: string;
-    cardId: string;
-    titulo: string;
-  } | null>(null);
+  const [resultadoModal, setResultadoModal] = useState<{ columnId: string; cardId: string; titulo: string } | null>(null);
   const [resultadoText, setResultadoText] = useState("");
+  const [convertModal, setConvertModal] = useState<{
+    card: KanbanCardData;
+    sourceColId: string;
+    destColId: string;
+    sourceIndex: number;
+    destIndex: number;
+  } | null>(null);
+  const [convertDate, setConvertDate] = useState(localDateKey());
+  const [convertTime, setConvertTime] = useState(DEFAULT_ACTIVITY_TIME);
 
-  // ─── Drag & drop ────────────────────────────────────────────────────────────
+  function findCard(columnId: string, cardId: string) {
+    return columns.find((c) => c.id === columnId)?.cards.find((c) => c.id === cardId) ?? null;
+  }
+
   function handleDragEnd(result: DropResult) {
     const { source, destination, draggableId } = result;
     if (!destination) return;
-    if (
-      source.droppableId === destination.droppableId &&
-      source.index === destination.index
-    ) {
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+
+    const moved = findCard(source.droppableId, draggableId);
+    if (!moved) return;
+
+    // Tarea → Orden del dia: pedir fecha/hora antes de convertir
+    if (moved.source === "tarea" && destination.droppableId === "en_progreso") {
+      setConvertDate(localDateKey());
+      setConvertTime(DEFAULT_ACTIVITY_TIME);
+      setConvertModal({
+        card: moved,
+        sourceColId: source.droppableId,
+        destColId: destination.droppableId,
+        sourceIndex: source.index,
+        destIndex: destination.index,
+      });
       return;
     }
 
@@ -79,89 +85,100 @@ export default function KanbanBoard({
       const sourceCol = next.find((c) => c.id === source.droppableId);
       const destCol = next.find((c) => c.id === destination.droppableId);
       if (!sourceCol || !destCol) return prev;
-
-      const [moved] = sourceCol.cards.splice(source.index, 1);
-      destCol.cards.splice(destination.index, 0, moved);
+      const [card] = sourceCol.cards.splice(source.index, 1);
+      destCol.cards.splice(destination.index, 0, card);
       return next;
     });
 
-    if (source.droppableId !== destination.droppableId) {
-      const nuevoEstado = COL_TO_ESTADO[destination.droppableId];
-      const numId = parseInt(draggableId, 10);
-      if (nuevoEstado && !isNaN(numId)) {
-        updateTareaEstadoAction(numId, nuevoEstado).catch(() => {});
-      }
+    if (source.droppableId === destination.droppableId) return;
+
+    if (moved.source === "agenda" && destination.droppableId === "pendientes") {
+      convertAgendaToTareaAction(moved.dbId, moved.assignedUserIds)
+        .then(() => router.refresh())
+        .catch(() => router.refresh());
     }
   }
 
-  // ─── Column ops ─────────────────────────────────────────────────────────────
-  const handleAddColumn = useCallback(async (title: string) => {
-    const id = `col-${Date.now()}`;
+  function handleConfirmConvert() {
+    if (!convertModal) return;
+    const { card, sourceColId, destColId, sourceIndex, destIndex } = convertModal;
+    setConvertModal(null);
+
     setColumns((prev) => {
-      const orden = prev.filter((c) => !c.fixed).length;
-      addKanbanColumnAction({ col_id: id, titulo: title, orden }).catch(() => {});
-      return [...prev, { id, title, fixed: false, cards: [] }];
+      const next = prev.map((col) => ({ ...col, cards: [...col.cards] }));
+      const sourceCol = next.find((c) => c.id === sourceColId);
+      const destCol = next.find((c) => c.id === destColId);
+      if (!sourceCol || !destCol) return prev;
+      const [movedCard] = sourceCol.cards.splice(sourceIndex, 1);
+      destCol.cards.splice(destIndex, 0, { ...movedCard, source: "agenda" as const });
+      return next;
     });
-  }, []);
 
-  const handleDeleteColumn = useCallback(async (columnId: string) => {
-    setColumns((prev) => prev.filter((c) => c.id !== columnId || c.fixed));
-    deleteKanbanColumnAction(columnId).catch(() => {});
-  }, []);
+    convertTareaToAgendaAction(card.dbId, {
+      date: convertDate,
+      time: convertTime,
+      assignedUserIds: card.assignedUserIds,
+    }).then(() => router.refresh()).catch(() => router.refresh());
+  }
 
-  // ─── Card ops ───────────────────────────────────────────────────────────────
-  const handleAddCard = useCallback(async (columnId: string, newCard: Omit<KanbanCardData, "id">) => {
-    // Si se añade en "Orden del día" con fecha futura → redirigir a "Pendientes"
-    const future = isFutureDate(newCard.dueDate);
-    const fromOrdenDia = columnId === "en_progreso" && future;
-    const targetColId = fromOrdenDia ? "pendientes" : columnId;
-    const estado = targetColId === "en_progreso" ? "en_progreso" : "pendiente";
-
+  const handleAddCard = useCallback(async (columnId: string, newCard: NewKanbanCard) => {
     try {
-      const { id: dbId } = await createTareaAction({
-        titulo: newCard.title,
-        prioridad: newCard.priority,
-        fecha: newCard.dueDate,
-        estado,
-        fromOrdenDia,
-      });
+      const assignedUserIds = newCard.assignedUserIds?.length ? newCard.assignedUserIds : undefined;
+      const { date, time } = splitLocalDateTime(newCard.dueDate);
+      const isAgendaColumn = columnId === "en_progreso";
+      const created = isAgendaColumn
+        ? await createAgendaAction({
+            description: newCard.title,
+            eventDate: date ?? localDateKey(),
+            time: time ?? DEFAULT_ACTIVITY_TIME,
+            priority: newCard.priority,
+            tipo: newCard.tipo ?? "actividad",
+            assignedUserIds,
+          })
+        : await createTareaAction({
+            titulo: newCard.title,
+            prioridad: newCard.priority,
+            assignedUserIds,
+          });
+
       const finalCard: KanbanCardData = {
         ...newCard,
-        id: String(dbId),
+        id: `${isAgendaColumn ? "agenda" : "tarea"}-${created.id}`,
+        source: isAgendaColumn ? "agenda" : "tarea",
+        dbId: created.id,
         isCompleted: false,
-        fromOrdenDia,
+        fromOrdenDia: isAgendaColumn,
       };
       setColumns((prev) =>
-        prev.map((col) =>
-          col.id === targetColId
-            ? { ...col, cards: [...col.cards, finalCard] }
-            : col,
-        ),
+        prev.map((col) => col.id === columnId ? { ...col, cards: [...col.cards, finalCard] } : col),
       );
+      router.refresh();
     } catch {
-      // fallo silencioso
+      router.refresh();
     }
-  }, []);
+  }, [router]);
 
-  const handleDeleteCard = useCallback(async (columnId: string, cardId: string) => {
+  function handleDeleteCard(columnId: string, cardId: string) {
+    const card = findCard(columnId, cardId);
     setColumns((prev) =>
-      prev.map((col) =>
-        col.id === columnId
-          ? { ...col, cards: col.cards.filter((c) => c.id !== cardId) }
-          : col,
-      ),
+      prev.map((col) => col.id === columnId ? { ...col, cards: col.cards.filter((c) => c.id !== cardId) } : col),
     );
-    const numId = parseInt(cardId, 10);
-    if (!isNaN(numId)) {
-      deleteTareaAction(numId).catch(() => {});
+    if (card?.source === "tarea") {
+      deleteTareaAction(card.dbId).then(() => router.refresh()).catch(() => router.refresh());
     }
-  }, []);
+  }
 
   const handleOpenEdit = useCallback((columnId: string, card: KanbanCardData) => {
     setEditingCard({ columnId, card });
   }, []);
 
-  const handleSaveEdit = useCallback((updates: { title: string; priority: KanbanPriority; dueDate?: string }) => {
+  const handleSaveEdit = useCallback((updates: {
+    title: string;
+    priority: KanbanPriority;
+    dueDate?: string;
+    tipo?: string;
+    assignedUserIds?: number[];
+  }) => {
     if (!editingCard) return;
     const { columnId, card } = editingCard;
     setColumns((prev) =>
@@ -171,60 +188,67 @@ export default function KanbanBoard({
           : col,
       ),
     );
-    const numId = parseInt(card.id, 10);
-    if (!isNaN(numId)) {
-      updateTareaAction(numId, { titulo: updates.title, prioridad: updates.priority, fecha: updates.dueDate || null }).catch(() => {});
+
+    if (card.source === "tarea") {
+      updateTareaAction(card.dbId, {
+        titulo: updates.title,
+        prioridad: updates.priority,
+        assignedUserIds: updates.assignedUserIds,
+      })
+        .then(() => router.refresh())
+        .catch(() => router.refresh());
+      return;
     }
-  }, [editingCard]);
+
+    const { date, time } = splitLocalDateTime(updates.dueDate ?? card.dueDate);
+    updateAgendaAction(card.dbId, {
+      description: updates.title,
+      priority: updates.priority,
+      tipo: updates.tipo ?? card.tipo ?? "actividad",
+      eventDate: date ?? localDateKey(),
+      time: time ?? card.time ?? DEFAULT_ACTIVITY_TIME,
+      assignedUserIds: updates.assignedUserIds,
+    }).then(() => router.refresh()).catch(() => router.refresh());
+  }, [editingCard, router]);
 
   const handleCompleteCard = useCallback((columnId: string, cardId: string, card: KanbanCardData) => {
-
-    const needsResultado = card.fromOrdenDia || columnId === "en_progreso";
-
-    if (needsResultado) {
+    if (card.source === "agenda") {
       setResultadoText("");
       setResultadoModal({ columnId, cardId, titulo: card.title });
-    } else {
-      // Completar en sitio sin modal
-      setColumns((prev) =>
-        prev.map((col) =>
-          col.id === columnId
-            ? { ...col, cards: col.cards.map((c) => c.id === cardId ? { ...c, isCompleted: true } : c) }
-            : col,
-        ),
-      );
-      const numId = parseInt(cardId, 10);
-      if (!isNaN(numId)) {
-        completeTareaAction(numId).catch(() => {});
-      }
+      return;
     }
-  }, []);
 
-  const handleConfirmResultado = useCallback(async () => {
-    if (!resultadoModal) return;
-    const { columnId, cardId } = resultadoModal;
-    const resultado = resultadoText.trim();
-    setResultadoModal(null);
-
-    // Marcar en su columna actual como completada (sin mover)
     setColumns((prev) =>
       prev.map((col) =>
         col.id === columnId
-          ? {
-              ...col,
-              cards: col.cards.map((c) =>
-                c.id === cardId ? { ...c, isCompleted: true, resultado: resultado || null } : c
-              ),
-            }
+          ? { ...col, cards: col.cards.map((c) => c.id === cardId ? { ...c, isCompleted: true } : c) }
+          : col,
+      ),
+    );
+    completeTareaAction(card.dbId).then(() => router.refresh()).catch(() => router.refresh());
+  }, [router]);
+
+  function handleConfirmResultado() {
+    if (!resultadoModal) return;
+    const { columnId, cardId } = resultadoModal;
+    const card = findCard(columnId, cardId);
+    const resultado = resultadoText.trim();
+    setResultadoModal(null);
+
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === columnId
+          ? { ...col, cards: col.cards.map((c) => c.id === cardId ? { ...c, isCompleted: true, resultado: resultado || null } : c) }
           : col,
       ),
     );
 
-    const numId = parseInt(cardId, 10);
-    if (!isNaN(numId)) {
-      completeTareaAction(numId, resultado || undefined).catch(() => {});
+    if (card?.source === "agenda") {
+      completeAgendaAction(card.dbId, true, resultado || undefined).then(() => router.refresh()).catch(() => router.refresh());
+    } else if (card?.source === "tarea") {
+      completeTareaAction(card.dbId, resultado || undefined).then(() => router.refresh()).catch(() => router.refresh());
     }
-  }, [resultadoModal, resultadoText]);
+  }
 
   return (
     <>
@@ -236,14 +260,13 @@ export default function KanbanBoard({
               column={column}
               role={role}
               currentUserId={_currentUserId}
-              onDeleteColumn={handleDeleteColumn}
+              onDeleteColumn={() => {}}
               onAddCard={(colId) => setAddingCardCol(colId)}
               onDeleteCard={handleDeleteCard}
               onEditCard={handleOpenEdit}
               onCompleteCard={handleCompleteCard}
             />
           ))}
-          <KanbanAddColumn onAdd={handleAddColumn} />
         </div>
       </DragDropContext>
 
@@ -251,6 +274,8 @@ export default function KanbanBoard({
         <KanbanAddCard
           role={role}
           agents={agents}
+          currentUserId={_currentUserId}
+          mode={addingCardCol === "en_progreso" ? "actividad" : "tarea"}
           onAdd={(card) => handleAddCard(addingCardCol, card)}
           onClose={() => setAddingCardCol(null)}
         />
@@ -259,20 +284,21 @@ export default function KanbanBoard({
       {editingCard && (
         <KanbanEditCard
           card={editingCard.card}
-          onSave={(updates: { title: string; priority: KanbanPriority; dueDate?: string }) => { handleSaveEdit(updates); setEditingCard(null); }}
+          agents={agents}
+          currentUserId={_currentUserId}
+          onSave={(updates) => { handleSaveEdit(updates); setEditingCard(null); }}
           onClose={() => setEditingCard(null)}
         />
       )}
 
-      {/* Modal de resultado al completar tarea de Orden del día */}
       {resultadoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl">
             <div className="border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">¿Como ha ido?</h2>
+              <h2 className="text-base font-semibold text-text-primary">Como ha ido?</h2>
               <p className="mt-0.5 truncate text-sm text-text-secondary">{resultadoModal.titulo}</p>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="space-y-4 p-6">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-text-secondary">
                   Consecuencia / nota de lo realizado
@@ -289,7 +315,7 @@ export default function KanbanBoard({
                   rows={4}
                   className="input w-full resize-none text-sm"
                 />
-                <p className="text-xs text-text-secondary">Opcional · Ctrl+Enter para confirmar</p>
+                <p className="text-xs text-text-secondary">Opcional - Ctrl+Enter para confirmar</p>
               </div>
               <div className="flex justify-end gap-3 pt-1">
                 <button
@@ -305,6 +331,63 @@ export default function KanbanBoard({
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
                 >
                   Marcar como realizada
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {convertModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-surface shadow-xl">
+            <div className="border-b border-border px-6 py-4">
+              <h2 className="text-base font-semibold text-text-primary">Programar en el Orden del dia</h2>
+              <p className="mt-0.5 truncate text-sm text-text-secondary">{convertModal.card.title}</p>
+            </div>
+            <div className="space-y-4 p-6">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-text-secondary">
+                    <Calendar className="h-3.5 w-3.5" />
+                    Fecha
+                  </label>
+                  <input
+                    type="date"
+                    value={convertDate}
+                    onChange={(e) => setConvertDate(e.target.value)}
+                    className="input"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-text-secondary">
+                    <Clock className="h-3.5 w-3.5" />
+                    Hora
+                  </label>
+                  <input
+                    type="time"
+                    value={convertTime}
+                    onChange={(e) => setConvertTime(e.target.value)}
+                    className="input"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setConvertModal(null)}
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmConvert}
+                  disabled={!convertDate}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-50"
+                >
+                  Programar
                 </button>
               </div>
             </div>

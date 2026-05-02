@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   Phone, Users, Home, Clock, BookOpen, Star, Activity, Calendar,
   ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter,
@@ -9,6 +9,8 @@ import { createClient } from "@/lib/supabase-browser";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { updateTareaEstadoAction } from "@/app/(crm)/dashboard/actions";
 import type { UserRole } from "@/lib/roles";
+import { DEFAULT_ACTIVITY_TIME, normalizeTime } from "@/lib/local-date-time";
+import { isActivityPriority, isActivityType, normalizeActivityPriority, normalizeActivityType } from "@/lib/activity-options";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,6 +27,7 @@ type AgendaEvent = {
   tarea_id?: number | null;
   owner_user_id: number | null;
   created_at: string;
+  agenda_usuarios?: Array<{ usuario_id: number; usuarios?: { nombre: string | null; apellidos: string | null } | null }>;
 };
 
 type TareaEvent = {
@@ -41,6 +44,13 @@ type GCalEvent = {
   summary: string;
   start: { dateTime?: string; date?: string };
   end: { dateTime?: string; date?: string };
+  extendedProperties?: {
+    private?: {
+      source?: string;
+      entity?: string;
+      agendaId?: string;
+    };
+  };
 };
 
 type FormState = {
@@ -52,6 +62,7 @@ type FormState = {
   completed: boolean;
   result: string;
   syncToGcal: boolean;
+  assignedUserIds: number[];
 };
 
 type ViewMode = "month" | "week";
@@ -64,6 +75,7 @@ type Props = {
   currentUserId: number;
   usersMap: Record<number, string>;
   filterableUsers: Array<{ id: number; name: string }>;
+  archivedGoogleEventIds: string[];
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -142,6 +154,7 @@ function emptyForm(date?: Date, syncToGcal = false): FormState {
     completed: false,
     result: "",
     syncToGcal,
+    assignedUserIds: [],
   };
 }
 
@@ -156,6 +169,10 @@ function priorityMeta(priority: string) {
 const canSeeOthers = (role: UserRole) =>
   role === "Administrador" || role === "Director" || role === "Responsable";
 
+function agendaAssignedIds(ev: AgendaEvent) {
+  return ev.agenda_usuarios?.map((u) => u.usuario_id) ?? [];
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CalendarioClient({
@@ -166,6 +183,7 @@ export default function CalendarioClient({
   currentUserId,
   usersMap,
   filterableUsers,
+  archivedGoogleEventIds,
 }: Props) {
   const today = useMemo(() => new Date(), []);
 
@@ -176,6 +194,8 @@ export default function CalendarioClient({
 
   const [events, setEvents]         = useState<AgendaEvent[]>(initialEvents);
   const [tareas, setTareas]         = useState<TareaEvent[]>(initialTareas);
+  const eventsRef = useRef(events);
+  useEffect(() => { eventsRef.current = events; }, [events]);
   const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
 
   // Filter by user — default al usuario actual
@@ -197,7 +217,7 @@ export default function CalendarioClient({
   // ── Apply user filter ──────────────────────────────────────────────────────
 
   const filteredEvents = useMemo(() =>
-    filterUserId === "all" ? events : events.filter((e) => e.owner_user_id === filterUserId),
+    filterUserId === "all" ? events : events.filter((e) => e.owner_user_id === filterUserId || agendaAssignedIds(e).includes(filterUserId)),
     [events, filterUserId]
   );
 
@@ -256,8 +276,15 @@ export default function CalendarioClient({
 
   // ── Google Calendar fetch ──────────────────────────────────────────────────
 
+  const gcalAbortRef = useRef<AbortController | null>(null);
+
   const fetchGcalEvents = useCallback(async () => {
     if (!isConnected) return;
+
+    gcalAbortRef.current?.abort();
+    const controller = new AbortController();
+    gcalAbortRef.current = controller;
+
     let timeMin: string, timeMax: string;
     if (viewMode === "week") {
       timeMin = weekStart.toISOString();
@@ -268,9 +295,50 @@ export default function CalendarioClient({
       timeMin = new Date(year, month, 1).toISOString();
       timeMax = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
     }
-    const res = await fetch(`/api/google/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`);
-    if (res.ok) { const d = await res.json(); setGcalEvents(d.items ?? []); }
-  }, [isConnected, currentDate, weekStart, viewMode]);
+
+    let res: Response;
+    try {
+      res = await fetch(
+        `/api/google/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`,
+        { signal: controller.signal },
+      );
+    } catch {
+      return; // abortado o error de red
+    }
+    if (!res.ok) return;
+
+    const d = await res.json();
+    const items = (d.items ?? []) as GCalEvent[];
+    const localAgendaIds = new Set(eventsRef.current.map((ev) => String(ev.id)));
+    const archivedGoogleIds = new Set(archivedGoogleEventIds);
+    const visibleItems: GCalEvent[] = [];
+    const orphanIds: string[] = [];
+
+    for (const item of items) {
+      const props = item.extendedProperties?.private;
+      const isMetriaAgenda = props?.source === "metria" && props?.entity === "agenda" && props.agendaId;
+
+      if (archivedGoogleIds.has(item.id) || (isMetriaAgenda && !localAgendaIds.has(props.agendaId!))) {
+        orphanIds.push(item.id);
+        continue;
+      }
+
+      visibleItems.push(item);
+    }
+
+    if (controller.signal.aborted) return;
+    setGcalEvents(visibleItems);
+
+    await Promise.all(
+      orphanIds.map((eventId) =>
+        fetch("/api/google/events", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ eventId }),
+        }).catch(() => null),
+      ),
+    );
+  }, [isConnected, currentDate, weekStart, viewMode, archivedGoogleEventIds]);
 
   useEffect(() => { fetchGcalEvents(); }, [fetchGcalEvents]);
 
@@ -309,103 +377,129 @@ export default function CalendarioClient({
 
   function openCreate(date?: Date) {
     setEditId(null);
-    setForm(emptyForm(date ?? selectedDate, isConnected));
+    setForm({ ...emptyForm(date ?? selectedDate, isConnected), assignedUserIds: [currentUserId] });
     setSaveError(null);
     setModalOpen(true);
   }
 
   function openEdit(ev: AgendaEvent) {
     setEditId(ev.id);
-    setForm({ description: ev.description, event_date: ev.event_date, time: ev.time ?? "", priority: ev.priority, tipo: ev.tipo ?? "actividad", completed: ev.completed, result: ev.result ?? "", syncToGcal: false });
+    setForm({
+      description: ev.description,
+      event_date: ev.event_date,
+      time: ev.time ?? "",
+      priority: ev.priority,
+      tipo: ev.tipo ?? "actividad",
+      completed: ev.completed,
+      result: ev.result ?? "",
+      syncToGcal: false,
+      assignedUserIds: agendaAssignedIds(ev).length ? agendaAssignedIds(ev) : [ev.owner_user_id ?? currentUserId],
+    });
     setSaveError(null); setModalOpen(true);
+  }
+
+  function toggleAssignedUser(userId: number) {
+    setForm((prev) => {
+      const exists = prev.assignedUserIds.includes(userId);
+      const next = exists
+        ? prev.assignedUserIds.filter((id) => id !== userId)
+        : [...prev.assignedUserIds, userId];
+      return { ...prev, assignedUserIds: next.length ? next : prev.assignedUserIds };
+    });
   }
 
   // ── Save ───────────────────────────────────────────────────────────────────
 
   async function handleSave() {
+    const priority = normalizeActivityPriority(form.priority);
+    const tipo = normalizeActivityType(form.tipo);
+
     if (!form.description.trim()) return;
+    if (!isActivityPriority(priority) || !isActivityType(tipo)) {
+      setSaveError("Prioridad o tipo de actividad no validos");
+      return;
+    }
+    if (form.assignedUserIds.length === 0) {
+      setSaveError("Debes asignar al menos un usuario");
+      return;
+    }
     setSaving(true); setSaveError(null);
 
     const payload = {
       description: form.description.trim(),
       event_date: form.event_date,
-      time: form.time || null,
-      priority: form.priority,
-      tipo: form.tipo,
+      time: normalizeTime(form.time, DEFAULT_ACTIVITY_TIME),
+      priority,
+      tipo,
       completed: form.completed,
       result: form.result || null,
     };
 
     async function insertOrUpdate(p: typeof payload) {
+      const assignedUserIds = form.assignedUserIds.length ? form.assignedUserIds : [currentUserId];
       if (editId !== null) {
-        const res = await supabase.from("agenda").update(p).eq("id", editId).select().single();
-        if (res.error?.message?.includes("'tipo'")) {
-          const { tipo: _t, ...rest } = p as typeof p & { tipo?: string };
-          return supabase.from("agenda").update(rest).eq("id", editId).select().single();
-        }
-        return res;
+        return supabase.rpc("update_agenda_activity", {
+          p_agenda_id: editId,
+          p_description: p.description,
+          p_event_date: p.event_date,
+          p_time: p.time,
+          p_priority: p.priority,
+          p_tipo: p.tipo,
+          p_completed: p.completed,
+          p_result: p.result ?? undefined,
+          p_assigned_user_ids: assignedUserIds,
+        });
       }
-      const res = await supabase.from("agenda").insert(p).select().single();
-      if (res.error?.message?.includes("'tipo'")) {
-        const { tipo: _t, ...rest } = p as typeof p & { tipo?: string };
-        return supabase.from("agenda").insert(rest).select().single();
-      }
-      return res;
+      return supabase.rpc("create_agenda_activity", {
+        p_description: p.description,
+        p_event_date: p.event_date,
+        p_time: p.time,
+        p_priority: p.priority,
+        p_tipo: p.tipo,
+        p_completed: p.completed,
+        p_result: p.result ?? undefined,
+        p_assigned_user_ids: assignedUserIds,
+        p_visibility: "private",
+      });
     }
 
     if (editId !== null) {
       const { data, error } = await insertOrUpdate(payload);
       if (error) setSaveError(error.message);
       else if (data) {
-        setEvents((prev) => prev.map((e) => e.id === editId ? (data as unknown as AgendaEvent) : e));
+        const updated = {
+          ...(data as unknown as AgendaEvent),
+          agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
+        };
+        setEvents((prev) => prev.map((e) => e.id === editId ? updated : e));
         toast("Actividad actualizada"); setModalOpen(false);
       }
     } else {
       const { data, error } = await insertOrUpdate(payload);
       if (error) setSaveError(error.message);
       else if (data) {
-        let saved = data as unknown as AgendaEvent;
-
-        // Si el evento es para hoy, crear también una tarea en ordenes del día
-        if (form.event_date === todayStr) {
-          const horaDefault = form.time ? `${form.event_date}T${form.time}:00` : `${form.event_date}T20:00:00`;
-          const { data: tareaData } = await supabase
-            .from("tareas")
-            .insert({
-              titulo: form.description.trim(),
-              prioridad: form.priority,
-              fecha: horaDefault,
-              estado: "pendiente",
-              visibility: "private",
-              owner_user_id: currentUserId,
-            })
-            .select()
-            .single();
-          if (tareaData) {
-            const tareaId = (tareaData as unknown as { id: number }).id;
-            // Vincular tarea al evento de agenda
-            const { data: upd } = await supabase
-              .from("agenda")
-              .update({ tarea_id: tareaId } as never)
-              .eq("id", saved.id)
-              .select()
-              .single();
-            if (upd) saved = upd as unknown as AgendaEvent;
-            setTareas((prev) => [...prev, tareaData as unknown as TareaEvent]);
-          }
-        }
+        let saved = {
+          ...(data as unknown as AgendaEvent),
+          agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
+        };
 
         if (isConnected) {
           const gcalRes = await fetch("/api/google/events", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ summary: form.description, date: form.event_date, time: form.time || null }),
+            body: JSON.stringify({ summary: form.description, date: form.event_date, time: form.time || null, agendaId: saved.id }),
           });
           if (gcalRes.ok) {
             const gcalData = await gcalRes.json();
             if (gcalData.id) {
               const { data: upd } = await supabase.from("agenda").update({ gcal_event_id: gcalData.id }).eq("id", saved.id).select().single();
-              if (upd) { saved = upd as unknown as AgendaEvent; await fetchGcalEvents(); }
+              if (upd) {
+                saved = {
+                  ...(upd as unknown as AgendaEvent),
+                  agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
+                };
+                await fetchGcalEvents();
+              }
             }
           }
         }
@@ -423,14 +517,16 @@ export default function CalendarioClient({
     setDeleting(true);
     const target = events.find((e) => e.id === deleteId);
     if (target?.gcal_event_id && isConnected) {
-      await fetch("/api/google/events", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventId: target.gcal_event_id }) });
+      const gcalDelete = await fetch("/api/google/events", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventId: target.gcal_event_id }) });
+      if (!gcalDelete.ok) {
+        const data = await gcalDelete.json().catch(() => null);
+        toast(data?.error ?? "No se pudo eliminar de Google Calendar", "error");
+        setDeleting(false);
+        return;
+      }
+      setGcalEvents((prev) => prev.filter((ev) => ev.id !== target.gcal_event_id));
     }
-    // Si tiene tarea vinculada, eliminarla también
-    if (target?.tarea_id) {
-      await supabase.from("tareas").delete().eq("id", target.tarea_id);
-      setTareas((prev) => prev.filter((t) => t.id !== target.tarea_id));
-    }
-    const { error } = await supabase.from("agenda").delete().eq("id", deleteId);
+    const { error } = await supabase.rpc("archive_agenda", { p_agenda_id: deleteId, p_reason: "archived_from_calendar" });
     if (error) toast("Error al eliminar: " + error.message, "error");
     else { setEvents((prev) => prev.filter((e) => e.id !== deleteId)); toast("Actividad eliminada"); setDeleteId(null); }
     setDeleting(false);
@@ -450,9 +546,6 @@ export default function CalendarioClient({
 
   const todayStr        = toDateStr(today);
   const selectedDateStr = toDateStr(selectedDate);
-  const dayLocalEvents  = [...(eventsByDate[selectedDateStr] ?? [])].sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
-  const dayGcalEvents   = gcalByDate[selectedDateStr] ?? [];
-  const dayTareas       = tareasByDate[selectedDateStr] ?? [];
   const deleteTarget    = events.find((e) => e.id === deleteId);
 
   const showOwner = canSeeOthers(role);
@@ -1078,6 +1171,27 @@ export default function CalendarioClient({
                   </div>
                 </div>
 
+                {/* Assigned users */}
+                <div>
+                  <label className="text-xs font-medium text-text-secondary">Usuarios asignados *</label>
+                  <div className="mt-1.5 max-h-32 space-y-1 overflow-y-auto rounded-xl border border-border bg-background p-2">
+                    {[
+                      { id: currentUserId, name: usersMap[currentUserId] ?? "Yo" },
+                      ...filterableUsers.filter((u) => u.id !== currentUserId),
+                    ].map((user) => (
+                      <label key={user.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-secondary hover:bg-surface">
+                        <input
+                          type="checkbox"
+                          checked={form.assignedUserIds.includes(user.id)}
+                          onChange={() => toggleAssignedUser(user.id)}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        {user.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Completed (edit only) */}
                 {editId !== null && (
                   <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background p-3">
@@ -1121,7 +1235,7 @@ export default function CalendarioClient({
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving || !form.description.trim()}
+                disabled={saving || !form.description.trim() || form.assignedUserIds.length === 0}
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
               >
                 {saving ? "Guardando..." : editId !== null ? "Guardar cambios" : "Crear actividad"}

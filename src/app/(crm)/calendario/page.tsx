@@ -17,63 +17,61 @@ export default async function CalendarioPage() {
   const role = yo?.role ?? "Agente";
   const supervisedIds = yo?.supervisedAgentIds ?? [];
 
-  // ── Agenda query según rol ────────────────────────────────────────────────
   let eventsQuery;
 
   if (role === "Administrador" || role === "Director") {
-    // RLS ya filtra por empresa — ven todos los eventos de su empresa
     eventsQuery = supabase
       .from("agenda")
-      .select("*")
+      .select("*, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .is("archived_at", null)
       .order("event_date", { ascending: true });
   } else if (role === "Responsable") {
-    // Ven los suyos + los de sus agentes supervisados (incluyendo privados)
     const adminSupa = createAdminClient();
-    const visibleIds = [userId, ...supervisedIds];
     eventsQuery = adminSupa
       .from("agenda")
-      .select("*")
-      .in("owner_user_id", visibleIds)
+      .select("*, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .is("archived_at", null)
+      .eq("empresa_id", yo?.empresaId ?? -1)
       .order("event_date", { ascending: true });
   } else {
-    // Agente: solo los suyos
     eventsQuery = supabase
       .from("agenda")
-      .select("*")
+      .select("*, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .is("archived_at", null)
       .eq("owner_user_id", userId)
       .order("event_date", { ascending: true });
   }
 
-  const [{ data: events }, { data: tareas }, { data: usersData }] = await Promise.all([
+  const [{ data: events }, { data: usersData }, { data: archivedGoogleEvents }] = await Promise.all([
     eventsQuery,
-    supabase
-      .from("tareas")
-      .select("id, titulo, prioridad, fecha, estado, owner_user_id")
-      .not("fecha", "is", null)
-      .order("fecha", { ascending: true })
-      .returns<{ id: number; titulo: string; prioridad: string | null; fecha: string; estado: string | null; owner_user_id: number | null }[]>(),
-    // Mapa de usuarios para mostrar nombre del propietario del evento
     supabase.from("usuarios").select("id, nombre, apellidos"),
+    supabase
+      .from("agenda")
+      .select("gcal_event_id")
+      .not("archived_at", "is", null)
+      .not("gcal_event_id", "is", null)
+      .eq("owner_user_id", userId),
   ]);
 
-  // Filtrar tareas según rol
-  const visibleTareaIds = new Set([userId, ...supervisedIds]);
-  const filteredTareas = (tareas ?? []).filter((t) => {
-    if (role === "Administrador" || role === "Director") return true;
-    if (role === "Responsable") return t.owner_user_id != null && visibleTareaIds.has(t.owner_user_id);
-    return t.owner_user_id === userId;
-  });
+  type EventWithAssignments = {
+    owner_user_id: number | null;
+    agenda_usuarios?: { usuario_id: number }[];
+  };
+  const visibleIds = [userId, ...supervisedIds];
+  const visibleEvents = role === "Responsable"
+    ? ((events ?? []) as unknown as EventWithAssignments[]).filter((event) => {
+        const assigned = event.agenda_usuarios?.map((u) => u.usuario_id) ?? [];
+        return assigned.some((id) => visibleIds.includes(id)) || (
+          event.owner_user_id != null && visibleIds.includes(event.owner_user_id)
+        );
+      })
+    : (events ?? []);
 
-  // Filtrar tareas según rol (tareas también respetan visibilidad)
-  // (ya filtradas arriba en filteredTareas)
-
-  // Mapa id → nombre completo
   const usersMap: Record<number, string> = {};
   for (const u of usersData ?? []) {
     usersMap[u.id] = `${u.nombre} ${u.apellidos}`.trim();
   }
 
-  // Lista de usuarios filtrables según rol
   const filterableUsers = (usersData ?? [])
     .filter((u) => {
       if (role === "Administrador" || role === "Director") return true;
@@ -84,16 +82,17 @@ export default async function CalendarioPage() {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
-    <>
-      <CalendarioClient
-        initialEvents={(events ?? []) as unknown as Parameters<typeof CalendarioClient>[0]["initialEvents"]}
-        initialTareas={filteredTareas}
-        isConnected={isConnected}
-        role={role}
-        currentUserId={userId}
-        usersMap={usersMap}
-        filterableUsers={filterableUsers}
-      />
-    </>
+    <CalendarioClient
+      initialEvents={visibleEvents as unknown as Parameters<typeof CalendarioClient>[0]["initialEvents"]}
+      initialTareas={[]}
+      isConnected={isConnected}
+      role={role}
+      currentUserId={userId}
+      usersMap={usersMap}
+      filterableUsers={filterableUsers}
+      archivedGoogleEventIds={(archivedGoogleEvents ?? [])
+        .map((event) => event.gcal_event_id)
+        .filter((id): id is string => Boolean(id))}
+    />
   );
 }
