@@ -1,9 +1,11 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
+// VERIFICATION_SECRET debe definirse en .env.local como variable independiente.
+// Nunca usar SUPABASE_SERVICE_ROLE_KEY como secreto derivado: si el token HMAC
+// se filtrase, comprometería también el acceso al admin de Supabase.
 const SECRET =
   process.env.VERIFICATION_SECRET ??
-  process.env.SUPABASE_SERVICE_ROLE_KEY ??
-  "fallback-secret-change-me";
+  "metria-verification-fallback-change-in-production";
 
 const EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 días
 

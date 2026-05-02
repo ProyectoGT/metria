@@ -1,0 +1,29 @@
+-- Extiende agenda_select_scoped para que Responsable pueda ver
+-- los eventos de sus agentes supervisados sin necesitar admin client.
+-- Mismo patrón que tareas_select_scoped (migración 20260414000001).
+--
+-- Esto elimina el uso de createAdminClient() en calendario/page.tsx
+-- y ordenes/page.tsx para el rol Responsable.
+
+drop policy if exists agenda_select_scoped on public.agenda;
+
+create policy agenda_select_scoped
+on public.agenda for select
+using (
+  public.can_access_scoped_row(owner_user_id, empresa_id, equipo_id, visibility)
+  or (
+    auth.uid() is not null
+    and public.current_user_role() = 'Responsable'
+    and empresa_id = public.current_empresa_id()
+    and (
+      owner_user_id in (select public.get_supervised_user_ids())
+      or exists (
+        select 1 from public.agenda_usuarios au
+        where au.agenda_id = agenda.id
+          and au.usuario_id in (select public.get_supervised_user_ids())
+      )
+    )
+  )
+);
+
+notify pgrst, 'reload schema';

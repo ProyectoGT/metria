@@ -32,15 +32,28 @@ export async function POST(request: Request) {
 
     const { tipo, asunto, descripcion, prioridad, nombre_usuario, user_id } = parsed.data;
 
+    // Obtener el ID interno del usuario autenticado para evitar suplantación.
+    // El user_id del body se ignora; siempre se usa el del usuario de la sesión.
+    const { data: profile } = await supabase
+      .from("usuarios")
+      .select("id")
+      .eq("auth_id", user.id)
+      .maybeSingle();
+
+    const resolvedUserId = profile?.id ?? null;
+
+    // admin client necesario: tickets_soporte tiene RLS INSERT que solo permite
+    // user_id = current_usuario_id() — el service role garantiza que siempre funciona
+    // aunque el perfil no esté perfectamente enlazado.
     const admin = createAdminClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const adminAny = admin as any;
 
-    // Insertar ticket
+    // Insertar ticket — user_id siempre viene de la sesión, nunca del body
     const { data: ticket, error: insertError } = await adminAny
       .from("tickets_soporte")
       .insert({
-        user_id: user_id ?? null,
+        user_id: resolvedUserId,
         nombre_usuario: nombre_usuario?.trim() || "Usuario",
         tipo,
         asunto: asunto.trim(),

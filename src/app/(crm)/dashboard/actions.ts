@@ -1,7 +1,6 @@
 "use server";
 
 import { createClient } from "@/lib/supabase";
-import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { revalidatePath } from "next/cache";
 import { DEFAULT_ACTIVITY_TIME, localDateKey, normalizeDateKey, normalizeTime } from "@/lib/local-date-time";
@@ -267,7 +266,9 @@ export async function saveAgentOfMonthPrizeAction(data: {
   if (!yo) throw new Error("No autenticado");
   if (!yo.empresaId) throw new Error("Sin empresa asignada");
 
-  const supabase = createAdminClient();
+  // agente_del_mes tiene RLS con política de escritura para Admin/Director/Responsable.
+  // createClient() es suficiente; el service role no es necesario.
+  const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: row, error } = await (supabase as any)
     .from("agente_del_mes")
@@ -297,13 +298,15 @@ export async function saveAgentOfMonthWinnerAction(data: {
 }): Promise<void> {
   const yo = await getCurrentUserContext();
   if (!yo) throw new Error("No autenticado");
+  // Validar que el target empresaId coincide con la empresa del usuario autenticado
+  if (yo.empresaId !== data.empresaId) throw new Error("Sin acceso a esta empresa.");
 
-  const supabase = createAdminClient();
+  const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
     .from("agente_del_mes")
     .update({ agente_id: data.agenteId, agente_nombre: data.agenteNombre })
-    .eq("empresa_id", data.empresaId);
+    .eq("empresa_id", yo.empresaId); // siempre la empresa del usuario autenticado
 
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
@@ -314,7 +317,7 @@ export async function clearAgentOfMonthAction(): Promise<void> {
   if (!yo) throw new Error("No autenticado");
   if (!yo.empresaId) throw new Error("Sin empresa asignada");
 
-  const supabase = createAdminClient();
+  const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
     .from("agente_del_mes")

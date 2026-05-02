@@ -36,9 +36,23 @@ export async function upsertPropiedadAction(
     }
   }
 
-  const supabase = createAdminClient();
+  // Usar cliente con RLS — las policies de propiedades gestionan el acceso.
+  // Para updates: RLS propiedades_update_scoped ya valida ownership + empresa.
+  // Para inserts: RLS propiedades_insert_scoped ya valida empresa_id = current.
+  const supabase = await createClient();
 
   if (propiedadId) {
+    // Verificar explícitamente que la propiedad pertenece a la empresa del usuario
+    // como segunda capa defensiva (RLS también lo hace).
+    const { data: existing } = await supabase
+      .from("propiedades")
+      .select("empresa_id")
+      .eq("id", propiedadId)
+      .single();
+
+    if (!existing) return { error: "Propiedad no encontrada o sin acceso." };
+    if (existing.empresa_id !== yo.empresaId) return { error: "Sin acceso a esta propiedad." };
+
     const { data, error } = await supabase
       .from("propiedades")
       .update(payload as never)
@@ -51,6 +65,7 @@ export async function upsertPropiedadAction(
     revalidatePath(`/dashboard`);
     return { data: data as Record<string, unknown> };
   } else {
+    // INSERT: el trigger apply_default_access_scope rellena empresa_id y owner_user_id.
     const { data, error } = await supabase
       .from("propiedades")
       .insert({ ...payload, finca_id: fincaId } as never)
@@ -94,6 +109,10 @@ export async function toggleContactadoAction(
 
   if (error) return { error: error.message };
 
+  // actividad_desarrollo requiere admin client: la tabla tiene RLS con policy SELECT
+  // pero no tiene política INSERT/DELETE explícita, por lo que solo puede escribirse
+  // via service role o funciones security definer. No expone datos de terceros porque
+  // agente_id y empresa_id siempre se fijan con los valores del usuario autenticado.
   const admin = createAdminClient();
   if (contactado) {
     await admin.from("actividad_desarrollo").insert({
@@ -115,7 +134,8 @@ export async function toggleContactadoAction(
       .delete()
       .eq("source_table", "propiedades")
       .eq("source_id", propiedadId)
-      .eq("metric", "contactos");
+      .eq("metric", "contactos")
+      .eq("agente_id", yo.id); // nunca borrar actividad de otros agentes
   }
 
   return {};

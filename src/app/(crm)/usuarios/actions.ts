@@ -322,11 +322,20 @@ export async function updateUserSupervisorAction(input: {
   if (!currentUser) return { error: "Tu sesion no es valida. Vuelve a iniciar sesion." };
   if (!canManageUsers(currentUser.role)) return { error: "Solo un Administrador puede editar usuarios." };
 
+  // Verificar que el target pertenece a la misma empresa antes de modificar
+  const targetResult = await getManagedUserTarget(input.userId, currentUser);
+  if (targetResult.error || !targetResult.data) {
+    return { error: targetResult.error ?? "No se pudo cargar el usuario." };
+  }
+
   const adminClient = createAdminClient();
+  // admin client necesario: usuarios no tiene INSERT policy para terceros,
+  // solo se puede modificar supervisor_id con service role o RLS del propio usuario.
   const updateResult = await adminClient
     .from("usuarios")
     .update({ supervisor_id: input.supervisorId })
-    .eq("id", input.userId);
+    .eq("id", input.userId)
+    .eq("empresa_id", currentUser.empresaId ?? -1); // segunda capa: nunca tocar otras empresas
 
   if (updateResult.error) {
     return { error: updateResult.error.message ?? "No se pudo actualizar el supervisor." };
@@ -631,10 +640,13 @@ export async function resendVerificationAction(input: {
   if (!canManageUsers(currentUser.role)) return { error: "No tienes permisos para esta accion." };
 
   const adminClient = createAdminClient();
+  // admin client necesario: buscamos por id sin sesión del target.
+  // Se filtra explícitamente por empresa_id para garantizar aislamiento multiempresa.
   const { data: target } = await adminClient
     .from("usuarios")
-    .select("id, nombre, correo, estado, auth_id")
+    .select("id, nombre, correo, estado, auth_id, empresa_id")
     .eq("id", input.userId)
+    .eq("empresa_id", currentUser.empresaId ?? -1) // nunca reenviar verificaciones fuera de la empresa
     .maybeSingle();
 
   if (!target) return { error: "Usuario no encontrado." };

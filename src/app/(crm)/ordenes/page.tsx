@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase";
-import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { canViewAllAgents, canViewSupervisedAgents } from "@/lib/roles";
 import { formatLocalDateEs, localDateKey } from "@/lib/local-date-time";
@@ -21,12 +20,11 @@ export default async function OrdenesPage() {
       ? [yo.id, ...yo.supervisedAgentIds]
       : [yo.id];
 
-  const agendaClient = canViewSupervisedAgents(yo.role) || canViewAllAgents(yo.role)
-    ? createAdminClient()
-    : supabase;
-
+  // La política agenda_select_scoped incluye supervisados vía RLS (migración 20260503000009).
+  // Admin/Director ven toda la empresa por can_access_scoped_row.
+  // Responsable ve sus supervisados. Agente ve solo los suyos.
   const [{ data: actividadesRaw }, { data: usuarios }] = await Promise.all([
-    agendaClient
+    supabase
       .from("agenda")
       .select("id, description, event_date, time, priority, tipo, completed, result, owner_user_id, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)

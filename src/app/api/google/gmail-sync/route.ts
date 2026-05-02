@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createAdminClient } from "@/lib/supabase-admin";
 import { createClient } from "@/lib/supabase";
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
@@ -235,9 +234,8 @@ export async function POST(request: NextRequest) {
 
   const messageIds: string[] = listData.messages.map((m: { id: string }) => m.id);
 
-  // Check which message IDs are already in DB
-  const adminSupabase = createAdminClient();
-  const { data: existing } = await adminSupabase
+  // idealista_leads tiene RLS con política por empresa_id; createClient() es suficiente.
+  const { data: existing } = await supabase
     .from("idealista_leads")
     .select("gmail_message_id")
     .in("gmail_message_id", messageIds);
@@ -303,7 +301,7 @@ export async function POST(request: NextRequest) {
     return response;
   }
 
-  const { data: inserted, error } = await adminSupabase
+  const { data: inserted, error } = await supabase
     .from("idealista_leads")
     .insert(leadsToInsert)
     .select();

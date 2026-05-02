@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
-import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import CalendarioClient from "./calendario-client";
 
@@ -26,12 +25,12 @@ export default async function CalendarioPage() {
       .is("archived_at", null)
       .order("event_date", { ascending: true });
   } else if (role === "Responsable") {
-    const adminSupa = createAdminClient();
-    eventsQuery = adminSupa
+    // La política agenda_select_scoped (migración 20260503000009) ya incluye
+    // a los agentes supervisados del Responsable, por lo que createClient() es suficiente.
+    eventsQuery = supabase
       .from("agenda")
       .select("*, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
-      .eq("empresa_id", yo?.empresaId ?? -1)
       .order("event_date", { ascending: true });
   } else {
     eventsQuery = supabase
