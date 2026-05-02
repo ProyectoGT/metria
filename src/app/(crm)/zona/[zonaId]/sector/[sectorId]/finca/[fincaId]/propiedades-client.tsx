@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { SlidersHorizontal, X, MapPin, Loader2, Navigation } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deletePropiedadAction } from "@/app/actions/security";
-import { createTareaAction } from "@/app/(crm)/dashboard/actions";
+import { createAgendaAction } from "@/app/(crm)/dashboard/actions";
 import { updatePropiedadesPosicionesAction, upsertPropiedadAction, toggleContactadoAction } from "@/app/(crm)/zona/actions";
 import { canSetVendido, type UserRole } from "@/lib/roles";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
@@ -328,17 +328,19 @@ export default function PropiedadesClient({
     if (!reminderPropiedad || !reminderForm.fecha) return;
     setReminderSaving(true);
 
-    const fechaHora = reminderForm.hora
-      ? `${reminderForm.fecha}T${reminderForm.hora}:00`
-      : `${reminderForm.fecha}T09:00:00`;
-
     const propDesc = reminderPropiedad.propietario
       ?? `Planta ${reminderPropiedad.planta ?? "-"} Puerta ${reminderPropiedad.puerta ?? "-"}`;
     const notaSufijo = reminderForm.nota ? ` — ${reminderForm.nota}` : "";
     const titulo = `Recordatorio: ${propDesc}${notaSufijo}`.slice(0, 200);
 
     try {
-      await createTareaAction({ titulo, prioridad: "media", fecha: fechaHora });
+      await createAgendaAction({
+        description: titulo,
+        eventDate: reminderForm.fecha,
+        time: reminderForm.hora || "09:00",
+        priority: "media",
+        tipo: "seguimiento",
+      });
       toast("Recordatorio creado — aparecera en notificaciones");
       closeReminder();
     } catch (err) {

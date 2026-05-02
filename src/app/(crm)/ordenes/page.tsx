@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { canViewAllAgents, canViewSupervisedAgents } from "@/lib/roles";
+import { formatLocalDateEs, localDateKey } from "@/lib/local-date-time";
 import PageHeader from "@/components/layout/page-header";
 import OrdenesClient from "./ordenes-client";
 
@@ -12,86 +14,59 @@ export default async function OrdenesPage() {
     return <div className="p-6 text-text-secondary">No autenticado.</div>;
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateKey();
+  const allowedUserIds = canViewAllAgents(yo.role)
+    ? null
+    : canViewSupervisedAgents(yo.role)
+      ? [yo.id, ...yo.supervisedAgentIds]
+      : [yo.id];
 
-  let allowedUserIds: number[] | null = null;
+  const agendaClient = canViewSupervisedAgents(yo.role) || canViewAllAgents(yo.role)
+    ? createAdminClient()
+    : supabase;
 
-  if (canViewAllAgents(yo.role)) {
-    allowedUserIds = null;
-  } else if (canViewSupervisedAgents(yo.role)) {
-    allowedUserIds = [yo.id, ...yo.supervisedAgentIds];
-  } else {
-    allowedUserIds = [yo.id];
-  }
+  const [{ data: actividadesRaw }, { data: usuarios }] = await Promise.all([
+    agendaClient
+      .from("agenda")
+      .select("id, description, event_date, time, priority, tipo, completed, result, owner_user_id, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .is("archived_at", null)
+      .eq("event_date", today)
+      .order("time", { ascending: true, nullsFirst: false }),
+    supabase
+      .from("usuarios")
+      .select("id, nombre, apellidos")
+      .order("nombre"),
+  ]);
 
-  // Mover tareas de dias pasados no completadas a pendientes (sin fecha)
-  {
-    let q = supabase
-      .from("tareas")
-      .update({ fecha: null })
-      .lt("fecha", today)
-      .neq("estado", "completado");
-    if (allowedUserIds !== null) q = q.in("owner_user_id", allowedUserIds);
-    await q;
-  }
+  type Actividad = {
+    owner_user_id: number | null;
+    agenda_usuarios?: { usuario_id: number }[];
+  };
 
-  // Eliminar tareas de dias pasados ya completadas
-  {
-    let q = supabase
-      .from("tareas")
-      .delete()
-      .lt("fecha", today)
-      .eq("estado", "completado");
-    if (allowedUserIds !== null) q = q.in("owner_user_id", allowedUserIds);
-    await q;
-  }
+  const actividades = ((actividadesRaw ?? []) as unknown as Actividad[]).filter((actividad) => {
+    if (allowedUserIds === null) return true;
+    const assigned = actividad.agenda_usuarios?.map((u) => u.usuario_id) ?? [];
+    return assigned.some((id) => allowedUserIds.includes(id)) || (
+      actividad.owner_user_id != null && allowedUserIds.includes(actividad.owner_user_id)
+    );
+  });
 
-  // Obtener tareas de hoy + pendientes (sin fecha)
-  // Usamos rango completo del dia para capturar timestamps con hora (ej: 2026-04-23T20:00:00)
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().split("T")[0];
-
-  let tareasQuery = supabase
-    .from("tareas")
-    .select("*")
-    .or(`fecha.is.null,and(fecha.gte.${today}T00:00:00,fecha.lt.${tomorrowStr}T00:00:00)`)
-    .order("id", { ascending: false });
-
-  if (allowedUserIds !== null) {
-    tareasQuery = tareasQuery.in("owner_user_id", allowedUserIds);
-  }
-
-  const { data: tareas } = await tareasQuery;
-
-  let usuariosQuery = supabase
-    .from("usuarios")
-    .select("id, nombre, apellidos")
-    .order("nombre");
-
-  if (allowedUserIds !== null) {
-    usuariosQuery = usuariosQuery.in("id", allowedUserIds);
-  }
-
-  const { data: usuarios } = await usuariosQuery;
-
-  const fechaHoy = new Date().toLocaleDateString("es-ES", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
+  const usuariosVisibles = (usuarios ?? []).filter((u) => {
+    if (allowedUserIds === null) return true;
+    return allowedUserIds.includes(u.id);
   });
 
   return (
     <>
       <PageHeader
         title="Orden del dia"
-        description={`Tareas de hoy — ${fechaHoy}`}
+        description={`Actividades de hoy - ${formatLocalDateEs(today)}`}
       />
       <OrdenesClient
-        initialTareas={tareas ?? []}
+        initialActividades={actividades as Parameters<typeof OrdenesClient>[0]["initialActividades"]}
         currentUserId={yo.id}
         currentUserRole={yo.role}
-        usuarios={usuarios ?? []}
+        usuarios={usuariosVisibles}
         today={today}
       />
     </>

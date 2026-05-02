@@ -162,7 +162,7 @@ export async function GET(request: NextRequest) {
       .or(`asunto.ilike.%${q}%,tipo.ilike.%${q}%,nombre_usuario.ilike.%${q}%,descripcion.ilike.%${q}%`)
       .limit(ctx === "soporte" ? 10 : 5);
 
-    for (const t of (tickets ?? []) as any[]) {
+    for (const t of (tickets ?? []) as Array<{ id: number; asunto: string | null; estado: string | null; tipo: string | null; nombre_usuario: string | null }>) {
       results.push({
         id: `ticket-${t.id}`,
         type: "ticket",
@@ -179,6 +179,8 @@ export async function GET(request: NextRequest) {
       .from("tareas")
       .select("id, titulo, fecha, prioridad")
       .ilike("titulo", `%${q}%`)
+      .is("fecha", null)
+      .is("archived_at", null)
       .limit(4);
 
     for (const t of tareas ?? []) {

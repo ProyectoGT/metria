@@ -70,6 +70,8 @@ export default async function AppShell({
       .select("id, titulo, fecha, prioridad")
       .eq("owner_user_id", userId)
       .eq("estado", "pendiente")
+      .is("fecha", null)
+      .is("archived_at", null)
       .order("fecha", { ascending: true, nullsFirst: false })
       .limit(8);
     notifications = (tareas ?? []) as NotificationItem[];

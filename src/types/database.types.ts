@@ -82,6 +82,10 @@ export interface Database {
           completed: boolean;
           result: string | null;
           gcal_event_id: string | null;
+          tarea_id: number | null;
+          archived_at: string | null;
+          archived_reason: string | null;
+          converted_to_tarea_id: number | null;
           user_id: number | null;
           owner_user_id: number | null;
           empresa_id: number | null;
@@ -99,6 +103,10 @@ export interface Database {
           completed?: boolean;
           result?: string | null;
           gcal_event_id?: string | null;
+          tarea_id?: number | null;
+          archived_at?: string | null;
+          archived_reason?: string | null;
+          converted_to_tarea_id?: number | null;
           user_id?: number | null;
           owner_user_id?: number | null;
           empresa_id?: number | null;
@@ -116,6 +124,10 @@ export interface Database {
           completed?: boolean;
           result?: string | null;
           gcal_event_id?: string | null;
+          tarea_id?: number | null;
+          archived_at?: string | null;
+          archived_reason?: string | null;
+          converted_to_tarea_id?: number | null;
           user_id?: number | null;
           owner_user_id?: number | null;
           empresa_id?: number | null;
@@ -146,6 +158,40 @@ export interface Database {
             foreignKeyName: "agenda_equipo_id_fkey";
             columns: ["equipo_id"];
             referencedRelation: "equipos";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agenda_usuarios: {
+        Row: {
+          id: number;
+          agenda_id: number;
+          usuario_id: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          agenda_id: number;
+          usuario_id: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          agenda_id?: number;
+          usuario_id?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agenda_usuarios_agenda_id_fkey";
+            columns: ["agenda_id"];
+            referencedRelation: "agenda";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agenda_usuarios_usuario_id_fkey";
+            columns: ["usuario_id"];
+            referencedRelation: "usuarios";
             referencedColumns: ["id"];
           },
         ];
@@ -686,7 +732,11 @@ export interface Database {
           empresa_id: number | null;
           equipo_id: number | null;
           visibility: string;
+          from_orden_dia: boolean;
           resultado: string | null;
+          archived_at: string | null;
+          archived_reason: string | null;
+          converted_to_agenda_id: number | null;
         };
         Insert: {
           id?: number;
@@ -699,6 +749,11 @@ export interface Database {
           empresa_id?: number | null;
           equipo_id?: number | null;
           visibility?: string;
+          from_orden_dia?: boolean;
+          resultado?: string | null;
+          archived_at?: string | null;
+          archived_reason?: string | null;
+          converted_to_agenda_id?: number | null;
         };
         Update: {
           id?: number;
@@ -711,7 +766,11 @@ export interface Database {
           empresa_id?: number | null;
           equipo_id?: number | null;
           visibility?: string;
+          from_orden_dia?: boolean;
           resultado?: string | null;
+          archived_at?: string | null;
+          archived_reason?: string | null;
+          converted_to_agenda_id?: number | null;
         };
         Relationships: [
           {
@@ -736,6 +795,40 @@ export interface Database {
             foreignKeyName: "tareas_equipo_id_fkey";
             columns: ["equipo_id"];
             referencedRelation: "equipos";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tarea_usuarios: {
+        Row: {
+          id: number;
+          tarea_id: number;
+          usuario_id: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          tarea_id: number;
+          usuario_id: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          tarea_id?: number;
+          usuario_id?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tarea_usuarios_tarea_id_fkey";
+            columns: ["tarea_id"];
+            referencedRelation: "tareas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tarea_usuarios_usuario_id_fkey";
+            columns: ["usuario_id"];
+            referencedRelation: "usuarios";
             referencedColumns: ["id"];
           },
         ];
@@ -932,6 +1025,127 @@ export interface Database {
           target_agente_id: number;
         };
         Returns: boolean;
+      };
+      current_user_can_use_usuario: {
+        Args: {
+          target_usuario_id: number;
+        };
+        Returns: boolean;
+      };
+      is_agenda_assigned: {
+        Args: {
+          target_agenda_id: number;
+        };
+        Returns: boolean;
+      };
+      is_tarea_assigned: {
+        Args: {
+          target_tarea_id: number;
+        };
+        Returns: boolean;
+      };
+      normalize_assigned_user_ids: {
+        Args: {
+          candidate_ids: number[] | null;
+          fallback_id: number | null;
+        };
+        Returns: number[];
+      };
+      create_agenda_activity: {
+        Args: {
+          p_description: string;
+          p_event_date: string;
+          p_time: string;
+          p_priority?: string;
+          p_tipo?: string;
+          p_result?: string | null;
+          p_completed?: boolean;
+          p_assigned_user_ids?: number[] | null;
+          p_visibility?: string;
+        };
+        Returns: Database["public"]["Tables"]["agenda"]["Row"];
+      };
+      create_pending_tarea: {
+        Args: {
+          p_titulo: string;
+          p_prioridad?: string;
+          p_resultado?: string | null;
+          p_completed?: boolean;
+          p_assigned_user_ids?: number[] | null;
+          p_visibility?: string;
+        };
+        Returns: Database["public"]["Tables"]["tareas"]["Row"];
+      };
+      update_pending_tarea: {
+        Args: {
+          p_tarea_id: number;
+          p_titulo: string;
+          p_prioridad?: string;
+          p_resultado?: string | null;
+          p_completed?: boolean;
+          p_assigned_user_ids?: number[] | null;
+        };
+        Returns: Database["public"]["Tables"]["tareas"]["Row"];
+      };
+      set_tarea_completed: {
+        Args: {
+          p_tarea_id: number;
+          p_completed: boolean;
+          p_resultado?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["tareas"]["Row"];
+      };
+      set_agenda_completed: {
+        Args: {
+          p_agenda_id: number;
+          p_completed: boolean;
+          p_result?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["agenda"]["Row"];
+      };
+      archive_tarea: {
+        Args: {
+          p_tarea_id: number;
+          p_reason?: string;
+        };
+        Returns: Database["public"]["Tables"]["tareas"]["Row"];
+      };
+      archive_agenda: {
+        Args: {
+          p_agenda_id: number;
+          p_reason?: string;
+        };
+        Returns: Database["public"]["Tables"]["agenda"]["Row"];
+      };
+      update_agenda_activity: {
+        Args: {
+          p_agenda_id: number;
+          p_description: string;
+          p_event_date: string;
+          p_time: string;
+          p_priority?: string;
+          p_tipo?: string;
+          p_result?: string | null;
+          p_completed?: boolean;
+          p_assigned_user_ids?: number[] | null;
+        };
+        Returns: Database["public"]["Tables"]["agenda"]["Row"];
+      };
+      convert_tarea_to_agenda: {
+        Args: {
+          p_tarea_id: number;
+          p_event_date: string;
+          p_time: string;
+          p_assigned_user_ids?: number[] | null;
+        };
+        Returns: Database["public"]["Tables"]["agenda"]["Row"];
+      };
+      convert_agenda_to_tarea: {
+        Args: {
+          p_agenda_id: number;
+          p_assigned_user_ids?: number[] | null;
+        };
+        Returns: Database["public"]["Tables"]["tareas"]["Row"];
       };
       insert_desarrollo_activity: {
         Args: {

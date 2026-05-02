@@ -75,7 +75,7 @@ export default function KanbanColumn({
                   >
                     <KanbanCard
                       card={card}
-                      canDelete={!card.assignedBy}
+                      canDelete={card.source === "tarea" && !card.assignedBy}
                       isCompleted={card.isCompleted ?? false}
                       onDelete={(id) => onDeleteCard(column.id, id)}
                       onEdit={(id) => { const c = column.cards.find((x) => x.id === id); if (c) onEditCard(column.id, c); }}

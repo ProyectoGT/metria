@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function OfflinePage() {
   return (
     <div style={{ margin: 0, padding: 0, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", backgroundColor: "#f4f4f5", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
@@ -15,12 +17,12 @@ export default function OfflinePage() {
           No hay conexion a internet. Comprueba tu red y vuelve a intentarlo.
         </p>
 
-        <a
+        <Link
           href="/"
           style={{ display: "inline-block", backgroundColor: "#2563eb", color: "#fff", fontSize: 15, fontWeight: 600, padding: "13px 28px", borderRadius: 8, textDecoration: "none" }}
         >
           Reintentar
-        </a>
+        </Link>
 
         <p style={{ marginTop: 32, fontSize: 13, color: "#a1a1aa" }}>
           Metria CRM · Master Iberica
