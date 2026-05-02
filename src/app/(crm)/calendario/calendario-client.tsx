@@ -483,41 +483,6 @@ export default function CalendarioClient({
           agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
         };
 
-        // Si el evento es para hoy, crear también una tarea en ordenes del día
-        const syncLegacyTarea = false;
-        if (syncLegacyTarea && form.event_date === todayStr) {
-          const horaDefault = form.time ? `${form.event_date}T${form.time}:00` : `${form.event_date}T20:00:00`;
-          const { data: tareaData } = await supabase
-            .from("tareas")
-            .insert({
-              titulo: form.description.trim(),
-              prioridad: form.priority,
-              fecha: horaDefault,
-              estado: "pendiente",
-              visibility: "private",
-              owner_user_id: currentUserId,
-            })
-            .select()
-            .single();
-          if (tareaData) {
-            const tareaId = (tareaData as unknown as { id: number }).id;
-            // Vincular tarea al evento de agenda
-            const { data: upd } = await supabase
-              .from("agenda")
-              .update({ tarea_id: tareaId } as never)
-              .eq("id", saved.id)
-              .select()
-              .single();
-            if (upd) {
-              saved = {
-                ...(upd as unknown as AgendaEvent),
-                agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
-              };
-            }
-            setTareas((prev) => [...prev, tareaData as unknown as TareaEvent]);
-          }
-        }
-
         if (isConnected) {
           const gcalRes = await fetch("/api/google/events", {
             method: "POST",
@@ -560,12 +525,6 @@ export default function CalendarioClient({
         return;
       }
       setGcalEvents((prev) => prev.filter((ev) => ev.id !== target.gcal_event_id));
-    }
-    // Si tiene tarea vinculada, eliminarla también
-    const deleteLegacyTarea = false;
-    if (deleteLegacyTarea && target?.tarea_id) {
-      await supabase.rpc("archive_tarea", { p_tarea_id: target.tarea_id, p_reason: "legacy_calendar_link_archived" });
-      setTareas((prev) => prev.filter((t) => t.id !== target.tarea_id));
     }
     const { error } = await supabase.rpc("archive_agenda", { p_agenda_id: deleteId, p_reason: "archived_from_calendar" });
     if (error) toast("Error al eliminar: " + error.message, "error");

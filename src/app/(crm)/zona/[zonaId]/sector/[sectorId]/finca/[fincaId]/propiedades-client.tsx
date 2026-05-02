@@ -226,9 +226,20 @@ export default function PropiedadesClient({
   const router = useRouter();
   const { toasts, toast } = useToast();
 
+  // IDs ya procesados para no disparar el mismo RPC más de una vez
+  // aunque `propiedades` cambie por otras razones (edición, reorden, etc.)
+  const processedExpiradasRef = useRef<Set<number>>(new Set());
+
   useEffect(() => {
     const expiradas = propiedades.filter(isContactadaCaducada);
     if (expiradas.length === 0) return;
+
+    // Solo actuar sobre IDs que aún no se han procesado en esta sesión
+    const nuevas = expiradas.filter((p) => !processedExpiradasRef.current.has(p.id));
+    if (nuevas.length === 0) return;
+
+    // Marcar como procesadas antes de la mutación para evitar llamadas dobles
+    nuevas.forEach((p) => processedExpiradasRef.current.add(p.id));
 
     setPropiedades((prev) =>
       prev.map((p) =>
@@ -236,9 +247,11 @@ export default function PropiedadesClient({
       )
     );
 
-    expiradas.forEach((p) => {
+    nuevas.forEach((p) => {
       toggleContactadoAction(p.id, false).then(({ error }) => {
         if (error) {
+          // Si falla, permitir reintentar en la próxima carga
+          processedExpiradasRef.current.delete(p.id);
           console.warn("Error al desmarcar contactado caducado:", p.id, error);
         }
       });
