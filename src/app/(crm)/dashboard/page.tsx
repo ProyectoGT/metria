@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { getPeriodRange, mergeRendimientoRows } from "@/lib/desarrollo-metrics";
+import { getNextBestActions } from "@/lib/next-actions";
 import {
   emptyRendimiento,
   type SummaryData,
@@ -18,6 +19,7 @@ import OrdenDiaPanel from "@/components/dashboard/OrdenDiaPanel";
 import AgentOfMonth from "@/components/dashboard/AgentOfMonth";
 import AgentPerformanceTable from "@/components/dashboard/AgentPerformanceTable";
 import MyActivity from "@/components/dashboard/MyActivity";
+import NextBestActionsPanel from "@/components/dashboard/NextBestActionsPanel";
 import MapaDashboardLazy from "@/components/dashboard/MapaDashboardLazy";
 import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
 import { combineLocalDateTime, localDateKey, normalizeTime } from "@/lib/local-date-time";
@@ -65,6 +67,7 @@ export default async function DashboardPage() {
   const fullName = yo ? `${yo.nombre} ${yo.apellidos}`.trim() : "Usuario";
   const anioActual = new Date().getFullYear();
   const periodRange = getPeriodRange(anioActual, 0);
+  const nextBestActions = await getNextBestActions(yo);
 
   const isManager = role === "Administrador" || role === "Director";
 
@@ -519,6 +522,8 @@ export default async function DashboardPage() {
 
       {/* 2 — Summary panel */}
       <SummaryPanel summary={summary} listings={listings} />
+
+      <NextBestActionsPanel actions={nextBestActions} currentUserId={userId} />
 
       {/* 4 — Mis tareas (Kanban) */}
       <section className="min-w-0">

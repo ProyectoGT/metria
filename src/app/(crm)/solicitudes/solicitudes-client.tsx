@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { History, X } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 import {
   ACCESS_SCOPE_BADGES,
@@ -8,6 +9,8 @@ import {
   normalizeAccessScope,
   type AccessScope,
 } from "@/lib/access-scope";
+import PropertyMatchesPanel from "@/components/matching/PropertyMatchesPanel";
+import ContactoTimeline, { type TimelineEvent } from "@/components/timeline/ContactoTimeline";
 import type { UserRole } from "@/lib/roles";
 import { useToast, Toaster } from "@/components/ui/toast";
 
@@ -123,6 +126,7 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<PedidoForm>(emptyForm());
+  const [timelinePedido, setTimelinePedido] = useState<Pedido | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -232,6 +236,28 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
       if (data) { setPedidos((prev) => [data as Pedido, ...prev]); toast("Solicitud creada"); setModalOpen(false); }
     }
     setSaving(false);
+  }
+
+  function pedidoTimelineEvents(pedido: Pedido): TimelineEvent[] {
+    const details = [
+      pedido.tipo_propiedad && `Tipo: ${pedido.tipo_propiedad}`,
+      pedido.zona_busqueda && `Zona: ${pedido.zona_busqueda}`,
+      pedido.presupuesto && `Presupuesto: ${formatPresupuesto(pedido.presupuesto)}`,
+      pedido.modalidad && `Modalidad: ${pedido.modalidad}`,
+      pedido.telefono && `Telefono: ${pedido.telefono}`,
+      pedido.origen && `Origen: ${pedido.origen}`,
+    ].filter(Boolean);
+
+    return [{
+      id: `pedido-${pedido.id}`,
+      pedido_id: pedido.id,
+      agente_id: pedido.owner_user_id,
+      tipo_evento: "pedido",
+      titulo: "Solicitud registrada",
+      descripcion: details.join("\n") || null,
+      created_at: new Date().toISOString(),
+      synthetic: true,
+    }];
   }
 
   async function handleDelete() {
@@ -352,14 +378,23 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
                   </td>
                   <td className="px-4 py-3.5 text-center">{scopeBadge(pedido.visibility)}</td>
                   <td className="px-4 py-3.5 text-right">
-                    {canManagePedido(pedido, currentUserId, currentUserRole) && (
-                      <button onClick={(e) => { e.stopPropagation(); setDeleteId(pedido.id); }}
-                        className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100" title="Eliminar">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setTimelinePedido(pedido); }}
+                        className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-primary/10 hover:text-primary group-hover:opacity-100"
+                        title="Timeline"
+                      >
+                        <History className="h-4 w-4" />
                       </button>
-                    )}
+                      {canManagePedido(pedido, currentUserId, currentUserRole) && (
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteId(pedido.id); }}
+                          className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100" title="Eliminar">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -376,7 +411,22 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
               <h2 className="text-base font-semibold text-text-primary">
                 {editId !== null ? "Editar solicitud" : "Nueva solicitud"}
               </h2>
-              <button onClick={() => setModalOpen(false)} className="text-xl text-text-secondary hover:text-text-primary">×</button>
+              <div className="flex items-center gap-1">
+                {editId !== null && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pedido = pedidos.find((p) => p.id === editId);
+                      if (pedido) setTimelinePedido(pedido);
+                    }}
+                    className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-primary"
+                    title="Timeline"
+                  >
+                    <History className="h-4 w-4" />
+                  </button>
+                )}
+                <button onClick={() => setModalOpen(false)} className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"><X className="h-4 w-4" /></button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
@@ -556,6 +606,13 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
                   rows={6} className="input mt-1.5 resize-y" />
               </div>
 
+              {editId !== null && (() => {
+                const pedido = pedidos.find((p) => p.id === editId);
+                return pedido ? (
+                  <PropertyMatchesPanel pedido={pedido} currentUserId={currentUserId} />
+                ) : null;
+              })()}
+
               {saveError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{saveError}</p>}
             </div>
 
@@ -581,6 +638,31 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
               <button onClick={handleDelete} disabled={deleting} className="rounded-lg bg-danger px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">
                 {deleting ? "Eliminando..." : "Eliminar"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {timelinePedido && (
+        <div
+          className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setTimelinePedido(null); }}
+        >
+          <div className="h-full w-full max-w-2xl bg-surface shadow-xl">
+            <div className="flex h-full flex-col">
+              <div className="flex justify-end border-b border-border px-4 py-3">
+                <button
+                  onClick={() => setTimelinePedido(null)}
+                  className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <ContactoTimeline
+                subject={{ type: "pedido", id: timelinePedido.id, title: timelinePedido.nombre_cliente }}
+                currentUserId={currentUserId}
+                initialEvents={pedidoTimelineEvents(timelinePedido)}
+              />
             </div>
           </div>
         </div>

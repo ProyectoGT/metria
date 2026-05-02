@@ -3,10 +3,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Archive, Download, Mail, Pencil, Phone, Plus, RotateCcw, Search,
-  SlidersHorizontal, Upload, User, X,
+  History, SlidersHorizontal, Upload, User, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 import { useToast, Toaster } from "@/components/ui/toast";
+import ContactoTimeline, { type TimelineEvent } from "@/components/timeline/ContactoTimeline";
 import type { Contacto, ContactoTipo, ContactoEstado } from "@/types";
 import type { UserRole } from "@/lib/roles";
 
@@ -227,6 +228,7 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
   const [form, setForm]           = useState<ContactoForm>(emptyForm());
   const [saving, setSaving]       = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [timelineContacto, setTimelineContacto] = useState<Contacto | null>(null);
 
   // Archive / restore
   const [archivingId, setArchivingId]   = useState<number | null>(null);
@@ -319,6 +321,25 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
   }
 
   // ─── Archivar / Restaurar ────────────────────────────────────────────────────
+
+  function contactoTimelineEvents(c: Contacto): TimelineEvent[] {
+    const details = [
+      c.tipo && `Tipo: ${tipoMeta(c.tipo).label}`,
+      c.telefono && `Telefono: ${c.telefono}`,
+      c.email && `Email: ${c.email}`,
+      c.origen && `Origen: ${c.origen}`,
+    ].filter(Boolean);
+
+    return [{
+      id: `contacto-${c.id}`,
+      contacto_id: c.id,
+      tipo_evento: "contacto",
+      titulo: "Contacto registrado",
+      descripcion: details.join("\n") || null,
+      created_at: c.created_at,
+      synthetic: true,
+    }];
+  }
 
   async function handleArchive(id: number) {
     if (archivingId === id) return;
@@ -609,6 +630,9 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
                             <button onClick={(ev) => { ev.stopPropagation(); openEdit(c); }} className="rounded p-1.5 text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary" title="Editar">
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
+                            <button onClick={(ev) => { ev.stopPropagation(); setTimelineContacto(c); }} className="rounded p-1.5 text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary" title="Timeline">
+                              <History className="h-3.5 w-3.5" />
+                            </button>
                             {(canManageAll || c.owner_user_id === currentUserId) && (
                               <button onClick={(ev) => { ev.stopPropagation(); handleArchive(c.id); }} disabled={archivingId === c.id} className="rounded p-1.5 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50" title="Archivar">
                                 <Archive className="h-3.5 w-3.5" />
@@ -688,7 +712,22 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
           <div className="w-full max-w-2xl rounded-2xl bg-surface shadow-xl">
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <h2 className="text-base font-semibold text-text-primary">{editId ? "Editar contacto" : "Nuevo contacto"}</h2>
-              <button onClick={closeModal} className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"><X className="h-4 w-4" /></button>
+              <div className="flex items-center gap-1">
+                {editId !== null && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const contacto = contactos.find((c) => c.id === editId);
+                      if (contacto) setTimelineContacto(contacto);
+                    }}
+                    className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-primary"
+                    title="Timeline"
+                  >
+                    <History className="h-4 w-4" />
+                  </button>
+                )}
+                <button onClick={closeModal} className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"><X className="h-4 w-4" /></button>
+              </div>
             </div>
 
             <form onSubmit={handleSave} className="max-h-[75vh] overflow-y-auto">
@@ -856,6 +895,31 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
                   {importing ? "Importando..." : `Importar ${importRows.length} contactos`}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {timelineContacto && (
+        <div
+          className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setTimelineContacto(null); }}
+        >
+          <div className="h-full w-full max-w-2xl bg-surface shadow-xl">
+            <div className="flex h-full flex-col">
+              <div className="flex justify-end border-b border-border px-4 py-3">
+                <button
+                  onClick={() => setTimelineContacto(null)}
+                  className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <ContactoTimeline
+                subject={{ type: "contacto", id: timelineContacto.id, title: nombreCompleto(timelineContacto) }}
+                currentUserId={currentUserId}
+                initialEvents={contactoTimelineEvents(timelineContacto)}
+              />
             </div>
           </div>
         </div>
