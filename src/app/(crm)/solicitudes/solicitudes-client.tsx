@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileText, History, X } from "lucide-react";
+import { FileText, History, Users, X } from "lucide-react";
 import DocumentGeneratorModal from "@/components/documents/DocumentGeneratorModal";
+import ColaboracionesPanel from "@/components/colaboraciones/ColaboracionesPanel";
 import { createClient } from "@/lib/supabase-browser";
 import {
   ACCESS_SCOPE_BADGES,
@@ -129,6 +130,7 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
   const [form, setForm] = useState<PedidoForm>(emptyForm());
   const [timelinePedido, setTimelinePedido] = useState<Pedido | null>(null);
   const [docPedido, setDocPedido] = useState<Pedido | null>(null);
+  const [colabPedido, setColabPedido] = useState<Pedido | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -420,6 +422,17 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
                       type="button"
                       onClick={() => {
                         const pedido = pedidos.find((p) => p.id === editId);
+                        if (pedido) setColabPedido(pedido);
+                      }}
+                      className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-primary"
+                      title="Colaboraciones"
+                    >
+                      <Users className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pedido = pedidos.find((p) => p.id === editId);
                         if (pedido) setDocPedido(pedido);
                       }}
                       className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-primary"
@@ -681,6 +694,17 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
             </div>
           </div>
         </div>
+      )}
+
+      {colabPedido && (
+        <ColaboracionesPanel
+          entidad_tipo="pedido"
+          entidad_id={colabPedido.id}
+          entidad_label={colabPedido.nombre_cliente}
+          currentUserId={currentUserId ?? 0}
+          agentes={agentes}
+          onClose={() => setColabPedido(null)}
+        />
       )}
 
       {docPedido && (

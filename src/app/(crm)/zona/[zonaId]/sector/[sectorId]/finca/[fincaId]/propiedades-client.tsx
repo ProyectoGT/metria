@@ -2,8 +2,9 @@
 
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { SlidersHorizontal, X, MapPin, Loader2, Navigation, FileText } from "lucide-react";
+import { SlidersHorizontal, X, MapPin, Loader2, Navigation, FileText, Users } from "lucide-react";
 import DocumentGeneratorModal from "@/components/documents/DocumentGeneratorModal";
+import ColaboracionesPanel from "@/components/colaboraciones/ColaboracionesPanel";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deletePropiedadAction } from "@/app/actions/security";
 import { createAgendaAction } from "@/app/(crm)/dashboard/actions";
@@ -172,6 +173,7 @@ export default function PropiedadesClient({
   const [editTarget, setEditTarget] = useState<Propiedad | null>(null);
   const [encargoPropiedad, setEncargoPropiedad] = useState<Propiedad | null>(null);
   const [docPropiedad, setDocPropiedad] = useState<Propiedad | null>(null);
+  const [colabPropiedad, setColabPropiedad] = useState<Propiedad | null>(null);
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -856,6 +858,13 @@ export default function PropiedadesClient({
                     Recordatorio
                   </button>
                   <button
+                    onClick={() => setColabPropiedad(propiedad)}
+                    className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-primary"
+                  >
+                    <Users className="h-3.5 w-3.5" />
+                    Colaborar
+                  </button>
+                  <button
                     onClick={() => setDocPropiedad(propiedad)}
                     className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-primary"
                   >
@@ -1097,6 +1106,13 @@ export default function PropiedadesClient({
                                       Ver encargo
                                     </button>
                                   )}
+                                  <button
+                                    onClick={() => setColabPropiedad(propiedad)}
+                                    className="rounded px-2 py-1 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-primary"
+                                    title="Colaboraciones"
+                                  >
+                                    <Users className="h-3.5 w-3.5" />
+                                  </button>
                                   <button
                                     onClick={() => setDocPropiedad(propiedad)}
                                     className="rounded px-2 py-1 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-primary"
@@ -1503,6 +1519,20 @@ export default function PropiedadesClient({
             setDeleteError(null);
           }}
           onConfirm={handleDelete}
+        />
+      )}
+
+      {colabPropiedad && (
+        <ColaboracionesPanel
+          entidad_tipo="propiedad"
+          entidad_id={colabPropiedad.id}
+          entidad_label={
+            colabPropiedad.propietario?.trim()
+            || `Planta ${colabPropiedad.planta ?? "-"} Puerta ${colabPropiedad.puerta ?? "-"}`
+          }
+          currentUserId={currentUserId}
+          agentes={agentes}
+          onClose={() => setColabPropiedad(null)}
         />
       )}
 
