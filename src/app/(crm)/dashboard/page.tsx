@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { getPeriodRange, mergeRendimientoRows } from "@/lib/desarrollo-metrics";
 import { getNextBestActions } from "@/lib/next-actions";
+import { generateAndFetchSuggestions } from "@/lib/pipeline-suggestions";
+import { detectLostOpportunities } from "@/lib/opportunities";
 import {
   emptyRendimiento,
   type SummaryData,
@@ -20,6 +22,8 @@ import AgentOfMonth from "@/components/dashboard/AgentOfMonth";
 import AgentPerformanceTable from "@/components/dashboard/AgentPerformanceTable";
 import MyActivity from "@/components/dashboard/MyActivity";
 import NextBestActionsPanel from "@/components/dashboard/NextBestActionsPanel";
+import PipelineSuggestionsPanel from "@/components/dashboard/PipelineSuggestionsPanel";
+import LostOpportunitiesPanel from "@/components/dashboard/LostOpportunitiesPanel";
 import MapaDashboardLazy from "@/components/dashboard/MapaDashboardLazy";
 import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
 import { combineLocalDateTime, localDateKey, normalizeTime } from "@/lib/local-date-time";
@@ -68,6 +72,8 @@ export default async function DashboardPage() {
   const anioActual = new Date().getFullYear();
   const periodRange = getPeriodRange(anioActual, 0);
   const nextBestActions = await getNextBestActions(yo);
+  const pipelineSuggestions = yo ? await generateAndFetchSuggestions(yo) : [];
+  const lostOpportunities = yo ? await detectLostOpportunities(yo) : [];
 
   const isManager = role === "Administrador" || role === "Director";
 
@@ -524,6 +530,10 @@ export default async function DashboardPage() {
       <SummaryPanel summary={summary} listings={listings} />
 
       <NextBestActionsPanel actions={nextBestActions} currentUserId={userId} />
+
+      <PipelineSuggestionsPanel suggestions={pipelineSuggestions} />
+
+      <LostOpportunitiesPanel opportunities={lostOpportunities} />
 
       {/* 4 — Mis tareas (Kanban) */}
       <section className="min-w-0">

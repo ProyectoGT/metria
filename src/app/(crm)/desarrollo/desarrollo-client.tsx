@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import Link from "next/link";
+import { BarChart3 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 import {
   defaultRendimiento,
@@ -259,8 +261,23 @@ export default function DesarrolloClient({
       : []),
   ];
 
+  const canSeeInsights = role === "Administrador" || role === "Director" || role === "Responsable";
+
   return (
     <div className="space-y-6">
+
+      {/* ── Acceso a Business Intelligence ────────────────────────── */}
+      {canSeeInsights && (
+        <div className="flex justify-end">
+          <Link
+            href="/desarrollo/insights"
+            className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Business Intelligence
+          </Link>
+        </div>
+      )}
 
       {/* ── Resumen de rendimiento ─────────────────────────────────── */}
       <div className={`grid grid-cols-2 gap-3 sm:gap-4 ${canSeeFacturado ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
