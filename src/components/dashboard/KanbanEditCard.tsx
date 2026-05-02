@@ -47,6 +47,7 @@ export default function KanbanEditCard({ card, onSave, onClose, agents = [], cur
   const [assignedUserIds, setAssignedUserIds] = useState<string[]>(
     card.assignedUserIds?.length ? card.assignedUserIds.map(String) : [currentUserId],
   );
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const isActivity = card.source === "agenda";
   const availableAgents = agents.length ? agents : [{ id: currentUserId, nombre: "Yo" }];
 
@@ -59,7 +60,8 @@ export default function KanbanEditCard({ card, onSave, onClose, agents = [], cur
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || isSubmitting) return;
+    setIsSubmitting(true);
     const dueDate = date ? `${date}T${normalizeTime(time, DEFAULT_ACTIVITY_TIME)}` : undefined;
     onSave({
       title: title.trim(),
@@ -176,8 +178,8 @@ export default function KanbanEditCard({ card, onSave, onClose, agents = [], cur
             <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">
               Cancelar
             </button>
-            <button type="submit" disabled={!title.trim() || assignedUserIds.length === 0} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50">
-              Guardar cambios
+            <button type="submit" disabled={!title.trim() || assignedUserIds.length === 0 || isSubmitting} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50">
+              {isSubmitting ? "Guardando..." : "Guardar cambios"}
             </button>
           </div>
         </form>

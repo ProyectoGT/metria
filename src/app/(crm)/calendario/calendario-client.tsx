@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   Phone, Users, Home, Clock, BookOpen, Star, Activity, Calendar,
   ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter,
@@ -194,6 +194,8 @@ export default function CalendarioClient({
 
   const [events, setEvents]         = useState<AgendaEvent[]>(initialEvents);
   const [tareas, setTareas]         = useState<TareaEvent[]>(initialTareas);
+  const eventsRef = useRef(events);
+  useEffect(() => { eventsRef.current = events; }, [events]);
   const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
 
   // Filter by user — default al usuario actual
@@ -274,8 +276,15 @@ export default function CalendarioClient({
 
   // ── Google Calendar fetch ──────────────────────────────────────────────────
 
+  const gcalAbortRef = useRef<AbortController | null>(null);
+
   const fetchGcalEvents = useCallback(async () => {
     if (!isConnected) return;
+
+    gcalAbortRef.current?.abort();
+    const controller = new AbortController();
+    gcalAbortRef.current = controller;
+
     let timeMin: string, timeMax: string;
     if (viewMode === "week") {
       timeMin = weekStart.toISOString();
@@ -286,12 +295,21 @@ export default function CalendarioClient({
       timeMin = new Date(year, month, 1).toISOString();
       timeMax = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
     }
-    const res = await fetch(`/api/google/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`);
+
+    let res: Response;
+    try {
+      res = await fetch(
+        `/api/google/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`,
+        { signal: controller.signal },
+      );
+    } catch {
+      return; // abortado o error de red
+    }
     if (!res.ok) return;
 
     const d = await res.json();
     const items = (d.items ?? []) as GCalEvent[];
-    const localAgendaIds = new Set(events.map((ev) => String(ev.id)));
+    const localAgendaIds = new Set(eventsRef.current.map((ev) => String(ev.id)));
     const archivedGoogleIds = new Set(archivedGoogleEventIds);
     const visibleItems: GCalEvent[] = [];
     const orphanIds: string[] = [];
@@ -308,6 +326,7 @@ export default function CalendarioClient({
       visibleItems.push(item);
     }
 
+    if (controller.signal.aborted) return;
     setGcalEvents(visibleItems);
 
     await Promise.all(
@@ -319,7 +338,7 @@ export default function CalendarioClient({
         }).catch(() => null),
       ),
     );
-  }, [isConnected, currentDate, weekStart, viewMode, events, archivedGoogleEventIds]);
+  }, [isConnected, currentDate, weekStart, viewMode, archivedGoogleEventIds]);
 
   useEffect(() => { fetchGcalEvents(); }, [fetchGcalEvents]);
 

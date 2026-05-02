@@ -63,7 +63,7 @@ export default function OrdenesClient({
   usuarios,
   today,
 }: Props) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { toast, toasts } = useToast();
   const [actividades, setActividades] = useState<Actividad[]>(initialActividades);
   const [filterUserId, setFilterUserId] = useState<number | null>(null);
@@ -71,6 +71,7 @@ export default function OrdenesClient({
   const [editing, setEditing] = useState<Actividad | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [completingId, setCompletingId] = useState<number | null>(null);
   const [form, setForm] = useState({
     description: "",
     time: DEFAULT_ACTIVITY_TIME,
@@ -190,16 +191,19 @@ export default function OrdenesClient({
   }
 
   async function setCompleted(actividad: Actividad, completed: boolean) {
+    if (completingId === actividad.id) return;
+    setCompletingId(actividad.id);
+    setActividades((prev) => prev.map((a) => a.id === actividad.id ? { ...a, completed } : a));
     const { data, error } = await supabase.rpc("set_agenda_completed", {
       p_agenda_id: actividad.id,
       p_completed: completed,
       p_result: completed ? actividad.result : null,
     });
+    setCompletingId(null);
     if (error || !data) {
+      setActividades((prev) => prev.map((a) => a.id === actividad.id ? { ...a, completed: !completed } : a));
       toast(error?.message ?? "Error al actualizar", "error");
-      return;
     }
-    setActividades((prev) => prev.map((a) => a.id === actividad.id ? { ...a, completed } : a));
   }
 
   async function archiveActividad(id: number) {
@@ -279,9 +283,12 @@ export default function OrdenesClient({
                         e.stopPropagation();
                         setCompleted(actividad, !actividad.completed);
                       }}
-                      className={`mt-0.5 shrink-0 ${actividad.completed ? "text-success" : "text-text-secondary hover:text-success"}`}
+                      disabled={completingId === actividad.id}
+                      className={`mt-0.5 shrink-0 transition-opacity disabled:opacity-50 ${actividad.completed ? "text-success" : "text-text-secondary hover:text-success"}`}
                     >
-                      <CheckCircle2 className="h-4 w-4" />
+                      {completingId === actividad.id
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <CheckCircle2 className="h-4 w-4" />}
                     </button>
                     <div className="min-w-0 flex-1">
                       <p className={`break-words text-sm font-medium leading-snug ${actividad.completed ? "line-through text-text-secondary" : "text-text-primary"}`}>

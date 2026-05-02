@@ -48,6 +48,7 @@ export default function KanbanAddCard({
   const [date, setDate] = useState(localDateKey());
   const [time, setTime] = useState(DEFAULT_ACTIVITY_TIME);
   const [assignedUserIds, setAssignedUserIds] = useState<string[]>([currentUserId]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canAssign = role === "Administrador" || role === "Director" || role === "Responsable";
   const isActivity = mode === "actividad";
@@ -62,7 +63,8 @@ export default function KanbanAddCard({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim() || assignedUserIds.length === 0) return;
+    if (!title.trim() || assignedUserIds.length === 0 || isSubmitting) return;
+    setIsSubmitting(true);
     onAdd({
       title: title.trim(),
       description: description.trim() || undefined,
@@ -225,7 +227,7 @@ export default function KanbanAddCard({
             </button>
             <button
               type="submit"
-              disabled={!title.trim() || assignedUserIds.length === 0}
+              disabled={!title.trim() || assignedUserIds.length === 0 || isSubmitting}
               className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isActivity ? "Crear actividad" : "Anadir tarea"}
