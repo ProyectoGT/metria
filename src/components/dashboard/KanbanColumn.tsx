@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { CheckCircle2, Plus, X } from "lucide-react";
 import KanbanCard from "./KanbanCard";
@@ -18,7 +18,7 @@ type KanbanColumnProps = {
   onCompleteCard?: (columnId: string, cardId: string, card: KanbanCardData) => void;
 };
 
-export default function KanbanColumn({
+function KanbanColumn({
   column,
   onDeleteColumn,
   onAddCard,
@@ -28,7 +28,7 @@ export default function KanbanColumn({
 }: KanbanColumnProps) {
   const [hovered, setHovered] = useState(false);
 
-  const activeCount = column.cards.filter((c) => !c.isCompleted).length;
+  const activeCount = useMemo(() => column.cards.filter((c) => !c.isCompleted).length, [column.cards]);
   const totalCount = column.cards.length;
   const countLabel = activeCount === totalCount ? String(activeCount) : `${activeCount}/${totalCount}`;
 
@@ -128,3 +128,5 @@ export default function KanbanColumn({
     </div>
   );
 }
+
+export default memo(KanbanColumn);

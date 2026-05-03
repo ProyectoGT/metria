@@ -2,7 +2,7 @@
 
 
 import { APIProvider, Map, AdvancedMarker, InfoWindow, Polygon, useMap } from "@vis.gl/react-google-maps";
-import { useState, useEffect } from "react";
+import { memo, useMemo, useState, useEffect } from "react";
 import { Navigation, FileText } from "lucide-react";
 
 const OFICINA = { lat: 41.365795, lng: 2.053508 };
@@ -142,7 +142,7 @@ function fallbackFit(map: google.maps.Map, points: { lat: number; lng: number }[
   if (points.length === 1) map.setZoom(14);
 }
 
-export default function MapaDashboard({
+function MapaDashboard({
   noticias,
   encargos,
 }: {
@@ -152,10 +152,13 @@ export default function MapaDashboard({
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
   const [selected, setSelected] = useState<Selected | null>(null);
 
-  const allPoints = [
-    ...noticias.map((n) => ({ lat: n.latitud, lng: n.longitud })),
-    ...encargos.map((e) => ({ lat: e.latitud, lng: e.longitud })),
-  ];
+  const allPoints = useMemo(
+    () => [
+      ...noticias.map((n) => ({ lat: n.latitud, lng: n.longitud })),
+      ...encargos.map((e) => ({ lat: e.latitud, lng: e.longitud })),
+    ],
+    [encargos, noticias],
+  );
 
   return (
     <div className="h-full w-full" style={{ minHeight: 380 }}>
@@ -312,3 +315,5 @@ export default function MapaDashboard({
     </div>
   );
 }
+
+export default memo(MapaDashboard);

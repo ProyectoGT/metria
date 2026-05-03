@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { createClient } from "@/lib/supabase";
+import { canViewOrgChart } from "@/lib/roles";
 import PageHeader from "@/components/layout/page-header";
 import OrganigramaClient from "./organigrama-client";
 import type { OrgUser } from "@/lib/org-chart";
@@ -11,7 +12,7 @@ export default async function OrganigramaPage() {
   if (!yo) redirect("/login");
 
   // Solo Administrador, Director y Responsable pueden ver el organigrama
-  if (yo.role === "Agente") redirect("/dashboard");
+  if (!canViewOrgChart(yo.role)) redirect("/dashboard");
 
   const supabase = await createClient();
 
@@ -55,7 +56,12 @@ export default async function OrganigramaPage() {
         )
       : allUsers;
 
-  const users: OrgUser[] = visibleUsers.map((u) => ({
+  const users: OrgUser[] = visibleUsers
+    .filter((u) => {
+      const r = (u.rol ?? "").toLowerCase();
+      return r !== "administrador" && r !== "admin";
+    })
+    .map((u) => ({
     id: u.id,
     nombre: u.nombre,
     apellidos: u.apellidos,

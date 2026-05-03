@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Calendar, User, Trash2, CheckCircle2, Circle, ExternalLink, AlertCircle, Pencil, GripVertical } from "lucide-react";
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 
@@ -68,7 +68,7 @@ type KanbanCardProps = {
   isDragging?: boolean;
 };
 
-export default function KanbanCard({
+function KanbanCard({
   card,
   canDelete,
   isCompleted = false,
@@ -232,3 +232,5 @@ export default function KanbanCard({
     </div>
   );
 }
+
+export default memo(KanbanCard);

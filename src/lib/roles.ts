@@ -73,6 +73,19 @@ export function canViewSupervisedAgents(role: UserRole) {
   return role === "Responsable";
 }
 
+export function canViewOrgChart(role: UserRole) {
+  return role === "Administrador" || role === "Director" || role === "Responsable";
+}
+
+export function canViewInsights(role: UserRole) {
+  return canViewOrgChart(role);
+}
+
+export function canAccessEmail(_role: UserRole) {
+  void _role;
+  return true;
+}
+
 /**
  * Determina si un usuario puede marcar una propiedad como "vendido".
  * - Administrador y Director: siempre.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import { Archive, CheckCircle2, ExternalLink, Inbox, Mail, Paperclip, RefreshCw, Search, Send, Tag, Undo2 } from "lucide-react";
 
@@ -18,7 +18,7 @@ type Message = {
   to_emails: Array<{ email: string; name: string | null }>;
   subject: string | null;
   snippet: string | null;
-  body_text: string | null;
+  body_text?: string | null;
   received_at: string | null;
   sent_at: string | null;
   is_read: boolean;
@@ -86,6 +86,7 @@ export default function EmailInboxClient({
   const [composeOpen, setComposeOpen] = useState(false);
   const [compose, setCompose] = useState({ to: "", subject: "", bodyText: "" });
   const [manualLink, setManualLink] = useState({ entityType: "contacto", entityId: "" });
+  const [messageBodies, setMessageBodies] = useState<Record<number, string>>({});
 
   const linksByMessage = useMemo(() => {
     const map = new Map<number, LinkRow[]>();
@@ -132,6 +133,22 @@ export default function EmailInboxClient({
   const selected = filtered.find((message) => message.id === selectedId) ?? filtered[0] ?? null;
   const account = accounts[0] ?? null;
   const connected = account?.status === "connected";
+  const selectedBody = selected ? (messageBodies[selected.id] ?? selected.body_text ?? selected.snippet ?? "") : "";
+
+  useEffect(() => {
+    if (!selected || messageBodies[selected.id] || selected.body_text) return;
+    let active = true;
+    fetch(`/api/email/messages/${selected.id}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((json) => {
+        const body = json?.message?.body_text;
+        if (active && typeof body === "string") {
+          setMessageBodies((current) => ({ ...current, [selected.id]: body }));
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [messageBodies, selected]);
 
   function sync() {
     startTransition(async () => {
@@ -439,7 +456,7 @@ export default function EmailInboxClient({
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-5">
-              <pre className="whitespace-pre-wrap font-sans text-sm leading-7 text-text-primary">{selected.body_text || selected.snippet}</pre>
+              <pre className="whitespace-pre-wrap font-sans text-sm leading-7 text-text-primary">{selectedBody}</pre>
             </div>
           </div>
         ) : (

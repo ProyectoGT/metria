@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { BarChart3 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
+import { canViewInsights, normalizeUserRole } from "@/lib/roles";
 import {
   defaultRendimiento,
   getPeriodRange,
@@ -255,7 +256,7 @@ export default function DesarrolloClient({
   const yearOptions = [defaultAnio - 1, defaultAnio, defaultAnio + 1];
 
   const summaryCards = [
-    { label: "Noticias", value: String(totalNoticias), color: "var(--color-primary)" },
+    { label: "Noticias visibles", value: String(totalNoticias), color: "var(--color-primary)" },
     { label: "Encargos", value: String(totals.encargos), color: "#7c3aed" },
     { label: "Ventas", value: String(totals.ventas), color: "var(--color-success)" },
     ...(canSeeFacturado
@@ -263,7 +264,7 @@ export default function DesarrolloClient({
       : []),
   ];
 
-  const canSeeInsights = role === "Administrador" || role === "Director" || role === "Responsable";
+  const canSeeInsights = canViewInsights(normalizeUserRole(role));
 
   return (
     <div className="space-y-6">
@@ -293,6 +294,9 @@ export default function DesarrolloClient({
           </div>
         ))}
       </div>
+      <p className="-mt-3 text-xs text-text-secondary">
+        Las metricas de rendimiento siguen el periodo seleccionado. Noticias visibles es una foto operativa actual.
+      </p>
 
       {/* ── Filtros ────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3">

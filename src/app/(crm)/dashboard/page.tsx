@@ -45,9 +45,9 @@ export default async function DashboardPage() {
   const anioActual = new Date().getFullYear();
   const currentDateLabel = formatLocalDateEs(localDateKey());
   const periodRange = getPeriodRange(anioActual, 0);
-  const nextBestActions = await getNextBestActions(yo);
-  const pipelineSuggestions = yo ? await generateAndFetchSuggestions(yo) : [];
-  const lostOpportunities = yo ? await detectLostOpportunities(yo) : [];
+  const nextBestActionsPromise = getNextBestActions(yo);
+  const pipelineSuggestionsPromise = yo ? generateAndFetchSuggestions(yo) : Promise.resolve([]);
+  const lostOpportunitiesPromise = yo ? detectLostOpportunities(yo) : Promise.resolve([]);
 
   const isManager = role === "Administrador" || role === "Director";
 
@@ -128,7 +128,6 @@ export default async function DashboardPage() {
     { data: investigacionesList },
     { data: encargosList },
     { data: pedidosList },
-    { count: contactosCount },
     { data: todosAgentes },
     { data: rendimientoData },
     { data: actividadData },
@@ -138,6 +137,9 @@ export default async function DashboardPage() {
     { data: agenteMesData },
     { data: noticiasMapData },
     { data: encargosMapData },
+    nextBestActions,
+    pipelineSuggestions,
+    lostOpportunities,
   ] = await Promise.all([
     applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "noticia")),
     applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "investig%")),
@@ -159,8 +161,6 @@ export default async function DashboardPage() {
       ).order("id", { ascending: false }).limit(50)
     ),
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from("contactos").select("id", { count: "exact", head: true }).is("archived_at", null),
     supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
     supabase.from("rendimiento").select("agente_id, anio, mes, facturado, objetivo_facturado, encargos, objetivo_encargos, ventas, objetivo_ventas, contactos, objetivo_contactos").eq("anio", anioActual).eq("mes", 0),
     supabase
@@ -216,6 +216,9 @@ export default async function DashboardPage() {
         .not("latitud", "is", null)
         .not("longitud", "is", null)
     ),
+    nextBestActionsPromise,
+    pipelineSuggestionsPromise,
+    lostOpportunitiesPromise,
   ]);
 
   // ─── 2. Summary data ─────────────────────────────────────────────────────

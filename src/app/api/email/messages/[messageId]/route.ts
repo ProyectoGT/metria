@@ -4,6 +4,27 @@ import { createClient } from "@/lib/supabase";
 import { type EmailAccount } from "@/lib/email/gmail";
 import { getEmailProviderAdapter } from "@/lib/email/providers";
 
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ messageId: string }> },
+) {
+  const currentUser = await getCurrentUserContext();
+  if (!currentUser) return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
+
+  const { messageId } = await params;
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: message } = await (supabase as any)
+    .from("email_messages")
+    .select("id,body_text,body_html")
+    .eq("id", Number(messageId))
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
+
+  if (!message) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  return NextResponse.json({ message });
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ messageId: string }> },

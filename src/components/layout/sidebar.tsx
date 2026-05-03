@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { canManageUsers, normalizeUserRole } from "@/lib/roles";
+import { canManageUsers, canViewOrgChart, normalizeUserRole } from "@/lib/roles";
 import {
   LayoutDashboard,
   MapPin,
@@ -117,8 +117,23 @@ export default function Sidebar({ userRole: _userRole }: Props) {
 
   const userRole = _userRole ? normalizeUserRole(_userRole) : null;
   const canSeeUsers = canManageUsers(userRole ?? "Agente");
-  const canSeeOrganigrama =
-    userRole === "Administrador" || userRole === "Director" || userRole === "Responsable";
+  const canSeeOrganigrama = canViewOrgChart(userRole ?? "Agente");
+
+  const applyTheme = useCallback((t: Theme, persist = true) => {
+    const el = document.documentElement;
+    el.classList.remove("dark", "dark-black");
+    if (t === "dark")       el.classList.add("dark");
+    if (t === "dark-black") el.classList.add("dark", "dark-black");
+    localStorage.setItem("metria-theme", t);
+    setTheme(t);
+    if (persist) {
+      fetch("/api/user/preferences/theme", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme: t }),
+      }).catch(() => {});
+    }
+  }, []);
 
   // Escuchar evento del botón hamburger del header
   useEffect(() => {
@@ -127,20 +142,22 @@ export default function Sidebar({ userRole: _userRole }: Props) {
     return () => window.removeEventListener("sidebar:toggle", handleToggle);
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    fetch("/api/user/preferences/theme")
+      .then((res) => res.ok ? res.json() : null)
+      .then((json) => {
+        if (active && json?.theme) applyTheme(json.theme as Theme, false);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [applyTheme]);
+
   // Cerrar al navegar
   useEffect(() => {
     const id = window.requestAnimationFrame(() => setMobileOpen(false));
     return () => window.cancelAnimationFrame(id);
   }, [pathname]);
-
-  function applyTheme(t: Theme) {
-    const el = document.documentElement;
-    el.classList.remove("dark", "dark-black");
-    if (t === "dark")       el.classList.add("dark");
-    if (t === "dark-black") el.classList.add("dark", "dark-black");
-    localStorage.setItem("metria-theme", t);
-    setTheme(t);
-  }
 
   function isActive(href: string) {
     if (href === "/dashboard") return pathname === "/dashboard";
