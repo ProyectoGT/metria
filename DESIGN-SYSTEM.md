@@ -1,0 +1,198 @@
+# Design System — Metria CRM
+
+Filosofía visual: **"Structured Calm"** — moderno, limpio, minimalista y premium.
+Cards amplias, mucho aire, jerarquía clara, dark mode excelente.
+
+---
+
+## Tokens de color
+
+Definidos en `src/app/globals.css` dentro del bloque `@theme {}`.
+Los dark mode overrides están en `html.dark {}`.
+
+| Token | Light | Dark | Uso |
+|-------|-------|------|-----|
+| `bg-background` | #f8fafc | #09090b | Fondo de página |
+| `bg-surface` | #ffffff | #111113 | Fondo de cards |
+| `bg-surface-raised` | #f1f5f9 | #18181b | Fondos dentro de cards |
+| `bg-muted` | #f1f5f9 | #18181b | Fondos sutiles, thead |
+| `text-text-primary` | #0f172a | #fafafa | Texto principal |
+| `text-text-secondary` | #64748b | #a1a1aa | Texto secundario |
+| `border-border` | #e2e8f0 | #27272a | Bordes |
+| `text-primary` | #2563eb | = | Acción primaria |
+| `text-success` | #16a34a | = | Éxito |
+| `text-danger` | #dc2626 | = | Error / Destructivo |
+| `text-accent` | #f59e0b | = | Advertencia / Amber |
+
+---
+
+## Espaciado (escala 4px)
+
+Usar **solo** estos valores. No usar gap-1.5, gap-2.5, gap-3, gap-5.
+
+| Nombre | Valor | Clases |
+|--------|-------|--------|
+| xs | 4px | `gap-1`, `p-1` |
+| sm | 8px | `gap-2`, `p-2` |
+| md | 16px | `gap-4`, `p-4` |
+| lg | 24px | `gap-6`, `p-6` |
+| xl | 32px | `gap-8`, `p-8` |
+
+---
+
+## Border radius
+
+| Nivel | Clase | Uso |
+|-------|-------|-----|
+| sm | `rounded-lg` (8px) | Botones, inputs, badges, chips |
+| md | `rounded-xl` (12px) | Cards pequeñas, panels, dropdowns |
+| lg | `rounded-2xl` (16px) | Modales, drawers, stat cards, tablas |
+
+---
+
+## Sombras
+
+| Nivel | Clase | Uso |
+|-------|-------|-----|
+| layer-1 | `shadow-sm` | Cards en reposo |
+| layer-2 | `shadow-md` | Hover de cards, dropdowns |
+| layer-3 | `shadow-xl` | Modales, drawers activos |
+
+---
+
+## Tipografía
+
+| Rol | Clases | Uso |
+|-----|--------|-----|
+| Display | `text-2xl font-bold` | Títulos de página (h1) |
+| Heading | `text-lg font-semibold` | Títulos de sección / card |
+| Subheading | `text-sm font-semibold` | Subtítulos, thead |
+| Body | `text-sm` | Contenido estándar |
+| Caption | `text-xs font-medium` | Labels, hints, badges |
+| Micro | `text-[11px]` | Contadores, timestamps |
+
+---
+
+## Z-index
+
+| Capa | Valor | Componentes |
+|------|-------|-------------|
+| dropdown | 20 (`z-20`) | Menús, selects |
+| modal | 30 (`z-[30]`) | Modales / Dialogs |
+| drawer | 40 (`z-[40]`) | Drawers laterales |
+| toast | 50 (`z-[50]`) | Notificaciones |
+| tooltip | 60 (`z-[60]`) | Tooltips |
+
+---
+
+## Componentes disponibles
+
+### Primitivos (`src/components/ui/`)
+
+| Componente | Archivo | Descripción |
+|------------|---------|-------------|
+| `Button` | `button.tsx` | Botón con variantes: primary, secondary, ghost, danger, outline |
+| `Badge` | `badge.tsx` | Etiqueta de estado: default, primary, success, warning, danger, purple, blue |
+| `Card` | `card.tsx` | Contenedor base con border + surface + shadow |
+| `StatCard` | `card.tsx` | Métrica numérica con icono y trend |
+| `SectionCard` | `card.tsx` | Sección con header, título y slot de acción |
+| `Avatar` | `avatar.tsx` | Avatar con imagen o iniciales determinísticas |
+| `Modal` | `modal.tsx` | Dialog con Root/Header/Body/Footer |
+| `Drawer` | `drawer.tsx` | Panel lateral deslizante |
+| `Tabs` + `Tab` | `tabs.tsx` | Navegación por pestañas: underline y pill |
+| `EmptyState` | `empty-state.tsx` | Estado vacío con icono, título y CTA |
+| `FilterBar` | `filter-bar.tsx` | Barra de filtros con contador de activos |
+| `Table*` | `table.tsx` | Familia: TableContainer, Table, TableHead, Th, TableBody, Tr, Td |
+| `DeleteConfirmationDialog` | `delete-confirmation-dialog.tsx` | Confirmación destructiva con contraseña |
+| `Toast` / `Toaster` | `toast.tsx` | Sistema de notificaciones |
+| `Skeleton*` | `skeleton.tsx` | Loading states por página |
+
+### Layout (`src/components/layout/`)
+
+| Componente | Descripción |
+|------------|-------------|
+| `PageHeader` | Cabecera de página con `title`, `description`, `actions`, `back` |
+| `Sidebar` | Navegación lateral (220px fijo desktop, drawer mobile) |
+| `Header` | Cabecera sticky con search, notificaciones y perfil |
+| `AppShell` | Layout raíz: Sidebar + Header + main |
+
+---
+
+## Constantes de tema (`src/lib/theme.ts`)
+
+Para evitar colores hardcoded en badges y estados:
+
+```tsx
+import { PRIORITY_BADGE, ESTADO_PROPIEDAD, ROL_BADGE, ESTADO_USUARIO } from "@/lib/theme";
+
+// Prioridad de tareas
+<span className={PRIORITY_BADGE.alta}>Alta</span>
+
+// Estado de propiedad
+<span className={ESTADO_PROPIEDAD.encargo}>Encargo</span>
+
+// Rol de usuario
+<span className={ROL_BADGE.Responsable}>Responsable</span>
+
+// Estado de usuario
+<span className={ESTADO_USUARIO.active}>{ESTADO_USUARIO_LABEL.active}</span>
+```
+
+---
+
+## Reglas de uso
+
+1. **Tokens siempre sobre hardcoded.** `bg-surface` no `bg-white`. `text-text-secondary` no `text-gray-500`.
+2. **Un componente, una responsabilidad.** No pases lógica de negocio a componentes UI.
+3. **El KanbanBoard es intocable.** Nunca modificar la estructura de nodos `Droppable`/`Draggable`.
+4. **Dark mode automático.** Si usas solo tokens del sistema, dark mode funciona sin clases `dark:` extra.
+5. **Accesibilidad básica.** Todos los botones y links tienen `focus-visible:ring-*`. No eliminar estos estilos.
+6. **Escala de spacing.** Solo xs/sm/md/lg/xl. Nada de valores ad-hoc.
+
+---
+
+## Estructura de un modal estándar
+
+```tsx
+<Modal open={open} onClose={close} size="md">
+  <ModalHeader title="Título" onClose={close} />
+  <ModalBody>
+    {/* contenido scrollable */}
+  </ModalBody>
+  <ModalFooter>
+    <Button variant="secondary" onClick={close}>Cancelar</Button>
+    <Button onClick={save} loading={saving}>Guardar</Button>
+  </ModalFooter>
+</Modal>
+```
+
+## Estructura de una página estándar
+
+```tsx
+// page.tsx (Server Component)
+return (
+  <>
+    <PageHeader
+      title="Solicitudes"
+      description="Gestión de pedidos de clientes."
+      actions={<Button size="sm">+ Nueva solicitud</Button>}
+    />
+    <ClientComponent initialData={data} />
+  </>
+);
+
+// *-client.tsx (Client Component)
+return (
+  <div className="space-y-6">
+    <FilterBar activeCount={activeFilters} onClear={clearFilters}>
+      {/* selects, inputs de filtro */}
+    </FilterBar>
+    <TableContainer>
+      <Table>
+        <TableHead>…</TableHead>
+        <TableBody>…</TableBody>
+      </Table>
+    </TableContainer>
+  </div>
+);
+```

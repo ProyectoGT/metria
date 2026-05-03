@@ -163,7 +163,7 @@ export default function SummaryPanel({ summary, listings }: SummaryPanelProps) {
 
   return (
     <>
-      {/* Cards row */}
+      {/* ── Cards row ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {CARDS.map((card) => (
           <SummaryCard
@@ -174,37 +174,42 @@ export default function SummaryPanel({ summary, listings }: SummaryPanelProps) {
             activeBg={card.activeBg}
             icon={card.icon}
             isActive={activeKey === card.key}
-            onClick={() => setActiveKey(card.key)}
+            onClick={() => setActiveKey(activeKey === card.key ? null : card.key)}
           />
         ))}
       </div>
 
-      {/* Full-screen overlay — cubre el contenido principal bajo el header */}
+      {/* ── Detalle fullscreen — abre sobre el content bajo el header ── */}
       {activeKey && activeCard && (
-        <div className="fixed inset-0 z-30 flex flex-col bg-background pt-16 md:pl-[220px]">
-          {/* Cabecera de la pantalla */}
-          <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4 md:px-6">
+        <div className="fixed inset-0 z-[30] flex min-w-0 flex-col bg-background/95 backdrop-blur-[2px] pt-16 md:pl-[260px]">
+          {/* Cabecera */}
+          <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface/95 px-5 backdrop-blur-sm">
             <button
               onClick={handleClose}
-              className="flex items-center gap-1.5 rounded-lg p-1.5 text-sm font-medium text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
               aria-label="Volver al dashboard"
             >
               <ArrowLeft className="h-4 w-4" />
               Volver
             </button>
             <div className="h-4 w-px bg-border" />
+            <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${activeCard.accentColor}`}>
+              <activeCard.icon className="h-3.5 w-3.5" />
+            </div>
             <h2 className="font-semibold text-text-primary">{activeCard.label}</h2>
-            <span className="ml-1 text-sm text-text-secondary">
-              — {summary[activeKey]} {activeKey === "pedidosActivos" ? "pedidos" : "propiedades"}
-              {listings[activeKey].length < summary[activeKey] && (
-                <span className="ml-1 text-xs opacity-60">(mostrando {listings[activeKey].length})</span>
-              )}
+            <span className="rounded-full bg-surface-raised px-2.5 py-0.5 text-xs font-medium text-text-secondary">
+              {summary[activeKey]}
             </span>
+            {listings[activeKey].length < summary[activeKey] && (
+              <span className="text-xs text-text-secondary opacity-60">
+                (mostrando {listings[activeKey].length})
+              </span>
+            )}
           </div>
 
           {/* Contenido */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6">
-            <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+          <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-7">
+            <div className="rounded-2xl border border-border bg-surface shadow-sm">
               <PropertyTable listings={listings[activeKey]} />
             </div>
           </div>

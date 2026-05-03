@@ -1,6 +1,6 @@
 function Sk({ className }: { className?: string }) {
   return (
-    <div className={`animate-pulse rounded-md bg-border/60 ${className ?? ""}`} />
+    <div className={`animate-pulse rounded-md bg-border/55 ${className ?? ""}`} />
   );
 }
 
@@ -40,8 +40,8 @@ export function TableSkeleton({ rows = 8 }: { rows?: number }) {
       </div>
       <div className="rounded-2xl border border-border bg-surface shadow-sm overflow-hidden">
         <div className="flex gap-4 border-b border-border px-5 py-3">
-          {[40, 60, 30, 50].map((w, i) => (
-            <Sk key={i} className={`h-4 w-${w}`} />
+          {["w-40", "w-60", "w-30", "w-50"].map((widthClass, i) => (
+            <Sk key={i} className={`h-4 ${widthClass}`} />
           ))}
         </div>
         <div className="divide-y divide-border">

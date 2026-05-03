@@ -3,7 +3,6 @@ import { normalizeUserRole } from "@/lib/roles";
 import { redirect } from "next/navigation";
 import Sidebar from "./sidebar";
 import Header from "./header";
-import ThemeScript from "./theme-script";
 
 export type NotificationItem = {
   id: number;
@@ -78,15 +77,16 @@ export default async function AppShell({
   }
 
   return (
-    <>
-      <ThemeScript />
+    <div className="h-dvh overflow-hidden bg-background">
       <Sidebar userRole={userRole} />
-      <div className="flex h-screen flex-col md:pl-[220px]">
+      <div className="flex h-full min-w-0 flex-col md:pl-[260px]">
         <Header userName={userName} userEmail={userEmail} avatarUrl={userAvatarUrl} notifications={notifications} />
-        <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
-          {children}
+        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background px-4 py-5 md:px-6 md:py-6 lg:px-7 lg:py-7">
+          <div className="w-full min-w-0">
+            {children}
+          </div>
         </main>
       </div>
-    </>
+    </div>
   );
 }

@@ -1,11 +1,65 @@
 "use server";
 
 import { createClient } from "@/lib/supabase";
-import { getCurrentUserContext } from "@/lib/current-user";
+import { getCurrentUserContext, type CurrentUserContext } from "@/lib/current-user";
 import { revalidatePath } from "next/cache";
-import type { LostOpportunity } from "@/lib/opportunities";
+import type { LostOpportunity, LostOpportunityEntity } from "@/lib/opportunities";
 
 export type OpportunityActionResult = { ok: true } | { ok: false; error: string };
+
+function allowedAgentIds(user: CurrentUserContext): number[] | null {
+  if (user.role === "Administrador" || user.role === "Director") return null;
+  if (user.role === "Responsable") return [user.id, ...user.supervisedAgentIds];
+  return [user.id];
+}
+
+function includesNullable(ids: number[], value: number | null | undefined) {
+  return typeof value === "number" && ids.includes(value);
+}
+
+async function canUseOpportunityEntity(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  entity: LostOpportunityEntity,
+  user: CurrentUserContext
+): Promise<boolean> {
+  const allowedIds = allowedAgentIds(user);
+
+  if (entity.type === "pedido") {
+    const { data } = await supabase.from("pedidos").select("owner_user_id, empresa_id").eq("id", entity.id).maybeSingle();
+    if (!data || data.empresa_id !== user.empresaId) return false;
+    return allowedIds === null || includesNullable(allowedIds, data.owner_user_id);
+  }
+
+  if (entity.type === "propiedad") {
+    const { data } = await supabase
+      .from("propiedades")
+      .select("agente_asignado, owner_user_id, empresa_id")
+      .eq("id", entity.id)
+      .maybeSingle();
+    if (!data || data.empresa_id !== user.empresaId) return false;
+    return allowedIds === null || includesNullable(allowedIds, data.agente_asignado) || includesNullable(allowedIds, data.owner_user_id);
+  }
+
+  if (entity.type === "contacto") {
+    const { data } = await supabase.from("contactos").select("owner_user_id, empresa_id").eq("id", entity.id).maybeSingle();
+    if (!data || data.empresa_id !== user.empresaId) return false;
+    return allowedIds === null || includesNullable(allowedIds, data.owner_user_id);
+  }
+
+  if (entity.type === "tarea") {
+    const { data } = await supabase
+      .from("tareas")
+      .select("owner_user_id, empresa_id, tarea_usuarios(usuario_id)")
+      .eq("id", entity.id)
+      .maybeSingle();
+    if (!data || data.empresa_id !== user.empresaId) return false;
+    if (allowedIds === null || includesNullable(allowedIds, data.owner_user_id)) return true;
+    return (data.tarea_usuarios ?? []).some((row: { usuario_id: number }) => allowedIds.includes(row.usuario_id));
+  }
+
+  return false;
+}
 
 /**
  * Crea una tarea de seguimiento a partir de una oportunidad perdida
@@ -18,6 +72,9 @@ export async function createTaskFromOpportunityAction(
   const supabase = await createClient() as any;
   const yo = await getCurrentUserContext();
   if (!yo) return { ok: false, error: "No autenticado" };
+  if (!(await canUseOpportunityEntity(supabase, opportunity.entidad, yo))) {
+    return { ok: false, error: "No tienes permiso para actuar sobre esta oportunidad" };
+  }
 
   // ── 1. Crear tarea ─────────────────────────────────────────────────────────
   const prioridad = opportunity.impacto === "alto" ? "alta" : opportunity.impacto === "medio" ? "media" : "baja";
@@ -80,6 +137,9 @@ export async function dismissOpportunityAction(
   const supabase = await createClient() as any;
   const yo = await getCurrentUserContext();
   if (!yo) return { ok: false, error: "No autenticado" };
+  if (!(await canUseOpportunityEntity(supabase, opportunity.entidad, yo))) {
+    return { ok: false, error: "No tienes permiso para descartar esta oportunidad" };
+  }
 
   const timelinePayload: Record<string, unknown> = {
     empresa_id: yo.empresaId,

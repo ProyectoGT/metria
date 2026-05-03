@@ -1,5 +1,13 @@
 "use client";
 
+// ─── DeleteConfirmationDialog ─────────────────────────────────────────────────
+// Modal de confirmación destructiva con contraseña de seguridad.
+// Refactorizado para usar los nuevos primitivos Button y Modal del design system.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { Modal, ModalHeader, ModalBody, ModalFooter } from "@/components/ui/modal";
+import Button from "@/components/ui/button";
+
 type DeleteConfirmationDialogProps = {
   title: string;
   description: string;
@@ -24,13 +32,13 @@ export default function DeleteConfirmationDialog({
   onConfirm,
 }: DeleteConfirmationDialogProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
-        <h2 className="text-base font-semibold text-text-primary">{title}</h2>
-        <p className="mt-2 text-sm text-text-secondary">{description}</p>
+    <Modal open size="sm" onClose={onCancel}>
+      <ModalHeader title={title} onClose={onCancel} />
+      <ModalBody>
+        <p className="text-sm text-text-secondary">{description}</p>
 
         <div className="mt-4">
-          <label className="text-xs font-medium text-text-secondary">
+          <label className="block text-xs font-medium text-text-secondary">
             Contraseña de confirmación
           </label>
           <input
@@ -48,23 +56,15 @@ export default function DeleteConfirmationDialog({
             {error}
           </p>
         )}
-
-        <div className="mt-5 flex justify-end gap-3">
-          <button
-            onClick={onCancel}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={pending}
-            className="rounded-lg bg-danger px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-60"
-          >
-            {pending ? "Eliminando..." : confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="secondary" size="sm" onClick={onCancel} disabled={pending}>
+          Cancelar
+        </Button>
+        <Button variant="danger" size="sm" onClick={onConfirm} loading={pending}>
+          {pending ? "Eliminando..." : confirmLabel}
+        </Button>
+      </ModalFooter>
+    </Modal>
   );
 }

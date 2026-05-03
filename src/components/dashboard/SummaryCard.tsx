@@ -1,14 +1,12 @@
 "use client";
 
 import { memo } from "react";
-import { ChevronRight, type LucideIcon } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
 
 type SummaryCardProps = {
   count: number;
   label: string;
-  /** Tailwind classes for icon container, e.g. "bg-blue-100 text-blue-600" */
   accentColor: string;
-  /** Tailwind class for active card background, e.g. "bg-blue-50" */
   activeBg: string;
   icon: LucideIcon;
   isActive: boolean;
@@ -28,23 +26,34 @@ const SummaryCard = memo(function SummaryCard({
     <button
       onClick={onClick}
       className={[
-        "flex w-full cursor-pointer items-center justify-between rounded-xl p-3 shadow-sm text-left sm:p-6",
-        "border-2 transition-all duration-200",
+        "group relative w-full overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition-all duration-200 md:p-5",
         isActive
-          ? `border-blue-600 ${activeBg}`
-          : "border-transparent bg-surface hover:border-border hover:shadow-md",
+          ? `border-primary/30 ${activeBg} shadow-md ring-1 ring-primary/10`
+          : "border-border bg-surface hover:border-secondary/35 hover:shadow-md",
       ].join(" ")}
     >
-      <div className="flex items-center gap-2 sm:gap-4">
-        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-12 sm:w-12 ${accentColor}`}>
-          <Icon className="h-4 w-4 sm:h-6 sm:w-6" />
-        </div>
-        <div>
-          <p className="text-xl font-bold text-text-primary sm:text-3xl">{count}</p>
-          <p className="mt-0.5 text-xs font-medium text-text-secondary sm:text-sm">{label}</p>
-        </div>
+      {/* Icono en la esquina superior derecha — decorativo */}
+      <div
+        className={[
+          "absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105 md:h-10 md:w-10",
+          accentColor,
+        ].join(" ")}
+      >
+        <Icon className="h-5 w-5" />
       </div>
-      <ChevronRight className={["h-4 w-4 shrink-0 text-text-secondary transition-transform duration-200 sm:h-5 sm:w-5", isActive ? "rotate-90" : ""].join(" ")} />
+
+      {/* Contenido */}
+      <div className="pr-14">
+        <p className="text-xs font-medium text-text-secondary">{label}</p>
+        <p className="mt-1.5 text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
+          {count}
+        </p>
+      </div>
+
+      {/* Indicador activo */}
+      {isActive && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary/40" />
+      )}
     </button>
   );
 });

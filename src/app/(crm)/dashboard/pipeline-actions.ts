@@ -1,10 +1,70 @@
 "use server";
 
 import { createClient } from "@/lib/supabase";
-import { getCurrentUserContext } from "@/lib/current-user";
+import { getCurrentUserContext, type CurrentUserContext } from "@/lib/current-user";
 import { revalidatePath } from "next/cache";
 
 export type ResolveSuggestionResult = { ok: true } | { ok: false; error: string };
+
+type SuggestionAccessRow = {
+  id: number;
+  propiedad_id: number | null;
+  pedido_id: number | null;
+  agente_id: number | null;
+  empresa_id: number | null;
+};
+
+function allowedAgentIds(user: CurrentUserContext): number[] | null {
+  if (user.role === "Administrador" || user.role === "Director") return null;
+  if (user.role === "Responsable") return [user.id, ...user.supervisedAgentIds];
+  return [user.id];
+}
+
+function hasDirectAgentAccess(agentId: number | null, user: CurrentUserContext) {
+  const allowedIds = allowedAgentIds(user);
+  return allowedIds === null || (agentId !== null && allowedIds.includes(agentId));
+}
+
+async function canResolveSuggestion(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  suggestion: SuggestionAccessRow,
+  user: CurrentUserContext
+): Promise<boolean> {
+  if (suggestion.empresa_id !== user.empresaId) return false;
+  if (hasDirectAgentAccess(suggestion.agente_id, user)) return true;
+
+  const allowedIds = allowedAgentIds(user);
+  if (allowedIds === null) return true;
+  if (allowedIds.length === 0) return false;
+
+  if (suggestion.propiedad_id) {
+    const { data } = await supabase
+      .from("propiedades")
+      .select("agente_asignado, owner_user_id, empresa_id")
+      .eq("id", suggestion.propiedad_id)
+      .maybeSingle();
+    if (
+      data?.empresa_id === user.empresaId &&
+      (allowedIds.includes(data.agente_asignado) || allowedIds.includes(data.owner_user_id))
+    ) {
+      return true;
+    }
+  }
+
+  if (suggestion.pedido_id) {
+    const { data } = await supabase
+      .from("pedidos")
+      .select("owner_user_id, empresa_id")
+      .eq("id", suggestion.pedido_id)
+      .maybeSingle();
+    if (data?.empresa_id === user.empresaId && allowedIds.includes(data.owner_user_id)) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 /**
  * Acepta una sugerencia de cambio de estado del pipeline.
@@ -32,8 +92,9 @@ export async function acceptPipelineSuggestionAction(
 
   if (readErr || !suggestion) return { ok: false, error: "Sugerencia no encontrada o ya resuelta" };
 
-  // Verificar que pertenece a la misma empresa
-  if (suggestion.empresa_id !== yo.empresaId) return { ok: false, error: "Sin acceso" };
+  if (!(await canResolveSuggestion(supabase, suggestion, yo))) {
+    return { ok: false, error: "No tienes permiso para resolver esta sugerencia" };
+  }
 
   // ── 1. Actualizar estado de propiedad (solo si el sujeto es una propiedad y el estado es válido) ──
   const VALID_ESTADOS = ["neutral", "investigacion", "seguimiento", "noticia", "encargo", "vendido"];
@@ -111,13 +172,15 @@ export async function rejectPipelineSuggestionAction(
 
   const { data: suggestion, error: readErr } = await supabase
     .from("pipeline_state_suggestions")
-    .select("id, propiedad_id, pedido_id, tipo_regla, razon, empresa_id")
+    .select("id, propiedad_id, pedido_id, agente_id, tipo_regla, razon, empresa_id")
     .eq("id", suggestionId)
     .eq("status", "pendiente")
     .single();
 
   if (readErr || !suggestion) return { ok: false, error: "Sugerencia no encontrada o ya resuelta" };
-  if (suggestion.empresa_id !== yo.empresaId) return { ok: false, error: "Sin acceso" };
+  if (!(await canResolveSuggestion(supabase, suggestion, yo))) {
+    return { ok: false, error: "No tienes permiso para resolver esta sugerencia" };
+  }
 
   // Registrar rechazo en timeline
   const timelinePayload: Record<string, unknown> = {

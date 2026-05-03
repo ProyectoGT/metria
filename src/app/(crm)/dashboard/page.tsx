@@ -25,8 +25,11 @@ import NextBestActionsPanel from "@/components/dashboard/NextBestActionsPanel";
 import PipelineSuggestionsPanel from "@/components/dashboard/PipelineSuggestionsPanel";
 import LostOpportunitiesPanel from "@/components/dashboard/LostOpportunitiesPanel";
 import MapaDashboardLazy from "@/components/dashboard/MapaDashboardLazy";
+import DashboardSection from "@/components/dashboard/DashboardSection";
+import DashboardQuickActions from "@/components/dashboard/DashboardQuickActions";
 import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
 import { combineLocalDateTime, localDateKey, normalizeTime } from "@/lib/local-date-time";
+import { Kanban, Lightbulb, MapPin, BarChart3 } from "lucide-react";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -517,32 +520,45 @@ export default async function DashboardPage() {
   const encargosMap: NoticiaMapPoint[] = ((encargosMapData ?? []) as unknown as NoticiasMapRow[]).map(mapRowToPoint);
 
   return (
-    <div className="flex flex-col gap-8">
-      {/* 1 — Saludo */}
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">
-          {getGreeting()}, {userName}
-        </h1>
-        <p className="mt-1 text-sm text-text-secondary">{formatDateEs()}</p>
+    <div className="flex min-w-0 flex-col gap-6">
+
+      {/* ── 1. Hero — saludo + fecha + accesos rápidos ──────────────── */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-text-primary md:text-2xl">
+              {getGreeting()}, {userName} 👋
+            </h1>
+            <p className="mt-1 text-sm text-text-secondary">{formatDateEs()}</p>
+          </div>
+        </div>
+
+        {/* Accesos rápidos */}
+        <DashboardQuickActions role={role} />
       </div>
 
-      {/* 2 — Summary panel */}
+      {/* ── 2. Métricas principales (4 stat cards clicables) ────────── */}
       <SummaryPanel summary={summary} listings={listings} />
 
-      <NextBestActionsPanel actions={nextBestActions} currentUserId={userId} />
-
-      <PipelineSuggestionsPanel suggestions={pipelineSuggestions} />
-
-      <LostOpportunitiesPanel opportunities={lostOpportunities} />
-
-      {/* 4 — Mis tareas (Kanban) */}
-      <section className="min-w-0">
-        <div className="mb-4">
-          <h2 className="font-semibold text-text-primary">Mis tareas</h2>
-          <p className="text-sm text-text-secondary">
-            Organiza tu trabajo arrastrando las tarjetas entre columnas.
-          </p>
+      {/* ── 3. Inteligencia: 3 paneles colapsables ──────────────────── */}
+      <DashboardSection
+        title="Inteligencia comercial"
+        description="Recomendaciones y alertas basadas en tu actividad."
+        icon={<Lightbulb className="h-4 w-4" />}
+      >
+        <div className="space-y-3">
+          <NextBestActionsPanel actions={nextBestActions} currentUserId={userId} />
+          <PipelineSuggestionsPanel suggestions={pipelineSuggestions} />
+          <LostOpportunitiesPanel opportunities={lostOpportunities} />
         </div>
+      </DashboardSection>
+
+      {/* ── 4. Mis tareas (Kanban) ───────────────────────────────────── */}
+      <DashboardSection
+        title="Mis tareas"
+        description="Arrastra las tarjetas entre columnas para organizarte."
+        icon={<Kanban className="h-4 w-4" />}
+      >
         <KanbanBoard
           initialData={kanbanData}
           customColumns={(kanbanColsData ?? []).map((c: { col_id: string; titulo: string }) => ({ id: c.col_id, title: c.titulo }))}
@@ -550,23 +566,35 @@ export default async function DashboardPage() {
           currentUserId={String(userId)}
           agents={agentMetrics.map((a) => ({ id: a.id, nombre: a.nombre }))}
         />
-      </section>
+      </DashboardSection>
 
-      {/* 5 — Orden del día + Mapa (grid en desktop grande, mapa primero en móvil) */}
+      {/* ── 5. Orden del día + Mapa ──────────────────────────────────── */}
       {showOrdenDia ? (
-        <div className="grid grid-cols-1 items-stretch gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" style={{ minHeight: 480 }}>
-          <div className="order-2 flex xl:order-1">
-            <OrdenDiaPanel agentes={ordenDiaAgentes} />
+        <DashboardSection
+          title="Mapa y orden del dia"
+          description="Vista geográfica de noticias y encargos + actividades del equipo."
+          icon={<MapPin className="h-4 w-4" />}
+        >
+          <div className="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.4fr)]">
+            <div className="order-2 min-w-0 xl:order-1">
+              <OrdenDiaPanel agentes={ordenDiaAgentes} />
+            </div>
+            <div className="order-1 min-w-0 xl:order-2">
+              <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
+            </div>
           </div>
-          <div className="order-1 flex xl:order-2">
-            <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
-          </div>
-        </div>
+        </DashboardSection>
       ) : (
-        <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
+        <DashboardSection
+          title="Mapa"
+          description="Vista geográfica de noticias y encargos."
+          icon={<MapPin className="h-4 w-4" />}
+        >
+          <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
+        </DashboardSection>
       )}
 
-      {/* 7 — Agente del mes */}
+      {/* ── 6. Agente del mes ────────────────────────────────────────── */}
       <AgentOfMonth
         initialData={
           agenteMesData
@@ -586,8 +614,16 @@ export default async function DashboardPage() {
         agents={agentMetrics.map((a) => ({ id: a.id, nombre: a.nombre }))}
       />
 
-      {/* 8 — Rendimiento / Mi actividad */}
-      {showAgentPerformance && <AgentPerformanceTable agents={agentMetrics} role={role} />}
+      {/* ── 7. Rendimiento del equipo / Mi actividad ─────────────────── */}
+      {showAgentPerformance && (
+        <DashboardSection
+          title="Rendimiento del equipo"
+          description="Comparativa de objetivos y resultados anuales."
+          icon={<BarChart3 className="h-4 w-4" />}
+        >
+          <AgentPerformanceTable agents={agentMetrics} role={role} />
+        </DashboardSection>
+      )}
       {showMyActivity && <MyActivity rendimiento={ownMetrics} role={role} />}
     </div>
   );

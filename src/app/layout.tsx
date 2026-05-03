@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
+import ThemeScript from "@/components/layout/theme-script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -54,6 +55,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="h-full bg-background text-text-primary font-sans">
+        <ThemeScript />
         {children}
         <Script id="service-worker-registration" strategy="afterInteractive">
           {`

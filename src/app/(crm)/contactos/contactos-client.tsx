@@ -707,134 +707,173 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
       )}
 
       {/* ── Modal crear/editar ── */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
-          <div className="w-full max-w-2xl rounded-2xl bg-surface shadow-xl">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">{editId ? "Editar contacto" : "Nuevo contacto"}</h2>
-              <div className="flex items-center gap-1">
-                {editId !== null && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const contacto = contactos.find((c) => c.id === editId);
-                      if (contacto) setTimelineContacto(contacto);
-                    }}
-                    className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-primary"
-                    title="Timeline"
-                  >
-                    <History className="h-4 w-4" />
+      {modalOpen && (() => {
+        const contactoEditando = editId !== null ? contactos.find((c) => c.id === editId) : null;
+        const t = contactoEditando ? tipoMeta(contactoEditando.tipo) : null;
+        const nombre = contactoEditando ? nombreCompleto(contactoEditando) : "";
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+            <div className="flex w-full max-w-2xl flex-col rounded-2xl bg-surface shadow-xl" style={{ maxHeight: "calc(100vh - 2rem)" }}>
+
+              {/* Header — modo edición con hero, modo creación simple */}
+              {contactoEditando ? (
+                <div className="flex shrink-0 flex-col gap-3 border-b border-border px-5 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      {/* Avatar */}
+                      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white ${avatarColor(nombre)}`}>
+                        {initials(contactoEditando)}
+                      </span>
+                      <div className="min-w-0">
+                        {t && (
+                          <div className="mb-1 flex items-center gap-1.5">
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${t.badge}`}>{t.label}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${estadoMeta(contactoEditando.estado).badge}`}>
+                              {estadoMeta(contactoEditando.estado).label}
+                            </span>
+                          </div>
+                        )}
+                        <h2 className="truncate text-base font-semibold text-text-primary leading-tight">{nombre}</h2>
+                        {contactoEditando.empresa && (
+                          <p className="mt-0.5 text-sm text-text-secondary">{contactoEditando.empresa}{contactoEditando.cargo ? ` · ${contactoEditando.cargo}` : ""}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => { if (contactoEditando) setTimelineContacto(contactoEditando); }}
+                        className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-primary"
+                        title="Timeline"
+                      >
+                        <History className="h-4 w-4" />
+                      </button>
+                      <div className="mx-0.5 h-4 w-px bg-border" />
+                      <button onClick={closeModal} className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
+                  <h2 className="text-base font-semibold text-text-primary">Nuevo contacto</h2>
+                  <button onClick={closeModal} className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary">
+                    <X className="h-4 w-4" />
                   </button>
-                )}
-                <button onClick={closeModal} className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"><X className="h-4 w-4" /></button>
-              </div>
+                </div>
+              )}
+
+              <form onSubmit={handleSave} className="flex flex-col overflow-hidden">
+                <div className="flex-1 overflow-y-auto">
+                  <div className="space-y-5 px-6 py-5">
+                    {/* Datos básicos */}
+                    <div className="space-y-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Datos basicos</p>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-text-secondary">Nombre <span className="text-danger">*</span></label>
+                          <input value={form.nombre} onChange={(e) => setField("nombre", e.target.value)} className="input" required autoFocus placeholder="Nombre" />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-text-secondary">Apellidos</label>
+                          <input value={form.apellidos} onChange={(e) => setField("apellidos", e.target.value)} className="input" placeholder="Apellidos" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-text-secondary">Tipo <span className="text-danger">*</span></label>
+                          <select value={form.tipo} onChange={(e) => setField("tipo", e.target.value as ContactoTipo)} className="input" required>
+                            {TIPOS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-text-secondary">Estado</label>
+                          <select value={form.estado} onChange={(e) => setField("estado", e.target.value as ContactoEstado)} className="input">
+                            {ESTADOS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-text-secondary">Empresa</label>
+                          <input value={form.empresa} onChange={(e) => setField("empresa", e.target.value)} className="input" placeholder="Nombre de la empresa" />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-text-secondary">Cargo</label>
+                          <input value={form.cargo} onChange={(e) => setField("cargo", e.target.value)} className="input" placeholder="Cargo o puesto" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Contacto */}
+                    <div className="space-y-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Informacion de contacto</p>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-text-secondary">Email</label>
+                          <input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} className="input" placeholder="correo@ejemplo.com" />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-text-secondary">Telefono</label>
+                          <input type="tel" value={form.telefono} onChange={(e) => setField("telefono", e.target.value)} className="input" placeholder="600 000 000" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-text-secondary">Telefono secundario</label>
+                        <input type="tel" value={form.telefono_secundario} onChange={(e) => setField("telefono_secundario", e.target.value)} className="input" placeholder="Segundo numero opcional" />
+                      </div>
+                    </div>
+
+                    {/* Ubicación */}
+                    <div className="space-y-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Ubicacion</p>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-text-secondary">Ciudad</label>
+                          <input value={form.ciudad} onChange={(e) => setField("ciudad", e.target.value)} className="input" placeholder="Ciudad" />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-text-secondary">Provincia</label>
+                          <input value={form.provincia} onChange={(e) => setField("provincia", e.target.value)} className="input" placeholder="Provincia" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-text-secondary">Direccion</label>
+                        <input value={form.direccion} onChange={(e) => setField("direccion", e.target.value)} className="input" placeholder="Calle, numero, piso..." />
+                      </div>
+                    </div>
+
+                    {/* Otros */}
+                    <div className="space-y-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Otros datos</p>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-text-secondary">Origen</label>
+                        <input value={form.origen} onChange={(e) => setField("origen", e.target.value)} className="input" placeholder="Como ha llegado este contacto" />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-text-secondary">Notas</label>
+                        <textarea value={form.notas} onChange={(e) => setField("notas", e.target.value)} rows={3} className="input resize-none" placeholder="Notas adicionales..." />
+                      </div>
+                    </div>
+
+                    {saveError && <p className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{saveError}</p>}
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 justify-end gap-3 border-t border-border px-6 py-4">
+                  <button type="button" onClick={closeModal} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised">
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={saving || !form.nombre.trim()} className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50">
+                    {saving ? "Guardando..." : editId ? "Guardar cambios" : "Crear contacto"}
+                  </button>
+                </div>
+              </form>
             </div>
-
-            <form onSubmit={handleSave} className="max-h-[75vh] overflow-y-auto">
-              <div className="space-y-5 px-6 py-5">
-                {/* Datos básicos */}
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Datos basicos</p>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Nombre <span className="text-danger">*</span></label>
-                      <input value={form.nombre} onChange={(e) => setField("nombre", e.target.value)} className="input" required autoFocus placeholder="Nombre" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Apellidos</label>
-                      <input value={form.apellidos} onChange={(e) => setField("apellidos", e.target.value)} className="input" placeholder="Apellidos" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Tipo <span className="text-danger">*</span></label>
-                      <select value={form.tipo} onChange={(e) => setField("tipo", e.target.value as ContactoTipo)} className="input" required>
-                        {TIPOS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Estado</label>
-                      <select value={form.estado} onChange={(e) => setField("estado", e.target.value as ContactoEstado)} className="input">
-                        {ESTADOS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Empresa</label>
-                      <input value={form.empresa} onChange={(e) => setField("empresa", e.target.value)} className="input" placeholder="Nombre de la empresa" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Cargo</label>
-                      <input value={form.cargo} onChange={(e) => setField("cargo", e.target.value)} className="input" placeholder="Cargo o puesto" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Contacto */}
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Informacion de contacto</p>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Email</label>
-                      <input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} className="input" placeholder="correo@ejemplo.com" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Telefono</label>
-                      <input type="tel" value={form.telefono} onChange={(e) => setField("telefono", e.target.value)} className="input" placeholder="600 000 000" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-text-primary">Telefono secundario</label>
-                    <input type="tel" value={form.telefono_secundario} onChange={(e) => setField("telefono_secundario", e.target.value)} className="input" placeholder="Segundo numero opcional" />
-                  </div>
-                </div>
-
-                {/* Ubicación */}
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Ubicacion</p>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Ciudad</label>
-                      <input value={form.ciudad} onChange={(e) => setField("ciudad", e.target.value)} className="input" placeholder="Ciudad" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Provincia</label>
-                      <input value={form.provincia} onChange={(e) => setField("provincia", e.target.value)} className="input" placeholder="Provincia" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-text-primary">Direccion</label>
-                    <input value={form.direccion} onChange={(e) => setField("direccion", e.target.value)} className="input" placeholder="Calle, numero, piso..." />
-                  </div>
-                </div>
-
-                {/* Otros */}
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Otros datos</p>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-text-primary">Origen</label>
-                    <input value={form.origen} onChange={(e) => setField("origen", e.target.value)} className="input" placeholder="Como ha llegado este contacto" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-text-primary">Notas</label>
-                    <textarea value={form.notas} onChange={(e) => setField("notas", e.target.value)} rows={3} className="input resize-none" placeholder="Notas adicionales..." />
-                  </div>
-                </div>
-
-                {saveError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{saveError}</p>}
-              </div>
-
-              <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
-                <button type="button" onClick={closeModal} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">Cancelar</button>
-                <button type="submit" disabled={saving || !form.nombre.trim()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50">
-                  {saving ? "Guardando..." : editId ? "Guardar cambios" : "Crear contacto"}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Modal importar CSV ── */}
       {importModal && (

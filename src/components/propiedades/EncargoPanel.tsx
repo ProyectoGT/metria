@@ -477,57 +477,76 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
 
       <div className="fixed inset-y-0 right-0 z-[61] flex w-full flex-col bg-surface shadow-2xl sm:w-[520px]">
         {/* ── Header ── */}
-        <div className="flex shrink-0 flex-col gap-3 border-b border-border bg-success/10 px-5 py-4 dark:bg-success/15">
+        <div className="flex shrink-0 flex-col gap-3 border-b border-border px-5 py-4">
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="mb-1 flex items-center gap-2">
-                <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900 dark:text-green-300">
-                  Encargo
-                </span>
+            <div className="flex items-start gap-3 min-w-0">
+              {/* Avatar con iniciales */}
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success/12 text-sm font-bold text-success">
+                {propLabel(propiedad).charAt(0).toUpperCase()}
               </div>
-              <h2 className="truncate text-lg font-bold text-text-primary">
-                {propLabel(propiedad)}
-              </h2>
-              {propiedad.telefono && (
-                <p className="mt-0.5 text-sm text-text-secondary">{propiedad.telefono}</p>
-              )}
+              <div className="min-w-0">
+                {/* Badge de estado */}
+                <div className="mb-1 flex items-center gap-1.5">
+                  <span className="rounded-full bg-success/12 px-2 py-0.5 text-[11px] font-semibold text-success">
+                    Encargo
+                  </span>
+                  {propiedad.estado && propiedad.estado !== "encargo" && (
+                    <span className="rounded-full bg-surface-raised px-2 py-0.5 text-[11px] font-medium text-text-secondary capitalize">
+                      {propiedad.estado}
+                    </span>
+                  )}
+                </div>
+                <h2 className="truncate text-base font-semibold text-text-primary leading-tight">
+                  {propLabel(propiedad)}
+                </h2>
+                {propiedad.telefono && (
+                  <p className="mt-0.5 text-sm text-text-secondary">{propiedad.telefono}</p>
+                )}
+              </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+
+            {/* Acciones */}
+            <div className="flex shrink-0 items-center gap-1.5">
               <button
                 onClick={onEdit}
-                className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
+                className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
               >
-                Editar datos
+                Editar
               </button>
               <button
                 onClick={onClose}
-                className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
+                className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
                 aria-label="Cerrar panel"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
           </div>
         </div>
 
         {/* ── Tabs ── */}
-        <div className="flex shrink-0 overflow-x-auto border-b border-border">
+        <div className="flex shrink-0 overflow-x-auto border-b border-border bg-surface">
           {tabs.map((tab) => {
             const Icon = tab.icon;
+            const isActive = activeTab === tab.key;
             return (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap px-2 py-3 text-sm font-medium transition-colors ${
-                  activeTab === tab.key
+                className={[
+                  "flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap px-2 py-3 text-sm font-medium transition-colors",
+                  isActive
                     ? "border-b-2 border-primary text-primary"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
+                    : "text-text-secondary hover:text-text-primary hover:bg-surface-raised",
+                ].join(" ")}
               >
-                <Icon className="h-4 w-4 shrink-0" />
+                <Icon className="h-3.5 w-3.5 shrink-0" />
                 {tab.label}
                 {tab.count > 0 && (
-                  <span className="rounded-full bg-background px-1.5 py-0.5 text-xs text-text-secondary">
+                  <span className={[
+                    "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                    isActive ? "bg-primary/10 text-primary" : "bg-surface-raised text-text-secondary",
+                  ].join(" ")}>
                     {tab.count}
                   </span>
                 )}

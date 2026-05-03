@@ -15,9 +15,9 @@ export default function AuthShell({
   eyebrow = "Acceso privado",
 }: AuthShellProps) {
   return (
-    <main className="min-h-screen bg-[#f4f2ee] lg:grid lg:grid-cols-[1.05fr_1fr]">
-      <section className="relative hidden overflow-hidden bg-[#050505] lg:flex lg:min-h-screen lg:items-center lg:justify-center">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.08),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(255,255,255,0.05),_transparent_28%)]" />
+    <main className="min-h-screen bg-[#f4f2ee] transition-colors dark:bg-background lg:grid lg:grid-cols-[1.05fr_1fr]">
+      <section className="relative hidden overflow-hidden bg-[#050505] dark:bg-sidebar-logo lg:flex lg:min-h-screen lg:items-center lg:justify-center">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.08),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(255,255,255,0.05),_transparent_28%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(96,165,250,0.16),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(251,191,36,0.10),_transparent_30%)]" />
         <div className="relative flex w-full max-w-xl items-center justify-center px-16">
           <Image
             src="/logo-bg-master-iberica.png"
@@ -31,7 +31,7 @@ export default function AuthShell({
       </section>
 
       <section className="flex min-h-screen items-center justify-center px-6 py-12 sm:px-10 lg:px-16">
-        <div className="w-full max-w-md rounded-[2rem] border border-white/70 bg-white/80 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur md:p-10">
+        <div className="w-full max-w-md rounded-[2rem] border border-white/70 bg-white/80 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur transition-colors dark:border-border dark:bg-surface/90 dark:shadow-xl md:p-10">
           <div className="mb-4 space-y-1">
             <div className="mb-1 flex justify-center lg:hidden">
               <Image
@@ -44,13 +44,13 @@ export default function AuthShell({
               />
             </div>
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#8d867c]">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#8d867c] dark:text-text-secondary">
                 {eyebrow}
               </p>
-              <h1 className="text-3xl font-semibold tracking-tight text-[#171717]">
+              <h1 className="text-3xl font-semibold tracking-tight text-[#171717] dark:text-text-primary">
                 {title}
               </h1>
-              <div className="max-w-sm text-sm leading-6 text-[#6f6a63]">
+              <div className="max-w-sm text-sm leading-6 text-[#6f6a63] dark:text-text-secondary">
                 {description}
               </div>
             </div>

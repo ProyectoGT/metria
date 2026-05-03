@@ -253,7 +253,7 @@ export default function KanbanBoard({
   return (
     <>
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex flex-row gap-4 overflow-x-auto pb-4">
+        <div className="flex min-w-0 flex-row gap-4 overflow-x-auto overscroll-x-contain pb-3">
           {columns.map((column) => (
             <KanbanColumn
               key={column.id}
@@ -292,7 +292,7 @@ export default function KanbanBoard({
       )}
 
       {resultadoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]">
           <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl">
             <div className="border-b border-border px-6 py-4">
               <h2 className="text-base font-semibold text-text-primary">Como ha ido?</h2>
@@ -301,7 +301,7 @@ export default function KanbanBoard({
             <div className="space-y-4 p-6">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-text-secondary">
-                  Consecuencia / nota de lo realizado
+                  Resultado / nota de lo realizado
                 </label>
                 <textarea
                   autoFocus
@@ -315,20 +315,20 @@ export default function KanbanBoard({
                   rows={4}
                   className="input w-full resize-none text-sm"
                 />
-                <p className="text-xs text-text-secondary">Opcional - Ctrl+Enter para confirmar</p>
+                <p className="text-xs text-text-secondary">Opcional · Ctrl+Enter para confirmar</p>
               </div>
-              <div className="flex justify-end gap-3 pt-1">
+              <div className="flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setResultadoModal(null)}
-                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
+                  className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised"
                 >
                   Cancelar
                 </button>
                 <button
                   type="button"
                   onClick={handleConfirmResultado}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+                  className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
                 >
                   Marcar como realizada
                 </button>
@@ -339,7 +339,7 @@ export default function KanbanBoard({
       )}
 
       {convertModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]">
           <div className="w-full max-w-sm rounded-2xl bg-surface shadow-xl">
             <div className="border-b border-border px-6 py-4">
               <h2 className="text-base font-semibold text-text-primary">Programar en el Orden del dia</h2>
@@ -373,11 +373,11 @@ export default function KanbanBoard({
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-3 pt-1">
+              <div className="flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setConvertModal(null)}
-                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
+                  className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised"
                 >
                   Cancelar
                 </button>
@@ -385,7 +385,7 @@ export default function KanbanBoard({
                   type="button"
                   onClick={handleConfirmConvert}
                   disabled={!convertDate}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-50"
+                  className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-50"
                 >
                   Programar
                 </button>

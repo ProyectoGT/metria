@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileText, History, Users, X } from "lucide-react";
+import { FileText, History, Users, X, Phone } from "lucide-react";
 import DocumentGeneratorModal from "@/components/documents/DocumentGeneratorModal";
 import ColaboracionesPanel from "@/components/colaboraciones/ColaboracionesPanel";
 import { createClient } from "@/lib/supabase-browser";
@@ -409,53 +409,87 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
 
       {/* ── Modal formulario ── */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]">
           <div className="flex w-full max-w-lg flex-col rounded-2xl bg-surface shadow-xl" style={{ maxHeight: "calc(100vh - 2rem)" }}>
-            <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">
-                {editId !== null ? "Editar solicitud" : "Nueva solicitud"}
-              </h2>
-              <div className="flex items-center gap-1">
-                {editId !== null && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const pedido = pedidos.find((p) => p.id === editId);
-                        if (pedido) setColabPedido(pedido);
-                      }}
-                      className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-primary"
-                      title="Colaboraciones"
-                    >
-                      <Users className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const pedido = pedidos.find((p) => p.id === editId);
-                        if (pedido) setDocPedido(pedido);
-                      }}
-                      className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-primary"
-                      title="Generar documento"
-                    >
-                      <FileText className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const pedido = pedidos.find((p) => p.id === editId);
-                        if (pedido) setTimelinePedido(pedido);
-                      }}
-                      className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-primary"
-                      title="Timeline"
-                    >
-                      <History className="h-4 w-4" />
-                    </button>
-                  </>
-                )}
-                <button onClick={() => setModalOpen(false)} className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"><X className="h-4 w-4" /></button>
+
+            {/* Header — modo edición con hero, modo creación con header simple */}
+            {editId !== null ? (() => {
+              const pedido = pedidos.find((p) => p.id === editId);
+              const initials = pedido ? pedido.nombre_cliente.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase() : "?";
+              return (
+                <div className="flex shrink-0 flex-col gap-3 border-b border-border px-5 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    {/* Hero del pedido */}
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 text-sm font-bold text-purple-600 dark:text-purple-400">
+                        {initials}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="mb-1 flex items-center gap-1.5">
+                          <span className="rounded-full bg-purple-500/10 px-2 py-0.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
+                            Solicitud #{editId}
+                          </span>
+                        </div>
+                        <h2 className="truncate text-base font-semibold text-text-primary leading-tight">
+                          {pedido?.nombre_cliente ?? "Editando solicitud"}
+                        </h2>
+                        {pedido?.telefono && (
+                          <p className="mt-0.5 flex items-center gap-1 text-sm text-text-secondary">
+                            <Phone className="h-3 w-3" />
+                            {pedido.telefono}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Acciones */}
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => { if (pedido) setColabPedido(pedido); }}
+                        className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-primary"
+                        title="Colaboraciones"
+                      >
+                        <Users className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { if (pedido) setDocPedido(pedido); }}
+                        className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-primary"
+                        title="Generar documento"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { if (pedido) setTimelinePedido(pedido); }}
+                        className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-primary"
+                        title="Timeline"
+                      >
+                        <History className="h-4 w-4" />
+                      </button>
+                      <div className="mx-1 h-4 w-px bg-border" />
+                      <button
+                        onClick={() => setModalOpen(false)}
+                        className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })() : (
+              <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
+                <h2 className="text-base font-semibold text-text-primary">Nueva solicitud</h2>
+                <button
+                  onClick={() => setModalOpen(false)}
+                  className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-            </div>
+            )}
 
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
 

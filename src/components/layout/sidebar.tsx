@@ -22,16 +22,73 @@ import {
   X,
 } from "lucide-react";
 
-const baseNavItems = [
+// ─── Grupos de navegación ─────────────────────────────────────────────────────
+
+const MAIN_NAV = [
   { label: "Dashboard",      href: "/dashboard",  icon: LayoutDashboard },
   { label: "Zona",           href: "/zona",        icon: MapPin },
   { label: "Solicitudes",    href: "/solicitudes", icon: ClipboardList },
   { label: "Contactos",      href: "/contactos",   icon: BookUser },
-  { label: "Desarrollo",     href: "/desarrollo",  icon: TrendingUp },
-  { label: "Calendario",     href: "/calendario",  icon: Calendar },
-  { label: "Ordenes del dia",href: "/ordenes",     icon: FileText },
-  { label: "Calculadora",    href: "/calculadora", icon: Calculator },
 ];
+
+const TOOLS_NAV = [
+  { label: "Desarrollo",      href: "/desarrollo",  icon: TrendingUp },
+  { label: "Calendario",      href: "/calendario",  icon: Calendar },
+  { label: "Ordenes del dia", href: "/ordenes",     icon: FileText },
+  { label: "Calculadora",     href: "/calculadora", icon: Calculator },
+];
+
+// ─── Estilos compartidos de item ──────────────────────────────────────────────
+
+function NavItem({
+  href,
+  icon: Icon,
+  label,
+  active,
+}: {
+  href: string;
+  icon: React.ElementType;
+  label: string;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={[
+        "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150",
+        active
+          ? "bg-primary/10 text-primary"
+          : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary",
+      ].join(" ")}
+    >
+      <Icon
+        className={[
+          "h-[18px] w-[18px] shrink-0 transition-colors",
+          active ? "text-primary" : "text-text-secondary group-hover:text-text-primary",
+        ].join(" ")}
+      />
+      <span className="truncate">{label}</span>
+      {active && (
+        <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+      )}
+    </Link>
+  );
+}
+
+function NavGroup({ label, children }: { label?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-0.5">
+      {label && (
+        <p className="mb-1.5 mt-3 px-3 text-[10px] font-semibold uppercase tracking-widest text-text-secondary/50">
+          {label}
+        </p>
+      )}
+      {children}
+    </div>
+  );
+}
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 interface Props {
   userRole?: string | null;
@@ -39,6 +96,7 @@ interface Props {
 
 export default function Sidebar({ userRole: _userRole }: Props) {
   const pathname = usePathname();
+
   const [dark, setDark] = useState(() =>
     typeof document !== "undefined" && document.documentElement.classList.contains("dark")
   );
@@ -47,21 +105,11 @@ export default function Sidebar({ userRole: _userRole }: Props) {
   const userRole = _userRole ? normalizeUserRole(_userRole) : null;
   const canSeeUsers = canManageUsers(userRole ?? "Agente");
   const canSeeOrganigrama =
-    userRole === "Administrador" ||
-    userRole === "Director" ||
-    userRole === "Responsable";
+    userRole === "Administrador" || userRole === "Director" || userRole === "Responsable";
 
-  const navItems = [
-    ...baseNavItems,
-    ...(canSeeUsers ? [{ label: "Usuarios", href: "/usuarios", icon: Users }] : []),
-    ...(canSeeOrganigrama ? [{ label: "Organigrama", href: "/empresa/organigrama", icon: Network }] : []),
-  ];
-
-  // Escuchar evento del botón hamburger en el header
+  // Escuchar evento del botón hamburger del header
   useEffect(() => {
-    function handleToggle() {
-      setMobileOpen((prev) => !prev);
-    }
+    function handleToggle() { setMobileOpen((prev) => !prev); }
     window.addEventListener("sidebar:toggle", handleToggle);
     return () => window.removeEventListener("sidebar:toggle", handleToggle);
   }, []);
@@ -79,109 +127,107 @@ export default function Sidebar({ userRole: _userRole }: Props) {
     localStorage.setItem("metria-theme", next ? "dark" : "light");
   }
 
+  function isActive(href: string) {
+    if (href === "/dashboard") return pathname === "/dashboard";
+    return pathname.startsWith(href);
+  }
+
   const navContent = (
-    <>
-      {/* Logo */}
-      <div className="relative flex h-16 items-center justify-center bg-sidebar-logo px-2">
+    <div className="flex h-full min-h-0 flex-col">
+      {/* ── Logo ─────────────────────────────────────────────────── */}
+      <div className="relative flex h-16 shrink-0 items-center justify-center border-b border-border/60 bg-sidebar-logo px-4">
         <Image
           src="/logo-bg-master-iberica.png"
           alt="Master Ibérica"
-          width={240}
-          height={56}
-          className="h-20 w-auto object-contain"
+          width={190}
+          height={48}
+          className="max-h-10 w-auto object-contain"
           priority
         />
-        {/* Cerrar drawer — solo en móvil */}
+        {/* Cerrar — solo en móvil */}
         <button
           onClick={() => setMobileOpen(false)}
-          className="absolute right-2 rounded-lg p-1.5 text-white/70 hover:bg-white/10 md:hidden"
+          className="absolute right-3 rounded-lg p-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white md:hidden"
           aria-label="Cerrar menú"
         >
-          <X className="h-5 w-5" />
+          <X className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname.startsWith(item.href);
+      {/* ── Navegación ───────────────────────────────────────────── */}
+      <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-primary text-white"
-                  : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary"
-              }`}
-            >
-              <Icon className="h-[18px] w-[18px] shrink-0" />
-              {item.label}
-            </Link>
-          );
-        })}
+        <NavGroup>
+          {MAIN_NAV.map((item) => (
+            <NavItem key={item.href} {...item} active={isActive(item.href)} />
+          ))}
+        </NavGroup>
 
-        <div className="my-3 border-t border-border" />
+        <NavGroup label="Herramientas">
+          {TOOLS_NAV.map((item) => (
+            <NavItem key={item.href} {...item} active={isActive(item.href)} />
+          ))}
+        </NavGroup>
 
-        <Link
-          href="/soporte"
-          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-            pathname.startsWith("/soporte")
-              ? "bg-primary text-white"
-              : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary"
-          }`}
-        >
-          <LifeBuoy className="h-[18px] w-[18px] shrink-0" />
-          Soporte
-        </Link>
+        {(canSeeUsers || canSeeOrganigrama) && (
+          <NavGroup label="Gestión">
+            {canSeeUsers && (
+              <NavItem href="/usuarios" icon={Users} label="Usuarios" active={isActive("/usuarios")} />
+            )}
+            {canSeeOrganigrama && (
+              <NavItem href="/empresa/organigrama" icon={Network} label="Organigrama" active={isActive("/empresa/organigrama")} />
+            )}
+          </NavGroup>
+        )}
+
+        {/* Separador + Soporte */}
+        <div className="mt-3 border-t border-border/60 pt-3">
+          <NavItem href="/soporte" icon={LifeBuoy} label="Soporte" active={isActive("/soporte")} />
+        </div>
       </nav>
 
-      {/* Tema */}
-      <div className="border-t border-border px-3 py-3 space-y-0.5">
-        <p className="px-3 pb-1 text-[10px] font-medium text-text-secondary/50 tracking-widest uppercase">
-          v1.0.0
-        </p>
+      {/* ── Footer: tema + versión ────────────────────────────────── */}
+      <div className="shrink-0 border-t border-border/60 px-3 py-3">
         <button
           onClick={toggleTheme}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-sidebar-hover hover:text-text-primary"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-text-secondary transition-all hover:bg-sidebar-hover hover:text-text-primary"
         >
           {dark ? (
             <Sun className="h-[18px] w-[18px] shrink-0" />
           ) : (
             <Moon className="h-[18px] w-[18px] shrink-0" />
           )}
-          {dark ? "Modo claro" : "Modo oscuro"}
+          <span>{dark ? "Modo claro" : "Modo oscuro"}</span>
+          <span className="ml-auto text-[10px] font-medium text-text-secondary/40">v1.0</span>
         </button>
       </div>
-    </>
+    </div>
   );
+
+  const sidebarClass = "fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col bg-sidebar";
+  const borderClass  = "border-r border-border";
 
   return (
     <>
-      {/* ── Desktop: sidebar fijo siempre visible ────────────────────── */}
-      <aside className="fixed inset-y-0 left-0 z-50 hidden w-[220px] flex-col border-r border-border bg-sidebar md:flex">
+      {/* ── Desktop ───────────────────────────────────────────────── */}
+      <aside className={`${sidebarClass} ${borderClass} hidden md:flex`}>
         {navContent}
       </aside>
 
-      {/* ── Móvil: overlay + drawer deslizante ──────────────────────── */}
+      {/* ── Móvil: overlay con blur ───────────────────────────────── */}
       <div
-        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 md:hidden ${
-          mobileOpen
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none"
-        }`}
+        className={[
+          "fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] transition-opacity duration-300 md:hidden",
+          mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
+        ].join(" ")}
         onClick={() => setMobileOpen(false)}
         aria-hidden="true"
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col border-r border-border bg-sidebar transition-transform duration-300 md:hidden ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={[
+          `${sidebarClass} ${borderClass} transition-transform duration-300 ease-out md:hidden`,
+          mobileOpen ? "translate-x-0 shadow-xl" : "-translate-x-full",
+        ].join(" ")}
       >
         {navContent}
       </aside>

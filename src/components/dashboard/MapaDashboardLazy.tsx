@@ -6,7 +6,7 @@ import type { NoticiaMapPoint } from "./MapaDashboard";
 const MapaDashboard = dynamic(() => import("./MapaDashboard"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-64 items-center justify-center rounded-xl bg-surface-hover animate-pulse">
+    <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-border bg-surface-raised animate-pulse">
       <span className="text-sm text-text-secondary">Cargando mapa...</span>
     </div>
   ),
