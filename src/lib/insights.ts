@@ -23,12 +23,23 @@ export type PropiedadSinActividad = {
   agente_nombre: string | null;
 };
 
+export type PropiedadPorEstado = {
+  estado: string;
+  total: number;
+};
+
 export type AgenteConversionRow = {
   agente_id: number;
   agente_nombre: string;
   encargos: number;
   ventas: number;
-  tasa_conversion: number | null; // ventas / encargos, null si encargos === 0
+  tasa_conversion: number | null;
+};
+
+export type AgenteRankingRow = {
+  agente_id: number;
+  agente_nombre: string;
+  valor: number;
 };
 
 export type AgentePedidosSinSeguimiento = {
@@ -37,8 +48,23 @@ export type AgentePedidosSinSeguimiento = {
   pedidos_sin_seguimiento: number;
 };
 
+export type AgenteSinResponsable = {
+  id: number;
+  nombre: string;
+  correo: string;
+  rol: string;
+};
+
+export type UsuarioInactivoConPendientes = {
+  id: number;
+  nombre: string;
+  correo: string;
+  tareas_abiertas: number;
+  pedidos_abiertos: number;
+};
+
 export type EvolucionMensualRow = {
-  mes: number;           // 1-12
+  mes: number;
   mes_label: string;
   contactos: number;
   pedidos: number;
@@ -47,13 +73,31 @@ export type EvolucionMensualRow = {
 };
 
 export type InsightsData = {
+  // Resumen rápido
+  propiedadesPorEstado: PropiedadPorEstado[];
+  totalPedidosActivos: number;
+
+  // Zonas
   zonasPedidos: ZonaPedidosRow[];
   zonasEncargos: ZonaEncargosRow[];
+
+  // Actividad
   propiedadesSinActividad: PropiedadSinActividad[];
   agentesConversion: AgenteConversionRow[];
   agentesPedidosSinSeguimiento: AgentePedidosSinSeguimiento[];
+
+  // Rankings
+  rankingPropiedadesGestionadas: AgenteRankingRow[];
+  rankingTareasCompletadas: AgenteRankingRow[];
+
+  // Alertas
+  agenteSinResponsable: AgenteSinResponsable[];
+  usuariosInactivosConPendientes: UsuarioInactivoConPendientes[];
+
+  // Evolución
   evolucionMensual: EvolucionMensualRow[];
-  // Filtros devueltos para uso del cliente
+
+  // Filtros disponibles
   agentes: { id: number; nombre: string }[];
   zonas: { id: number; nombre: string }[];
   anio: number;
@@ -65,6 +109,8 @@ export type InsightsFilters = {
   anio: number;
   agenteId?: number | null;
   zonaId?: number | null;
+  fechaDesde?: string | null; // ISO date YYYY-MM-DD
+  fechaHasta?: string | null;
 };
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
@@ -75,19 +121,16 @@ const MESES_LABEL = [
 ];
 
 const PROPIEDAD_INACTIVA_DIAS = 14;
+const PEDIDO_SIN_SEGUIMIENTO_DIAS = 14;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+const ESTADOS_ORDEN = ["noticia", "investigacion", "seguimiento", "encargo", "vendido", "neutral"];
+
+// ─── Helpers internos ────────────────────────────────────────────────────────
 
 function toTime(v: string | null | undefined) {
   if (!v) return 0;
   const t = new Date(v).getTime();
   return Number.isFinite(t) ? t : 0;
-}
-
-function daysAgo(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d;
 }
 
 // ─── Función principal ────────────────────────────────────────────────────────
@@ -99,11 +142,12 @@ export async function fetchInsights(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = await createClient() as any;
 
-  const { anio, agenteId, zonaId } = filters;
-  const empresaId = user.empresaId;
-  const isManager = user.role === "Administrador" || user.role === "Director" || user.role === "Responsable";
+  const { anio, agenteId, zonaId, fechaDesde, fechaHasta } = filters;
 
-  // Agentes visibles según rol
+  // ── Scope de agentes según rol ──────────────────────────────────────────
+  // Administrador/Director: todos los agentes de la empresa.
+  // Responsable: solo sus supervisados (+ él mismo para sus propias métricas).
+  // Agente: no debería llegar aquí (guard en page.tsx), pero lo dejamos safe.
   const allowedAgentIds: number[] | null =
     user.role === "Administrador" || user.role === "Director"
       ? null
@@ -111,14 +155,24 @@ export async function fetchInsights(
         ? [user.id, ...user.supervisedAgentIds]
         : [user.id];
 
-  // Si hay filtro de agente adicional, intersectar
+  // Si hay filtro de agente adicional, intersectar con los permitidos
   const effectiveAgentIds: number[] | null = agenteId
     ? allowedAgentIds
       ? allowedAgentIds.includes(agenteId) ? [agenteId] : [-1]
       : [agenteId]
     : allowedAgentIds;
 
-  // ── Carga paralela inicial ──────────────────────────────────────────────
+  // Rango de fechas para consultas de actividad
+  const actividadFrom = fechaDesde
+    ? new Date(fechaDesde).toISOString()
+    : new Date(Date.UTC(anio, 0, 1)).toISOString();
+  const actividadTo = fechaHasta
+    ? new Date(new Date(fechaHasta).getTime() + 86_400_000).toISOString()
+    : new Date(Date.UTC(anio + 1, 0, 1)).toISOString();
+
+  // ── Carga inicial paralela ──────────────────────────────────────────────
+  // SEGURIDAD: todas las queries de usuarios filtran por empresa_id explícitamente
+  // para no depender solo de RLS como única capa.
 
   const [
     { data: agentesData },
@@ -126,20 +180,27 @@ export async function fetchInsights(
   ] = await Promise.all([
     supabase
       .from("usuarios")
-      .select("id, nombre, apellidos, rol")
+      .select("id, nombre, apellidos, rol, estado, supervisor_id")
+      .eq("empresa_id", user.empresaId ?? -1)          // filtro empresa explícito
       .not("rol", "ilike", "administrador")
       .order("nombre"),
     supabase.from("zona").select("id, nombre").order("nombre"),
   ]);
 
-  type AgenteRow = { id: number; nombre: string; apellidos: string; rol: string };
+  type AgenteRow = {
+    id: number; nombre: string; apellidos: string; rol: string;
+    estado: string | null; supervisor_id: number | null;
+  };
   type ZonaRow = { id: number; nombre: string };
 
   let agentes = (agentesData ?? []) as AgenteRow[];
-  if (!isManager) agentes = agentes.filter((a) => a.id === user.id);
-  else if (allowedAgentIds) agentes = agentes.filter((a) => allowedAgentIds.includes(a.id));
+  // Filtrar agentes visibles según rol
+  if (allowedAgentIds) agentes = agentes.filter((a) => allowedAgentIds.includes(a.id));
 
-  const agentList = agentes.map((a) => ({ id: a.id, nombre: `${a.nombre} ${a.apellidos}`.trim() }));
+  const agentList = agentes.map((a) => ({
+    id: a.id,
+    nombre: `${a.nombre} ${a.apellidos}`.trim(),
+  }));
   const agenteMap = new Map(agentList.map((a) => [a.id, a.nombre]));
   const zonas = (zonasData ?? []) as ZonaRow[];
   const zonaMap = new Map(zonas.map((z) => [z.id, z.nombre]));
@@ -157,21 +218,37 @@ export async function fetchInsights(
     );
   }
 
-  // ── Propiedades y pedidos ───────────────────────────────────────────────
+  // ── Queries de datos principales ────────────────────────────────────────
 
   let propQ = supabase
     .from("propiedades")
     .select("id, propietario, planta, puerta, estado, honorarios, agente_asignado, finca_id, created_at")
-    .not("estado", "ilike", "vendid%");
+    .eq("empresa_id", user.empresaId ?? -1);             // filtro empresa explícito
   if (effectiveAgentIds) propQ = propQ.in("agente_asignado", effectiveAgentIds.length ? effectiveAgentIds : [-1]);
   if (zonaFincaIds) propQ = propQ.in("finca_id", zonaFincaIds.length ? zonaFincaIds : [-1]);
 
   let pedidosQ = supabase
     .from("pedidos")
-    .select("id, nombre_cliente, owner_user_id, zona_deseada, created_at");
+    .select("id, nombre_cliente, owner_user_id, zona_deseada, created_at")
+    .eq("empresa_id", user.empresaId ?? -1);             // filtro empresa explícito
   if (effectiveAgentIds) pedidosQ = pedidosQ.in("owner_user_id", effectiveAgentIds.length ? effectiveAgentIds : [-1]);
 
-  // Rendimiento anual para conversión y evolución
+  let tareasQ = supabase
+    .from("tareas")
+    .select("id, estado, owner_user_id")
+    .eq("empresa_id", user.empresaId ?? -1)
+    .is("archived_at", null);
+  if (effectiveAgentIds) tareasQ = tareasQ.in("owner_user_id", effectiveAgentIds.length ? effectiveAgentIds : [-1]);
+
+  const tareasCompletadasQ = supabase
+    .from("tareas")
+    .select("owner_user_id")
+    .eq("empresa_id", user.empresaId ?? -1)
+    .eq("estado", "completado")
+    .is("archived_at", null)
+    .gte("created_at", actividadFrom)
+    .lt("created_at", actividadTo);
+
   const rendQ = supabase
     .from("rendimiento")
     .select("agente_id, mes, encargos, ventas, contactos")
@@ -179,44 +256,59 @@ export async function fetchInsights(
     .gte("mes", 1)
     .lte("mes", 12);
 
-  // Actividad de desarrollo (encargos/ventas reales registrados)
-  const actividadFrom = new Date(Date.UTC(anio, 0, 1)).toISOString();
-  const actividadTo = new Date(Date.UTC(anio + 1, 0, 1)).toISOString();
   const actividadQ = supabase
     .from("actividad_desarrollo")
     .select("agente_id, metric, value, occurred_at")
+    .eq("empresa_id", user.empresaId ?? -1)              // filtro empresa explícito
     .gte("occurred_at", actividadFrom)
     .lt("occurred_at", actividadTo)
-    .in("metric", ["encargos", "ventas", "contactos", "pedidos"]);
+    .in("metric", ["encargos", "ventas", "contactos"]);
 
   const [
     { data: propiedadesData },
     { data: pedidosData },
+    { data: tareasData },
+    { data: tareasCompletadasData },
     { data: rendimientoData },
     { data: actividadData },
-  ] = await Promise.all([propQ, pedidosQ, rendQ, actividadQ]);
+  ] = await Promise.all([propQ, pedidosQ, tareasQ, tareasCompletadasQ, rendQ, actividadQ]);
 
-  type PropRow = { id: number; propietario: string | null; planta: string | null; puerta: string | null; estado: string | null; agente_asignado: number | null; finca_id: number | null; created_at: string | null };
-  type PedidoRow = { id: number; nombre_cliente: string; owner_user_id: number | null; zona_deseada: number | null; created_at: string | null };
+  type PropRow = {
+    id: number; propietario: string | null; planta: string | null; puerta: string | null;
+    estado: string | null; agente_asignado: number | null; finca_id: number | null;
+    created_at: string | null;
+  };
+  type PedidoRow = {
+    id: number; nombre_cliente: string; owner_user_id: number | null;
+    zona_deseada: number | null; created_at: string | null;
+  };
+  type TareaRow = { id: number; estado: string; owner_user_id: number | null };
+  type TareaCompRow = { owner_user_id: number | null };
   type RendRow = { agente_id: number; mes: number; encargos: number | null; ventas: number | null; contactos: number | null };
   type ActRow = { agente_id: number | null; metric: string | null; value: number | null; occurred_at: string };
 
   const propiedades = (propiedadesData ?? []) as PropRow[];
   const pedidos = (pedidosData ?? []) as PedidoRow[];
+  const tareas = (tareasData ?? []) as TareaRow[];
+  const tareasCompletadas = (tareasCompletadasData ?? []) as TareaCompRow[];
   const rendimiento = (rendimientoData ?? []) as RendRow[];
   const actividad = (actividadData ?? []) as ActRow[];
 
-  // ── Timeline: última actividad por propiedad y pedido ──────────────────
+  // ── Timeline: última actividad ──────────────────────────────────────────
 
   const propIds = propiedades.map((p) => p.id);
   const pedidoIds = pedidos.map((p) => p.id);
 
   const [{ data: propTimeline }, { data: pedidoTimeline }] = await Promise.all([
     propIds.length
-      ? supabase.from("contacto_timeline_events").select("propiedad_id, created_at").in("propiedad_id", propIds)
+      ? supabase.from("contacto_timeline_events")
+          .select("propiedad_id, created_at")
+          .in("propiedad_id", propIds)
       : Promise.resolve({ data: [] }),
     pedidoIds.length
-      ? supabase.from("contacto_timeline_events").select("pedido_id, created_at").in("pedido_id", pedidoIds)
+      ? supabase.from("contacto_timeline_events")
+          .select("pedido_id, created_at")
+          .in("pedido_id", pedidoIds)
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -230,7 +322,30 @@ export async function fetchInsights(
     if (e.pedido_id) lastPedidoActivity.set(e.pedido_id, Math.max(lastPedidoActivity.get(e.pedido_id) ?? 0, toTime(e.created_at)));
   }
 
-  // ── 1. Zonas con más pedidos activos ────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════
+  // MÉTRICAS
+  // ════════════════════════════════════════════════════════════════════════
+
+  // ── M1. Propiedades por estado ──────────────────────────────────────────
+
+  const estadoCount = new Map<string, number>();
+  for (const p of propiedades) {
+    const e = (p.estado ?? "neutral").toLowerCase();
+    estadoCount.set(e, (estadoCount.get(e) ?? 0) + 1);
+  }
+
+  const propiedadesPorEstado: PropiedadPorEstado[] = ESTADOS_ORDEN
+    .filter((e) => estadoCount.has(e))
+    .map((e) => ({ estado: e, total: estadoCount.get(e)! }));
+
+  // Añadir estados que no estén en ESTADOS_ORDEN
+  for (const [e, total] of estadoCount) {
+    if (!ESTADOS_ORDEN.includes(e)) propiedadesPorEstado.push({ estado: e, total });
+  }
+
+  const totalPedidosActivos = pedidos.length;
+
+  // ── M2. Zonas con más pedidos activos ───────────────────────────────────
 
   const pedidosPorZona = new Map<number, number>();
   for (const p of pedidos) {
@@ -246,9 +361,8 @@ export async function fetchInsights(
     .sort((a, b) => b.pedidos_activos - a.pedidos_activos)
     .slice(0, 10);
 
-  // ── 2. Zonas con más propiedades en encargo ──────────────────────────────
+  // ── M3. Zonas con más propiedades en encargo ────────────────────────────
 
-  // Necesitamos finca→zona. Cargamos solo si hay propiedades en encargo
   const encargosProps = propiedades.filter((p) => p.estado?.toLowerCase().startsWith("encarg"));
   let zonasEncargos: ZonaEncargosRow[] = [];
 
@@ -275,24 +389,26 @@ export async function fetchInsights(
     }
 
     zonasEncargos = [...encargosCount.entries()]
-      .map(([zona_id, encargos]) => ({
+      .map(([zona_id, enc]) => ({
         zona_id,
         zona_nombre: zonaMap.get(zona_id) ?? `Zona #${zona_id}`,
-        encargos,
+        encargos: enc,
       }))
       .sort((a, b) => b.encargos - a.encargos)
       .slice(0, 10);
   }
 
-  // ── 3. Propiedades sin actividad ─────────────────────────────────────────
+  // ── M4. Propiedades sin actividad ───────────────────────────────────────
 
   const propiedadesSinActividad: PropiedadSinActividad[] = propiedades
+    .filter((p) => !p.estado?.toLowerCase().startsWith("vendid"))
     .map((p) => {
       const last = Math.max(lastPropActivity.get(p.id) ?? 0, toTime(p.created_at));
       const dias = last ? Math.floor((Date.now() - last) / 86_400_000) : PROPIEDAD_INACTIVA_DIAS;
-      const label = p.propietario?.trim()
-        || [p.planta && `Planta ${p.planta}`, p.puerta && `Puerta ${p.puerta}`].filter(Boolean).join(" ")
-        || `Propiedad #${p.id}`;
+      const label =
+        p.propietario?.trim() ||
+        [p.planta && `Planta ${p.planta}`, p.puerta && `Puerta ${p.puerta}`].filter(Boolean).join(" ") ||
+        `Propiedad #${p.id}`;
       return {
         id: p.id,
         label,
@@ -305,14 +421,12 @@ export async function fetchInsights(
     .sort((a, b) => b.dias_inactiva - a.dias_inactiva)
     .slice(0, 20);
 
-  // ── 4. Conversión tarea→encargo/venta por agente ─────────────────────────
-  // Usamos rendimiento (encargos + ventas acumulados) como proxy de conversión
+  // ── M5. Conversión encargo→venta por agente ─────────────────────────────
 
   const agenteEncargos = new Map<number, number>();
   const agenteVentas = new Map<number, number>();
   const agenteContactos = new Map<number, number>();
 
-  // Sumamos por actividad real (actividad_desarrollo) — más fiable que rendimiento
   for (const act of actividad) {
     if (!act.agente_id) continue;
     const val = Number(act.value ?? 0);
@@ -321,7 +435,6 @@ export async function fetchInsights(
     if (act.metric === "contactos") agenteContactos.set(act.agente_id, (agenteContactos.get(act.agente_id) ?? 0) + val);
   }
 
-  // Fallback a rendimiento si actividad vacía
   if (agenteEncargos.size === 0) {
     for (const r of rendimiento) {
       agenteEncargos.set(r.agente_id, (agenteEncargos.get(r.agente_id) ?? 0) + Number(r.encargos ?? 0));
@@ -344,16 +457,16 @@ export async function fetchInsights(
     })
     .sort((a, b) => (b.tasa_conversion ?? -1) - (a.tasa_conversion ?? -1));
 
-  // ── 5. Pedidos sin seguimiento por agente ────────────────────────────────
+  // ── M6. Pedidos sin seguimiento por agente ──────────────────────────────
 
-  const pedidosSinSeguimiento = new Map<number, number>();
+  const pedidosSinSeg = new Map<number, number>();
   for (const pedido of pedidos) {
     const ownerId = pedido.owner_user_id;
     if (!ownerId) continue;
     const last = lastPedidoActivity.get(pedido.id) ?? toTime(pedido.created_at);
-    const days = last ? Math.floor((Date.now() - last) / 86_400_000) : 14;
-    if (days >= 14) {
-      pedidosSinSeguimiento.set(ownerId, (pedidosSinSeguimiento.get(ownerId) ?? 0) + 1);
+    const days = last ? Math.floor((Date.now() - last) / 86_400_000) : PEDIDO_SIN_SEGUIMIENTO_DIAS;
+    if (days >= PEDIDO_SIN_SEGUIMIENTO_DIAS) {
+      pedidosSinSeg.set(ownerId, (pedidosSinSeg.get(ownerId) ?? 0) + 1);
     }
   }
 
@@ -361,21 +474,120 @@ export async function fetchInsights(
     .map((a) => ({
       agente_id: a.id,
       agente_nombre: a.nombre,
-      pedidos_sin_seguimiento: pedidosSinSeguimiento.get(a.id) ?? 0,
+      pedidos_sin_seguimiento: pedidosSinSeg.get(a.id) ?? 0,
     }))
     .filter((a) => a.pedidos_sin_seguimiento > 0)
     .sort((a, b) => b.pedidos_sin_seguimiento - a.pedidos_sin_seguimiento);
 
-  // ── 6. Evolución mensual ─────────────────────────────────────────────────
+  // ── M7. Ranking: propiedades gestionadas por agente ─────────────────────
 
-  // Pedidos creados por mes en el año
+  const propPorAgente = new Map<number, number>();
+  for (const p of propiedades) {
+    if (!p.agente_asignado) continue;
+    propPorAgente.set(p.agente_asignado, (propPorAgente.get(p.agente_asignado) ?? 0) + 1);
+  }
+
+  const rankingPropiedadesGestionadas: AgenteRankingRow[] = agentList
+    .map((a) => ({ agente_id: a.id, agente_nombre: a.nombre, valor: propPorAgente.get(a.id) ?? 0 }))
+    .filter((a) => a.valor > 0)
+    .sort((a, b) => b.valor - a.valor)
+    .slice(0, 10);
+
+  // ── M8. Ranking: tareas completadas por agente (en el periodo) ──────────
+
+  const tareasCompPorAgente = new Map<number, number>();
+  for (const t of tareasCompletadas) {
+    if (!t.owner_user_id) continue;
+    tareasCompPorAgente.set(t.owner_user_id, (tareasCompPorAgente.get(t.owner_user_id) ?? 0) + 1);
+  }
+
+  const rankingTareasCompletadas: AgenteRankingRow[] = agentList
+    .map((a) => ({ agente_id: a.id, agente_nombre: a.nombre, valor: tareasCompPorAgente.get(a.id) ?? 0 }))
+    .filter((a) => a.valor > 0)
+    .sort((a, b) => b.valor - a.valor)
+    .slice(0, 10);
+
+  // ── M9. Agentes sin responsable asignado ────────────────────────────────
+  // Solo Administrador/Director ven esta métrica (implica ver toda la empresa)
+
+  let agenteSinResponsable: AgenteSinResponsable[] = [];
+  if (user.role === "Administrador" || user.role === "Director") {
+    const { data: sinResp } = await supabase
+      .from("usuarios")
+      .select("id, nombre, apellidos, correo, rol")
+      .eq("empresa_id", user.empresaId ?? -1)
+      .eq("rol", "Agente")
+      .is("supervisor_id", null)
+      .eq("estado", "active");
+
+    type SinRespRow = { id: number; nombre: string; apellidos: string; correo: string; rol: string };
+    agenteSinResponsable = ((sinResp ?? []) as SinRespRow[]).map((u) => ({
+      id: u.id,
+      nombre: `${u.nombre} ${u.apellidos}`.trim(),
+      correo: u.correo,
+      rol: u.rol,
+    }));
+  }
+
+  // ── M10. Usuarios inactivos con tareas o pedidos abiertos ───────────────
+
+  let usuariosInactivosConPendientes: UsuarioInactivoConPendientes[] = [];
+  if (user.role === "Administrador" || user.role === "Director") {
+    const { data: inactivos } = await supabase
+      .from("usuarios")
+      .select("id, nombre, apellidos, correo")
+      .eq("empresa_id", user.empresaId ?? -1)
+      .eq("estado", "disabled");
+
+    type InactivoRow = { id: number; nombre: string; apellidos: string; correo: string };
+    const inactivoList = (inactivos ?? []) as InactivoRow[];
+
+    if (inactivoList.length > 0) {
+      const inactivoIds = inactivoList.map((u) => u.id);
+
+      const [{ data: tareasAbiertas }, { data: pedidosAbiertos }] = await Promise.all([
+        supabase.from("tareas")
+          .select("owner_user_id")
+          .in("owner_user_id", inactivoIds)
+          .eq("estado", "pendiente")
+          .is("archived_at", null),
+        supabase.from("pedidos")
+          .select("owner_user_id")
+          .in("owner_user_id", inactivoIds)
+          .eq("empresa_id", user.empresaId ?? -1),
+      ]);
+
+      const tareasPorUser = new Map<number, number>();
+      for (const t of (tareasAbiertas ?? []) as Array<{ owner_user_id: number | null }>) {
+        if (t.owner_user_id) tareasPorUser.set(t.owner_user_id, (tareasPorUser.get(t.owner_user_id) ?? 0) + 1);
+      }
+
+      const pedidosPorUser = new Map<number, number>();
+      for (const p of (pedidosAbiertos ?? []) as Array<{ owner_user_id: number | null }>) {
+        if (p.owner_user_id) pedidosPorUser.set(p.owner_user_id, (pedidosPorUser.get(p.owner_user_id) ?? 0) + 1);
+      }
+
+      usuariosInactivosConPendientes = inactivoList
+        .map((u) => ({
+          id: u.id,
+          nombre: `${u.nombre} ${u.apellidos}`.trim(),
+          correo: u.correo,
+          tareas_abiertas: tareasPorUser.get(u.id) ?? 0,
+          pedidos_abiertos: pedidosPorUser.get(u.id) ?? 0,
+        }))
+        .filter((u) => u.tareas_abiertas > 0 || u.pedidos_abiertos > 0)
+        .sort((a, b) => (b.tareas_abiertas + b.pedidos_abiertos) - (a.tareas_abiertas + a.pedidos_abiertos));
+    }
+  }
+
+  // ── M11. Evolución mensual ──────────────────────────────────────────────
+
   const pedidosPorMes = new Array(12).fill(0);
   for (const p of pedidos) {
     const d = new Date(p.created_at ?? "");
     if (d.getFullYear() === anio) pedidosPorMes[d.getMonth()] += 1;
   }
 
-  // Encargos y ventas y contactos por mes desde actividad_desarrollo
   const encargosM = new Array(12).fill(0);
   const ventasM = new Array(12).fill(0);
   const contactosM = new Array(12).fill(0);
@@ -390,7 +602,6 @@ export async function fetchInsights(
     if (act.metric === "contactos") contactosM[m] += val;
   }
 
-  // Fallback: si actividad vacía, usar rendimiento
   if (actividad.length === 0) {
     for (const r of rendimiento) {
       const m = r.mes - 1;
@@ -410,14 +621,21 @@ export async function fetchInsights(
     ventas: ventasM[i],
   }));
 
-  void empresaId;
+  // Suprimir advertencia sobre variable no usada
+  void tareas;
 
   return {
+    propiedadesPorEstado,
+    totalPedidosActivos,
     zonasPedidos,
     zonasEncargos,
     propiedadesSinActividad,
     agentesConversion,
     agentesPedidosSinSeguimiento,
+    rankingPropiedadesGestionadas,
+    rankingTareasCompletadas,
+    agenteSinResponsable,
+    usuariosInactivosConPendientes,
     evolucionMensual,
     agentes: agentList,
     zonas: zonas.map((z) => ({ id: z.id, nombre: z.nombre })),
