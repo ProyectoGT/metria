@@ -15,41 +15,11 @@ import {
   type OrdenDiaAgente,
   type KanbanPriority,
 } from "@/lib/mock/dashboard";
-import SummaryPanel from "@/components/dashboard/SummaryPanel";
-import KanbanBoard from "@/components/dashboard/KanbanBoard";
-import OrdenDiaPanel from "@/components/dashboard/OrdenDiaPanel";
-import AgentOfMonth from "@/components/dashboard/AgentOfMonth";
-import AgentPerformanceTable from "@/components/dashboard/AgentPerformanceTable";
-import MyActivity from "@/components/dashboard/MyActivity";
-import NextBestActionsPanel from "@/components/dashboard/NextBestActionsPanel";
-import PipelineSuggestionsPanel from "@/components/dashboard/PipelineSuggestionsPanel";
-import LostOpportunitiesPanel from "@/components/dashboard/LostOpportunitiesPanel";
-import MapaDashboardLazy from "@/components/dashboard/MapaDashboardLazy";
-import DashboardSection from "@/components/dashboard/DashboardSection";
-import DashboardQuickActions from "@/components/dashboard/DashboardQuickActions";
+import DashboardWorkspace from "@/components/dashboard/DashboardWorkspace";
 import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
 import { combineLocalDateTime, localDateKey, normalizeTime } from "@/lib/local-date-time";
-import { Kanban, Lightbulb, MapPin, BarChart3 } from "lucide-react";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Buenos días";
-  if (hour < 20) return "Buenas tardes";
-  return "Buenas noches";
-}
-
-function formatDateEs() {
-  return new Date()
-    .toLocaleDateString("es-ES", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    })
-    .replace(/^./, (c) => c.toUpperCase());
-}
 
 function normalizePriority(p: string | null): KanbanPriority {
   if (p === "alta" || p === "media" || p === "baja") return p;
@@ -157,6 +127,7 @@ export default async function DashboardPage() {
     { data: investigacionesList },
     { data: encargosList },
     { data: pedidosList },
+    { count: contactosCount },
     { data: todosAgentes },
     { data: rendimientoData },
     { data: actividadData },
@@ -187,6 +158,8 @@ export default async function DashboardPage() {
       ).order("id", { ascending: false }).limit(50)
     ),
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).from("contactos").select("id", { count: "exact", head: true }).is("archived_at", null),
     supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
     supabase.from("rendimiento").select("agente_id, anio, mes, facturado, objetivo_facturado, encargos, objetivo_encargos, ventas, objetivo_ventas, contactos, objetivo_contactos").eq("anio", anioActual).eq("mes", 0),
     supabase
@@ -520,111 +493,28 @@ export default async function DashboardPage() {
   const encargosMap: NoticiaMapPoint[] = ((encargosMapData ?? []) as unknown as NoticiasMapRow[]).map(mapRowToPoint);
 
   return (
-    <div className="flex min-w-0 flex-col gap-6">
-
-      {/* ── 1. Hero — saludo + fecha + accesos rápidos ──────────────── */}
-      <div className="flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-text-primary md:text-2xl">
-              {getGreeting()}, {userName} 👋
-            </h1>
-            <p className="mt-1 text-sm text-text-secondary">{formatDateEs()}</p>
-          </div>
-        </div>
-
-        {/* Accesos rápidos */}
-        <DashboardQuickActions role={role} />
-      </div>
-
-      {/* ── 2. Métricas principales (4 stat cards clicables) ────────── */}
-      <SummaryPanel summary={summary} listings={listings} />
-
-      {/* ── 3. Inteligencia: 3 paneles colapsables ──────────────────── */}
-      <DashboardSection
-        title="Inteligencia comercial"
-        description="Recomendaciones y alertas basadas en tu actividad."
-        icon={<Lightbulb className="h-4 w-4" />}
-      >
-        <div className="space-y-3">
-          <NextBestActionsPanel actions={nextBestActions} currentUserId={userId} />
-          <PipelineSuggestionsPanel suggestions={pipelineSuggestions} />
-          <LostOpportunitiesPanel opportunities={lostOpportunities} />
-        </div>
-      </DashboardSection>
-
-      {/* ── 4. Mis tareas (Kanban) ───────────────────────────────────── */}
-      <DashboardSection
-        title="Mis tareas"
-        description="Arrastra las tarjetas entre columnas para organizarte."
-        icon={<Kanban className="h-4 w-4" />}
-      >
-        <KanbanBoard
-          initialData={kanbanData}
-          customColumns={(kanbanColsData ?? []).map((c: { col_id: string; titulo: string }) => ({ id: c.col_id, title: c.titulo }))}
-          role={role}
-          currentUserId={String(userId)}
-          agents={agentMetrics.map((a) => ({ id: a.id, nombre: a.nombre }))}
-        />
-      </DashboardSection>
-
-      {/* ── 5. Orden del día + Mapa ──────────────────────────────────── */}
-      {showOrdenDia ? (
-        <DashboardSection
-          title="Mapa y orden del dia"
-          description="Vista geográfica de noticias y encargos + actividades del equipo."
-          icon={<MapPin className="h-4 w-4" />}
-        >
-          <div className="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.4fr)]">
-            <div className="order-2 min-w-0 xl:order-1">
-              <OrdenDiaPanel agentes={ordenDiaAgentes} />
-            </div>
-            <div className="order-1 min-w-0 xl:order-2">
-              <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
-            </div>
-          </div>
-        </DashboardSection>
-      ) : (
-        <DashboardSection
-          title="Mapa"
-          description="Vista geográfica de noticias y encargos."
-          icon={<MapPin className="h-4 w-4" />}
-        >
-          <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
-        </DashboardSection>
-      )}
-
-      {/* ── 6. Agente del mes ────────────────────────────────────────── */}
-      <AgentOfMonth
-        initialData={
-          agenteMesData
-            ? {
-                id: agenteMesData.id,
-                mes: agenteMesData.mes,
-                premio: agenteMesData.premio,
-                agente: agenteMesData.agente_nombre ?? null,
-                agenteId: agenteMesData.agente_id ?? null,
-                añadidoPor: agenteMesData.anadido_por,
-              }
-            : null
-        }
-        empresaId={yo?.empresaId ?? null}
-        role={role}
-        currentUserName={fullName}
-        agents={agentMetrics.map((a) => ({ id: a.id, nombre: a.nombre }))}
-      />
-
-      {/* ── 7. Rendimiento del equipo / Mi actividad ─────────────────── */}
-      {showAgentPerformance && (
-        <DashboardSection
-          title="Rendimiento del equipo"
-          description="Comparativa de objetivos y resultados anuales."
-          icon={<BarChart3 className="h-4 w-4" />}
-        >
-          <AgentPerformanceTable agents={agentMetrics} role={role} />
-        </DashboardSection>
-      )}
-      {showMyActivity && <MyActivity rendimiento={ownMetrics} role={role} />}
-    </div>
+    <DashboardWorkspace
+      role={role}
+      userName={userName}
+      currentUserId={userId}
+      summary={{ ...summary, contactos: contactosCount ?? 0 }}
+      listings={listings}
+      nextBestActions={nextBestActions}
+      pipelineSuggestions={pipelineSuggestions}
+      lostOpportunities={lostOpportunities}
+      kanbanData={kanbanData}
+      kanbanCols={(kanbanColsData ?? []).map((c: { col_id: string; titulo: string }) => ({ id: c.col_id, title: c.titulo }))}
+      agentMetrics={agentMetrics}
+      ownMetrics={ownMetrics}
+      ordenDiaAgentes={ordenDiaAgentes}
+      showOrdenDia={showOrdenDia}
+      showAgentPerformance={showAgentPerformance}
+      showMyActivity={showMyActivity}
+      noticiasMap={noticiasMap}
+      encargosMap={encargosMap}
+      empresaId={yo?.empresaId ?? null}
+      fullName={fullName}
+      agenteMesData={agenteMesData}
+    />
   );
 }

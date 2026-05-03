@@ -9,6 +9,8 @@ import type { NextBestAction } from "@/lib/next-actions";
 type Props = {
   actions: NextBestAction[];
   currentUserId: number;
+  defaultCollapsed?: boolean;
+  collapsible?: boolean;
 };
 
 const PRIORITY_CLASS: Record<NextBestAction["prioridad"], string> = {
@@ -26,12 +28,17 @@ const TYPE_LABEL: Record<NextBestAction["tipo"], string> = {
   oportunidad_perdida: "Oportunidad",
 };
 
-export default function NextBestActionsPanel({ actions, currentUserId }: Props) {
+export default function NextBestActionsPanel({
+  actions,
+  currentUserId,
+  defaultCollapsed = true,
+  collapsible = true,
+}: Props) {
   const supabase = createClient();
   const [items, setItems] = useState(actions);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   async function registerTimeline(action: NextBestAction, status: "aceptada" | "descartada" | "tarea_creada") {
     const pedidoId = action.entidad.pedidoId ?? (action.entidad.type === "pedido" ? action.entidad.id : null);
@@ -100,7 +107,7 @@ export default function NextBestActionsPanel({ actions, currentUserId }: Props) 
     <section className="rounded-xl bg-surface p-6 shadow-sm">
       <button
         type="button"
-        onClick={() => setCollapsed((v) => !v)}
+        onClick={() => collapsible && setCollapsed((v) => !v)}
         className="mb-5 flex w-full items-start justify-between gap-4 text-left"
       >
         <div>
@@ -114,11 +121,13 @@ export default function NextBestActionsPanel({ actions, currentUserId }: Props) 
           <span className="rounded-full bg-background px-2.5 py-1 text-xs font-medium text-text-secondary">
             {items.length}
           </span>
-          <ChevronDown className={`h-4 w-4 text-text-secondary transition-transform duration-200 ${collapsed ? "-rotate-90" : ""}`} />
+          {collapsible && (
+            <ChevronDown className={`h-4 w-4 text-text-secondary transition-transform duration-200 ${collapsed ? "-rotate-90" : ""}`} />
+          )}
         </div>
       </button>
 
-      {!collapsed && (
+      {(!collapsible || !collapsed) && (
         <>
           {error && <p className="mb-3 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
 

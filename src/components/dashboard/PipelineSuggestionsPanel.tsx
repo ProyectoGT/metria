@@ -10,6 +10,8 @@ import {
 
 type Props = {
   suggestions: PipelineSuggestion[];
+  defaultCollapsed?: boolean;
+  collapsible?: boolean;
 };
 
 const RULE_LABEL: Record<PipelineSuggestionRule, string> = {
@@ -48,9 +50,13 @@ function EstadoBadge({ estado }: { estado: string }) {
   );
 }
 
-export default function PipelineSuggestionsPanel({ suggestions: initial }: Props) {
+export default function PipelineSuggestionsPanel({
+  suggestions: initial,
+  defaultCollapsed = true,
+  collapsible = true,
+}: Props) {
   const [items, setItems] = useState(initial);
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,7 +88,7 @@ export default function PipelineSuggestionsPanel({ suggestions: initial }: Props
     <section className="rounded-xl bg-surface p-6 shadow-sm">
       <button
         type="button"
-        onClick={() => setCollapsed((v) => !v)}
+        onClick={() => collapsible && setCollapsed((v) => !v)}
         className="flex w-full items-start justify-between gap-4 text-left"
       >
         <div>
@@ -98,13 +104,15 @@ export default function PipelineSuggestionsPanel({ suggestions: initial }: Props
           <span className="rounded-full bg-background px-2.5 py-1 text-xs font-medium text-text-secondary">
             {items.length}
           </span>
-          <ChevronDown
-            className={`h-4 w-4 text-text-secondary transition-transform duration-200 ${collapsed ? "-rotate-90" : ""}`}
-          />
+          {collapsible && (
+            <ChevronDown
+              className={`h-4 w-4 text-text-secondary transition-transform duration-200 ${collapsed ? "-rotate-90" : ""}`}
+            />
+          )}
         </div>
       </button>
 
-      {!collapsed && (
+      {(!collapsible || !collapsed) && (
         <div className="mt-5">
           {error && (
             <p className="mb-3 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
