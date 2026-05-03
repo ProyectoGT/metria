@@ -5,7 +5,7 @@ import { SearchSchema } from "@/lib/validations/search";
 
 export type SearchResult = {
   id: string;
-  type: "propiedad" | "finca" | "sector" | "zona" | "solicitud" | "usuario" | "ticket" | "tarea" | "contacto";
+  type: "propiedad" | "finca" | "sector" | "zona" | "solicitud" | "usuario" | "ticket" | "tarea" | "contacto" | "email";
   label: string;
   sublabel?: string;
   href: string;
@@ -212,6 +212,26 @@ export async function GET(request: NextRequest) {
         label: t.titulo,
         sublabel: t.fecha ? new Date(t.fecha).toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : undefined,
         href: "/ordenes",
+      });
+    }
+  }
+
+  if (ctx === "general") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: emails } = await (supabase as any)
+      .from("email_messages")
+      .select("id, subject, from_email, from_name, snippet, received_at, body_text")
+      .or(`subject.ilike.%${q}%,from_email.ilike.%${q}%,from_name.ilike.%${q}%,snippet.ilike.%${q}%,body_text.ilike.%${q}%`)
+      .order("received_at", { ascending: false, nullsFirst: false })
+      .limit(5);
+
+    for (const email of (emails ?? []) as Array<{ id: number; subject: string | null; from_email: string | null; from_name: string | null; snippet: string | null }>) {
+      results.push({
+        id: `email-${email.id}`,
+        type: "email",
+        label: email.subject || `Email #${email.id}`,
+        sublabel: [email.from_name ?? email.from_email, email.snippet].filter(Boolean).join(" · ") || undefined,
+        href: `/email?message=${email.id}`,
       });
     }
   }

@@ -8,6 +8,7 @@ import {
 import { createClient } from "@/lib/supabase-browser";
 import { useToast, Toaster } from "@/components/ui/toast";
 import ContactoTimeline, { type TimelineEvent } from "@/components/timeline/ContactoTimeline";
+import RelatedEmailsPanel from "@/components/email/RelatedEmailsPanel";
 import type { Contacto, ContactoTipo, ContactoEstado } from "@/types";
 import type { UserRole } from "@/lib/roles";
 
@@ -958,6 +959,11 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
                 subject={{ type: "contacto", id: timelineContacto.id, title: nombreCompleto(timelineContacto) }}
                 currentUserId={currentUserId}
                 initialEvents={contactoTimelineEvents(timelineContacto)}
+              />
+              <RelatedEmailsPanel
+                entityType="contacto"
+                entityId={timelineContacto.id}
+                replyTo={timelineContacto.email}
               />
             </div>
           </div>

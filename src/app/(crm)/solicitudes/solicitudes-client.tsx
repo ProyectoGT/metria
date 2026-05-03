@@ -13,6 +13,7 @@ import {
 } from "@/lib/access-scope";
 import PropertyMatchesPanel from "@/components/matching/PropertyMatchesPanel";
 import ContactoTimeline, { type TimelineEvent } from "@/components/timeline/ContactoTimeline";
+import RelatedEmailsPanel from "@/components/email/RelatedEmailsPanel";
 import type { UserRole } from "@/lib/roles";
 import { useToast, Toaster } from "@/components/ui/toast";
 
@@ -724,6 +725,11 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
                 subject={{ type: "pedido", id: timelinePedido.id, title: timelinePedido.nombre_cliente }}
                 currentUserId={currentUserId}
                 initialEvents={pedidoTimelineEvents(timelinePedido)}
+              />
+              <RelatedEmailsPanel
+                entityType="pedido"
+                entityId={timelinePedido.id}
+                replyTo={null}
               />
             </div>
           </div>

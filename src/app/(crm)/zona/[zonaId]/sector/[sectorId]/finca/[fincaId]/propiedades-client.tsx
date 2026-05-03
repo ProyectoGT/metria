@@ -13,6 +13,7 @@ import { canSetVendido, type UserRole } from "@/lib/roles";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
 import EncargoPanel from "@/components/propiedades/EncargoPanel";
+import RelatedEmailsPanel from "@/components/email/RelatedEmailsPanel";
 
 type Agente = {
   id: number;
@@ -1479,6 +1480,14 @@ export default function PropiedadesClient({
                 <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
                   {saveError}
                 </p>
+              )}
+
+              {editTarget && (
+                <RelatedEmailsPanel
+                  entityType="propiedad"
+                  entityId={editTarget.id}
+                  replyTo={null}
+                />
               )}
             </div>
 

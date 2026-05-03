@@ -25,7 +25,7 @@ function formatFecha(fecha: string | null): string {
 const TYPE_LABELS: Record<SearchResult["type"], string> = {
   zona: "Zona", sector: "Sector", finca: "Finca",
   propiedad: "Propiedad", solicitud: "Solicitud",
-  usuario: "Usuario", ticket: "Soporte", tarea: "Tarea", contacto: "Contacto",
+  usuario: "Usuario", ticket: "Soporte", tarea: "Tarea", contacto: "Contacto", email: "Email",
 };
 
 const TYPE_COLORS: Record<SearchResult["type"], string> = {
@@ -38,6 +38,7 @@ const TYPE_COLORS: Record<SearchResult["type"], string> = {
   ticket:    "bg-danger/10     text-danger",
   tarea:     "bg-secondary/10  text-secondary",
   contacto:  "bg-teal-500/10   text-teal-600   dark:text-teal-400",
+  email:     "bg-sky-500/10    text-sky-600    dark:text-sky-400",
 };
 
 function getPlaceholder(pathname: string): string {
@@ -55,6 +56,7 @@ function getCtx(pathname: string): string {
   if (pathname.startsWith("/usuarios"))    return "usuarios";
   if (pathname.startsWith("/soporte"))     return "soporte";
   if (pathname.startsWith("/contactos"))   return "contactos";
+  if (pathname.startsWith("/email"))       return "general";
   return "general";
 }
 

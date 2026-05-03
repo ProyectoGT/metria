@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { decryptSecret, encryptSecret } from "./crypto";
+import { classifyAttachment } from "./rules";
 
 export type EmailAccount = {
   id: number;
@@ -19,7 +20,7 @@ type GmailHeader = { name: string; value: string };
 type GmailPayload = {
   mimeType?: string;
   filename?: string;
-  body?: { data?: string; attachmentId?: string };
+  body?: { data?: string; attachmentId?: string; size?: number };
   parts?: GmailPayload[];
   headers?: GmailHeader[];
 };
@@ -84,6 +85,20 @@ function hasAttachment(payload: GmailPayload | undefined): boolean {
   if (!payload) return false;
   if (payload.filename || payload.body?.attachmentId) return true;
   return (payload.parts ?? []).some(hasAttachment);
+}
+
+function collectAttachments(payload: GmailPayload | undefined, out: Array<{ filename: string; mime_type?: string; size_bytes?: number; provider_attachment_id?: string }> = []) {
+  if (!payload) return out;
+  if (payload.filename || payload.body?.attachmentId) {
+    out.push({
+      filename: payload.filename || "adjunto",
+      mime_type: payload.mimeType,
+      size_bytes: payload.body?.size,
+      provider_attachment_id: payload.body?.attachmentId,
+    });
+  }
+  for (const part of payload.parts ?? []) collectAttachments(part, out);
+  return out;
 }
 
 function header(headers: GmailHeader[] | undefined, name: string) {
@@ -238,6 +253,7 @@ export function mapGmailMessage(message: GmailMessage, account: EmailAccount) {
     folder: isSent ? "sent" : isInbox ? "inbox" : "archive",
     raw_metadata: { labelIds: message.labelIds ?? [] },
     archived_at: isInbox || isSent ? null : new Date().toISOString(),
+    _attachments: collectAttachments(message.payload),
   };
 }
 
@@ -263,13 +279,38 @@ export async function syncGmailMessages(
     rows.push(mapGmailMessage(message, account));
   }
 
+  const messageRows = rows.map((row) => {
+    const { _attachments: attachments, ...messageRow } = row;
+    void attachments;
+    return messageRow;
+  });
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from("email_messages")
-    .upsert(rows, { onConflict: "account_id,provider_message_id" })
-    .select("id, provider_message_id, subject, from_email, body_text, snippet, empresa_id");
+    .upsert(messageRows, { onConflict: "account_id,provider_message_id" })
+    .select("id, provider_message_id, subject, from_email, from_name, body_text, snippet, empresa_id, user_id, direction, is_read, has_attachments, received_at");
 
   if (error) throw error;
+
+  const attachmentsByMessage = new Map(rows.map((row) => [row.provider_message_id, row._attachments ?? []]));
+  const attachmentRows = ((data ?? []) as Array<{ id: number; provider_message_id: string }>).flatMap((message) =>
+    (attachmentsByMessage.get(message.provider_message_id) ?? []).map((attachment) => ({
+      empresa_id: account.empresa_id,
+      user_id: account.user_id,
+      email_message_id: message.id,
+      filename: attachment.filename,
+      mime_type: attachment.mime_type ?? null,
+      size_bytes: attachment.size_bytes ?? null,
+      provider_attachment_id: attachment.provider_attachment_id ?? null,
+      document_type: classifyAttachment(attachment.filename, attachment.mime_type),
+    }))
+  );
+
+  if (attachmentRows.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from("email_attachments").upsert(attachmentRows);
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase as any)

@@ -8,7 +8,7 @@ export default async function EmailPage() {
   if (!currentUser) return null;
 
   const supabase = await createClient();
-  const [{ data: accounts }, { data: messages }, { data: links }, { data: templates }] = await Promise.all([
+  const [{ data: accounts }, { data: messages }, { data: links }, { data: templates }, { data: alerts }, { data: attachments }] = await Promise.all([
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
       .from("email_accounts")
@@ -18,9 +18,10 @@ export default async function EmailPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
       .from("email_messages")
-      .select("id,account_id,provider_thread_id,from_email,from_name,to_emails,subject,snippet,body_text,received_at,sent_at,is_read,has_attachments,direction,folder")
+      .select("id,account_id,provider_thread_id,from_email,from_name,to_emails,subject,snippet,body_text,received_at,sent_at,is_read,has_attachments,direction,folder,commercial_priority,commercial_bucket,intent,urgency,needs_response,response_due_at,responded_at,portal_source")
       .eq("user_id", currentUser.id)
       .is("archived_at", null)
+      .order("commercial_priority", { ascending: false })
       .order("received_at", { ascending: false, nullsFirst: false })
       .order("sent_at", { ascending: false, nullsFirst: false })
       .limit(100),
@@ -33,6 +34,18 @@ export default async function EmailPage() {
       .from("email_templates")
       .select("id,name,subject,body_text,category")
       .order("category"),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from("email_alerts")
+      .select("id,email_message_id,alert_type,title,severity,due_at,status")
+      .eq("user_id", currentUser.id)
+      .eq("status", "open")
+      .order("due_at", { ascending: true }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from("email_attachments")
+      .select("id,email_message_id,filename,mime_type,document_type,storage_path")
+      .eq("user_id", currentUser.id),
   ]);
 
   return (
@@ -46,6 +59,8 @@ export default async function EmailPage() {
         messages={messages ?? []}
         links={links ?? []}
         templates={templates ?? []}
+        alerts={alerts ?? []}
+        attachments={attachments ?? []}
       />
     </>
   );

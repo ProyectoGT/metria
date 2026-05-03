@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { createClient } from "@/lib/supabase";
-import { getValidAccessToken, modifyGmailMessage, type EmailAccount } from "@/lib/email/gmail";
+import { type EmailAccount } from "@/lib/email/gmail";
+import { getEmailProviderAdapter } from "@/lib/email/providers";
 
 export async function PATCH(
   request: NextRequest,
@@ -37,10 +38,11 @@ export async function PATCH(
 
   if (!account) return NextResponse.json({ error: "account_not_found" }, { status: 404 });
 
-  const token = await getValidAccessToken(supabase, account as EmailAccount);
+  const adapter = getEmailProviderAdapter(account.provider);
+  const token = await adapter.getValidAccessToken(supabase, account as EmailAccount);
   if (!token) return NextResponse.json({ error: "reauth_required" }, { status: 401 });
 
-  await modifyGmailMessage(token, message.provider_message_id, action);
+  await adapter.modifyMessage(token, message.provider_message_id, action);
 
   const patch =
     action === "read" ? { is_read: true }

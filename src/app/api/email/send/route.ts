@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { createClient } from "@/lib/supabase";
-import { getValidAccessToken, sendGmailMessage, type EmailAccount } from "@/lib/email/gmail";
+import { type EmailAccount } from "@/lib/email/gmail";
 import { linkEmailMessageToEntities } from "@/lib/email/linking";
+import { getEmailProviderAdapter } from "@/lib/email/providers";
 
 export async function POST(request: NextRequest) {
   const currentUser = await getCurrentUserContext();
@@ -30,10 +31,11 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (!account) return NextResponse.json({ error: "gmail_not_connected" }, { status: 401 });
-  const token = await getValidAccessToken(supabase, account as EmailAccount);
+  const adapter = getEmailProviderAdapter(account.provider);
+  const token = await adapter.getValidAccessToken(supabase, account as EmailAccount);
   if (!token) return NextResponse.json({ error: "reauth_required" }, { status: 401 });
 
-  const sent = await sendGmailMessage(token, {
+  const sent = await adapter.sendMessage(token, {
     from: account.email,
     to,
     subject,

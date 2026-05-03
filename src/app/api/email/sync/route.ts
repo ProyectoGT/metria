@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { createClient } from "@/lib/supabase";
-import { getValidAccessToken, syncGmailMessages, type EmailAccount } from "@/lib/email/gmail";
+import { type EmailAccount } from "@/lib/email/gmail";
 import { linkEmailMessageToEntities } from "@/lib/email/linking";
+import { createClientNoReplyAlerts, enrichCommercialEmail } from "@/lib/email/commercial";
+import { getEmailProviderAdapter } from "@/lib/email/providers";
 
 export async function POST() {
   const currentUser = await getCurrentUserContext();
@@ -25,20 +27,35 @@ export async function POST() {
   }
 
   try {
-    const token = await getValidAccessToken(supabase, account as EmailAccount);
+    const adapter = getEmailProviderAdapter(account.provider);
+    const token = await adapter.getValidAccessToken(supabase, account as EmailAccount);
     if (!token) return NextResponse.json({ error: "reauth_required" }, { status: 401 });
 
-    const inbox = await syncGmailMessages(supabase, account as EmailAccount, token, "inbox", 30);
-    const sent = await syncGmailMessages(supabase, account as EmailAccount, token, "sent", 20);
-    const messages = [...(inbox.messages ?? []), ...(sent.messages ?? [])];
+    const synced = await adapter.syncMessages(supabase, account as EmailAccount, token);
+    const messages = (synced.messages ?? []) as Array<{
+      id: number;
+      empresa_id: number | null;
+      user_id: number;
+      subject?: string | null;
+      from_email?: string | null;
+      from_name?: string | null;
+      body_text?: string | null;
+      snippet?: string | null;
+      direction?: "inbound" | "outbound";
+      is_read?: boolean;
+      has_attachments?: boolean;
+      received_at?: string | null;
+    }>;
 
     let linked = 0;
     for (const message of messages) {
       const result = await linkEmailMessageToEntities(supabase, message);
       linked += result.linked;
+      await enrichCommercialEmail(supabase, message);
     }
+    await createClientNoReplyAlerts(supabase, currentUser.id);
 
-    return NextResponse.json({ synced: inbox.synced + sent.synced, linked });
+    return NextResponse.json({ synced: synced.synced, linked });
   } catch (error) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase as any)
