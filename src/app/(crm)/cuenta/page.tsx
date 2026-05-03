@@ -4,6 +4,7 @@ import { getCurrentUserContext } from "@/lib/current-user";
 import { createClient } from "@/lib/supabase";
 import SecuritySettingsForm from "./security-settings-form";
 import AccountProfileCard from "@/components/cuenta/AccountProfileCard";
+import EmailConnectionCard from "@/components/email/EmailConnectionCard";
 
 export default async function CuentaPage() {
   const supabase = await createClient();
@@ -58,6 +59,15 @@ export default async function CuentaPage() {
   const fullName = `${user.nombre} ${user.apellidos}`.trim();
   const avatarUrl =
     (authUser.user_metadata?.avatar_url as string | undefined) ?? null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: emailAccount } = await (supabase as any)
+    .from("email_accounts")
+    .select("email,status,last_sync_at,last_error")
+    .eq("user_id", user.id)
+    .eq("provider", "gmail")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   return (
     <>
@@ -79,6 +89,13 @@ export default async function CuentaPage() {
           email={user.email ?? authUser.email ?? ""}
           rol={user.role}
           initialAvatarUrl={avatarUrl}
+        />
+
+        <EmailConnectionCard
+          email={emailAccount?.email ?? null}
+          status={emailAccount?.status ?? "not_connected"}
+          lastSyncAt={emailAccount?.last_sync_at ?? null}
+          lastError={emailAccount?.last_error ?? null}
         />
 
         {isAdmin && (

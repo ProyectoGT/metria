@@ -19,6 +19,7 @@ import {
   Sun,
   Users,
   BookUser,
+  Mail,
   X,
 } from "lucide-react";
 
@@ -29,6 +30,7 @@ const MAIN_NAV = [
   { label: "Zona",           href: "/zona",        icon: MapPin },
   { label: "Solicitudes",    href: "/solicitudes", icon: ClipboardList },
   { label: "Contactos",      href: "/contactos",   icon: BookUser },
+  { label: "Email",          href: "/email",        icon: Mail },
 ];
 
 const TOOLS_NAV = [

@@ -1,21 +1,23 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
-import { Calendar, Clock } from "lucide-react";
+import { Calendar, Clock, Plus, X } from "lucide-react";
 import KanbanColumn from "./KanbanColumn";
 import KanbanAddCard from "./KanbanAddCard";
 import KanbanEditCard from "./KanbanEditCard";
 import type { KanbanData, KanbanColumnData, KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import type { UserRole } from "@/lib/roles";
 import {
+  addKanbanColumnAction,
   completeAgendaAction,
   completeTareaAction,
   convertAgendaToTareaAction,
   convertTareaToAgendaAction,
   createAgendaAction,
   createTareaAction,
+  deleteKanbanColumnAction,
   deleteTareaAction,
   updateAgendaAction,
   updateTareaAction,
@@ -34,12 +36,21 @@ type KanbanBoardProps = {
 
 export default function KanbanBoard({
   initialData,
+  customColumns = [],
   role,
   currentUserId: _currentUserId,
   agents = [],
 }: KanbanBoardProps) {
   const router = useRouter();
-  const [columns, setColumns] = useState<KanbanColumnData[]>(initialData.columns);
+  const [columns, setColumns] = useState<KanbanColumnData[]>(() => {
+    const custom: KanbanColumnData[] = customColumns.map((c) => ({
+      id: c.id,
+      title: c.title,
+      cards: [],
+      fixed: false,
+    }));
+    return [...initialData.columns, ...custom];
+  });
   const [addingCardCol, setAddingCardCol] = useState<string | null>(null);
   const [editingCard, setEditingCard] = useState<{ columnId: string; card: KanbanCardData } | null>(null);
   const [resultadoModal, setResultadoModal] = useState<{ columnId: string; cardId: string; titulo: string } | null>(null);
@@ -53,6 +64,9 @@ export default function KanbanBoard({
   } | null>(null);
   const [convertDate, setConvertDate] = useState(localDateKey());
   const [convertTime, setConvertTime] = useState(DEFAULT_ACTIVITY_TIME);
+  const [addingColumn, setAddingColumn] = useState(false);
+  const [newColTitle, setNewColTitle] = useState("");
+  const newColInputRef = useRef<HTMLInputElement>(null);
 
   function findCard(columnId: string, cardId: string) {
     return columns.find((c) => c.id === columnId)?.cards.find((c) => c.id === cardId) ?? null;
@@ -119,6 +133,32 @@ export default function KanbanBoard({
       time: convertTime,
       assignedUserIds: card.assignedUserIds,
     }).then(() => router.refresh()).catch(() => router.refresh());
+  }
+
+  function handleDeleteColumn(columnId: string) {
+    setColumns((prev) => prev.filter((c) => c.id !== columnId));
+    deleteKanbanColumnAction(columnId).catch(() => {});
+  }
+
+  function handleStartAddColumn() {
+    setNewColTitle("");
+    setAddingColumn(true);
+    setTimeout(() => newColInputRef.current?.focus(), 50);
+  }
+
+  async function handleConfirmAddColumn() {
+    const title = newColTitle.trim();
+    if (!title) { setAddingColumn(false); return; }
+    const id = `custom-${Date.now()}`;
+    const orden = columns.length;
+    setColumns((prev) => [...prev, { id, title, cards: [], fixed: false }]);
+    setAddingColumn(false);
+    setNewColTitle("");
+    try {
+      await addKanbanColumnAction({ col_id: id, titulo: title, orden });
+    } catch {
+      // La columna ya se añadió localmente; el error no bloquea la UX
+    }
   }
 
   const handleAddCard = useCallback(async (columnId: string, newCard: NewKanbanCard) => {
@@ -260,13 +300,56 @@ export default function KanbanBoard({
               column={column}
               role={role}
               currentUserId={_currentUserId}
-              onDeleteColumn={() => {}}
+              onDeleteColumn={handleDeleteColumn}
               onAddCard={(colId) => setAddingCardCol(colId)}
               onDeleteCard={handleDeleteCard}
               onEditCard={handleOpenEdit}
               onCompleteCard={handleCompleteCard}
             />
           ))}
+
+          {/* Añadir columna */}
+          {addingColumn ? (
+            <div className="flex w-[280px] shrink-0 flex-col gap-2 rounded-2xl border border-dashed border-border bg-surface p-3">
+              <input
+                ref={newColInputRef}
+                type="text"
+                value={newColTitle}
+                onChange={(e) => setNewColTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleConfirmAddColumn();
+                  if (e.key === "Escape") setAddingColumn(false);
+                }}
+                placeholder="Nombre de la columna..."
+                className="input text-sm"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleConfirmAddColumn}
+                  className="flex-1 rounded-xl bg-primary px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-primary-dark"
+                >
+                  Añadir
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddingColumn(false)}
+                  className="rounded-xl border border-border px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-raised"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleStartAddColumn}
+              className="flex h-fit w-[280px] shrink-0 items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface/50 px-4 py-6 text-sm font-medium text-text-secondary transition-all hover:border-primary/40 hover:bg-surface hover:text-primary"
+            >
+              <Plus className="h-4 w-4" />
+              Nueva columna
+            </button>
+          )}
         </div>
       </DragDropContext>
 

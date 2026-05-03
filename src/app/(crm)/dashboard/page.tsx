@@ -17,7 +17,7 @@ import {
 } from "@/lib/mock/dashboard";
 import DashboardWorkspace from "@/components/dashboard/DashboardWorkspace";
 import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
-import { combineLocalDateTime, localDateKey, normalizeTime } from "@/lib/local-date-time";
+import { combineLocalDateTime, formatLocalDateEs, localDateKey, normalizeTime } from "@/lib/local-date-time";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -43,6 +43,7 @@ export default async function DashboardPage() {
   const userId = yo?.id ?? 0;
   const fullName = yo ? `${yo.nombre} ${yo.apellidos}`.trim() : "Usuario";
   const anioActual = new Date().getFullYear();
+  const currentDateLabel = formatLocalDateEs(localDateKey());
   const periodRange = getPeriodRange(anioActual, 0);
   const nextBestActions = await getNextBestActions(yo);
   const pipelineSuggestions = yo ? await generateAndFetchSuggestions(yo) : [];
@@ -497,7 +498,7 @@ export default async function DashboardPage() {
       role={role}
       userName={userName}
       currentUserId={userId}
-      summary={{ ...summary, contactos: contactosCount ?? 0 }}
+      summary={summary}
       listings={listings}
       nextBestActions={nextBestActions}
       pipelineSuggestions={pipelineSuggestions}
@@ -514,6 +515,7 @@ export default async function DashboardPage() {
       encargosMap={encargosMap}
       empresaId={yo?.empresaId ?? null}
       fullName={fullName}
+      currentDateLabel={currentDateLabel}
       agenteMesData={agenteMesData}
     />
   );

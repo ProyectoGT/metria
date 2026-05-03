@@ -27,6 +27,7 @@ type Props = {
   totalNoticias: number;
   canManageObjectives: boolean;
   defaultAnio: number;
+  defaultMes: number;
   role: string;
 };
 
@@ -99,6 +100,7 @@ export default function DesarrolloClient({
   totalNoticias,
   canManageObjectives,
   defaultAnio,
+  defaultMes,
   role,
 }: Props) {
   const canSeeFacturado = role === "Administrador" || role === "Director";
@@ -106,12 +108,12 @@ export default function DesarrolloClient({
   const supabase = useMemo(() => createClient(), []);
 
   const [anio, setAnio] = useState(defaultAnio);
-  const [mes, setMes] = useState(0);
+  const [mes, setMes] = useState(defaultMes);
   const [statsMap, setStatsMap] = useState<Record<number, RendimientoPeriodo>>(() =>
     Object.fromEntries(
       agentes.map((a) => [
         a.id,
-        a.rendimiento ?? defaultRendimiento(a.id, defaultAnio, 0),
+        a.rendimiento ?? defaultRendimiento(a.id, defaultAnio, defaultMes),
       ]),
     ),
   );

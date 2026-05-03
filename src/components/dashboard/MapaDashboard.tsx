@@ -158,60 +158,15 @@ export default function MapaDashboard({
   ];
 
   return (
-    <section className="flex h-full min-h-[360px] w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-sm xl:min-h-[420px]">
-      {/* Header con título y leyenda */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-border">
-        <div>
-          <h2 className="font-semibold text-text-primary">Mapa de propiedades</h2>
-          <p className="text-xs text-text-secondary mt-0.5">
-            Noticias y encargos con ubicacion registrada.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-4 text-xs text-text-secondary">
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block h-3 w-3 rounded-sm bg-gray-900 dark:bg-gray-100" />
-            Oficina
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block h-3 w-3 rounded-full bg-blue-500" />
-            Noticia
-            {noticias.length > 0 && (
-              <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
-                {noticias.length}
-              </span>
-            )}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block h-3 w-3 rounded-full bg-green-500" />
-            Encargo
-            {encargos.length > 0 && (
-              <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">
-                {encargos.length}
-              </span>
-            )}
-          </span>
-          {ZONA_POLIGONOS.map((z) => (
-            <span key={z.id} className="flex items-center gap-1.5">
-              <span
-                className="inline-block h-3 w-3 rounded-sm opacity-70"
-                style={{ background: z.color }}
-              />
-              {z.nombre}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Mapa */}
-      <div className="min-h-[280px] flex-1">
-        <APIProvider apiKey={apiKey}>
-          <Map
-            defaultCenter={OFICINA}
-            defaultZoom={13}
-            gestureHandling="greedy"
-            mapId="metria-dashboard-map"
-            style={{ width: "100%", height: "100%" }}
-          >
+    <div className="h-full w-full" style={{ minHeight: 380 }}>
+      <APIProvider apiKey={apiKey}>
+        <Map
+          defaultCenter={OFICINA}
+          defaultZoom={13}
+          gestureHandling="greedy"
+          mapId="metria-dashboard-map"
+          style={{ width: "100%", height: "100%" }}
+        >
             <MapLocationInit points={allPoints} />
 
             {/* Polígonos de zonas */}
@@ -354,7 +309,6 @@ export default function MapaDashboard({
             )}
           </Map>
         </APIProvider>
-      </div>
-    </section>
+    </div>
   );
 }
