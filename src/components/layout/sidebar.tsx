@@ -17,11 +17,20 @@ import {
   Moon,
   Network,
   Sun,
+  Circle,
   Users,
   BookUser,
   Mail,
   X,
 } from "lucide-react";
+
+type Theme = "light" | "dark" | "dark-black";
+
+const THEMES: { value: Theme; label: string; icon: React.ElementType }[] = [
+  { value: "light",      label: "Claro",  icon: Sun },
+  { value: "dark",       label: "Oscuro", icon: Moon },
+  { value: "dark-black", label: "Negro",  icon: Circle },
+];
 
 // ─── Grupos de navegación ─────────────────────────────────────────────────────
 
@@ -99,9 +108,11 @@ interface Props {
 export default function Sidebar({ userRole: _userRole }: Props) {
   const pathname = usePathname();
 
-  const [dark, setDark] = useState(() =>
-    typeof document !== "undefined" && document.documentElement.classList.contains("dark")
-  );
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof document === "undefined") return "dark";
+    const saved = localStorage.getItem("metria-theme") as Theme | null;
+    return saved ?? "dark";
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const userRole = _userRole ? normalizeUserRole(_userRole) : null;
@@ -122,11 +133,13 @@ export default function Sidebar({ userRole: _userRole }: Props) {
     return () => window.cancelAnimationFrame(id);
   }, [pathname]);
 
-  function toggleTheme() {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("metria-theme", next ? "dark" : "light");
+  function applyTheme(t: Theme) {
+    const el = document.documentElement;
+    el.classList.remove("dark", "dark-black");
+    if (t === "dark")       el.classList.add("dark");
+    if (t === "dark-black") el.classList.add("dark", "dark-black");
+    localStorage.setItem("metria-theme", t);
+    setTheme(t);
   }
 
   function isActive(href: string) {
@@ -188,20 +201,30 @@ export default function Sidebar({ userRole: _userRole }: Props) {
         </div>
       </nav>
 
-      {/* ── Footer: tema + versión ────────────────────────────────── */}
+      {/* ── Footer: selector de tema ─────────────────────────────── */}
       <div className="shrink-0 border-t border-border/60 px-3 py-3">
-        <button
-          onClick={toggleTheme}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-text-secondary transition-all hover:bg-sidebar-hover hover:text-text-primary"
-        >
-          {dark ? (
-            <Sun className="h-[18px] w-[18px] shrink-0" />
-          ) : (
-            <Moon className="h-[18px] w-[18px] shrink-0" />
-          )}
-          <span>{dark ? "Modo claro" : "Modo oscuro"}</span>
-          <span className="ml-auto text-[10px] font-medium text-text-secondary/40">v1.0</span>
-        </button>
+        <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-text-secondary/50">
+          Tema
+        </p>
+        <div className="flex gap-1 rounded-xl bg-muted p-1">
+          {THEMES.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => applyTheme(value)}
+              title={label}
+              className={[
+                "flex flex-1 flex-col items-center gap-1 rounded-lg py-2 text-[11px] font-medium transition-all duration-150",
+                theme === value
+                  ? "bg-surface text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary",
+              ].join(" ")}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-center text-[10px] text-text-secondary/40">v1.0</p>
       </div>
     </div>
   );

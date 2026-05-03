@@ -126,6 +126,45 @@ html.dark body {
     linear-gradient(180deg, #111c31 0%, var(--color-background) 24rem);
 }
 
+/* ── Dark-black — true black, fondo puro ──────────────────────────────── */
+html.dark.dark-black {
+  color-scheme: dark;
+  --color-primary:        #60a5fa;
+  --color-primary-light:  #93c5fd;
+  --color-primary-dark:   #3b82f6;
+  --color-secondary:      #6b7280;
+  --color-accent:         #fbbf24;
+  --color-success:        #4ade80;
+  --color-danger:         #f87171;
+  --color-warning:        #fbbf24;
+  --color-background:     #000000;
+  --color-surface:        #0c0c0c;
+  --color-surface-raised: #141414;
+  --color-sidebar:        #050505;
+  --color-sidebar-hover:  #121212;
+  --color-sidebar-logo:   #000000;
+  --color-text-primary:   #e5e5e5;
+  --color-text-secondary: #767676;
+  --color-border:         #1e1e1e;
+  --color-muted:          #0a0a0a;
+}
+
+html.dark.dark-black body {
+  /* Sin gradiente azul, fondo negro puro */
+  background: #000000;
+}
+
+html.dark.dark-black .shadow-sm {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+html.dark.dark-black .shadow-md {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+}
+html.dark.dark-black .shadow-lg,
+html.dark.dark-black .shadow-xl {
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.75);
+}
+
 body {
   background:
     radial-gradient(circle at 24% -12%, rgba(37, 99, 235, 0.05), transparent 30rem),

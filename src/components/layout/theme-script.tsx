@@ -1,16 +1,23 @@
-"use client";
-
-import { useEffect } from "react";
-
+// Server Component — se renderiza como <script> inline para aplicar el tema
+// de forma SÍNCRONA antes de que el navegador pinte, evitando cualquier flash.
 export default function ThemeScript() {
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("metria-theme");
-    if (savedTheme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
+  return (
+    <script
+      dangerouslySetInnerHTML={{
+        __html: `(function(){
+  try {
+    var t = localStorage.getItem('metria-theme') || 'dark';
+    var el = document.documentElement;
+    el.classList.remove('dark', 'dark-black');
+    if (t === 'dark') {
+      el.classList.add('dark');
+    } else if (t === 'dark-black') {
+      el.classList.add('dark', 'dark-black');
     }
-  }, []);
-
-  return null;
+    // 'light': sin clases adicionales
+  } catch(e) {}
+})();`,
+      }}
+    />
+  );
 }
