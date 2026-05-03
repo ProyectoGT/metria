@@ -725,13 +725,18 @@ export type Database = {
       propiedades: {
         Row: {
           agente_asignado: number | null
+          calidad_ficha_score: number
           contactado: boolean
           contactado_hasta: string | null
           created_at: string
+          descripcion: string | null
           empresa_id: number | null
           equipo_id: number | null
           estado: string | null
+          estado_publicacion_web: string
+          faltantes_ficha: unknown[]
           fecha_visita: string | null
+          ficha_completa: boolean
           finca_id: number | null
           honorarios: number | null
           id: number
@@ -741,20 +746,36 @@ export type Database = {
           owner_user_id: number | null
           planta: string | null
           posicion: number | null
+          precio: number | null
           propietario: string | null
+          publicar_en_web: boolean
           puerta: string | null
           telefono: string | null
+          tipo_operacion: string | null
+          titulo: string | null
+          updated_at: string | null
           visibility: string
+          web_descripcion: string | null
+          web_destacada: boolean
+          web_error_sync: string | null
+          web_precio_visible: boolean
+          web_titulo: string | null
+          web_ultima_sincronizacion: string | null
         }
         Insert: {
           agente_asignado?: number | null
+          calidad_ficha_score?: number
           contactado?: boolean
           contactado_hasta?: string | null
           created_at?: string
+          descripcion?: string | null
           empresa_id?: number | null
           equipo_id?: number | null
           estado?: string | null
+          estado_publicacion_web?: string
+          faltantes_ficha?: unknown[]
           fecha_visita?: string | null
+          ficha_completa?: boolean
           finca_id?: number | null
           honorarios?: number | null
           id?: number
@@ -764,20 +785,36 @@ export type Database = {
           owner_user_id?: number | null
           planta?: string | null
           posicion?: number | null
+          precio?: number | null
           propietario?: string | null
+          publicar_en_web?: boolean
           puerta?: string | null
           telefono?: string | null
+          tipo_operacion?: string | null
+          titulo?: string | null
+          updated_at?: string | null
           visibility?: string
+          web_descripcion?: string | null
+          web_destacada?: boolean
+          web_error_sync?: string | null
+          web_precio_visible?: boolean
+          web_titulo?: string | null
+          web_ultima_sincronizacion?: string | null
         }
         Update: {
           agente_asignado?: number | null
+          calidad_ficha_score?: number
           contactado?: boolean
           contactado_hasta?: string | null
           created_at?: string
+          descripcion?: string | null
           empresa_id?: number | null
           equipo_id?: number | null
           estado?: string | null
+          estado_publicacion_web?: string
+          faltantes_ficha?: unknown[]
           fecha_visita?: string | null
+          ficha_completa?: boolean
           finca_id?: number | null
           honorarios?: number | null
           id?: number
@@ -787,10 +824,21 @@ export type Database = {
           owner_user_id?: number | null
           planta?: string | null
           posicion?: number | null
+          precio?: number | null
           propietario?: string | null
+          publicar_en_web?: boolean
           puerta?: string | null
           telefono?: string | null
+          tipo_operacion?: string | null
+          titulo?: string | null
+          updated_at?: string | null
           visibility?: string
+          web_descripcion?: string | null
+          web_destacada?: boolean
+          web_error_sync?: string | null
+          web_precio_visible?: boolean
+          web_titulo?: string | null
+          web_ultima_sincronizacion?: string | null
         }
         Relationships: [
           {

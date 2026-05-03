@@ -20,6 +20,7 @@ import {
   Circle,
   Users,
   BookUser,
+  Building2,
   Mail,
   X,
 } from "lucide-react";
@@ -35,11 +36,12 @@ const THEMES: { value: Theme; label: string; icon: React.ElementType }[] = [
 // ─── Grupos de navegación ─────────────────────────────────────────────────────
 
 const MAIN_NAV = [
-  { label: "Dashboard",      href: "/dashboard",  icon: LayoutDashboard },
-  { label: "Zona",           href: "/zona",        icon: MapPin },
-  { label: "Solicitudes",    href: "/solicitudes", icon: ClipboardList },
-  { label: "Contactos",      href: "/contactos",   icon: BookUser },
-  { label: "Email",          href: "/email",        icon: Mail },
+  { label: "Dashboard",      href: "/dashboard",    icon: LayoutDashboard },
+  { label: "Zona",           href: "/zona",          icon: MapPin },
+  { label: "Propiedades",    href: "/propiedades",   icon: Building2 },
+  { label: "Solicitudes",    href: "/solicitudes",   icon: ClipboardList },
+  { label: "Contactos",      href: "/contactos",     icon: BookUser },
+  { label: "Email",          href: "/email",          icon: Mail },
 ];
 
 const TOOLS_NAV = [
