@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Network } from "lucide-react";
 import PageHeader from "@/components/layout/page-header";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { canManageUsers, canCreateUsers, USER_ROLES } from "@/lib/roles";
@@ -44,10 +46,19 @@ export default async function UsuariosPage() {
 
   return (
     <>
-      <PageHeader
-        title="Usuarios"
-        description="Gestion de accesos y rangos del equipo."
-      />
+      <div className="mb-6 flex items-start justify-between gap-4 md:mb-8">
+        <div>
+          <h1 className="text-xl font-semibold text-text-primary md:text-2xl">Usuarios</h1>
+          <p className="mt-1 text-sm text-text-secondary">Gestion de accesos y rangos del equipo.</p>
+        </div>
+        <Link
+          href="/empresa/organigrama"
+          className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+        >
+          <Network className="h-4 w-4" />
+          Ver organigrama
+        </Link>
+      </div>
       <UsersManagementPanel
         users={users}
         roles={USER_ROLES}

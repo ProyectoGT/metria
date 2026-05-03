@@ -15,6 +15,7 @@ import {
   FileText,
   LifeBuoy,
   Moon,
+  Network,
   Sun,
   Users,
   BookUser,
@@ -44,9 +45,17 @@ export default function Sidebar({ userRole: _userRole }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const userRole = _userRole ? normalizeUserRole(_userRole) : null;
-  const navItems = canManageUsers(userRole ?? "Agente")
-    ? [...baseNavItems, { label: "Usuarios", href: "/usuarios", icon: Users }]
-    : baseNavItems;
+  const canSeeUsers = canManageUsers(userRole ?? "Agente");
+  const canSeeOrganigrama =
+    userRole === "Administrador" ||
+    userRole === "Director" ||
+    userRole === "Responsable";
+
+  const navItems = [
+    ...baseNavItems,
+    ...(canSeeUsers ? [{ label: "Usuarios", href: "/usuarios", icon: Users }] : []),
+    ...(canSeeOrganigrama ? [{ label: "Organigrama", href: "/empresa/organigrama", icon: Network }] : []),
+  ];
 
   // Escuchar evento del botón hamburger en el header
   useEffect(() => {
