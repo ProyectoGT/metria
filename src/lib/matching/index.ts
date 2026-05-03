@@ -178,7 +178,8 @@ export function calculatePropertyMatches(
   const limit = options.limit ?? 10;
   return propiedades
     .map((propiedad) => calculatePropertyMatchScore(pedido, propiedad))
-    .filter((match) => match.score >= minScore)
+    // score=0 significa "propiedad no disponible" — siempre excluir
+    .filter((match) => match.score > 0 && match.score >= minScore)
     .sort((a, b) => b.score - a.score || a.propiedad.id - b.propiedad.id)
     .slice(0, limit);
 }
