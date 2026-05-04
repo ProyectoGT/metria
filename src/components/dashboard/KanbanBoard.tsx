@@ -66,6 +66,7 @@ export default function KanbanBoard({
 
     const moved = findCard(source.droppableId, draggableId);
     if (!moved) return;
+    if (moved.source === "agenda" && destination.droppableId === "pendientes" && moved.gcalEventId) return;
 
     // Tarea → Orden del dia: pedir fecha/hora antes de convertir
     if (moved.source === "tarea" && destination.droppableId === "en_progreso") {

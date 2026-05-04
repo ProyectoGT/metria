@@ -69,6 +69,7 @@ export type KanbanCardData = {
   resultado?: string | null;
   isCompleted?: boolean;
   fromOrdenDia?: boolean;
+  gcalEventId?: string | null;
 };
 
 export type KanbanColumnData = {

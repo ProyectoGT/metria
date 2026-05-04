@@ -4,7 +4,6 @@ import { getCurrentUserContext } from "@/lib/current-user";
 import { canViewAllAgents, canViewSupervisedAgents } from "@/lib/roles";
 import { formatLocalDateEs, localDateKey } from "@/lib/local-date-time";
 import { normalizeAgendaEvent } from "@/lib/agenda/normalize-agenda-event";
-import { getMadridTodayRangeUtc } from "@/lib/dates/timezone";
 import PageHeader from "@/components/layout/page-header";
 import OrdenesClient from "./ordenes-client";
 
@@ -17,7 +16,6 @@ export default async function OrdenesPage() {
   }
 
   const today = localDateKey();
-  const todayRange = getMadridTodayRangeUtc();
   const allowedUserIds = canViewAllAgents(yo.role)
     ? null
     : canViewSupervisedAgents(yo.role)
@@ -56,6 +54,11 @@ export default async function OrdenesPage() {
   }
 
   type Actividad = {
+    id: number;
+    priority?: string | null;
+    tipo?: string | null;
+    completed?: boolean | null;
+    result?: string | null;
     owner_user_id: number | null;
     user_id?: number | null;
     event_date?: string | null;
@@ -92,6 +95,16 @@ export default async function OrdenesPage() {
         description={`Actividades de hoy - ${formatLocalDateEs(today)}`}
       />
       <OrdenesClient
+        key={JSON.stringify(actividades.map((actividad) => ({
+          id: actividad.id,
+          description: actividad.description,
+          time: actividad.time,
+          priority: actividad.priority,
+          tipo: actividad.tipo,
+          completed: actividad.completed,
+          result: actividad.result,
+          assigned: actividad.agenda_usuarios?.map((u) => u.usuario_id),
+        })))}
         initialActividades={actividades as Parameters<typeof OrdenesClient>[0]["initialActividades"]}
         currentUserId={yo.id}
         currentUserRole={yo.role}

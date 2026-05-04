@@ -23,7 +23,6 @@ import MapaDashboardLazy from "@/components/dashboard/MapaDashboardLazy";
 import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
 import { combineLocalDateTime, localDateKey, normalizeTime } from "@/lib/local-date-time";
 import { normalizeAgendaEvent } from "@/lib/agenda/normalize-agenda-event";
-import { getMadridTodayRangeUtc } from "@/lib/dates/timezone";
 import { normalizeActivityType } from "@/lib/activity-options";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -71,7 +70,6 @@ export default async function DashboardPage() {
   const anioActual = new Date().getFullYear();
   const periodRange = getPeriodRange(anioActual, 0);
   const today = localDateKey();
-  const todayRange = getMadridTodayRangeUtc();
 
   const isManager = role === "Administrador" || role === "Director";
 
@@ -434,7 +432,7 @@ export default async function DashboardPage() {
     };
   });
   const myTareas = tareas.filter((t) => assignedIdsFromRows(t.tarea_usuarios).includes(userId) || t.owner_user_id === userId);
-  const myAgendaHoy = agendaHoy.filter((a) => a.owner_user_id === userId || a.user_id === userId);
+  const myAgendaHoy = agendaHoy.filter((a) => assignedIdsFromRows(a.agenda_usuarios).includes(userId) || a.owner_user_id === userId || a.user_id === userId);
 
   function toCard(t: TareaDbRow) {
     return {
@@ -470,6 +468,7 @@ export default async function DashboardPage() {
       resultado: a.result ?? null,
       isCompleted: a.completed,
       fromOrdenDia: true,
+      gcalEventId: a.gcal_event_id ?? null,
     };
   }
 
@@ -575,6 +574,19 @@ export default async function DashboardPage() {
           </p>
         </div>
         <KanbanBoard
+          key={JSON.stringify(kanbanData.columns.map((column) => ({
+            id: column.id,
+            cards: column.cards.map((card) => ({
+              id: card.id,
+              title: card.title,
+              priority: card.priority,
+              tipo: card.tipo,
+              dueDate: card.dueDate,
+              isCompleted: card.isCompleted,
+              assignedUserIds: card.assignedUserIds,
+              gcalEventId: card.gcalEventId,
+            })),
+          })))}
           initialData={kanbanData}
           customColumns={(kanbanColsData ?? []).map((c: { col_id: string; titulo: string }) => ({ id: c.col_id, title: c.titulo }))}
           role={role}

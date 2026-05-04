@@ -21,7 +21,8 @@ export default async function CalendarioPage() {
   let eventsQuery;
 
   if (role === "Administrador" || role === "Director") {
-    eventsQuery = supabase
+    const adminSupa = createAdminClient();
+    eventsQuery = adminSupa
       .from("agenda")
       .select("*, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
@@ -43,7 +44,6 @@ export default async function CalendarioPage() {
       .from("agenda")
       .select("*, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
-      .or(`owner_user_id.eq.${userId},user_id.eq.${userId}`)
       .order("event_date", { ascending: true });
     if (empresaId !== null) eventsQuery = eventsQuery.eq("empresa_id", empresaId);
   }

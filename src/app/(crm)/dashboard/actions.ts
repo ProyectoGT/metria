@@ -83,28 +83,94 @@ export async function updateAgendaAction(
     assignedUserIds?: number[];
   },
 ): Promise<void> {
-  const supabase = await createClient();
+  const yo = await getCurrentUserContext();
+  if (!yo) throw new Error("No autenticado");
+
+  const supabase = createAdminClient();
   const { data: existing, error: readError } = await supabase
     .from("agenda")
-    .select("description, event_date, time, priority, tipo, completed, result, agenda_usuarios(usuario_id)")
+    .select("id, description, event_date, time, priority, tipo, completed, result, user_id, owner_user_id, empresa_id, archived_at, agenda_usuarios(usuario_id)")
     .eq("id", id)
+    .is("archived_at", null)
     .single();
   if (readError) throw new Error(readError.message);
 
   const currentAssigned = ((existing as unknown as { agenda_usuarios?: { usuario_id: number }[] }).agenda_usuarios ?? [])
     .map((u) => u.usuario_id);
-  const { error } = await supabase.rpc("update_agenda_activity", {
-    p_agenda_id: id,
-    p_description: updates.description ?? existing.description,
-    p_event_date: normalizeDateKey(updates.eventDate ?? existing.event_date),
-    p_time: normalizeTime(updates.time ?? existing.time, DEFAULT_ACTIVITY_TIME),
-    p_priority: normalizeActivityPriority(updates.priority ?? existing.priority),
-    p_tipo: normalizeActivityType(updates.tipo ?? existing.tipo),
-    p_completed: updates.completed ?? existing.completed,
-    p_result: updates.result ?? existing.result ?? undefined,
-    p_assigned_user_ids: updates.assignedUserIds?.length ? updates.assignedUserIds : currentAssigned,
-  });
-  if (error) throw new Error(error.message);
+  const isSameCompany = yo.empresaId !== null && existing.empresa_id === yo.empresaId;
+  const isDirectManager = yo.role === "Administrador" || yo.role === "Director";
+  const canEdit =
+    isSameCompany && (
+      isDirectManager ||
+      existing.owner_user_id === yo.id ||
+      existing.user_id === yo.id ||
+      currentAssigned.includes(yo.id) ||
+      (yo.role === "Responsable" && [
+        yo.id,
+        ...yo.supervisedAgentIds,
+      ].some((allowedId) =>
+        allowedId === existing.owner_user_id ||
+        allowedId === existing.user_id ||
+        currentAssigned.includes(allowedId)
+      ))
+    );
+
+  if (!canEdit) throw new Error("Sin permisos para editar la actividad");
+
+  const fallbackAssigned = currentAssigned.length
+    ? currentAssigned
+    : [existing.user_id, existing.owner_user_id, yo.id].filter((value): value is number => value != null);
+  const candidateAssigned = updates.assignedUserIds?.length ? updates.assignedUserIds : fallbackAssigned;
+  const allowedAssigned = Array.from(new Set(candidateAssigned));
+
+  const { data: allowedUsers, error: usersError } = await supabase
+    .from("usuarios")
+    .select("id")
+    .eq("empresa_id", yo.empresaId ?? -1)
+    .in("id", allowedAssigned);
+  if (usersError) throw new Error(usersError.message);
+
+  const assignedUserIds = (allowedUsers ?? []).map((user) => user.id);
+  if (assignedUserIds.length === 0) throw new Error("Debe asignarse al menos un usuario");
+  if (yo.role === "Agente" && assignedUserIds.some((userId) => userId !== yo.id)) {
+    throw new Error("Sin permisos para asignar esta actividad");
+  }
+  if (yo.role === "Responsable") {
+    const allowed = new Set([yo.id, ...yo.supervisedAgentIds]);
+    if (assignedUserIds.some((userId) => !allowed.has(userId))) {
+      throw new Error("Sin permisos para asignar esta actividad");
+    }
+  }
+
+  const firstAssigned = assignedUserIds[0];
+  const { error: updateError } = await supabase
+    .from("agenda")
+    .update({
+      description: (updates.description ?? existing.description).trim(),
+      event_date: normalizeDateKey(updates.eventDate ?? existing.event_date),
+      time: normalizeTime(updates.time ?? existing.time, DEFAULT_ACTIVITY_TIME),
+      priority: normalizeActivityPriority(updates.priority ?? existing.priority),
+      tipo: normalizeActivityType(updates.tipo ?? existing.tipo),
+      completed: updates.completed ?? existing.completed,
+      result: (updates.result ?? existing.result)?.trim() || null,
+      user_id: firstAssigned,
+    })
+    .eq("id", id);
+  if (updateError) throw new Error(updateError.message);
+
+  const removedAssigned = currentAssigned.filter((userId) => !assignedUserIds.includes(userId));
+  await Promise.all(removedAssigned.map((userId) =>
+    supabase.from("agenda_usuarios").delete().eq("agenda_id", id).eq("usuario_id", userId)
+  ));
+
+  const { error: assignError } = await supabase
+    .from("agenda_usuarios")
+    .upsert(
+      assignedUserIds.map((usuario_id) => ({ agenda_id: id, usuario_id })),
+      { onConflict: "agenda_id,usuario_id" },
+    );
+  if (assignError) throw new Error(assignError.message);
+
   revalidatePath("/dashboard");
   revalidatePath("/ordenes");
   revalidatePath("/calendario");
