@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { canManageUsers, normalizeUserRole } from "@/lib/roles";
+import { canAccessContactos, canManageUsers, normalizeUserRole } from "@/lib/roles";
 import {
   LayoutDashboard,
   MapPin,
@@ -25,7 +25,6 @@ const baseNavItems = [
   { label: "Dashboard",      href: "/dashboard",  icon: LayoutDashboard },
   { label: "Zona",           href: "/zona",        icon: MapPin },
   { label: "Solicitudes",    href: "/solicitudes", icon: ClipboardList },
-  { label: "Contactos",      href: "/contactos",   icon: BookUser },
   { label: "Desarrollo",     href: "/desarrollo",  icon: TrendingUp },
   { label: "Calendario",     href: "/calendario",  icon: Calendar },
   { label: "Ordenes del dia",href: "/ordenes",     icon: FileText },
@@ -44,9 +43,13 @@ export default function Sidebar({ userRole: _userRole }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const userRole = _userRole ? normalizeUserRole(_userRole) : null;
-  const navItems = canManageUsers(userRole ?? "Agente")
-    ? [...baseNavItems, { label: "Usuarios", href: "/usuarios", icon: Users }]
-    : baseNavItems;
+  const role = userRole ?? "Agente";
+  const navItems = [
+    ...baseNavItems.slice(0, 3),
+    ...(canAccessContactos(role) ? [{ label: "Contactos", href: "/contactos", icon: BookUser }] : []),
+    ...baseNavItems.slice(3),
+    ...(canManageUsers(role) ? [{ label: "Usuarios", href: "/usuarios", icon: Users }] : []),
+  ];
 
   // Escuchar evento del botón hamburger en el header
   useEffect(() => {

@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUserContext } from "@/lib/current-user";
+import { canViewIdealistaLeads } from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
   const origin = new URL(request.url).origin;
+  const currentUser = await getCurrentUserContext();
+
+  if (!currentUser || !canViewIdealistaLeads(currentUser.role)) {
+    return NextResponse.redirect(`${origin}/dashboard`);
+  }
+
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");

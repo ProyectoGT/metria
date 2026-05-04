@@ -57,6 +57,14 @@ export function canManageConfirmationPassword(role: UserRole) {
   return role === "Administrador";
 }
 
+export function canAccessContactos(role: UserRole) {
+  return role === "Administrador";
+}
+
+export function canViewIdealistaLeads(role: UserRole) {
+  return role === "Administrador";
+}
+
 export function canManageUsers(role: UserRole) {
   return role === "Administrador" || role === "Director";
 }

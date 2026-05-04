@@ -8,12 +8,20 @@ type Tab = "solicitudes" | "idealista";
 type Props = {
   defaultTab: Tab;
   nuevosLeads: number;
+  showIdealista: boolean;
   solicitudesContent: React.ReactNode;
-  idealistaContent: React.ReactNode;
+  idealistaContent?: React.ReactNode;
 };
 
-export default function SolicitudesTabs({ defaultTab, nuevosLeads, solicitudesContent, idealistaContent }: Props) {
+export default function SolicitudesTabs({
+  defaultTab,
+  nuevosLeads,
+  showIdealista,
+  solicitudesContent,
+  idealistaContent,
+}: Props) {
   const [active, setActive] = useState<Tab>(defaultTab);
+  const activeTab = showIdealista ? active : "solicitudes";
 
   return (
     <div>
@@ -22,7 +30,7 @@ export default function SolicitudesTabs({ defaultTab, nuevosLeads, solicitudesCo
         <button
           onClick={() => setActive("solicitudes")}
           className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-            active === "solicitudes"
+            activeTab === "solicitudes"
               ? "bg-surface shadow-sm text-text-primary"
               : "text-text-secondary hover:text-text-primary"
           }`}
@@ -31,26 +39,28 @@ export default function SolicitudesTabs({ defaultTab, nuevosLeads, solicitudesCo
           Solicitudes
         </button>
 
-        <button
-          onClick={() => setActive("idealista")}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-            active === "idealista"
-              ? "bg-surface shadow-sm text-text-primary"
-              : "text-text-secondary hover:text-text-primary"
-          }`}
-        >
-          <Mail className="h-4 w-4 text-orange-500" />
-          <span className="font-black text-orange-500">idealista</span>
-          {nuevosLeads > 0 && (
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white">
-              {nuevosLeads > 9 ? "9+" : nuevosLeads}
-            </span>
-          )}
-        </button>
+        {showIdealista && (
+          <button
+            onClick={() => setActive("idealista")}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === "idealista"
+                ? "bg-surface shadow-sm text-text-primary"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            <Mail className="h-4 w-4 text-orange-500" />
+            <span className="font-black text-orange-500">idealista</span>
+            {nuevosLeads > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white">
+                {nuevosLeads > 9 ? "9+" : nuevosLeads}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Content */}
-      {active === "solicitudes" ? solicitudesContent : idealistaContent}
+      {activeTab === "solicitudes" ? solicitudesContent : idealistaContent}
     </div>
   );
 }

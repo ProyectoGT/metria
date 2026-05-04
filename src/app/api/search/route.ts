@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase";
 import { rateLimiter, getIp } from "@/lib/rate-limiter";
 import { SearchSchema } from "@/lib/validations/search";
+import { getCurrentUserContext } from "@/lib/current-user";
+import { canAccessContactos } from "@/lib/roles";
 
 export type SearchResult = {
   id: string;
@@ -30,6 +32,8 @@ export async function GET(request: NextRequest) {
   const { q, ctx } = parsed.data;
 
   const supabase = await createClient();
+  const currentUser = await getCurrentUserContext();
+  const canSearchContactos = canAccessContactos(currentUser?.role ?? "Agente");
   const results: SearchResult[] = [];
 
   // ── Zona / Sectores / Fincas / Propiedades ──────────────────────
@@ -174,7 +178,7 @@ export async function GET(request: NextRequest) {
   }
 
   // ── Contactos ────────────────────────────────────────────────────
-  if (ctx === "contactos" || ctx === "general") {
+  if (canSearchContactos && (ctx === "contactos" || ctx === "general")) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: contactos } = await (supabase as any)
       .from("contactos")
