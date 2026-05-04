@@ -8,6 +8,10 @@ export const CreateEventSchema = z.object({
   agendaId: z.number().int().positive().optional(),
 });
 
+export const UpdateEventSchema = CreateEventSchema.extend({
+  eventId: z.string().min(1).max(1024),
+});
+
 export const DeleteEventSchema = z.object({
   eventId: z.string().min(1).max(1024),
 });

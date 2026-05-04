@@ -193,7 +193,6 @@ export default async function DashboardPage() {
       .from("tareas")
       .select("id, titulo, prioridad, fecha, estado, resultado, from_orden_dia, owner_user_id, tarea_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
-      .is("fecha", null)
       .in("estado", ["pendiente", "completado"])
       .order("id", { ascending: false }),
 

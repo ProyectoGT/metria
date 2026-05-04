@@ -246,6 +246,10 @@ export default function CalendarioClient({
     setEvents(initialEvents.map(normalizeCalendarEvent));
   }, [initialEvents, saving]);
 
+  useEffect(() => {
+    setTareas(initialTareas);
+  }, [initialTareas]);
+
   // filterableUsers comes from the server — always complete regardless of events loaded
 
   // ── Apply user filter ──────────────────────────────────────────────────────
@@ -500,6 +504,7 @@ export default function CalendarioClient({
     }
 
     if (editId !== null) {
+      const previousEvent = events.find((event) => event.id === editId);
       const { data, error } = await insertOrUpdate(payload);
       if (error) setSaveError(error.message);
       else if (data) {
@@ -508,7 +513,45 @@ export default function CalendarioClient({
           agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
         };
         const normalizedUpdated = normalizeCalendarEvent(updated);
+        const googleEventId = normalizedUpdated.gcal_event_id ?? previousEvent?.gcal_event_id ?? null;
+
+        if (isConnected && googleEventId) {
+          const gcalRes = await fetch("/api/google/events", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              eventId: googleEventId,
+              summary: payload.description,
+              description: payload.result ?? "",
+              date: payload.event_date,
+              time: payload.time,
+              agendaId: editId,
+            }),
+          });
+
+          if (!gcalRes.ok) {
+            const gcalData = await gcalRes.json().catch(() => null);
+            toast(
+              `Actividad actualizada en CRM, pero no en Google Calendar: ${gcalData?.error ?? "error de sincronizacion"}`,
+              "error",
+            );
+          } else {
+            setGcalEvents((prev) =>
+              prev.map((event) =>
+                event.id === googleEventId
+                  ? {
+                      ...event,
+                      summary: payload.description,
+                      start: { ...event.start, dateTime: `${payload.event_date}T${payload.time}:00` },
+                    }
+                  : event,
+              ),
+            );
+          }
+        }
+
         setEvents((prev) => prev.map((e) => e.id === editId ? normalizedUpdated : e));
+        router.refresh();
         toast("Actividad actualizada"); setModalOpen(false);
       }
     } else {
