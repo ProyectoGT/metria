@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
+import { canViewIdealistaLeads } from "@/lib/roles";
 import PageHeader from "@/components/layout/page-header";
 import PedidosClient from "./solicitudes-client";
 import IdealistaClient from "./idealista-client";
@@ -20,14 +21,18 @@ export default async function PedidosPage({
     cookieStore.get("gmail_refresh_token")?.value
   );
 
-  const [user, { data: pedidos }, { data: agentes }, { data: leads }] = await Promise.all([
-    getCurrentUserContext(),
+  const user = await getCurrentUserContext();
+  const canViewIdealista = canViewIdealistaLeads(user?.role ?? "Agente");
+
+  const [{ data: pedidos }, { data: agentes }, { data: leads }] = await Promise.all([
     supabase.from("pedidos").select("*").order("id", { ascending: false }),
     supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
-    supabase
-      .from("idealista_leads")
-      .select("*")
-      .order("fecha_contacto", { ascending: false }),
+    canViewIdealista
+      ? supabase
+          .from("idealista_leads")
+          .select("*")
+          .order("fecha_contacto", { ascending: false })
+      : Promise.resolve({ data: [] }),
   ]);
 
   const role = user?.role ?? "Agente";
@@ -46,8 +51,9 @@ export default async function PedidosPage({
     <>
       <PageHeader title="Solicitudes" description="Gestion de solicitudes y leads de clientes" />
       <SolicitudesTabs
-        defaultTab={tab === "idealista" ? "idealista" : "solicitudes"}
+        defaultTab={canViewIdealista && tab === "idealista" ? "idealista" : "solicitudes"}
         nuevosLeads={nuevosLeads}
+        showIdealista={canViewIdealista}
         solicitudesContent={
           <PedidosClient
             initialPedidos={pedidos ?? []}
@@ -57,10 +63,12 @@ export default async function PedidosPage({
           />
         }
         idealistaContent={
-          <IdealistaClient
-            initialLeads={(leads ?? []) as Parameters<typeof IdealistaClient>[0]["initialLeads"]}
-            gmailConnected={gmailConnected}
-          />
+          canViewIdealista ? (
+            <IdealistaClient
+              initialLeads={(leads ?? []) as Parameters<typeof IdealistaClient>[0]["initialLeads"]}
+              gmailConnected={gmailConnected}
+            />
+          ) : null
         }
       />
     </>

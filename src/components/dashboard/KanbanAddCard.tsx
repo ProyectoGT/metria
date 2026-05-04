@@ -5,6 +5,7 @@ import { Activity, BookOpen, Clock, Home, Phone, Star, Users, X } from "lucide-r
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import type { UserRole } from "@/lib/roles";
 import { DEFAULT_ACTIVITY_TIME, localDateKey } from "@/lib/local-date-time";
+import type { ActivityType } from "@/lib/activity-options";
 
 type NewCard = Omit<KanbanCardData, "id" | "source" | "dbId">;
 
@@ -23,7 +24,7 @@ const PRIORITIES: { value: KanbanPriority; label: string; cls: string; activeCls
   { value: "baja", label: "Baja", cls: "text-gray-600 hover:bg-gray-50", activeCls: "border-gray-400 bg-gray-100 text-gray-700" },
 ];
 
-const ACTIVITY_TYPES = [
+const ACTIVITY_TYPES: Array<{ value: ActivityType; label: string; icon: typeof Home; active: string }> = [
   { value: "visita", label: "Visita", icon: Home, active: "border-emerald-500 bg-emerald-500/15 text-emerald-700" },
   { value: "llamada", label: "Llamada", icon: Phone, active: "border-blue-500 bg-blue-500/15 text-blue-700" },
   { value: "reunion", label: "Reunion", icon: Users, active: "border-violet-500 bg-violet-500/15 text-violet-700" },
@@ -44,7 +45,7 @@ export default function KanbanAddCard({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<KanbanPriority>("media");
-  const [tipo, setTipo] = useState("actividad");
+  const [tipo, setTipo] = useState<ActivityType>("actividad");
   const [date, setDate] = useState(localDateKey());
   const [time, setTime] = useState(DEFAULT_ACTIVITY_TIME);
   const [assignedUserIds, setAssignedUserIds] = useState<string[]>([currentUserId]);
@@ -69,7 +70,7 @@ export default function KanbanAddCard({
       title: title.trim(),
       description: description.trim() || undefined,
       priority,
-      tipo,
+      ...(isActivity ? { tipo } : {}),
       dueDate: isActivity ? `${date}T${time}` : undefined,
       time: isActivity ? time : undefined,
       assignedBy: null,

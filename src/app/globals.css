@@ -40,8 +40,8 @@
   --color-text-secondary: #64748b;
   --color-border: #e2e8f0;
   --color-muted: #f1f5f9;
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: "Geist", "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", "Cascadia Code", monospace;
 }
 
 /* Dark mode overrides — pure black aesthetic */

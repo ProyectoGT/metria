@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { rateLimiter, getIp } from "@/lib/rate-limiter";
-import { CreateEventSchema, DeleteEventSchema } from "@/lib/validations/calendar";
+import { CreateEventSchema, DeleteEventSchema, UpdateEventSchema } from "@/lib/validations/calendar";
 import { googleCalendarDateTime, normalizeTime } from "@/lib/local-date-time";
+import { MADRID_TIME_ZONE } from "@/lib/dates/timezone";
 
 async function getAccessToken(): Promise<{ token: string; refreshed?: string } | null> {
   const cookieStore = await cookies();
@@ -38,6 +39,16 @@ function setRefreshedToken(response: NextResponse, token: string) {
   });
 }
 
+function addOneHourLocal(date: string, time: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  const value = new Date(Date.UTC(year, month - 1, day, hour + 1, minute, 0));
+  return {
+    date: `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}-${String(value.getUTCDate()).padStart(2, "0")}`,
+    time: `${String(value.getUTCHours()).padStart(2, "0")}:${String(value.getUTCMinutes()).padStart(2, "0")}`,
+  };
+}
+
 // GET — fetch events for a date range
 export async function GET(request: NextRequest) {
   try { await rateLimiter.consume(getIp(request.headers)); }
@@ -62,7 +73,7 @@ export async function GET(request: NextRequest) {
   });
 
   const data = await gcalRes.json();
-  const response = NextResponse.json(data);
+  const response = NextResponse.json(data, { status: gcalRes.status });
   if (auth.refreshed) setRefreshedToken(response, auth.refreshed);
   return response;
 }
@@ -82,14 +93,14 @@ export async function POST(request: NextRequest) {
   }
 
   const body = parsed.data;
-  const startDateTime = new Date(googleCalendarDateTime(body.date, normalizeTime(body.time, "09:00")));
-  const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000);
+  const startTime = normalizeTime(body.time, "09:00");
+  const end = addOneHourLocal(body.date, startTime);
 
   const event = {
     summary: body.summary,
     description: body.description,
-    start: { dateTime: startDateTime.toISOString(), timeZone: "Europe/Madrid" },
-    end: { dateTime: endDateTime.toISOString(), timeZone: "Europe/Madrid" },
+    start: { dateTime: googleCalendarDateTime(body.date, startTime), timeZone: MADRID_TIME_ZONE },
+    end: { dateTime: googleCalendarDateTime(end.date, end.time), timeZone: MADRID_TIME_ZONE },
     extendedProperties: body.agendaId
       ? {
           private: {
@@ -114,12 +125,64 @@ export async function POST(request: NextRequest) {
   );
 
   const data = await gcalRes.json();
-  const response = NextResponse.json(data);
+  const response = NextResponse.json(data, { status: gcalRes.status });
   if (auth.refreshed) setRefreshedToken(response, auth.refreshed);
   return response;
 }
 
 // DELETE — remove an event by ID (passed in body)
+// PUT - update an existing event
+export async function PUT(request: NextRequest) {
+  try { await rateLimiter.consume(getIp(request.headers)); }
+  catch { return NextResponse.json({ error: "Demasiadas solicitudes" }, { status: 429 }); }
+
+  const auth = await getAccessToken();
+  if (!auth) return NextResponse.json({ error: "not_connected" }, { status: 401 });
+
+  const raw = await request.json();
+  const parsed = UpdateEventSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Datos invalidos" }, { status: 400 });
+  }
+
+  const body = parsed.data;
+  const startTime = normalizeTime(body.time, "09:00");
+  const end = addOneHourLocal(body.date, startTime);
+
+  const event = {
+    summary: body.summary,
+    description: body.description,
+    start: { dateTime: googleCalendarDateTime(body.date, startTime), timeZone: MADRID_TIME_ZONE },
+    end: { dateTime: googleCalendarDateTime(end.date, end.time), timeZone: MADRID_TIME_ZONE },
+    extendedProperties: body.agendaId
+      ? {
+          private: {
+            source: "metria",
+            entity: "agenda",
+            agendaId: String(body.agendaId),
+          },
+        }
+      : undefined,
+  };
+
+  const gcalRes = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(body.eventId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${auth.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(event),
+    }
+  );
+
+  const data = await gcalRes.json();
+  const response = NextResponse.json(data, { status: gcalRes.status });
+  if (auth.refreshed) setRefreshedToken(response, auth.refreshed);
+  return response;
+}
+
 export async function DELETE(request: NextRequest) {
   try { await rateLimiter.consume(getIp(request.headers)); }
   catch { return NextResponse.json({ error: "Demasiadas solicitudes" }, { status: 429 }); }

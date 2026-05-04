@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, ChevronDown, Clock, Loader2, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 import type { UserRole } from "@/lib/roles";
 import { DEFAULT_ACTIVITY_TIME, normalizeTime } from "@/lib/local-date-time";
 import { useToast, Toaster } from "@/components/ui/toast";
-import { isActivityPriority, isActivityType, normalizeActivityPriority, normalizeActivityType } from "@/lib/activity-options";
+import { isActivityPriority, isActivityType, normalizeActivityPriority, normalizeActivityType, type ActivityType } from "@/lib/activity-options";
 
 type Usuario = { id: number; nombre: string; apellidos: string };
 
@@ -19,6 +20,7 @@ type Actividad = {
   tipo: string;
   completed: boolean;
   result: string | null;
+  user_id?: number | null;
   owner_user_id: number | null;
   agenda_usuarios?: Array<{
     usuario_id: number;
@@ -40,6 +42,16 @@ const PRIORIDADES = [
   { value: "baja", label: "Baja", badge: "bg-blue-500/15 text-blue-700 dark:text-blue-400", border: "border-l-blue-400" },
 ];
 
+const TIPOS_ACTIVIDAD: Array<{ value: ActivityType; label: string }> = [
+  { value: "actividad", label: "Actividad" },
+  { value: "llamada", label: "Llamada" },
+  { value: "visita", label: "Visita" },
+  { value: "reunion", label: "Reunion" },
+  { value: "seguimiento", label: "Seguimiento" },
+  { value: "formacion", label: "Formacion" },
+  { value: "otro", label: "Otro" },
+];
+
 function nombreCompleto(u: Usuario) {
   return `${u.nombre} ${u.apellidos}`.trim();
 }
@@ -50,6 +62,11 @@ function canManageOthers(role: UserRole | null) {
 
 function priorityMeta(priority: string | null) {
   return PRIORIDADES.find((p) => p.value === priority) ?? PRIORIDADES[1];
+}
+
+function tipoLabel(tipo: string | null) {
+  const normalized = normalizeActivityType(tipo);
+  return TIPOS_ACTIVIDAD.find((item) => item.value === normalized)?.label ?? "Actividad";
 }
 
 function assignedIds(actividad: Actividad) {
@@ -64,6 +81,7 @@ export default function OrdenesClient({
   today,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
   const { toast, toasts } = useToast();
   const [actividades, setActividades] = useState<Actividad[]>(initialActividades);
   const [filterUserId, setFilterUserId] = useState<number | null>(null);
@@ -91,7 +109,7 @@ export default function OrdenesClient({
   const filteredActividades = useMemo(() => {
     return actividades.filter((actividad) => {
       if (!filterUserId) return true;
-      return assignedIds(actividad).includes(filterUserId) || actividad.owner_user_id === filterUserId;
+      return assignedIds(actividad).includes(filterUserId) || actividad.owner_user_id === filterUserId || actividad.user_id === filterUserId;
     });
   }, [actividades, filterUserId]);
 
@@ -186,6 +204,7 @@ export default function OrdenesClient({
     setActividades((prev) => editing
       ? prev.map((a) => a.id === editing.id ? withUsers : a)
       : [...prev, withUsers].sort((a, b) => normalizeTime(a.time).localeCompare(normalizeTime(b.time))));
+    router.refresh();
     setShowModal(false);
     toast(editing ? "Actividad actualizada" : "Actividad creada");
   }
@@ -203,7 +222,9 @@ export default function OrdenesClient({
     if (error || !data) {
       setActividades((prev) => prev.map((a) => a.id === actividad.id ? { ...a, completed: !completed } : a));
       toast(error?.message ?? "Error al actualizar", "error");
+      return;
     }
+    router.refresh();
   }
 
   async function archiveActividad(id: number) {
@@ -215,6 +236,7 @@ export default function OrdenesClient({
       return;
     }
     setActividades((prev) => prev.filter((a) => a.id !== id));
+    router.refresh();
     toast("Actividad archivada");
   }
 
@@ -296,6 +318,7 @@ export default function OrdenesClient({
                       </p>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-text-secondary">
                         <span>{normalizeTime(actividad.time, DEFAULT_ACTIVITY_TIME)}</span>
+                        <span>{tipoLabel(actividad.tipo)}</span>
                         {ids.map((id) => <span key={id}>{userMap.get(id) ?? `Usuario ${id}`}</span>)}
                       </div>
                       {actividad.completed && actividad.result && (
@@ -368,6 +391,18 @@ export default function OrdenesClient({
                     {PRIORIDADES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                   </select>
                 </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-text-secondary">Tipo de actividad</label>
+                <select
+                  value={form.tipo}
+                  onChange={(e) => setForm((prev) => ({ ...prev, tipo: e.target.value }))}
+                  className="input text-sm"
+                >
+                  {TIPOS_ACTIVIDAD.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-text-secondary">Usuarios *</label>

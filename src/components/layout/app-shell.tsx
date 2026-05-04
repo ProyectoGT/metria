@@ -80,12 +80,14 @@ export default async function AppShell({
   return (
     <>
       <ThemeScript />
-      <Sidebar userRole={userRole} />
-      <div className="flex h-screen flex-col md:pl-[220px]">
-        <Header userName={userName} userEmail={userEmail} avatarUrl={userAvatarUrl} notifications={notifications} />
-        <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
-          {children}
-        </main>
+      <div className="flex min-h-screen bg-background">
+        <Sidebar userRole={userRole} />
+        <div className="flex h-screen min-w-0 flex-1 flex-col">
+          <Header userName={userName} userEmail={userEmail} avatarUrl={userAvatarUrl} notifications={notifications} />
+          <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
+            {children}
+          </main>
+        </div>
       </div>
     </>
   );

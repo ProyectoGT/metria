@@ -4,12 +4,13 @@ import { useState } from "react";
 import { Activity, BookOpen, Clock, Home, Phone, Star, Users, X } from "lucide-react";
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import { DEFAULT_ACTIVITY_TIME, normalizeTime, splitLocalDateTime } from "@/lib/local-date-time";
+import { ACTIVITY_TYPES as ACTIVITY_TYPE_VALUES, type ActivityType } from "@/lib/activity-options";
 
 type EditUpdates = {
   title: string;
   priority: KanbanPriority;
   dueDate?: string;
-  tipo?: string;
+  tipo?: ActivityType;
   assignedUserIds?: number[];
 };
 
@@ -27,7 +28,7 @@ const PRIORITIES: { value: KanbanPriority; label: string; activeCls: string; cls
   { value: "baja", label: "Baja", cls: "text-gray-600 hover:bg-gray-50", activeCls: "border-gray-400 bg-gray-100 text-gray-700" },
 ];
 
-const ACTIVITY_TYPES = [
+const ACTIVITY_TYPES: Array<{ value: ActivityType; label: string; icon: typeof Home; active: string }> = [
   { value: "visita", label: "Visita", icon: Home, active: "border-emerald-500 bg-emerald-500/15 text-emerald-700" },
   { value: "llamada", label: "Llamada", icon: Phone, active: "border-blue-500 bg-blue-500/15 text-blue-700" },
   { value: "reunion", label: "Reunion", icon: Users, active: "border-violet-500 bg-violet-500/15 text-violet-700" },
@@ -37,13 +38,17 @@ const ACTIVITY_TYPES = [
   { value: "otro", label: "Otro", icon: Star, active: "border-rose-400 bg-rose-500/15 text-rose-700" },
 ];
 
+function normalizeEditType(value: string | null | undefined): ActivityType {
+  return ACTIVITY_TYPE_VALUES.includes(value as ActivityType) ? value as ActivityType : "actividad";
+}
+
 export default function KanbanEditCard({ card, onSave, onClose, agents = [], currentUserId }: Props) {
   const initialDateTime = splitLocalDateTime(card.dueDate);
   const [title, setTitle]       = useState(card.title);
   const [priority, setPriority] = useState<KanbanPriority>(card.priority);
   const [date, setDate]         = useState(initialDateTime.date ?? "");
   const [time, setTime]         = useState(initialDateTime.time ?? card.time ?? DEFAULT_ACTIVITY_TIME);
-  const [tipo, setTipo]         = useState(card.tipo ?? "actividad");
+  const [tipo, setTipo]         = useState<ActivityType>(() => normalizeEditType(card.tipo));
   const [assignedUserIds, setAssignedUserIds] = useState<string[]>(
     card.assignedUserIds?.length ? card.assignedUserIds.map(String) : [currentUserId],
   );
@@ -67,7 +72,7 @@ export default function KanbanEditCard({ card, onSave, onClose, agents = [], cur
       title: title.trim(),
       priority,
       dueDate,
-      tipo,
+      ...(isActivity ? { tipo } : {}),
       assignedUserIds: assignedUserIds.map(Number).filter(Number.isFinite),
     });
   }
