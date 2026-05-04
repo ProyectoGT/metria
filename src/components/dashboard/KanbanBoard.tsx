@@ -9,6 +9,7 @@ import KanbanAddCard from "./KanbanAddCard";
 import KanbanEditCard from "./KanbanEditCard";
 import type { KanbanData, KanbanColumnData, KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import type { UserRole } from "@/lib/roles";
+import type { ActivityType } from "@/lib/activity-options";
 import {
   completeAgendaAction,
   completeTareaAction,
@@ -176,7 +177,7 @@ export default function KanbanBoard({
     title: string;
     priority: KanbanPriority;
     dueDate?: string;
-    tipo?: string;
+    tipo?: ActivityType;
     assignedUserIds?: number[];
   }) => {
     if (!editingCard) return;

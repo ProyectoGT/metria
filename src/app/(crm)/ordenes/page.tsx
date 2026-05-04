@@ -24,22 +24,36 @@ export default async function OrdenesPage() {
       ? [yo.id, ...yo.supervisedAgentIds]
       : [yo.id];
 
-  const agendaClient = canViewSupervisedAgents(yo.role) || canViewAllAgents(yo.role)
-    ? createAdminClient()
-    : supabase;
+  const agendaAdmin = createAdminClient();
 
-  const [{ data: actividadesRaw }, { data: usuarios }] = await Promise.all([
-    agendaClient
+  const [{ data: actividadesRaw, error: actividadesError }, { data: usuarios }] = await Promise.all([
+    agendaAdmin
       .from("agenda")
-      .select("id, description, event_date, time, priority, tipo, completed, result, user_id, owner_user_id, empresa_id, created_at, sync_status, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .select("id, description, event_date, time, priority, tipo, completed, result, gcal_event_id, user_id, owner_user_id, empresa_id, equipo_id, visibility, archived_at, archived_reason, converted_to_tarea_id, created_at, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
-      .or(`event_date.eq.${today},and(event_date.is.null,created_at.gte.${todayRange.startUtc},created_at.lte.${todayRange.endUtc})`)
+      .eq("empresa_id", yo.empresaId ?? -1)
+      .eq("event_date", today)
       .order("time", { ascending: true, nullsFirst: false }),
     supabase
       .from("usuarios")
       .select("id, nombre, apellidos")
       .order("nombre"),
   ]);
+  if (process.env.NODE_ENV !== "production") {
+    console.debug("[ordenes] agenda-query params", {
+      userId: yo.id, role: yo.role, empresaId: yo.empresaId, today,
+      actividadesCount: actividadesRaw?.length ?? "null",
+    });
+    if (actividadesError) {
+      console.error("[ordenes] Error cargando actividades:", {
+        message: actividadesError?.message,
+        details: actividadesError?.details,
+        hint: actividadesError?.hint,
+        code: actividadesError?.code,
+        raw: JSON.stringify(actividadesError, Object.getOwnPropertyNames(actividadesError)),
+      });
+    }
+  }
 
   type Actividad = {
     owner_user_id: number | null;

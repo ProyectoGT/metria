@@ -36,10 +36,14 @@ export default async function CalendarioPage() {
       .eq("empresa_id", empresaId ?? -1)
       .order("event_date", { ascending: true });
   } else {
-    eventsQuery = supabase
+    // Agente: usar admin client con filtro explícito para garantizar visibilidad
+    // propia sin depender del RLS. El filtro JS posterior restringe al usuario.
+    const agenteSupa = createAdminClient();
+    eventsQuery = agenteSupa
       .from("agenda")
       .select("*, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
+      .or(`owner_user_id.eq.${userId},user_id.eq.${userId}`)
       .order("event_date", { ascending: true });
     if (empresaId !== null) eventsQuery = eventsQuery.eq("empresa_id", empresaId);
   }
@@ -56,9 +60,14 @@ export default async function CalendarioPage() {
   ]);
 
   type EventWithAssignments = {
+    id: number;
+    description?: string | null;
     owner_user_id: number | null;
     user_id?: number | null;
     event_date?: string | null;
+    time?: string | null;
+    tipo?: string | null;
+    gcal_event_id?: string | null;
     created_at?: string | null;
     agenda_usuarios?: { usuario_id: number }[];
   };
@@ -89,6 +98,20 @@ export default async function CalendarioPage() {
       discardedRows: rows.length - visibleRows.length,
       withoutEventDate: rows.filter((event) => !event.event_date).length,
     });
+    console.log("[calendario:server] initialEvents", {
+      count: visibleEvents.length,
+      ids: visibleEvents.map((event) => event.id),
+      rows: visibleEvents.slice(0, 10).map((event) => ({
+        id: event.id,
+        description: event.description,
+        event_date: event.event_date,
+        time: event.time,
+        tipo: event.tipo,
+        user_id: event.user_id,
+        owner_user_id: event.owner_user_id,
+        gcal_event_id: event.gcal_event_id,
+      })),
+    });
   }
 
   const usersMap: Record<number, string> = {};
@@ -112,6 +135,7 @@ export default async function CalendarioPage() {
       isConnected={isConnected}
       role={role}
       currentUserId={userId}
+      empresaId={empresaId}
       usersMap={usersMap}
       filterableUsers={filterableUsers}
       archivedGoogleEventIds={(archivedGoogleEvents ?? [])

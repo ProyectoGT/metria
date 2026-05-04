@@ -26,11 +26,11 @@ type AgendaRow = {
   tipo: string | null;
   completed: boolean;
   result: string | null;
+  gcal_event_id?: string | null;
   user_id: number | null;
   owner_user_id: number | null;
   empresa_id?: number | null;
   created_at?: string | null;
-  sync_status?: string | null;
 };
 
 export async function getDayItems(
@@ -39,11 +39,22 @@ export async function getDayItems(
 ): Promise<AgendaDayItem[]> {
   const { data, error } = await supabase
     .from("agenda")
-    .select("id, description, event_date, time, tipo, completed, result, user_id, owner_user_id, empresa_id, created_at, sync_status")
+    .select("id, description, event_date, time, tipo, completed, result, gcal_event_id, user_id, owner_user_id, empresa_id, created_at")
     .is("archived_at", null)
     .eq("event_date", date)
     .order("time", { ascending: true, nullsFirst: false });
 
+  if (process.env.NODE_ENV !== "production") {
+    if (error) {
+      console.error("[getDayItems] Error:", {
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+        raw: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+      });
+    }
+  }
   if (error) throw error;
 
   return ((data ?? []) as AgendaRow[]).map((row) => {

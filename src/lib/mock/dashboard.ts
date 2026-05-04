@@ -1,5 +1,7 @@
 // ─── Tipos compartidos ────────────────────────────────────────────────────────
 
+import type { ActivityType } from "@/lib/activity-options";
+
 export type SummaryData = {
   noticias: number;
   investigaciones: number;
@@ -57,7 +59,7 @@ export type KanbanCardData = {
   title: string;
   description?: string;
   priority: KanbanPriority;
-  tipo?: string;
+  tipo?: ActivityType;
   dueDate?: string;
   time?: string | null;
   assignedBy?: string | null;

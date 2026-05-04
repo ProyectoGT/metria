@@ -3,12 +3,27 @@
 import { useState } from "react";
 import { Calendar, User, Trash2, CheckCircle2, Circle, ExternalLink, AlertCircle, Pencil } from "lucide-react";
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
+import { ACTIVITY_TYPES, type ActivityType } from "@/lib/activity-options";
 
 const priorityBadge: Record<KanbanPriority, { cls: string; label: string }> = {
   alta: { cls: "bg-red-500/15 text-red-700 dark:bg-red-500/20 dark:text-red-400", label: "Alta" },
   media: { cls: "bg-yellow-500/15 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400", label: "Media" },
   baja: { cls: "bg-gray-500/15 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400", label: "Baja" },
 };
+
+const typeBadge: Record<ActivityType, { cls: string; label: string }> = {
+  actividad: { cls: "bg-gray-500/15 text-gray-700 dark:text-gray-300", label: "Actividad" },
+  llamada: { cls: "bg-blue-500/15 text-blue-700 dark:text-blue-400", label: "Llamada" },
+  visita: { cls: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400", label: "Visita" },
+  reunion: { cls: "bg-violet-500/15 text-violet-700 dark:text-violet-400", label: "Reunion" },
+  seguimiento: { cls: "bg-amber-500/15 text-amber-700 dark:text-amber-400", label: "Seguimiento" },
+  formacion: { cls: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-400", label: "Formacion" },
+  otro: { cls: "bg-rose-500/15 text-rose-700 dark:text-rose-400", label: "Otro" },
+};
+
+function normalizeCardType(value: string | null | undefined): ActivityType {
+  return ACTIVITY_TYPES.includes(value as ActivityType) ? value as ActivityType : "actividad";
+}
 
 function formatDate(iso: string) {
   const datePart = iso.split("T")[0];
@@ -78,6 +93,7 @@ export default function KanbanCard({
   isDragging,
 }: KanbanCardProps) {
   const badge = priorityBadge[card.priority];
+  const activityType = card.source === "agenda" ? normalizeCardType(card.tipo) : null;
   const [completing, setCompleting] = useState(false);
   const done = isCompleted || completing;
 
@@ -105,6 +121,11 @@ export default function KanbanCard({
           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${badge.cls} ${done ? "opacity-50" : ""}`}>
             {badge.label}
           </span>
+          {activityType && (
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${typeBadge[activityType].cls} ${done ? "opacity-50" : ""}`}>
+              {typeBadge[activityType].label}
+            </span>
+          )}
           {card.fromOrdenDia && !isCompleted && (
             <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary dark:bg-primary/20">
               Orden del dia

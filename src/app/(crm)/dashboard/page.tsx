@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { getPeriodRange, mergeRendimientoRows } from "@/lib/desarrollo-metrics";
 import {
@@ -23,6 +24,7 @@ import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
 import { combineLocalDateTime, localDateKey, normalizeTime } from "@/lib/local-date-time";
 import { normalizeAgendaEvent } from "@/lib/agenda/normalize-agenda-event";
 import { getMadridTodayRangeUtc } from "@/lib/dates/timezone";
+import { normalizeActivityType } from "@/lib/activity-options";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -59,6 +61,7 @@ function normalizeNullablePriority(p: string | null): KanbanPriority | null {
 
 export default async function DashboardPage() {
   const supabase = await createClient();
+  const agendaAdmin = createAdminClient();
   const yo = await getCurrentUserContext();
 
   const role = yo?.role ?? "Agente";
@@ -153,7 +156,7 @@ export default async function DashboardPage() {
     { data: rendimientoData },
     { data: actividadData },
     { data: tareasData },
-    { data: agendaData },
+    { data: agendaData, error: agendaError },
     { data: kanbanColsData },
     { data: agenteMesData },
     { data: noticiasMapData },
@@ -196,13 +199,12 @@ export default async function DashboardPage() {
       .in("estado", ["pendiente", "completado"])
       .order("id", { ascending: false }),
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any)
+    agendaAdmin
       .from("agenda")
-      .select("id, description, event_date, time, priority, completed, result, user_id, owner_user_id, empresa_id, created_at, sync_status, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .select("id, description, event_date, time, priority, completed, result, gcal_event_id, user_id, owner_user_id, empresa_id, equipo_id, visibility, tipo, archived_at, archived_reason, converted_to_tarea_id, created_at, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
-      .or(`event_date.eq.${today},and(event_date.is.null,created_at.gte.${todayRange.startUtc},created_at.lte.${todayRange.endUtc})`)
-      .order("time", { ascending: true, nullsFirst: false }),
+      .eq("empresa_id", yo?.empresaId ?? -1)
+      .eq("event_date", today),
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
@@ -235,6 +237,23 @@ export default async function DashboardPage() {
         .not("longitud", "is", null)
     ),
   ]);
+
+  if (process.env.NODE_ENV !== "production") {
+    console.debug("[dashboard] agenda-query params", {
+      userId, role, empresaId: yo?.empresaId, today,
+      agendaCount: agendaData?.length ?? "null",
+    });
+    if (agendaError) {
+      console.error("[dashboard] Error cargando agenda:", {
+        message: agendaError?.message,
+        details: agendaError?.details,
+        hint: agendaError?.hint,
+        code: agendaError?.code,
+        raw: JSON.stringify(agendaError, Object.getOwnPropertyNames(agendaError)),
+      });
+      console.error("[dashboard] agendaError raw direct", agendaError);
+    }
+  }
 
   // ─── 2. Summary data ─────────────────────────────────────────────────────
   const summary: SummaryData = {
@@ -371,13 +390,14 @@ export default async function DashboardPage() {
     event_date: string;
     time: string | null;
     priority: string | null;
+    tipo: string | null;
     completed: boolean;
     result: string | null;
+    gcal_event_id?: string | null;
     user_id: number | null;
     owner_user_id: number | null;
     empresa_id?: number | null;
     created_at?: string | null;
-    sync_status?: string | null;
     agenda_usuarios?: Array<{ usuario_id: number; usuarios?: { nombre: string | null; apellidos: string | null } | null }>;
   };
 
@@ -392,7 +412,19 @@ export default async function DashboardPage() {
   }
 
   const tareas: TareaDbRow[] = (tareasData ?? []) as TareaDbRow[];
-  const agendaHoy: AgendaDbRow[] = ((agendaData ?? []) as AgendaDbRow[]).map((row) => {
+  const agendaRows = ((agendaData ?? []) as AgendaDbRow[]).filter((row) => {
+    if (role === "Administrador" || role === "Director") return true;
+    const assigned = assignedIdsFromRows(row.agenda_usuarios);
+    if (role === "Responsable") {
+      const allowed = new Set([userId, ...(yo?.supervisedAgentIds ?? [])]);
+      return assigned.some((id) => allowed.has(id))
+        || (row.owner_user_id != null && allowed.has(row.owner_user_id))
+        || (row.user_id != null && allowed.has(row.user_id));
+    }
+    return assigned.includes(userId) || row.owner_user_id === userId || row.user_id === userId;
+  });
+
+  const agendaHoy: AgendaDbRow[] = agendaRows.map((row) => {
     const normalized = normalizeAgendaEvent(row);
     return {
       ...row,
@@ -402,7 +434,7 @@ export default async function DashboardPage() {
     };
   });
   const myTareas = tareas.filter((t) => assignedIdsFromRows(t.tarea_usuarios).includes(userId) || t.owner_user_id === userId);
-  const myAgendaHoy = agendaHoy.filter((a) => assignedIdsFromRows(a.agenda_usuarios).includes(userId) || a.owner_user_id === userId || a.user_id === userId);
+  const myAgendaHoy = agendaHoy.filter((a) => a.owner_user_id === userId || a.user_id === userId);
 
   function toCard(t: TareaDbRow) {
     return {
@@ -429,6 +461,7 @@ export default async function DashboardPage() {
       dbId: a.id,
       title: a.description,
       priority: normalizePriority(a.priority),
+      tipo: normalizeActivityType(a.tipo),
       dueDate: combineLocalDateTime(a.event_date, normalizeTime(a.time, "09:00")),
       time: normalizeTime(a.time, "09:00"),
       assignedBy: null,
@@ -473,10 +506,7 @@ export default async function DashboardPage() {
         id: a.id,
         nombre: `${a.nombre} ${a.apellidos}`.trim(),
         tareas: agendaHoy
-          .filter((t) => {
-            const assigned = assignedIdsFromRows(t.agenda_usuarios);
-            return assigned.includes(a.id) || t.owner_user_id === a.id || t.user_id === a.id;
-          })
+          .filter((t) => assignedIdsFromRows(t.agenda_usuarios).includes(a.id) || t.owner_user_id === a.id || t.user_id === a.id)
           .map((t) => ({
             id: t.id,
             titulo: t.description,

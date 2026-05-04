@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   Phone, Users, Home, Clock, BookOpen, Star, Activity, Calendar,
   ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 import { useToast, Toaster } from "@/components/ui/toast";
+import { saveAgendaGoogleEventIdAction } from "@/app/(crm)/calendario/actions";
 import { updateTareaEstadoAction } from "@/app/(crm)/dashboard/actions";
 import type { UserRole } from "@/lib/roles";
 import { DEFAULT_ACTIVITY_TIME, normalizeTime } from "@/lib/local-date-time";
@@ -30,8 +32,12 @@ type AgendaEvent = {
   owner_user_id: number | null;
   user_id: number | null;
   empresa_id: number | null;
+  equipo_id?: number | null;
+  visibility?: string | null;
+  archived_at?: string | null;
+  archived_reason?: string | null;
+  converted_to_tarea_id?: number | null;
   created_at: string;
-  sync_status?: string | null;
   agenda_usuarios?: Array<{ usuario_id: number; usuarios?: { nombre: string | null; apellidos: string | null } | null }>;
 };
 
@@ -78,6 +84,7 @@ type Props = {
   isConnected: boolean;
   role: UserRole;
   currentUserId: number;
+  empresaId: number | null;
   usersMap: Record<number, string>;
   filterableUsers: Array<{ id: number; name: string }>;
   archivedGoogleEventIds: string[];
@@ -180,16 +187,16 @@ function agendaAssignedIds(ev: AgendaEvent) {
 
 function normalizeCalendarEvent(ev: AgendaEvent): AgendaEvent {
   const normalized = normalizeAgendaEvent(ev);
+  const eventDate = (normalized.date || ev.event_date || "").slice(0, 10);
   return {
     ...ev,
     description: normalized.title,
-    event_date: normalized.date,
+    event_date: eventDate,
     time: normalized.timeLabel,
     tipo: normalized.type,
     owner_user_id: normalized.ownerUserId,
     user_id: normalized.userId,
     empresa_id: normalized.empresaId,
-    sync_status: normalized.syncStatus,
   };
 }
 
@@ -201,6 +208,7 @@ export default function CalendarioClient({
   isConnected,
   role,
   currentUserId,
+  empresaId,
   usersMap,
   filterableUsers,
   archivedGoogleEventIds,
@@ -214,8 +222,6 @@ export default function CalendarioClient({
 
   const [events, setEvents]         = useState<AgendaEvent[]>(() => initialEvents.map(normalizeCalendarEvent));
   const [tareas, setTareas]         = useState<TareaEvent[]>(initialTareas);
-  const eventsRef = useRef(events);
-  useEffect(() => { eventsRef.current = events; }, [events]);
   const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
 
   // Filter by user — default al usuario actual
@@ -232,7 +238,13 @@ export default function CalendarioClient({
   const [filterOpen, setFilterOpen] = useState(false);
 
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
   const { toasts, toast } = useToast();
+
+  useEffect(() => {
+    if (saving) return;
+    setEvents(initialEvents.map(normalizeCalendarEvent));
+  }, [initialEvents, saving]);
 
   // filterableUsers comes from the server — always complete regardless of events loaded
 
@@ -267,15 +279,16 @@ export default function CalendarioClient({
     return map;
   }, [filteredEvents]);
 
+  const localAgendaIds = useMemo(() => new Set(events.map((ev) => String(ev.id))), [events]);
+
   const syncedGcalIds = useMemo(
     () =>
       new Set(
         events
-          .filter((e) => e.owner_user_id === currentUserId || e.user_id === currentUserId || agendaAssignedIds(e).includes(currentUserId))
           .map((e) => e.gcal_event_id)
           .filter((id): id is string => Boolean(id))
       ),
-    [events, currentUserId]
+    [events]
   );
 
   const gcalByDate = useMemo(() => {
@@ -283,6 +296,8 @@ export default function CalendarioClient({
 
     for (const ev of gcalEvents) {
       if (syncedGcalIds.has(ev.id)) continue;
+      const agendaId = ev.extendedProperties?.private?.agendaId;
+      if (agendaId && localAgendaIds.has(agendaId)) continue;
 
       const d = ev.start.dateTime
         ? utcToMadridDisplay(ev.start.dateTime).date
@@ -292,7 +307,7 @@ export default function CalendarioClient({
     }
 
     return map;
-  }, [gcalEvents, syncedGcalIds]);
+  }, [gcalEvents, localAgendaIds, syncedGcalIds]);
 
   const tareasByDate = useMemo(() => {
     const map: Record<string, TareaEvent[]> = {};
@@ -335,20 +350,15 @@ export default function CalendarioClient({
 
     const d = await res.json();
     const items = (d.items ?? []) as GCalEvent[];
-    const localAgendaIds = new Set(eventsRef.current.map((ev) => String(ev.id)));
     const archivedGoogleIds = new Set(archivedGoogleEventIds);
     const visibleItems: GCalEvent[] = [];
-    const orphanIds: string[] = [];
+    const archivedOrphanIds: string[] = [];
 
     for (const item of items) {
-      const props = item.extendedProperties?.private;
-      const isMetriaAgenda = props?.source === "metria" && props?.entity === "agenda" && props.agendaId;
-
-      if (archivedGoogleIds.has(item.id) || (isMetriaAgenda && !localAgendaIds.has(props.agendaId!))) {
-        orphanIds.push(item.id);
+      if (archivedGoogleIds.has(item.id)) {
+        archivedOrphanIds.push(item.id);
         continue;
       }
-
       visibleItems.push(item);
     }
 
@@ -356,7 +366,7 @@ export default function CalendarioClient({
     setGcalEvents(visibleItems);
 
     await Promise.all(
-      orphanIds.map((eventId) =>
+      archivedOrphanIds.map((eventId) =>
         fetch("/api/google/events", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
@@ -510,6 +520,31 @@ export default function CalendarioClient({
           agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
         };
         saved = normalizeCalendarEvent(saved);
+        if (process.env.NODE_ENV !== "production") {
+          console.log("[calendario] actividad CRM creada antes de Google", {
+            id: saved.id,
+            description: saved.description,
+            event_date: saved.event_date,
+            time: saved.time,
+            priority: saved.priority,
+            completed: saved.completed,
+            result: saved.result,
+            gcal_event_id: saved.gcal_event_id,
+            user_id: saved.user_id,
+            owner_user_id: saved.owner_user_id,
+            empresa_id: saved.empresa_id,
+            equipo_id: saved.equipo_id,
+            visibility: saved.visibility,
+            tipo: saved.tipo,
+            archived_at: saved.archived_at,
+            archived_reason: saved.archived_reason,
+            converted_to_tarea_id: saved.converted_to_tarea_id,
+          });
+        }
+        setEvents((prev) =>
+          [...prev.filter((event) => event.id !== saved.id), saved]
+            .sort((a, b) => a.event_date.localeCompare(b.event_date))
+        );
 
         if (isConnected && form.syncToGcal) {
           const gcalRes = await fetch("/api/google/events", {
@@ -520,49 +555,45 @@ export default function CalendarioClient({
           if (gcalRes.ok) {
             const gcalData = await gcalRes.json();
             if (gcalData.id) {
-              const { data: upd, error: syncUpdateError } = await (supabase as any)
-                .from("agenda")
-                .update({
-                  gcal_event_id: gcalData.id,
-                  google_calendar_id: "primary",
-                  sync_status: "synced",
-                  sync_error: null,
-                  last_synced_at: new Date().toISOString(),
-                  timezone: "Europe/Madrid",
-                })
-                .eq("id", saved.id)
-                .select()
-                .single();
-              if (syncUpdateError) {
-                setSaveError(syncUpdateError.message);
-              }
-              if (upd) {
-                saved = normalizeCalendarEvent({
-                  ...(upd as unknown as AgendaEvent),
-                  agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
+              const localAgendaId = saved.id;
+              const googleEventId = gcalData.id;
+              if (process.env.NODE_ENV !== "production") {
+                console.log("[calendario] intentando guardar gcal_event_id", {
+                  localAgendaId,
+                  googleEventId,
+                  currentUserId,
+                  empresaId,
                 });
+              }
+
+              const syncUpdateResult = await saveAgendaGoogleEventIdAction(localAgendaId, googleEventId);
+              if (!syncUpdateResult.success) {
+                const syncUpdateError = syncUpdateResult.error;
+                if (process.env.NODE_ENV !== "production") {
+                  console.error("[calendario] Error guardando gcal_event_id:", {
+                    message: syncUpdateError?.message,
+                    details: syncUpdateError?.details,
+                    hint: syncUpdateError?.hint,
+                    code: syncUpdateError?.code,
+                    raw: JSON.stringify(syncUpdateError, Object.getOwnPropertyNames(syncUpdateError)),
+                  });
+                }
+                toast(
+                  `Actividad guardada en CRM, pero no enlazada con Google Calendar: ${syncUpdateError.message}`,
+                  "error",
+                );
+              } else {
+                saved = normalizeCalendarEvent({ ...saved, gcal_event_id: syncUpdateResult.data.gcal_event_id });
+                setEvents((prev) => prev.map((event) => event.id === saved.id ? saved : event));
               }
             }
           } else {
             const gcalData = await gcalRes.json().catch(() => null);
             const message = gcalData?.error ?? "No se pudo sincronizar con Google Calendar";
-            await (supabase as any)
-              .from("agenda")
-              .update({
-                sync_status: "error",
-                sync_error: message,
-                timezone: "Europe/Madrid",
-              })
-              .eq("id", saved.id);
             toast(`Actividad guardada localmente. ${message}`, "error");
           }
-        } else {
-          await (supabase as any)
-            .from("agenda")
-            .update({ sync_status: isConnected ? "local" : "local", timezone: "Europe/Madrid" })
-            .eq("id", saved.id);
         }
-        setEvents((prev) => [...prev, normalizeCalendarEvent(saved)].sort((a, b) => a.event_date.localeCompare(b.event_date)));
+        router.refresh();
         toast("Actividad creada"); setModalOpen(false);
       }
     }
@@ -611,6 +642,7 @@ export default function CalendarioClient({
 
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
+    const normalizedInitialEvents = initialEvents.map(normalizeCalendarEvent);
     console.debug("[agenda:calendario:client]", {
       currentUserId,
       role,
@@ -629,7 +661,36 @@ export default function CalendarioClient({
       })) ?? [],
       groupedDateKeys: Object.keys(eventsByDate).sort(),
     });
-  }, [currentUserId, role, filterUserId, initialEvents.length, events.length, filteredEvents.length, selectedDateStr, eventsByDate]);
+    console.log("[calendario:client]", {
+      initialCount: initialEvents.length,
+      initialEvents: initialEvents.slice(0, 10).map((event) => ({
+        id: event.id,
+        description: event.description,
+        event_date: event.event_date,
+        time: event.time,
+        tipo: event.tipo,
+        user_id: event.user_id,
+        owner_user_id: event.owner_user_id,
+        gcal_event_id: event.gcal_event_id,
+      })),
+      normalizedCount: events.length,
+      normalizedEvents: normalizedInitialEvents.slice(0, 10).map((event) => ({
+        id: event.id,
+        description: event.description,
+        event_date: event.event_date,
+        time: event.time,
+        tipo: event.tipo,
+        user_id: event.user_id,
+        owner_user_id: event.owner_user_id,
+        gcal_event_id: event.gcal_event_id,
+      })),
+      selectedDateStr,
+      currentWeekStart: toDateStr(weekStart),
+      currentMonth: `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`,
+      eventsByDateKeys: Object.keys(eventsByDate).sort(),
+      selectedDayEvents: eventsByDate[selectedDateStr] ?? [],
+    });
+  }, [currentUserId, role, filterUserId, initialEvents, events.length, filteredEvents.length, selectedDateStr, eventsByDate, weekStart, currentDate]);
 
   // Period label
   const periodLabel = viewMode === "month"
