@@ -81,7 +81,7 @@ export default async function AppShell({
     <>
       <ThemeScript />
       <Sidebar userRole={userRole} />
-      <div className="flex h-screen flex-col md:pl-[220px]">
+      <div className="flex h-screen min-w-0 flex-col md:ml-[220px]">
         <Header userName={userName} userEmail={userEmail} avatarUrl={userAvatarUrl} notifications={notifications} />
         <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
           {children}

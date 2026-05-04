@@ -19,6 +19,7 @@ type Actividad = {
   tipo: string;
   completed: boolean;
   result: string | null;
+  user_id?: number | null;
   owner_user_id: number | null;
   agenda_usuarios?: Array<{
     usuario_id: number;
@@ -91,7 +92,7 @@ export default function OrdenesClient({
   const filteredActividades = useMemo(() => {
     return actividades.filter((actividad) => {
       if (!filterUserId) return true;
-      return assignedIds(actividad).includes(filterUserId) || actividad.owner_user_id === filterUserId;
+      return assignedIds(actividad).includes(filterUserId) || actividad.owner_user_id === filterUserId || actividad.user_id === filterUserId;
     });
   }, [actividades, filterUserId]);
 

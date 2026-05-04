@@ -1,10 +1,9 @@
+import { googleMadridDateTime, madridTodayDateKey } from "@/lib/dates/timezone";
+
 export const DEFAULT_ACTIVITY_TIME = "09:00";
 
 export function localDateKey(date = new Date()): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return madridTodayDateKey(date);
 }
 
 export function normalizeDateKey(value: string): string {
@@ -37,7 +36,5 @@ export function formatLocalDateEs(date: string): string {
 }
 
 export function googleCalendarDateTime(date: string, time: string): string {
-  const [year, month, day] = date.split("-").map(Number);
-  const [hour, minute] = normalizeTime(time).split(":").map(Number);
-  return new Date(year, month - 1, day, hour, minute, 0).toISOString();
+  return googleMadridDateTime(date, normalizeTime(time));
 }

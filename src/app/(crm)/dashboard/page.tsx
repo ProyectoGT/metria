@@ -21,6 +21,8 @@ import MyActivity from "@/components/dashboard/MyActivity";
 import MapaDashboardLazy from "@/components/dashboard/MapaDashboardLazy";
 import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
 import { combineLocalDateTime, localDateKey, normalizeTime } from "@/lib/local-date-time";
+import { normalizeAgendaEvent } from "@/lib/agenda/normalize-agenda-event";
+import { getMadridTodayRangeUtc } from "@/lib/dates/timezone";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -65,6 +67,8 @@ export default async function DashboardPage() {
   const fullName = yo ? `${yo.nombre} ${yo.apellidos}`.trim() : "Usuario";
   const anioActual = new Date().getFullYear();
   const periodRange = getPeriodRange(anioActual, 0);
+  const today = localDateKey();
+  const todayRange = getMadridTodayRangeUtc();
 
   const isManager = role === "Administrador" || role === "Director";
 
@@ -195,9 +199,9 @@ export default async function DashboardPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
       .from("agenda")
-      .select("id, description, event_date, time, priority, completed, result, owner_user_id, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .select("id, description, event_date, time, priority, completed, result, user_id, owner_user_id, empresa_id, created_at, sync_status, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
-      .eq("event_date", localDateKey())
+      .or(`event_date.eq.${today},and(event_date.is.null,created_at.gte.${todayRange.startUtc},created_at.lte.${todayRange.endUtc})`)
       .order("time", { ascending: true, nullsFirst: false }),
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -369,7 +373,11 @@ export default async function DashboardPage() {
     priority: string | null;
     completed: boolean;
     result: string | null;
+    user_id: number | null;
     owner_user_id: number | null;
+    empresa_id?: number | null;
+    created_at?: string | null;
+    sync_status?: string | null;
     agenda_usuarios?: Array<{ usuario_id: number; usuarios?: { nombre: string | null; apellidos: string | null } | null }>;
   };
 
@@ -384,9 +392,17 @@ export default async function DashboardPage() {
   }
 
   const tareas: TareaDbRow[] = (tareasData ?? []) as TareaDbRow[];
-  const agendaHoy: AgendaDbRow[] = (agendaData ?? []) as AgendaDbRow[];
+  const agendaHoy: AgendaDbRow[] = ((agendaData ?? []) as AgendaDbRow[]).map((row) => {
+    const normalized = normalizeAgendaEvent(row);
+    return {
+      ...row,
+      description: normalized.title,
+      event_date: normalized.date,
+      time: normalized.timeLabel,
+    };
+  });
   const myTareas = tareas.filter((t) => assignedIdsFromRows(t.tarea_usuarios).includes(userId) || t.owner_user_id === userId);
-  const myAgendaHoy = agendaHoy.filter((a) => assignedIdsFromRows(a.agenda_usuarios).includes(userId) || a.owner_user_id === userId);
+  const myAgendaHoy = agendaHoy.filter((a) => assignedIdsFromRows(a.agenda_usuarios).includes(userId) || a.owner_user_id === userId || a.user_id === userId);
 
   function toCard(t: TareaDbRow) {
     return {
@@ -459,7 +475,7 @@ export default async function DashboardPage() {
         tareas: agendaHoy
           .filter((t) => {
             const assigned = assignedIdsFromRows(t.agenda_usuarios);
-            return assigned.includes(a.id) || t.owner_user_id === a.id;
+            return assigned.includes(a.id) || t.owner_user_id === a.id || t.user_id === a.id;
           })
           .map((t) => ({
             id: t.id,
