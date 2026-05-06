@@ -34,7 +34,7 @@ function KanbanColumn({
 
   return (
     <div
-      className="flex w-[280px] shrink-0 flex-col rounded-2xl border border-border bg-surface shadow-sm transition-shadow duration-200 hover:shadow-md"
+      className="flex w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col rounded-2xl border border-border bg-surface shadow-sm transition-shadow duration-200 hover:shadow-md"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >

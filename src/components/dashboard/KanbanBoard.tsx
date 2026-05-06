@@ -293,7 +293,7 @@ export default function KanbanBoard({
   return (
     <>
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex min-w-0 flex-row gap-4 overflow-x-auto overscroll-x-contain pb-3">
+        <div className="@container flex min-w-0 flex-row gap-4 overflow-x-auto overscroll-x-contain pb-3">
           {columns.map((column) => (
             <KanbanColumn
               key={column.id}
@@ -310,7 +310,7 @@ export default function KanbanBoard({
 
           {/* Añadir columna */}
           {addingColumn ? (
-            <div className="flex w-[280px] shrink-0 flex-col gap-2 rounded-2xl border border-dashed border-border bg-surface p-3">
+            <div className="flex w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col gap-2 rounded-2xl border border-dashed border-border bg-surface p-3">
               <input
                 ref={newColInputRef}
                 type="text"
@@ -344,7 +344,7 @@ export default function KanbanBoard({
             <button
               type="button"
               onClick={handleStartAddColumn}
-              className="flex h-fit w-[280px] shrink-0 items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface/50 px-4 py-6 text-sm font-medium text-text-secondary transition-all hover:border-primary/40 hover:bg-surface hover:text-primary"
+              className="flex h-fit w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface/50 px-4 py-6 text-sm font-medium text-text-secondary transition-all hover:border-primary/40 hover:bg-surface hover:text-primary"
             >
               <Plus className="h-4 w-4" />
               Nueva columna

@@ -110,11 +110,7 @@ interface Props {
 export default function Sidebar({ userRole: _userRole }: Props) {
   const pathname = usePathname();
 
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof document === "undefined") return "dark";
-    const saved = localStorage.getItem("metria-theme") as Theme | null;
-    return saved ?? "dark";
-  });
+  const [theme, setTheme] = useState<Theme>("dark");
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const userRole = _userRole ? normalizeUserRole(_userRole) : null;
@@ -135,6 +131,12 @@ export default function Sidebar({ userRole: _userRole }: Props) {
         body: JSON.stringify({ theme: t }),
       }).catch(() => {});
     }
+  }, []);
+
+  // Sincronizar estado del botón de tema desde localStorage al montar
+  useEffect(() => {
+    const saved = localStorage.getItem("metria-theme") as Theme | null;
+    if (saved) setTheme(saved);
   }, []);
 
   // Escuchar evento del botón hamburger del header
