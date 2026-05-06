@@ -25,6 +25,7 @@ import { combineLocalDateTime, localDateKey, normalizeTime } from "@/lib/local-d
 import { normalizeAgendaEvent } from "@/lib/agenda/normalize-agenda-event";
 import { rolloverOverdueAgendaToPendingTasks } from "@/lib/agenda/rollover-overdue-agenda";
 import { normalizeActivityType } from "@/lib/activity-options";
+import { filterReadablePedidos } from "@/lib/pedidos-access";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -182,7 +183,7 @@ export default async function DashboardPage() {
     ),
     applyPedidoFilters(
       supabase.from("pedidos").select(
-        "id, nombre_cliente, tipo_propiedad, zona:zona_deseada(nombre), usuarios:usuarios!pedidos_owner_user_id_fkey(nombre, apellidos)"
+        "id, nombre_cliente, tipo_propiedad, owner_user_id, empresa_id, equipo_id, visibility, visibility_agente_ids, zona:zona_deseada(nombre), usuarios:usuarios!pedidos_owner_user_id_fkey(nombre, apellidos)"
       ).order("id", { ascending: false }).limit(50)
     ),
 
@@ -307,6 +308,11 @@ export default async function DashboardPage() {
     id: number;
     nombre_cliente: string;
     tipo_propiedad: string | null;
+    owner_user_id: number | null;
+    empresa_id: number | null;
+    equipo_id: number | null;
+    visibility: string | null;
+    visibility_agente_ids: number[] | null;
     zona: { nombre: string | null } | null;
     usuarios: { nombre: string | null; apellidos: string | null } | null;
   };
@@ -329,7 +335,7 @@ export default async function DashboardPage() {
     noticias: ((noticiasList ?? []) as unknown as PropRow[]).map(mapPropiedad),
     investigaciones: ((investigacionesList ?? []) as unknown as PropRow[]).map(mapPropiedad),
     encargos: ((encargosList ?? []) as unknown as PropRow[]).map(mapPropiedad),
-    pedidosActivos: ((pedidosList ?? []) as unknown as PedidoRow[]).map(mapPedido),
+    pedidosActivos: filterReadablePedidos((pedidosList ?? []) as unknown as PedidoRow[], yo).map(mapPedido),
   };
 
   // ─── 3. Agentes filtrados por rol ────────────────────────────────────────

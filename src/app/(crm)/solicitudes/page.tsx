@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { canViewIdealistaLeads } from "@/lib/roles";
+import { filterReadablePedidos } from "@/lib/pedidos-access";
 import PageHeader from "@/components/layout/page-header";
 import PedidosClient from "./solicitudes-client";
 import IdealistaClient from "./idealista-client";
@@ -46,6 +47,7 @@ export default async function PedidosPage({
   });
 
   const nuevosLeads = (leads ?? []).filter((l) => l.estado === "nuevo").length;
+  const pedidosVisibles = filterReadablePedidos(pedidos ?? [], user);
 
   return (
     <>
@@ -56,7 +58,7 @@ export default async function PedidosPage({
         showIdealista={canViewIdealista}
         solicitudesContent={
           <PedidosClient
-            initialPedidos={pedidos ?? []}
+            initialPedidos={pedidosVisibles}
             agentes={agentesFiltrados}
             currentUserId={user?.id ?? null}
             currentUserRole={user?.role ?? null}

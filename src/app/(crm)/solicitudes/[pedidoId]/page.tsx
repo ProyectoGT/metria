@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Bath, BedDouble, Car, Euro, Home, MapPin, Phone, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase";
+import { getCurrentUserContext } from "@/lib/current-user";
+import { canReadPedido } from "@/lib/pedidos-access";
 import Breadcrumb from "@/components/ui/breadcrumb";
 import { ACCESS_SCOPE_LABELS, normalizeAccessScope } from "@/lib/access-scope";
 
@@ -21,6 +23,10 @@ type PedidoDetail = {
   referencia: string | null;
   notas: string | null;
   visibility: string | null;
+  visibility_agente_ids: number[] | null;
+  owner_user_id: number | null;
+  empresa_id: number | null;
+  equipo_id: number | null;
   usuarios: { id: number; nombre: string | null; apellidos: string | null } | null;
   zona: { id: number; nombre: string | null } | null;
 };
@@ -54,6 +60,7 @@ export default async function PedidoDetailPage({
 }) {
   const { pedidoId } = await params;
   const supabase = await createClient();
+  const user = await getCurrentUserContext();
 
   const { data } = await supabase
     .from("pedidos")
@@ -73,6 +80,10 @@ export default async function PedidoDetailPage({
       referencia,
       notas,
       visibility,
+      visibility_agente_ids,
+      owner_user_id,
+      empresa_id,
+      equipo_id,
       usuarios:usuarios!pedidos_owner_user_id_fkey(id, nombre, apellidos),
       zona:zona_deseada(id, nombre)
     `)
@@ -82,6 +93,8 @@ export default async function PedidoDetailPage({
   if (!data) notFound();
 
   const pedido = data as unknown as PedidoDetail;
+  if (!canReadPedido(pedido, user)) notFound();
+
   const agente = pedido.usuarios
     ? `${pedido.usuarios.nombre ?? ""} ${pedido.usuarios.apellidos ?? ""}`.trim()
     : "";

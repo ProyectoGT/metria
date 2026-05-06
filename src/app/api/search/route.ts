@@ -4,6 +4,7 @@ import { rateLimiter, getIp } from "@/lib/rate-limiter";
 import { SearchSchema } from "@/lib/validations/search";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { canAccessContactos } from "@/lib/roles";
+import { filterReadablePedidos } from "@/lib/pedidos-access";
 
 export type SearchResult = {
   id: string;
@@ -124,11 +125,11 @@ export async function GET(request: NextRequest) {
   if (ctx === "solicitudes" || ctx === "general") {
     const { data: pedidos } = await supabase
       .from("pedidos")
-      .select("id, nombre_cliente, tipo_propiedad, origen, referencia")
+      .select("id, nombre_cliente, tipo_propiedad, origen, referencia, owner_user_id, empresa_id, equipo_id, visibility, visibility_agente_ids")
       .or(`nombre_cliente.ilike.%${q}%,tipo_propiedad.ilike.%${q}%,origen.ilike.%${q}%,referencia.ilike.%${q}%`)
       .limit(ctx === "solicitudes" ? 10 : 5);
 
-    for (const p of pedidos ?? []) {
+    for (const p of filterReadablePedidos(pedidos ?? [], currentUser)) {
       results.push({
         id: `pedido-${p.id}`,
         type: "solicitud",
