@@ -4,6 +4,18 @@ import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import CalendarioClient from "./calendario-client";
 
+const AGENDA_SELECT = "id, description, event_date, time, priority, completed, result, gcal_event_id, user_id, created_at, owner_user_id, empresa_id, equipo_id, visibility, tipo, archived_at, archived_reason, converted_to_tarea_id, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))";
+
+function calendarRangeAroundToday() {
+  const today = new Date();
+  const from = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+  const to = new Date(today.getFullYear(), today.getMonth() + 13, 0);
+  return {
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+  };
+}
+
 export default async function CalendarioPage() {
   const cookieStore = await cookies();
   const isConnected = !!(
@@ -17,6 +29,7 @@ export default async function CalendarioPage() {
   const role = yo?.role ?? "Agente";
   const empresaId = yo?.empresaId ?? null;
   const supervisedIds = yo?.supervisedAgentIds ?? [];
+  const calendarRange = calendarRangeAroundToday();
 
   let eventsQuery;
 
@@ -24,17 +37,21 @@ export default async function CalendarioPage() {
     const adminSupa = createAdminClient();
     eventsQuery = adminSupa
       .from("agenda")
-      .select("*, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .select(AGENDA_SELECT)
       .is("archived_at", null)
+      .gte("event_date", calendarRange.from)
+      .lte("event_date", calendarRange.to)
       .order("event_date", { ascending: true });
     if (empresaId !== null) eventsQuery = eventsQuery.eq("empresa_id", empresaId);
   } else if (role === "Responsable") {
     const adminSupa = createAdminClient();
     eventsQuery = adminSupa
       .from("agenda")
-      .select("*, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .select(AGENDA_SELECT)
       .is("archived_at", null)
       .eq("empresa_id", empresaId ?? -1)
+      .gte("event_date", calendarRange.from)
+      .lte("event_date", calendarRange.to)
       .order("event_date", { ascending: true });
   } else {
     // Agente: usar admin client con filtro explícito para garantizar visibilidad
@@ -42,8 +59,10 @@ export default async function CalendarioPage() {
     const agenteSupa = createAdminClient();
     eventsQuery = agenteSupa
       .from("agenda")
-      .select("*, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .select(AGENDA_SELECT)
       .is("archived_at", null)
+      .gte("event_date", calendarRange.from)
+      .lte("event_date", calendarRange.to)
       .order("event_date", { ascending: true });
     if (empresaId !== null) eventsQuery = eventsQuery.eq("empresa_id", empresaId);
   }
@@ -56,6 +75,8 @@ export default async function CalendarioPage() {
       .select("gcal_event_id")
       .not("archived_at", "is", null)
       .not("gcal_event_id", "is", null)
+      .gte("event_date", calendarRange.from)
+      .lte("event_date", calendarRange.to)
       .eq("owner_user_id", userId),
   ]);
 

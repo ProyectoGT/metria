@@ -16,27 +16,55 @@ export default async function FincaDetailPage({
   const user = await getCurrentUserContext();
   const isAgente = user?.role === "Agente";
 
-  const propQuery = supabase
-    .from("propiedades")
-    .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)")
-    .eq("finca_id", Number(fincaId))
-    .order("planta")
-    .order("puerta");
+  const propiedadColumns = "id, planta, puerta, propietario, telefono, estado, fecha_visita, notas, honorarios, agente_asignado, latitud, longitud, contactado, contactado_hasta";
+  const propiedadSelect = `${propiedadColumns}, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)`;
+  const propiedadSelectWithAssignments = `${propiedadSelect}, propiedad_usuarios(usuario_id, usuarios(id, nombre, apellidos))`;
+
+  function buildPropiedadesQuery(select: string, assignedPropiedadIds: number[]) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const query = (supabase as any)
+      .from("propiedades")
+      .select(select)
+      .eq("finca_id", Number(fincaId))
+      .order("planta")
+      .order("puerta");
+
+    if (!isAgente || !user) return query;
+
+    return query.or([
+      `agente_asignado.eq.${user.id}`,
+      `owner_user_id.eq.${user.id}`,
+      assignedPropiedadIds.length ? `id.in.(${assignedPropiedadIds.join(",")})` : "id.eq.-1",
+    ].join(","));
+  }
+
+  let assignedPropiedadIds: number[] = [];
+  if (isAgente && user) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: assignedRows, error: assignedError } = await (supabase as any)
+      .from("propiedad_usuarios")
+      .select("propiedad_id")
+      .eq("usuario_id", user.id);
+    if (!assignedError) {
+      assignedPropiedadIds = ((assignedRows ?? []) as Array<{ propiedad_id: number }>).map((row) => row.propiedad_id);
+    }
+  }
+
+  let propiedadesResult = await buildPropiedadesQuery(propiedadSelectWithAssignments, assignedPropiedadIds);
+  if (propiedadesResult.error) {
+    propiedadesResult = await buildPropiedadesQuery(propiedadSelect, []);
+  }
 
   const [
     { data: zona },
     { data: sector },
     { data: finca },
-    { data: propiedadesRaw },
     { data: agentes },
     ordenPropiedades,
   ] = await Promise.all([
     supabase.from("zona").select("id, nombre").eq("id", Number(zonaId)).single(),
     supabase.from("sectores").select("id, numero").eq("id", Number(sectorId)).single(),
     supabase.from("fincas").select("id, numero").eq("id", Number(fincaId)).single(),
-    isAgente
-      ? propQuery.or(`agente_asignado.eq.${user.id},owner_user_id.eq.${user.id}`)
-      : propQuery,
     supabase.from("usuarios").select("id, nombre, apellidos").order("nombre"),
     getUserOrdenAction("propiedades"),
   ]);
@@ -62,7 +90,7 @@ export default async function FincaDetailPage({
     return 5000 + s.charCodeAt(0);
   }
 
-  const propiedades = (propiedadesRaw ?? [])
+  const propiedades = ((propiedadesResult.data ?? []) as Parameters<typeof PropiedadesClient>[0]["initialPropiedades"])
     .map((p) => ({ ...p, posicion: ordenPropiedades[p.id] ?? null }))
     .sort((a, b) => {
       const ap = a.posicion, bp = b.posicion;

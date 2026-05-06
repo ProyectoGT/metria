@@ -37,6 +37,10 @@ type Propiedad = {
   contactado?: boolean;
   contactado_hasta?: string | null;
   usuarios: { id: number; nombre: string; apellidos: string } | null;
+  propiedad_usuarios?: Array<{
+    usuario_id: number;
+    usuarios: { id: number; nombre: string; apellidos: string } | null;
+  }>;
   _order?: number;
 };
 
@@ -50,6 +54,7 @@ type FormData = {
   notas: string;
   honorarios: string;
   agente_asignado: string;
+  assigned_user_ids: string[];
   latitud: string;
   longitud: string;
 };
@@ -100,6 +105,22 @@ function isContactada(propiedad: Propiedad): boolean {
   return !!propiedad.contactado;
 }
 
+function assignedUserIds(propiedad: Propiedad) {
+  const relationIds = propiedad.propiedad_usuarios?.map((item) => item.usuario_id) ?? [];
+  const fallbackIds = propiedad.agente_asignado != null ? [propiedad.agente_asignado] : [];
+  return Array.from(new Set(relationIds.length ? relationIds : fallbackIds));
+}
+
+function assignedUsersLabel(propiedad: Propiedad) {
+  const relationNames = (propiedad.propiedad_usuarios ?? [])
+    .map((item) => item.usuarios ? `${item.usuarios.nombre} ${item.usuarios.apellidos}`.trim() : "")
+    .filter(Boolean);
+
+  if (relationNames.length > 0) return relationNames.join(", ");
+  if (propiedad.usuarios) return `${propiedad.usuarios.nombre} ${propiedad.usuarios.apellidos}`.trim();
+  return "Sin asignar";
+}
+
 function isContactadaCaducada(propiedad: Propiedad): boolean {
   if (!propiedad.contactado) return false;
   // Si tiene fecha de desmarque explícita, usarla
@@ -137,6 +158,7 @@ const EMPTY_FORM: FormData = {
   notas: "",
   honorarios: "",
   agente_asignado: "",
+  assigned_user_ids: [],
   latitud: "",
   longitud: "",
 };
@@ -265,7 +287,7 @@ export default function PropiedadesClient({
       list = list.filter((p) => filtroEstados.includes(p.estado ?? "neutral"));
     }
     if (filtroAgente) {
-      list = list.filter((p) => String(p.agente_asignado ?? "") === filtroAgente);
+      list = list.filter((p) => assignedUserIds(p).includes(Number(filtroAgente)));
     }
     if (filtroFechaDesde) {
       list = list.filter((p) => p.fecha_visita && p.fecha_visita >= filtroFechaDesde);
@@ -287,6 +309,7 @@ export default function PropiedadesClient({
       ...EMPTY_FORM,
       fecha_visita: nowLocalDatetime(),
       agente_asignado: currentUserId ? currentUserId.toString() : "",
+      assigned_user_ids: currentUserId ? [currentUserId.toString()] : [],
     });
     setSaveError(null);
     setModalOpen(true);
@@ -305,6 +328,7 @@ export default function PropiedadesClient({
       notas: propiedad.notas ?? "",
       honorarios: propiedad.honorarios != null ? propiedad.honorarios.toString() : "",
       agente_asignado: propiedad.agente_asignado?.toString() ?? "",
+      assigned_user_ids: assignedUserIds(propiedad).map(String),
       latitud: propiedad.latitud != null ? propiedad.latitud.toString() : "",
       longitud: propiedad.longitud != null ? propiedad.longitud.toString() : "",
     });
@@ -319,6 +343,22 @@ export default function PropiedadesClient({
 
   function setField(key: keyof FormData, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function toggleAssignedUser(userId: number) {
+    setForm((prev) => {
+      const userIdStr = String(userId);
+      const exists = prev.assigned_user_ids.includes(userIdStr);
+      const nextIds = exists
+        ? prev.assigned_user_ids.filter((id) => id !== userIdStr)
+        : [...prev.assigned_user_ids, userIdStr];
+
+      return {
+        ...prev,
+        assigned_user_ids: nextIds,
+        agente_asignado: nextIds[0] ?? "",
+      };
+    });
   }
 
   function openReminder(propiedad: Propiedad) {
@@ -382,7 +422,8 @@ export default function PropiedadesClient({
       fecha_visita: form.notas ? todayDate : (form.fecha_visita || null),
       notas: form.notas || null,
       honorarios: form.estado === "vendido" && form.honorarios ? parseFloat(form.honorarios) : null,
-      agente_asignado: form.agente_asignado ? Number(form.agente_asignado) : null,
+      agente_asignado: form.assigned_user_ids[0] ? Number(form.assigned_user_ids[0]) : null,
+      assigned_user_ids: form.assigned_user_ids.map(Number).filter(Number.isFinite),
       latitud: form.latitud ? parseFloat(form.latitud) : null,
       longitud: form.longitud ? parseFloat(form.longitud) : null,
     };
@@ -848,6 +889,10 @@ export default function PropiedadesClient({
                       <span className="font-medium text-text-primary line-clamp-2">{propiedad.notas}</span>
                     </div>
                   )}
+                  <div className="flex flex-col gap-0.5">
+                    <span>Usuarios asignados</span>
+                    <span className="font-medium text-text-primary">{assignedUsersLabel(propiedad)}</span>
+                  </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap justify-end gap-2">
@@ -910,6 +955,9 @@ export default function PropiedadesClient({
                 </th>
                 <th className="w-24 px-2 py-3 text-left font-medium text-text-secondary">
                   Ultima visita
+                </th>
+                <th className="w-40 px-2 py-3 text-left font-medium text-text-secondary">
+                  Usuarios asignados
                 </th>
                 <th className="px-3 py-3 text-left font-medium text-text-secondary">
                   Notas
@@ -1051,6 +1099,9 @@ export default function PropiedadesClient({
                                       : "-"}
                                   </span>
                                 </div>
+                              </td>
+                              <td className="px-2 py-3 text-xs text-text-secondary">
+                                {assignedUsersLabel(propiedad)}
                               </td>
                               <td className="px-3 py-3">
                                 {propiedad.notas ? (
@@ -1411,19 +1462,28 @@ export default function PropiedadesClient({
                 </FormField>
               )}
 
-              <FormField label="Agente asignado">
-                <select
-                  value={form.agente_asignado}
-                  onChange={(e) => setField("agente_asignado", e.target.value)}
-                  className="input"
-                >
-                  <option value="">Sin asignar</option>
-                  {agentes.map((agente) => (
-                    <option key={agente.id} value={agente.id}>
-                      {agente.nombre} {agente.apellidos}
-                    </option>
-                  ))}
-                </select>
+              <FormField label="Usuarios asignados">
+                <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-border bg-background p-2">
+                  {agentes.map((agente) => {
+                    const checked = form.assigned_user_ids.includes(String(agente.id));
+                    return (
+                      <label key={agente.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-text-secondary hover:bg-surface">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleAssignedUser(agente.id)}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        {agente.nombre} {agente.apellidos}
+                      </label>
+                    );
+                  })}
+                </div>
+                {form.assigned_user_ids.length > 0 && (
+                  <p className="text-xs text-text-secondary">
+                    El primer usuario seleccionado sera el agente principal.
+                  </p>
+                )}
               </FormField>
 
               <FormField label="Notas">

@@ -13,12 +13,12 @@ import type { ActivityType } from "@/lib/activity-options";
 import {
   completeAgendaAction,
   completeTareaAction,
-  convertAgendaToTareaAction,
   convertTareaToAgendaAction,
   createAgendaAction,
   createTareaAction,
   deleteTareaAction,
   updateAgendaAction,
+  updateKanbanCardOrderAction,
   updateTareaAction,
 } from "@/app/(crm)/dashboard/actions";
 import { DEFAULT_ACTIVITY_TIME, localDateKey, splitLocalDateTime } from "@/lib/local-date-time";
@@ -47,10 +47,6 @@ export default function KanbanBoard({
   const [resultadoText, setResultadoText] = useState("");
   const [convertModal, setConvertModal] = useState<{
     card: KanbanCardData;
-    sourceColId: string;
-    destColId: string;
-    sourceIndex: number;
-    destIndex: number;
   } | null>(null);
   const [convertDate, setConvertDate] = useState(localDateKey());
   const [convertTime, setConvertTime] = useState(DEFAULT_ACTIVITY_TIME);
@@ -63,24 +59,12 @@ export default function KanbanBoard({
     const { source, destination, draggableId } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+    if (source.droppableId !== destination.droppableId) return;
 
     const moved = findCard(source.droppableId, draggableId);
     if (!moved) return;
-    if (moved.source === "agenda" && destination.droppableId === "pendientes" && moved.gcalEventId) return;
 
-    // Tarea → Orden del dia: pedir fecha/hora antes de convertir
-    if (moved.source === "tarea" && destination.droppableId === "en_progreso") {
-      setConvertDate(localDateKey());
-      setConvertTime(DEFAULT_ACTIVITY_TIME);
-      setConvertModal({
-        card: moved,
-        sourceColId: source.droppableId,
-        destColId: destination.droppableId,
-        sourceIndex: source.index,
-        destIndex: destination.index,
-      });
-      return;
-    }
+    let reorderedColumnCards: KanbanCardData[] = [];
 
     setColumns((prev) => {
       const next = prev.map((col) => ({ ...col, cards: [...col.cards] }));
@@ -89,38 +73,45 @@ export default function KanbanBoard({
       if (!sourceCol || !destCol) return prev;
       const [card] = sourceCol.cards.splice(source.index, 1);
       destCol.cards.splice(destination.index, 0, card);
+      reorderedColumnCards = destCol.cards;
       return next;
     });
 
-    if (source.droppableId === destination.droppableId) return;
-
-    if (moved.source === "agenda" && destination.droppableId === "pendientes") {
-      convertAgendaToTareaAction(moved.dbId, moved.assignedUserIds)
-        .then(() => router.refresh())
-        .catch(() => router.refresh());
-    }
+    updateKanbanCardOrderAction(
+      reorderedColumnCards.map((card, index) => ({
+        source: card.source,
+        dbId: card.dbId,
+        columnId: destination.droppableId,
+        position: index,
+      })),
+    ).catch(() => router.refresh());
   }
 
   function handleConfirmConvert() {
     if (!convertModal) return;
-    const { card, sourceColId, destColId, sourceIndex, destIndex } = convertModal;
+    const { card } = convertModal;
     setConvertModal(null);
 
-    setColumns((prev) => {
-      const next = prev.map((col) => ({ ...col, cards: [...col.cards] }));
-      const sourceCol = next.find((c) => c.id === sourceColId);
-      const destCol = next.find((c) => c.id === destColId);
-      if (!sourceCol || !destCol) return prev;
-      const [movedCard] = sourceCol.cards.splice(sourceIndex, 1);
-      destCol.cards.splice(destIndex, 0, { ...movedCard, source: "agenda" as const });
-      return next;
-    });
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === "pendientes"
+          ? { ...col, cards: col.cards.filter((item) => item.id !== card.id) }
+          : col,
+      ),
+    );
 
     convertTareaToAgendaAction(card.dbId, {
       date: convertDate,
       time: convertTime,
       assignedUserIds: card.assignedUserIds,
     }).then(() => router.refresh()).catch(() => router.refresh());
+  }
+
+  function handleScheduleCard(_columnId: string, cardId: string, card: KanbanCardData) {
+    if (card.source !== "tarea" || card.id !== cardId) return;
+    setConvertDate(localDateKey());
+    setConvertTime(DEFAULT_ACTIVITY_TIME);
+    setConvertModal({ card });
   }
 
   const handleAddCard = useCallback(async (columnId: string, newCard: NewKanbanCard) => {
@@ -151,14 +142,26 @@ export default function KanbanBoard({
         isCompleted: false,
         fromOrdenDia: isAgendaColumn,
       };
+      const nextColumnCards = [
+        ...(columns.find((col) => col.id === columnId)?.cards ?? []),
+        finalCard,
+      ];
       setColumns((prev) =>
         prev.map((col) => col.id === columnId ? { ...col, cards: [...col.cards, finalCard] } : col),
+      );
+      await updateKanbanCardOrderAction(
+        nextColumnCards.map((card, index) => ({
+          source: card.source,
+          dbId: card.dbId,
+          columnId,
+          position: index,
+        })),
       );
       router.refresh();
     } catch {
       router.refresh();
     }
-  }, [router]);
+  }, [columns, router]);
 
   function handleDeleteCard(columnId: string, cardId: string) {
     const card = findCard(columnId, cardId);
@@ -267,6 +270,7 @@ export default function KanbanBoard({
               onDeleteCard={handleDeleteCard}
               onEditCard={handleOpenEdit}
               onCompleteCard={handleCompleteCard}
+              onScheduleCard={handleScheduleCard}
             />
           ))}
         </div>

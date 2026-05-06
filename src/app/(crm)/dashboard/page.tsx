@@ -10,6 +10,7 @@ import {
   type AgentMetrics,
   type Rendimiento,
   type KanbanData,
+  type KanbanCardData,
   type OrdenDiaAgente,
   type KanbanPriority,
 } from "@/lib/mock/dashboard";
@@ -23,7 +24,9 @@ import MapaDashboardLazy from "@/components/dashboard/MapaDashboardLazy";
 import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
 import { combineLocalDateTime, localDateKey, normalizeTime } from "@/lib/local-date-time";
 import { normalizeAgendaEvent } from "@/lib/agenda/normalize-agenda-event";
+import { rolloverOverdueAgendaToPendingTasks } from "@/lib/agenda/rollover-overdue-agenda";
 import { normalizeActivityType } from "@/lib/activity-options";
+import { filterReadablePedidos } from "@/lib/pedidos-access";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -73,11 +76,17 @@ export default async function DashboardPage() {
 
   const isManager = role === "Administrador" || role === "Director";
 
+  await rolloverOverdueAgendaToPendingTasks({
+    empresaId: yo?.empresaId ?? null,
+    today,
+  });
+
   // ─── 0. Calcular filtros de acceso ──────────────────────────────────────
   // fincaIdFilter: null = sin restricción, [] = sin acceso, [ids] = filtrar
   let fincaIdFilter: number[] | null = null;
   // agentIdFilter: null = sin restricción, [ids] = solo estos agentes
   let agentIdFilter: number[] | null = null;
+  let assignedPropiedadIds: number[] = [];
   // pedidoAgentFilter: null = sin restricción, [ids] = solo estos
   let pedidoAgentFilter: number[] | null = null;
 
@@ -115,27 +124,47 @@ export default async function DashboardPage() {
       agentIdFilter = supervised;
       pedidoAgentFilter = supervised;
     }
+
+    if (agentIdFilter && agentIdFilter.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: assignedRows } = await (supabase as any)
+        .from("propiedad_usuarios")
+        .select("propiedad_id")
+        .in("usuario_id", agentIdFilter);
+      assignedPropiedadIds = Array.from(new Set(
+        ((assignedRows ?? []) as Array<{ propiedad_id: number }>).map((row) => row.propiedad_id),
+      ));
+    }
   }
 
   // Aplica filtros de zona/agente a una query builder de propiedades
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function applyPropFilters(query: any): any {
     let q = query;
+    if (agentIdFilter !== null) {
+      if (agentIdFilter.length === 0) return q.eq("id", -1);
+      return q.or([
+        `agente_asignado.in.(${agentIdFilter.join(",")})`,
+        `owner_user_id.in.(${agentIdFilter.join(",")})`,
+        assignedPropiedadIds.length ? `id.in.(${assignedPropiedadIds.join(",")})` : "id.eq.-1",
+      ].join(","));
+    }
     if (fincaIdFilter !== null) {
       q = fincaIdFilter.length === 0 ? q.eq("id", -1) : q.in("finca_id", fincaIdFilter);
-    }
-    if (agentIdFilter !== null) {
-      q = agentIdFilter.length === 0 ? q.eq("agente_asignado", -1) : q.in("agente_asignado", agentIdFilter);
     }
     return q;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function applyPedidoFilters(query: any): any {
-    if (pedidoAgentFilter === null) return query;
+    let q = query;
+    if (yo?.empresaId != null) {
+      q = q.eq("empresa_id", yo.empresaId);
+    }
+    if (pedidoAgentFilter === null) return q;
     return pedidoAgentFilter.length === 0
-      ? query.eq("owner_user_id", -1)
-      : query.in("owner_user_id", pedidoAgentFilter);
+      ? q.eq("owner_user_id", -1)
+      : q.in("owner_user_id", pedidoAgentFilter);
   }
 
   // ─── 1. Summary counts + listings (paralelo) ────────────────────────────
@@ -156,6 +185,7 @@ export default async function DashboardPage() {
     { data: tareasData },
     { data: agendaData, error: agendaError },
     { data: kanbanColsData },
+    { data: kanbanOrderData },
     { data: agenteMesData },
     { data: noticiasMapData },
     { data: encargosMapData },
@@ -176,7 +206,7 @@ export default async function DashboardPage() {
     ),
     applyPedidoFilters(
       supabase.from("pedidos").select(
-        "id, nombre_cliente, tipo_propiedad, zona:zona_deseada(nombre), usuarios:usuarios!pedidos_owner_user_id_fkey(nombre, apellidos)"
+        "id, nombre_cliente, tipo_propiedad, owner_user_id, empresa_id, equipo_id, visibility, visibility_agente_ids, zona:zona_deseada(nombre), usuarios:usuarios!pedidos_owner_user_id_fkey(nombre, apellidos)"
       ).order("id", { ascending: false }).limit(50)
     ),
 
@@ -193,6 +223,7 @@ export default async function DashboardPage() {
       .from("tareas")
       .select("id, titulo, prioridad, fecha, estado, resultado, from_orden_dia, owner_user_id, tarea_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
+      .is("fecha", null)
       .in("estado", ["pendiente", "completado"])
       .order("id", { ascending: false }),
 
@@ -209,6 +240,12 @@ export default async function DashboardPage() {
       .select("col_id, titulo, orden")
       .eq("user_id", userId)
       .order("orden", { ascending: true }),
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from("kanban_card_orden")
+      .select("source, db_id, column_id, posicion")
+      .eq("user_id", userId),
 
     yo?.empresaId
       ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -300,6 +337,11 @@ export default async function DashboardPage() {
     id: number;
     nombre_cliente: string;
     tipo_propiedad: string | null;
+    owner_user_id: number | null;
+    empresa_id: number | null;
+    equipo_id: number | null;
+    visibility: string | null;
+    visibility_agente_ids: number[] | null;
     zona: { nombre: string | null } | null;
     usuarios: { nombre: string | null; apellidos: string | null } | null;
   };
@@ -322,7 +364,7 @@ export default async function DashboardPage() {
     noticias: ((noticiasList ?? []) as unknown as PropRow[]).map(mapPropiedad),
     investigaciones: ((investigacionesList ?? []) as unknown as PropRow[]).map(mapPropiedad),
     encargos: ((encargosList ?? []) as unknown as PropRow[]).map(mapPropiedad),
-    pedidosActivos: ((pedidosList ?? []) as unknown as PedidoRow[]).map(mapPedido),
+    pedidosActivos: filterReadablePedidos((pedidosList ?? []) as unknown as PedidoRow[], yo).map(mapPedido),
   };
 
   // ─── 3. Agentes filtrados por rol ────────────────────────────────────────
@@ -409,6 +451,31 @@ export default async function DashboardPage() {
       .filter(Boolean);
   }
 
+  type KanbanOrderRow = {
+    source: "tarea" | "agenda";
+    db_id: number;
+    column_id: string;
+    posicion: number;
+  };
+
+  const kanbanOrderMap = new Map(
+    ((kanbanOrderData ?? []) as KanbanOrderRow[]).map((row) => [
+      `${row.column_id}:${row.source}:${row.db_id}`,
+      row.posicion,
+    ]),
+  );
+
+  function sortKanbanCards(columnId: string, cards: KanbanCardData[]) {
+    return [...cards].sort((a, b) => {
+      const aOrder = kanbanOrderMap.get(`${columnId}:${a.source}:${a.dbId}`);
+      const bOrder = kanbanOrderMap.get(`${columnId}:${b.source}:${b.dbId}`);
+      if (aOrder != null && bOrder != null) return aOrder - bOrder;
+      if (aOrder != null) return -1;
+      if (bOrder != null) return 1;
+      return 0;
+    });
+  }
+
   const tareas: TareaDbRow[] = (tareasData ?? []) as TareaDbRow[];
   const agendaRows = ((agendaData ?? []) as AgendaDbRow[]).filter((row) => {
     if (role === "Administrador" || role === "Director") return true;
@@ -479,19 +546,19 @@ export default async function DashboardPage() {
         title: "Pendientes",
         fixed: true,
         // Pendientes primero, luego completadas al final con tachado
-        cards: [
+        cards: sortKanbanCards("pendientes", [
           ...myTareas.filter((t) => t.estado === "pendiente").map(toCard),
           ...myTareas.filter((t) => t.estado === "completado").map(toCard),
-        ],
+        ]),
       },
       {
         id: "en_progreso",
         title: "Orden del dia",
         fixed: true,
-        cards: [
+        cards: sortKanbanCards("en_progreso", [
           ...myAgendaHoy.filter((a) => !a.completed).map(agendaToCard),
           ...myAgendaHoy.filter((a) => a.completed).map(agendaToCard),
-        ],
+        ]),
       },
     ],
   };
