@@ -175,6 +175,18 @@ function agendaAssignedIds(ev: AgendaEvent) {
   return ev.agenda_usuarios?.map((u) => u.usuario_id) ?? [];
 }
 
+/** Normaliza los campos que pueden venir nulos de la base de datos */
+function normalizeCalendarEvent(ev: AgendaEvent): AgendaEvent {
+  return {
+    ...ev,
+    event_date: (ev.event_date ?? "").slice(0, 10) || toDateStr(new Date()),
+    time: normalizeTime(ev.time ?? "", "") || null,
+    tipo: ev.tipo ?? "actividad",
+    priority: ev.priority ?? "media",
+    description: ev.description ?? `Actividad #${ev.id}`,
+  };
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CalendarioClient({
@@ -195,11 +207,12 @@ export default function CalendarioClient({
   const [weekStart, setWeekStart]     = useState(() => getWeekStart(today));
   const [selectedDate, setSelectedDate] = useState<Date>(today);
 
-  const [events, setEvents]         = useState<AgendaEvent[]>(initialEvents);
+  const [events, setEvents]         = useState<AgendaEvent[]>(() => initialEvents.map(normalizeCalendarEvent));
   const [tareas, setTareas]         = useState<TareaEvent[]>(initialTareas);
   const eventsRef = useRef(events);
   useEffect(() => { eventsRef.current = events; }, [events]);
-  // Sync tareas when server re-renders with fresh data
+  // Sync events and tareas when server re-renders with fresh data
+  useEffect(() => { setEvents(initialEvents.map(normalizeCalendarEvent)); }, [initialEvents]);
   useEffect(() => { setTareas(initialTareas); }, [initialTareas]);
   const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
 
