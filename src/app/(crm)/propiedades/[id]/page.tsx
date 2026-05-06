@@ -72,7 +72,6 @@ export default async function PropiedadDetailPage({
       agente:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)
     `)
     .eq("id", propiedadId)
-    .eq("empresa_id", yo.empresaId ?? -1)
     .single();
 
   if (!raw) notFound();

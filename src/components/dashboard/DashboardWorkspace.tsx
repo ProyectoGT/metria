@@ -207,7 +207,7 @@ function ListingTable({ rows, titleKey }: { rows: PropertyListing[]; titleKey: M
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">{isPedidos ? "Zona" : "Finca"}</th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Estado</th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Agente</th>
-            {!isPedidos && <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Ficha</th>}
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Ficha</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -218,21 +218,19 @@ function ListingTable({ rows, titleKey }: { rows: PropertyListing[]; titleKey: M
               <td className="px-5 py-3 text-text-secondary">{row.finca}</td>
               <td className="px-5 py-3 text-text-secondary">{row.estado}</td>
               <td className="px-5 py-3 text-text-secondary">{row.agente}</td>
-              {!isPedidos && (
-                <td className="px-5 py-3">
-                  {row.zonaId && row.sectorId && row.fincaId ? (
-                    <Link
-                      href={`/zona/${row.zonaId}/sector/${row.sectorId}/finca/${row.fincaId}`}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                    >
-                      Ver ficha
-                      <ChevronRight className="h-3 w-3" />
-                    </Link>
-                  ) : (
-                    <span className="text-xs text-text-secondary">—</span>
-                  )}
-                </td>
-              )}
+              <td className="px-5 py-3">
+                {row.detailHref || (!isPedidos && row.id) ? (
+                  <Link
+                    href={row.detailHref || `/propiedades/${row.id}`}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  >
+                    Ver ficha
+                    <ChevronRight className="h-3 w-3" />
+                  </Link>
+                ) : (
+                  <span className="text-xs text-text-secondary">—</span>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

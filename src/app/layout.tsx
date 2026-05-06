@@ -43,8 +43,11 @@ export default function RootLayout({
       className="h-full antialiased"
       suppressHydrationWarning
     >
-      <body className="h-full bg-background text-text-primary font-sans">
+      <head>
         <ThemeScript />
+      </head>
+      <body className="h-full bg-background text-text-primary font-sans">
+
         {children}
         <Script id="service-worker-registration" strategy="afterInteractive">
           {`

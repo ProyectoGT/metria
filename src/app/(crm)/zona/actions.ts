@@ -68,7 +68,7 @@ export async function upsertPropiedadAction(
     const createPayload = {
       ...payload,
       finca_id: fincaId,
-      agente_asignado: payload.agente_asignado ?? yo.id,
+      agente_asignado: payload.agente_asignado !== undefined ? payload.agente_asignado : yo.id,
       owner_user_id: yo.id,
       empresa_id: yo.empresaId ?? null,
       equipo_id: yo.equipoId ?? null,
