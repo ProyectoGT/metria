@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import CalendarioClient from "./calendario-client";
 
@@ -41,7 +42,17 @@ export default async function CalendarioPage() {
       .order("event_date", { ascending: true });
   }
 
-  const [{ data: events }, { data: usersData }, { data: archivedGoogleEvents }] = await Promise.all([
+  // Tareas con fecha (para mostrar en el calendario)
+  const adminSupa = createAdminClient();
+  const tareasQuery = adminSupa
+    .from("tareas")
+    .select("id, titulo, prioridad, fecha, estado, owner_user_id, tarea_usuarios(usuario_id)")
+    .is("archived_at", null)
+    .not("fecha", "is", null)
+    .in("estado", ["pendiente", "completado"])
+    .order("fecha", { ascending: true });
+
+  const [{ data: events }, { data: usersData }, { data: archivedGoogleEvents }, { data: tareasData }] = await Promise.all([
     eventsQuery,
     supabase.from("usuarios").select("id, nombre, apellidos"),
     supabase
@@ -50,6 +61,7 @@ export default async function CalendarioPage() {
       .not("archived_at", "is", null)
       .not("gcal_event_id", "is", null)
       .eq("owner_user_id", userId),
+    tareasQuery,
   ]);
 
   type EventWithAssignments = {
@@ -65,6 +77,26 @@ export default async function CalendarioPage() {
         );
       })
     : (events ?? []);
+
+  // Filtrar tareas según el rol
+  type TareaRow = {
+    id: number;
+    titulo: string;
+    prioridad: string | null;
+    fecha: string;
+    estado: string | null;
+    owner_user_id: number | null;
+    tarea_usuarios?: { usuario_id: number }[];
+  };
+  const allTareas = (tareasData ?? []) as unknown as TareaRow[];
+  const visibleTareas = allTareas.filter((t) => {
+    if (role === "Administrador" || role === "Director") return true;
+    const assigned = t.tarea_usuarios?.map((u) => u.usuario_id) ?? [];
+    if (role === "Responsable") {
+      return assigned.some((id) => visibleIds.includes(id)) || visibleIds.includes(t.owner_user_id ?? -1);
+    }
+    return assigned.includes(userId) || t.owner_user_id === userId;
+  });
 
   const usersMap: Record<number, string> = {};
   for (const u of usersData ?? []) {
@@ -83,7 +115,7 @@ export default async function CalendarioPage() {
   return (
     <CalendarioClient
       initialEvents={visibleEvents as unknown as Parameters<typeof CalendarioClient>[0]["initialEvents"]}
-      initialTareas={[]}
+      initialTareas={visibleTareas}
       isConnected={isConnected}
       role={role}
       currentUserId={userId}

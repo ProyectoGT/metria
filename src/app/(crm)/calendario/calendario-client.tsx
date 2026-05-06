@@ -5,9 +5,11 @@ import {
   Phone, Users, Home, Clock, BookOpen, Star, Activity, Calendar,
   ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { updateTareaEstadoAction } from "@/app/(crm)/dashboard/actions";
+import { saveAgendaGoogleEventIdAction } from "@/app/(crm)/calendario/actions";
 import type { UserRole } from "@/lib/roles";
 import { DEFAULT_ACTIVITY_TIME, normalizeTime } from "@/lib/local-date-time";
 import { isActivityPriority, isActivityType, normalizeActivityPriority, normalizeActivityType } from "@/lib/activity-options";
@@ -186,6 +188,7 @@ export default function CalendarioClient({
   archivedGoogleEventIds,
 }: Props) {
   const today = useMemo(() => new Date(), []);
+  const router = useRouter();
 
   const [viewMode, setViewMode]       = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
@@ -196,6 +199,8 @@ export default function CalendarioClient({
   const [tareas, setTareas]         = useState<TareaEvent[]>(initialTareas);
   const eventsRef = useRef(events);
   useEffect(() => { eventsRef.current = events; }, [events]);
+  // Sync tareas when server re-renders with fresh data
+  useEffect(() => { setTareas(initialTareas); }, [initialTareas]);
   const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
 
   // Filter by user — default al usuario actual
@@ -464,6 +469,7 @@ export default function CalendarioClient({
     }
 
     if (editId !== null) {
+      const previousEvent = events.find((event) => event.id === editId);
       const { data, error } = await insertOrUpdate(payload);
       if (error) setSaveError(error.message);
       else if (data) {
@@ -471,7 +477,45 @@ export default function CalendarioClient({
           ...(data as unknown as AgendaEvent),
           agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
         };
+        const googleEventId = (updated as AgendaEvent).gcal_event_id ?? previousEvent?.gcal_event_id ?? null;
+
+        if (isConnected && googleEventId) {
+          const gcalRes = await fetch("/api/google/events", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              eventId: googleEventId,
+              summary: payload.description,
+              description: payload.result ?? "",
+              date: payload.event_date,
+              time: payload.time,
+              agendaId: editId,
+            }),
+          });
+
+          if (!gcalRes.ok) {
+            const gcalData = await gcalRes.json().catch(() => null);
+            toast(
+              `Actividad actualizada en CRM, pero no en Google Calendar: ${gcalData?.error ?? "error de sincronizacion"}`,
+              "error",
+            );
+          } else {
+            setGcalEvents((prev) =>
+              prev.map((event) =>
+                event.id === googleEventId
+                  ? {
+                      ...event,
+                      summary: payload.description,
+                      start: { ...event.start, dateTime: `${payload.event_date}T${payload.time}:00` },
+                    }
+                  : event,
+              ),
+            );
+          }
+        }
+
         setEvents((prev) => prev.map((e) => e.id === editId ? updated : e));
+        router.refresh();
         toast("Actividad actualizada"); setModalOpen(false);
       }
     } else {
@@ -483,7 +527,12 @@ export default function CalendarioClient({
           agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
         };
 
-        if (isConnected) {
+        setEvents((prev) =>
+          [...prev.filter((event) => event.id !== saved.id), saved]
+            .sort((a, b) => a.event_date.localeCompare(b.event_date))
+        );
+
+        if (isConnected && form.syncToGcal) {
           const gcalRes = await fetch("/api/google/events", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -492,18 +541,24 @@ export default function CalendarioClient({
           if (gcalRes.ok) {
             const gcalData = await gcalRes.json();
             if (gcalData.id) {
-              const { data: upd } = await supabase.from("agenda").update({ gcal_event_id: gcalData.id }).eq("id", saved.id).select().single();
-              if (upd) {
-                saved = {
-                  ...(upd as unknown as AgendaEvent),
-                  agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
-                };
+              const syncResult = await saveAgendaGoogleEventIdAction(saved.id, gcalData.id);
+              if (!syncResult.success) {
+                toast(
+                  `Actividad guardada en CRM, pero no enlazada con Google Calendar: ${syncResult.error.message}`,
+                  "error",
+                );
+              } else {
+                saved = { ...saved, gcal_event_id: syncResult.data.gcal_event_id ?? null };
+                setEvents((prev) => prev.map((event) => event.id === saved.id ? saved : event));
                 await fetchGcalEvents();
               }
             }
+          } else {
+            const gcalData = await gcalRes.json().catch(() => null);
+            toast(`Actividad guardada localmente. ${gcalData?.error ?? "No se pudo sincronizar con Google Calendar"}`, "error");
           }
         }
-        setEvents((prev) => [...prev, saved].sort((a, b) => a.event_date.localeCompare(b.event_date)));
+        router.refresh();
         toast("Actividad creada"); setModalOpen(false);
       }
     }
