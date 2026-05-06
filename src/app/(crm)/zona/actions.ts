@@ -51,9 +51,18 @@ export async function upsertPropiedadAction(
     revalidatePath(`/dashboard`);
     return { data: data as Record<string, unknown> };
   } else {
+    const createPayload = {
+      ...payload,
+      finca_id: fincaId,
+      agente_asignado: payload.agente_asignado ?? yo.id,
+      owner_user_id: yo.id,
+      empresa_id: yo.empresaId ?? null,
+      equipo_id: yo.equipoId ?? null,
+    };
+
     const { data, error } = await supabase
       .from("propiedades")
-      .insert({ ...payload, finca_id: fincaId } as never)
+      .insert(createPayload as never)
       .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)")
       .single();
 

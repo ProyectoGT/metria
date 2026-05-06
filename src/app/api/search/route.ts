@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
         type: "propiedad",
         label: p.propietario?.trim() || `Propiedad #${p.id}`,
         sublabel: `Finca ${p.fincas.numero}${p.planta ? ` · Planta ${p.planta}` : ""}${p.puerta ? ` Puerta ${p.puerta}` : ""}`,
-        href: `/zona/${p.fincas.sectores.zona_id}/sector/${p.fincas.sectores.id}/finca/${p.fincas.id}`,
+        href: `/propiedades/${p.id}`,
       });
     }
   }
@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
         type: "solicitud",
         label: p.nombre_cliente || `Solicitud #${p.id}`,
         sublabel: [p.tipo_propiedad, p.origen].filter(Boolean).join(" · ") || undefined,
-        href: "/solicitudes",
+        href: `/solicitudes/${p.id}`,
       });
     }
   }
