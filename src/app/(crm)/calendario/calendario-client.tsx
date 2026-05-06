@@ -28,6 +28,13 @@ type AgendaEvent = {
   gcal_event_id: string | null;
   tarea_id?: number | null;
   owner_user_id: number | null;
+  user_id: number | null;
+  empresa_id: number | null;
+  equipo_id?: number | null;
+  visibility?: string | null;
+  archived_at?: string | null;
+  archived_reason?: string | null;
+  converted_to_tarea_id?: number | null;
   created_at: string;
   agenda_usuarios?: Array<{ usuario_id: number; usuarios?: { nombre: string | null; apellidos: string | null } | null }>;
 };
@@ -75,6 +82,7 @@ type Props = {
   isConnected: boolean;
   role: UserRole;
   currentUserId: number;
+  empresaId: number | null;
   usersMap: Record<number, string>;
   filterableUsers: Array<{ id: number; name: string }>;
   archivedGoogleEventIds: string[];
@@ -195,6 +203,7 @@ export default function CalendarioClient({
   isConnected,
   role,
   currentUserId,
+  empresaId,
   usersMap,
   filterableUsers,
   archivedGoogleEventIds,
@@ -211,21 +220,28 @@ export default function CalendarioClient({
   const [tareas, setTareas]         = useState<TareaEvent[]>(initialTareas);
   const eventsRef = useRef(events);
   useEffect(() => { eventsRef.current = events; }, [events]);
-  // Sync events and tareas when server re-renders with fresh data
-  useEffect(() => { setEvents(initialEvents.map(normalizeCalendarEvent)); }, [initialEvents]);
-  useEffect(() => { setTareas(initialTareas); }, [initialTareas]);
-  const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
-
-  // Filter by user — default al usuario actual
-  const [filterUserId, setFilterUserId] = useState<number | "all">(currentUserId);
 
   const [modalOpen, setModalOpen]   = useState(false);
   const [editId, setEditId]         = useState<number | null>(null);
-  const [form, setForm] = useState<FormState>(() => emptyForm(undefined, isConnected));  const [saving, setSaving]         = useState(false);
+  const [form, setForm] = useState<FormState>(() => emptyForm(undefined, isConnected));
+  const [saving, setSaving]         = useState(false);
   const [saveError, setSaveError]   = useState<string | null>(null);
   const [deleteId, setDeleteId]     = useState<number | null>(null);
   const [deleting, setDeleting]     = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+
+  // Sync events and tareas when server re-renders with fresh data
+  useEffect(() => {
+    if (saving) return;
+    setEvents(initialEvents.map(normalizeCalendarEvent));
+  }, [initialEvents, saving]);
+  useEffect(() => { setTareas(initialTareas); }, [initialTareas]);
+  const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
+
+  // Filter by user — default "all" for managers, currentUserId for agents
+  const [filterUserId, setFilterUserId] = useState<number | "all">(() =>
+    canSeeOthers(role) ? "all" : currentUserId
+  );
 
   const supabase = useMemo(() => createClient(), []);
   const { toasts, toast } = useToast();
@@ -235,7 +251,7 @@ export default function CalendarioClient({
   // ── Apply user filter ──────────────────────────────────────────────────────
 
   const filteredEvents = useMemo(() =>
-    filterUserId === "all" ? events : events.filter((e) => e.owner_user_id === filterUserId || agendaAssignedIds(e).includes(filterUserId)),
+    filterUserId === "all" ? events : events.filter((e) => e.owner_user_id === filterUserId || e.user_id === filterUserId || agendaAssignedIds(e).includes(filterUserId)),
     [events, filterUserId]
   );
 
