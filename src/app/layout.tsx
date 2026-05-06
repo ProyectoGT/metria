@@ -50,6 +50,22 @@ export default function RootLayout({
           {`
             if ('serviceWorker' in navigator) {
               window.addEventListener('load', function() {
+                var isLocalhost = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+                if (isLocalhost) {
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    registrations.forEach(function(registration) {
+                      registration.unregister();
+                    });
+                  });
+                  if (window.caches) {
+                    caches.keys().then(function(keys) {
+                      keys.forEach(function(key) {
+                        caches.delete(key);
+                      });
+                    });
+                  }
+                  return;
+                }
                 navigator.serviceWorker.register('/sw.js');
               });
             }

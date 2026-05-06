@@ -106,9 +106,10 @@ function PropertyTable({ listings }: { listings: PropertyListing[] }) {
         <tbody>
           {listings.map((item) => {
             const href =
-              item.zonaId && item.sectorId && item.fincaId
-                ? `/zona/${item.zonaId}/sector/${item.sectorId}/finca/${item.fincaId}`
-                : null;
+              item.detailHref ??
+              (item.zonaId && item.sectorId && item.fincaId
+                ? `/propiedades/${item.id}`
+                : null);
 
             return (
               <tr
@@ -131,7 +132,7 @@ function PropertyTable({ listings }: { listings: PropertyListing[] }) {
                     <Link
                       href={href}
                       className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary opacity-0 transition-opacity hover:bg-primary/10 group-hover:opacity-100"
-                      title="Ver ficha del piso"
+                      title="Ver ficha"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
                       Ver ficha

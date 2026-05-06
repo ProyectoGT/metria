@@ -290,9 +290,9 @@ function MapaDashboard({
                       <Navigation style={{ width: 13, height: 13, flexShrink: 0 }} />
                       Como llegar desde la oficina
                     </a>
-                    {selected.zonaId && selected.sectorId && selected.fincaId && (
+                    {selected.id && (
                       <a
-                        href={`/zona/${selected.zonaId}/sector/${selected.sectorId}/finca/${selected.fincaId}`}
+                        href={`/propiedades/${selected.id}`}
                         style={{
                           display: "flex", alignItems: "center", gap: 6,
                           background: selected.tipo === "noticia" ? "#eff6ff" : "#f0fdf4",
@@ -303,7 +303,7 @@ function MapaDashboard({
                         }}
                       >
                         <FileText style={{ width: 13, height: 13, flexShrink: 0 }} />
-                        Ver ficha de la finca
+                        Ver ficha
                       </a>
                     )}
                   </div>

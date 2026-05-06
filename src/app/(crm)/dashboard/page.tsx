@@ -283,6 +283,7 @@ export default async function DashboardPage() {
       agente: p.usuarios
         ? `${p.usuarios.nombre ?? ""} ${p.usuarios.apellidos ?? ""}`.trim() || "Sin asignar"
         : "Sin asignar",
+      detailHref: `/solicitudes/${p.id}`,
     };
   }
 

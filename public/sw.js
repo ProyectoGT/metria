@@ -1,4 +1,4 @@
-const CACHE_NAME = "metria-crm-v1.0.1";
+const CACHE_NAME = "metria-crm-v1.0.2";
 const OFFLINE_URL = "/offline";
 
 // Recursos que se cachean al instalar
@@ -31,6 +31,10 @@ self.addEventListener("fetch", (event) => {
   // Solo interceptar mismo origen
   if (url.origin !== location.origin) return;
 
+  // Los chunks de Next deben venir siempre de red. Cachearlos puede mezclar HTML
+  // nuevo con JS antiguo y provocar errores de hidratacion.
+  if (url.pathname.startsWith("/_next/")) return;
+
   // No interceptar rutas de API ni auth
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth/")) return;
 
@@ -55,7 +59,6 @@ self.addEventListener("fetch", (event) => {
 
   // Para assets estáticos: Cache first
   if (
-    url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/") ||
     url.pathname.endsWith(".png") ||
     url.pathname.endsWith(".svg") ||

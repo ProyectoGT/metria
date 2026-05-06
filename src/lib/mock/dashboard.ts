@@ -16,7 +16,8 @@ export type PropertyListing = {
   finca: string;
   estado: string;
   agente: string;
-  // IDs para navegar a la ficha del piso (solo propiedades, no pedidos)
+  detailHref?: string;
+  // IDs para navegar a la ficha del piso (solo propiedades)
   zonaId?: number;
   sectorId?: number;
   fincaId?: number;

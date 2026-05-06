@@ -288,7 +288,11 @@ export default function PropiedadesClient({
 
   function openCreate() {
     setEditTarget(null);
-    setForm({ ...EMPTY_FORM, fecha_visita: nowLocalDatetime() });
+    setForm({
+      ...EMPTY_FORM,
+      fecha_visita: nowLocalDatetime(),
+      agente_asignado: currentUserId ? currentUserId.toString() : "",
+    });
     setSaveError(null);
     setModalOpen(true);
   }
