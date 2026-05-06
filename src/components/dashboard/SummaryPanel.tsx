@@ -106,9 +106,10 @@ function PropertyTable({ listings }: { listings: PropertyListing[] }) {
         <tbody>
           {listings.map((item) => {
             const href =
-              item.zonaId && item.sectorId && item.fincaId
-                ? `/zona/${item.zonaId}/sector/${item.sectorId}/finca/${item.fincaId}`
-                : null;
+              item.detailHref ??
+              (item.zonaId && item.sectorId && item.fincaId
+                ? `/propiedades/${item.id}`
+                : null);
 
             return (
               <tr
@@ -131,7 +132,7 @@ function PropertyTable({ listings }: { listings: PropertyListing[] }) {
                     <Link
                       href={href}
                       className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary opacity-0 transition-opacity hover:bg-primary/10 group-hover:opacity-100"
-                      title="Ver ficha del piso"
+                      title="Ver ficha"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
                       Ver ficha
@@ -181,7 +182,7 @@ export default function SummaryPanel({ summary, listings }: SummaryPanelProps) {
 
       {/* Full-screen overlay — cubre el contenido principal bajo el header */}
       {activeKey && activeCard && (
-        <div className="fixed inset-0 z-30 flex flex-col bg-background pt-16 md:pl-[220px]">
+        <div className="fixed inset-0 z-30 flex flex-col bg-background pt-16 md:left-[220px]">
           {/* Cabecera de la pantalla */}
           <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4 md:px-6">
             <button

@@ -80,9 +80,9 @@ export default async function AppShell({
   return (
     <>
       <ThemeScript />
-      <div className="flex min-h-screen bg-background">
+      <div className="min-h-screen bg-background md:grid md:grid-cols-[220px_minmax(0,1fr)]">
         <Sidebar userRole={userRole} />
-        <div className="flex h-screen min-w-0 flex-1 flex-col">
+        <div className="flex h-screen min-w-0 flex-col">
           <Header userName={userName} userEmail={userEmail} avatarUrl={userAvatarUrl} notifications={notifications} />
           <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
             {children}

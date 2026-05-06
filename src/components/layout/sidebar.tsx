@@ -158,7 +158,7 @@ export default function Sidebar({ userRole: _userRole }: Props) {
   return (
     <>
       {/* Desktop: sidebar visible en el layout */}
-      <aside className="sticky top-0 z-30 hidden h-screen w-[220px] shrink-0 flex-col border-r border-border bg-sidebar md:flex">
+      <aside className="sticky top-0 z-50 hidden h-screen w-[220px] flex-col border-r border-border bg-sidebar md:flex">
         {navContent}
       </aside>
 
