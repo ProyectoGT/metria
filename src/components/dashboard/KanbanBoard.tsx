@@ -18,6 +18,7 @@ import {
   createTareaAction,
   deleteTareaAction,
   updateAgendaAction,
+  updateKanbanCardOrderAction,
   updateTareaAction,
 } from "@/app/(crm)/dashboard/actions";
 import { DEFAULT_ACTIVITY_TIME, localDateKey, splitLocalDateTime } from "@/lib/local-date-time";
@@ -63,6 +64,8 @@ export default function KanbanBoard({
     const moved = findCard(source.droppableId, draggableId);
     if (!moved) return;
 
+    let reorderedColumnCards: KanbanCardData[] = [];
+
     setColumns((prev) => {
       const next = prev.map((col) => ({ ...col, cards: [...col.cards] }));
       const sourceCol = next.find((c) => c.id === source.droppableId);
@@ -70,9 +73,18 @@ export default function KanbanBoard({
       if (!sourceCol || !destCol) return prev;
       const [card] = sourceCol.cards.splice(source.index, 1);
       destCol.cards.splice(destination.index, 0, card);
+      reorderedColumnCards = destCol.cards;
       return next;
     });
 
+    updateKanbanCardOrderAction(
+      reorderedColumnCards.map((card, index) => ({
+        source: card.source,
+        dbId: card.dbId,
+        columnId: destination.droppableId,
+        position: index,
+      })),
+    ).catch(() => router.refresh());
   }
 
   function handleConfirmConvert() {
@@ -130,14 +142,26 @@ export default function KanbanBoard({
         isCompleted: false,
         fromOrdenDia: isAgendaColumn,
       };
+      const nextColumnCards = [
+        ...(columns.find((col) => col.id === columnId)?.cards ?? []),
+        finalCard,
+      ];
       setColumns((prev) =>
         prev.map((col) => col.id === columnId ? { ...col, cards: [...col.cards, finalCard] } : col),
+      );
+      await updateKanbanCardOrderAction(
+        nextColumnCards.map((card, index) => ({
+          source: card.source,
+          dbId: card.dbId,
+          columnId,
+          position: index,
+        })),
       );
       router.refresh();
     } catch {
       router.refresh();
     }
-  }, [router]);
+  }, [columns, router]);
 
   function handleDeleteCard(columnId: string, cardId: string) {
     const card = findCard(columnId, cardId);

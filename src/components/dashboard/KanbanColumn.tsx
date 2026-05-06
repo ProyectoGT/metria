@@ -37,14 +37,14 @@ export default function KanbanColumn({
 
   return (
     <div
-      className="flex w-[280px] shrink-0 flex-col rounded-xl bg-surface shadow-sm"
+      className="flex w-[320px] shrink-0 flex-col rounded-xl bg-surface shadow-sm sm:w-[340px]"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-text-primary">{column.title}</h3>
-          <span className="rounded-full bg-background px-2 py-0.5 text-xs font-medium text-text-secondary">
+          <span className="rounded-full border border-border bg-background/70 px-2 py-0.5 text-xs font-medium text-text-secondary">
             {countLabel}
           </span>
         </div>

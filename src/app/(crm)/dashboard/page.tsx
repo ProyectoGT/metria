@@ -10,6 +10,7 @@ import {
   type AgentMetrics,
   type Rendimiento,
   type KanbanData,
+  type KanbanCardData,
   type OrdenDiaAgente,
   type KanbanPriority,
 } from "@/lib/mock/dashboard";
@@ -184,6 +185,7 @@ export default async function DashboardPage() {
     { data: tareasData },
     { data: agendaData, error: agendaError },
     { data: kanbanColsData },
+    { data: kanbanOrderData },
     { data: agenteMesData },
     { data: noticiasMapData },
     { data: encargosMapData },
@@ -238,6 +240,12 @@ export default async function DashboardPage() {
       .select("col_id, titulo, orden")
       .eq("user_id", userId)
       .order("orden", { ascending: true }),
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from("kanban_card_orden")
+      .select("source, db_id, column_id, posicion")
+      .eq("user_id", userId),
 
     yo?.empresaId
       ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -443,6 +451,31 @@ export default async function DashboardPage() {
       .filter(Boolean);
   }
 
+  type KanbanOrderRow = {
+    source: "tarea" | "agenda";
+    db_id: number;
+    column_id: string;
+    posicion: number;
+  };
+
+  const kanbanOrderMap = new Map(
+    ((kanbanOrderData ?? []) as KanbanOrderRow[]).map((row) => [
+      `${row.column_id}:${row.source}:${row.db_id}`,
+      row.posicion,
+    ]),
+  );
+
+  function sortKanbanCards(columnId: string, cards: KanbanCardData[]) {
+    return [...cards].sort((a, b) => {
+      const aOrder = kanbanOrderMap.get(`${columnId}:${a.source}:${a.dbId}`);
+      const bOrder = kanbanOrderMap.get(`${columnId}:${b.source}:${b.dbId}`);
+      if (aOrder != null && bOrder != null) return aOrder - bOrder;
+      if (aOrder != null) return -1;
+      if (bOrder != null) return 1;
+      return 0;
+    });
+  }
+
   const tareas: TareaDbRow[] = (tareasData ?? []) as TareaDbRow[];
   const agendaRows = ((agendaData ?? []) as AgendaDbRow[]).filter((row) => {
     if (role === "Administrador" || role === "Director") return true;
@@ -513,19 +546,19 @@ export default async function DashboardPage() {
         title: "Pendientes",
         fixed: true,
         // Pendientes primero, luego completadas al final con tachado
-        cards: [
+        cards: sortKanbanCards("pendientes", [
           ...myTareas.filter((t) => t.estado === "pendiente").map(toCard),
           ...myTareas.filter((t) => t.estado === "completado").map(toCard),
-        ],
+        ]),
       },
       {
         id: "en_progreso",
         title: "Orden del dia",
         fixed: true,
-        cards: [
+        cards: sortKanbanCards("en_progreso", [
           ...myAgendaHoy.filter((a) => !a.completed).map(agendaToCard),
           ...myAgendaHoy.filter((a) => a.completed).map(agendaToCard),
-        ],
+        ]),
       },
     ],
   };
