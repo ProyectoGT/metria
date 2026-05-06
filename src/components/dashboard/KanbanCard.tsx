@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, User, Trash2, CheckCircle2, Circle, ExternalLink, AlertCircle, Pencil } from "lucide-react";
+import { Calendar, CalendarPlus, User, Trash2, CheckCircle2, Circle, ExternalLink, AlertCircle, Pencil } from "lucide-react";
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import { ACTIVITY_TYPES, type ActivityType } from "@/lib/activity-options";
 
@@ -78,6 +78,7 @@ type KanbanCardProps = {
   /** Abre el modal de edición completo */
   onEdit: (id: string) => void;
   onComplete?: (id: string) => void;
+  onSchedule?: (id: string) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   isDragging?: boolean;
 };
@@ -89,6 +90,7 @@ export default function KanbanCard({
   onDelete,
   onEdit,
   onComplete,
+  onSchedule,
   dragHandleProps,
   isDragging,
 }: KanbanCardProps) {
@@ -134,6 +136,17 @@ export default function KanbanCard({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {isCompleted && <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-500" />}
+
+          {onSchedule && !completing && !isCompleted && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onSchedule(card.id); }}
+              className="shrink-0 rounded p-0.5 text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
+              aria-label="Programar tarea"
+              title="Programar tarea"
+            >
+              <CalendarPlus className="h-3.5 w-3.5" />
+            </button>
+          )}
 
           {/* Editar — siempre disponible salvo durante la animación de completar */}
           {!completing && (

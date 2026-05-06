@@ -23,6 +23,7 @@ import MapaDashboardLazy from "@/components/dashboard/MapaDashboardLazy";
 import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
 import { combineLocalDateTime, localDateKey, normalizeTime } from "@/lib/local-date-time";
 import { normalizeAgendaEvent } from "@/lib/agenda/normalize-agenda-event";
+import { rolloverOverdueAgendaToPendingTasks } from "@/lib/agenda/rollover-overdue-agenda";
 import { normalizeActivityType } from "@/lib/activity-options";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -72,6 +73,11 @@ export default async function DashboardPage() {
   const today = localDateKey();
 
   const isManager = role === "Administrador" || role === "Director";
+
+  await rolloverOverdueAgendaToPendingTasks({
+    empresaId: yo?.empresaId ?? null,
+    today,
+  });
 
   // ─── 0. Calcular filtros de acceso ──────────────────────────────────────
   // fincaIdFilter: null = sin restricción, [] = sin acceso, [ids] = filtrar
@@ -193,6 +199,7 @@ export default async function DashboardPage() {
       .from("tareas")
       .select("id, titulo, prioridad, fecha, estado, resultado, from_orden_dia, owner_user_id, tarea_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
+      .is("fecha", null)
       .in("estado", ["pendiente", "completado"])
       .order("id", { ascending: false }),
 

@@ -16,6 +16,7 @@ type KanbanColumnProps = {
   onDeleteCard: (columnId: string, cardId: string) => void;
   onEditCard: (columnId: string, card: KanbanCardData) => void;
   onCompleteCard?: (columnId: string, cardId: string, card: KanbanCardData) => void;
+  onScheduleCard?: (columnId: string, cardId: string, card: KanbanCardData) => void;
 };
 
 export default function KanbanColumn({
@@ -25,12 +26,14 @@ export default function KanbanColumn({
   onDeleteCard,
   onEditCard,
   onCompleteCard,
+  onScheduleCard,
 }: KanbanColumnProps) {
   const [hovered, setHovered] = useState(false);
 
   const activeCount = column.cards.filter((c) => !c.isCompleted).length;
   const totalCount = column.cards.length;
   const countLabel = activeCount === totalCount ? String(activeCount) : `${activeCount}/${totalCount}`;
+  const addLabel = column.id === "en_progreso" ? "Anadir actividad" : "Anadir tarea";
 
   return (
     <div
@@ -78,8 +81,12 @@ export default function KanbanColumn({
                       canDelete={card.source === "tarea" && !card.assignedBy}
                       isCompleted={card.isCompleted ?? false}
                       onDelete={(id) => onDeleteCard(column.id, id)}
-                      onEdit={(id) => { const c = column.cards.find((x) => x.id === id); if (c) onEditCard(column.id, c); }}
+                      onEdit={(id) => {
+                        const found = column.cards.find((item) => item.id === id);
+                        if (found) onEditCard(column.id, found);
+                      }}
                       onComplete={onCompleteCard ? (id) => onCompleteCard(column.id, id, card) : undefined}
+                      onSchedule={onScheduleCard && card.source === "tarea" && !card.isCompleted ? (id) => onScheduleCard(column.id, id, card) : undefined}
                       dragHandleProps={dragProvided.dragHandleProps ?? undefined}
                       isDragging={dragSnapshot.isDragging}
                     />
@@ -99,7 +106,7 @@ export default function KanbanColumn({
             className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background hover:text-primary"
           >
             <Plus className="h-4 w-4" />
-            Añadir tarea
+            {addLabel}
           </button>
         </div>
       )}
