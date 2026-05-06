@@ -85,6 +85,7 @@ export default async function DashboardPage() {
   let fincaIdFilter: number[] | null = null;
   // agentIdFilter: null = sin restricción, [ids] = solo estos agentes
   let agentIdFilter: number[] | null = null;
+  let assignedPropiedadIds: number[] = [];
   // pedidoAgentFilter: null = sin restricción, [ids] = solo estos
   let pedidoAgentFilter: number[] | null = null;
 
@@ -122,27 +123,47 @@ export default async function DashboardPage() {
       agentIdFilter = supervised;
       pedidoAgentFilter = supervised;
     }
+
+    if (agentIdFilter && agentIdFilter.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: assignedRows } = await (supabase as any)
+        .from("propiedad_usuarios")
+        .select("propiedad_id")
+        .in("usuario_id", agentIdFilter);
+      assignedPropiedadIds = Array.from(new Set(
+        ((assignedRows ?? []) as Array<{ propiedad_id: number }>).map((row) => row.propiedad_id),
+      ));
+    }
   }
 
   // Aplica filtros de zona/agente a una query builder de propiedades
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function applyPropFilters(query: any): any {
     let q = query;
+    if (agentIdFilter !== null) {
+      if (agentIdFilter.length === 0) return q.eq("id", -1);
+      return q.or([
+        `agente_asignado.in.(${agentIdFilter.join(",")})`,
+        `owner_user_id.in.(${agentIdFilter.join(",")})`,
+        assignedPropiedadIds.length ? `id.in.(${assignedPropiedadIds.join(",")})` : "id.eq.-1",
+      ].join(","));
+    }
     if (fincaIdFilter !== null) {
       q = fincaIdFilter.length === 0 ? q.eq("id", -1) : q.in("finca_id", fincaIdFilter);
-    }
-    if (agentIdFilter !== null) {
-      q = agentIdFilter.length === 0 ? q.eq("agente_asignado", -1) : q.in("agente_asignado", agentIdFilter);
     }
     return q;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function applyPedidoFilters(query: any): any {
-    if (pedidoAgentFilter === null) return query;
+    let q = query;
+    if (yo?.empresaId != null) {
+      q = q.eq("empresa_id", yo.empresaId);
+    }
+    if (pedidoAgentFilter === null) return q;
     return pedidoAgentFilter.length === 0
-      ? query.eq("owner_user_id", -1)
-      : query.in("owner_user_id", pedidoAgentFilter);
+      ? q.eq("owner_user_id", -1)
+      : q.in("owner_user_id", pedidoAgentFilter);
   }
 
   // ─── 1. Summary counts + listings (paralelo) ────────────────────────────

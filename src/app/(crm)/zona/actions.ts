@@ -16,9 +16,13 @@ type PropiedadPayload = {
   notas: string | null;
   honorarios: number | null;
   agente_asignado: number | null;
+  assigned_user_ids?: number[];
   latitud: number | null;
   longitud: number | null;
 };
+
+const PROPIEDAD_SELECT = "id, planta, puerta, propietario, telefono, estado, fecha_visita, notas, honorarios, agente_asignado, latitud, longitud, contactado, contactado_hasta, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)";
+const PROPIEDAD_SELECT_WITH_ASSIGNMENTS = `${PROPIEDAD_SELECT}, propiedad_usuarios(usuario_id, usuarios(id, nombre, apellidos))`;
 
 export async function upsertPropiedadAction(
   payload: PropiedadPayload,
@@ -37,24 +41,52 @@ export async function upsertPropiedadAction(
   }
 
   const supabase = createAdminClient();
+  const assignedUserIds = Array.from(new Set(
+    (payload.assigned_user_ids?.length
+      ? payload.assigned_user_ids
+      : [payload.agente_asignado].filter((id): id is number => id != null)
+    )
+  ));
+  const primaryAgentId = assignedUserIds[0] ?? payload.agente_asignado;
+  const propiedadPayload: Omit<PropiedadPayload, "assigned_user_ids"> = {
+    planta: payload.planta,
+    puerta: payload.puerta,
+    propietario: payload.propietario,
+    telefono: payload.telefono,
+    estado: payload.estado,
+    fecha_visita: payload.fecha_visita,
+    notas: payload.notas,
+    honorarios: payload.honorarios,
+    agente_asignado: payload.agente_asignado,
+    latitud: payload.latitud,
+    longitud: payload.longitud,
+  };
+  const patchPayload = {
+    ...propiedadPayload,
+    agente_asignado: primaryAgentId ?? null,
+  };
 
   if (propiedadId) {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("propiedades")
-      .update(payload as never)
+      .update(patchPayload as never)
       .eq("id", propiedadId)
-      .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)")
+      .select("id")
       .single();
 
     if (error) return { error: error.message };
+    const assignResult = await updatePropiedadUsuarios(supabase, propiedadId, assignedUserIds);
+    if (assignResult.error) return { error: assignResult.error };
+    const data = await getPropiedadWithUsers(supabase, propiedadId);
+    if (data.error) return { error: data.error };
     revalidatePath(`/zona`);
     revalidatePath(`/dashboard`);
-    return { data: data as Record<string, unknown> };
+    return { data: data.row as Record<string, unknown> };
   } else {
     const createPayload = {
-      ...payload,
+      ...patchPayload,
       finca_id: fincaId,
-      agente_asignado: payload.agente_asignado ?? yo.id,
+      agente_asignado: primaryAgentId ?? yo.id,
       owner_user_id: yo.id,
       empresa_id: yo.empresaId ?? null,
       equipo_id: yo.equipoId ?? null,
@@ -63,14 +95,94 @@ export async function upsertPropiedadAction(
     const { data, error } = await supabase
       .from("propiedades")
       .insert(createPayload as never)
-      .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)")
+      .select("id")
       .single();
 
     if (error) return { error: error.message };
+    const propiedadId = Number(data.id);
+    const assignResult = await updatePropiedadUsuarios(supabase, propiedadId, assignedUserIds.length ? assignedUserIds : [yo.id]);
+    if (assignResult.error) return { error: assignResult.error };
+    const created = await getPropiedadWithUsers(supabase, propiedadId);
+    if (created.error) return { error: created.error };
     revalidatePath(`/zona`);
     revalidatePath(`/dashboard`);
-    return { data: data as Record<string, unknown> };
+    return { data: created.row as Record<string, unknown> };
   }
+}
+
+async function getPropiedadWithUsers(
+  supabase: ReturnType<typeof createAdminClient>,
+  propiedadId: number,
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from("propiedades")
+    .select(PROPIEDAD_SELECT_WITH_ASSIGNMENTS)
+    .eq("id", propiedadId)
+    .single();
+
+  if (error) {
+    if (!isPropiedadUsuariosMissingError(error.message)) return { error: error.message };
+
+    const fallback = await supabase
+      .from("propiedades")
+      .select(PROPIEDAD_SELECT)
+      .eq("id", propiedadId)
+      .single();
+    if (fallback.error) return { error: fallback.error.message };
+    return { row: fallback.data };
+  }
+  return { row: data };
+}
+
+function isPropiedadUsuariosMissingError(message: string | undefined) {
+  if (!message) return false;
+  return message.includes("propiedad_usuarios")
+    || message.includes("Could not find a relationship")
+    || message.includes("does not exist")
+    || message.includes("schema cache");
+}
+
+async function updatePropiedadUsuarios(
+  supabase: ReturnType<typeof createAdminClient>,
+  propiedadId: number,
+  assignedUserIds: number[],
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: currentRows, error: readError } = await (supabase as any)
+    .from("propiedad_usuarios")
+    .select("usuario_id")
+    .eq("propiedad_id", propiedadId);
+  if (readError) {
+    if (isPropiedadUsuariosMissingError(readError.message)) return {};
+    return { error: readError.message };
+  }
+
+  const currentIds = ((currentRows ?? []) as Array<{ usuario_id: number }>).map((row) => row.usuario_id);
+  const removedIds = currentIds.filter((id) => !assignedUserIds.includes(id));
+
+  if (removedIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
+      .from("propiedad_usuarios")
+      .delete()
+      .eq("propiedad_id", propiedadId)
+      .in("usuario_id", removedIds);
+    if (error) return { error: error.message };
+  }
+
+  if (assignedUserIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
+      .from("propiedad_usuarios")
+      .upsert(
+        assignedUserIds.map((usuario_id) => ({ propiedad_id: propiedadId, usuario_id })),
+        { onConflict: "propiedad_id,usuario_id" },
+      );
+    if (error) return { error: error.message };
+  }
+
+  return {};
 }
 
 export async function toggleContactadoAction(
