@@ -11,8 +11,8 @@ import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog
 import Drawer from "@/components/ui/drawer";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase-browser";
-import { staggerContainer, staggerItem, fadeInScale, fadeIn } from "@/lib/animations";
-import { AnimatedChevron } from "@/components/ui/animated";
+import { staggerContainer, staggerItem } from "@/lib/animations";
+import { AnimatedChevron, AnimatedAccordion } from "@/components/ui/animated";
 
 type Sector = {
   id: number;
@@ -459,7 +459,7 @@ export default function ZonasClient({
                 </div>
 
                 {/* ── Sectores ── */}
-                {isOpen && (
+                <AnimatedAccordion isOpen={isOpen}>
                   <div className="border-t border-border">
                     {zona.sectores.length === 0 ? (
                       <p className="px-4 py-6 text-sm italic text-text-secondary sm:px-12">
@@ -601,7 +601,7 @@ export default function ZonasClient({
                       </>
                     )}
                   </div>
-                )}
+                </AnimatedAccordion>
               </motion.div>
               )}
               </Draggable>

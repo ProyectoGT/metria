@@ -183,7 +183,7 @@ export default async function DashboardPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     createAdminClient()
       .from("agenda")
-      .select("id, description, event_date, time, priority, tipo, completed, result, gcal_event_id, user_id, owner_user_id, empresa_id, created_at, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .select("id, description, event_date, time, time_end, priority, tipo, completed, result, reminder_minutes_before, gcal_event_id, user_id, owner_user_id, empresa_id, created_at, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
       .eq("event_date", localDateKey())
       .eq("empresa_id", yo?.empresaId ?? -1)
@@ -359,10 +359,12 @@ export default async function DashboardPage() {
     description: string;
     event_date: string;
     time: string | null;
+    time_end: string | null;
     priority: string | null;
     tipo: string | null;
     completed: boolean;
     result: string | null;
+    reminder_minutes_before: number | null;
     gcal_event_id?: string | null;
     user_id: number | null;
     owner_user_id: number | null;
@@ -451,6 +453,8 @@ export default async function DashboardPage() {
       tipo: normalizeActivityType(a.tipo),
       dueDate: combineLocalDateTime(a.event_date, normalizeTime(a.time, "09:00")),
       time: normalizeTime(a.time, "09:00"),
+      timeEnd: a.time_end ?? null,
+      reminderMinutesBefore: a.reminder_minutes_before ?? null,
       assignedBy: null,
       assignedUserIds: assignedIdsFromRows(a.agenda_usuarios),
       assignedUsers: assignedNamesFromRows(a.agenda_usuarios),

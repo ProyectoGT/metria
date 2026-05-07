@@ -1,15 +1,16 @@
 import { randomBytes } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase";
+import { getGoogleRedirectUri } from "@/lib/google-redirect";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.redirect(new URL("/login", request.url));
 
-  const origin = new URL(request.url).origin;
-  const redirectUri = `${origin}/api/email/gmail/callback`;
-  const state = randomBytes(24).toString("base64url");
+  const redirectUri = getGoogleRedirectUri(request);
+  const csrfToken = randomBytes(24).toString("base64url");
+  const state = `email_${csrfToken}`;
 
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", process.env.GOOGLE_CLIENT_ID!);
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
   url.searchParams.set("state", state);
 
   const response = NextResponse.redirect(url.toString());
-  response.cookies.set("metria_gmail_oauth_state", state, {
+  response.cookies.set("metria_gmail_oauth_state", csrfToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

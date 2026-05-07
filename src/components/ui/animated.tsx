@@ -1,16 +1,14 @@
 "use client";
 
 import { type ReactNode, type ComponentProps, forwardRef, type HTMLAttributes } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import {
   fadeInUp,
   fadeIn,
   slideInRight,
   fadeInScale,
-  scaleTap,
   scaleTapIn,
   hoverLift,
-  hoverScale,
   staggerContainer,
   staggerItem,
   dropdown,
@@ -410,5 +408,111 @@ export function AnimatedProgress({ value, className, barClassName }: AnimatedPro
   );
 }
 
+// ─── AnimatedAccordion ──────────────────────────────────────────────────────
+// Acordeón con animación de altura + fade para contenido expandible.
+// Usa AnimatePresence para animar entrada/salida del contenido.
+
+interface AnimatedAccordionProps {
+  isOpen: boolean;
+  children: ReactNode;
+  className?: string;
+}
+
+export function AnimatedAccordion({ isOpen, children, className }: AnimatedAccordionProps) {
+  const prefersReduced = useReducedMotion();
+
+  if (prefersReduced) {
+    if (!isOpen) return null;
+    return <div className={className}>{children}</div>;
+  }
+
+  return (
+    <AnimatePresence initial={false}>
+      {isOpen && (
+        <motion.div
+          key="accordion-content"
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: "auto", opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className={`overflow-hidden ${className ?? ""}`}
+        >
+          {children}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ─── AnimatedFilterPanel ─────────────────────────────────────────────────────
+// Panel de filtros con fade + slide vertical.
+
+interface AnimatedFilterPanelProps {
+  isOpen: boolean;
+  children: ReactNode;
+  className?: string;
+}
+
+export function AnimatedFilterPanel({ isOpen, children, className }: AnimatedFilterPanelProps) {
+  const prefersReduced = useReducedMotion();
+
+  if (prefersReduced) {
+    if (!isOpen) return null;
+    return <div className={className}>{children}</div>;
+  }
+
+  return (
+    <AnimatePresence initial={false}>
+      {isOpen && (
+        <motion.div
+          key="filter-panel"
+          initial={{ opacity: 0, y: -8, height: 0 }}
+          animate={{ opacity: 1, y: 0, height: "auto" }}
+          exit={{ opacity: 0, y: -8, height: 0 }}
+          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className={`overflow-hidden ${className ?? ""}`}
+        >
+          {children}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ─── AnimatedResults ─────────────────────────────────────────────────────────
+// Panel de resultados con fade + slide hacia abajo (para dashboard filters).
+
+interface AnimatedResultsProps {
+  show: boolean;
+  children: ReactNode;
+  className?: string;
+}
+
+export function AnimatedResults({ show, children, className }: AnimatedResultsProps) {
+  const prefersReduced = useReducedMotion();
+
+  if (prefersReduced) {
+    if (!show) return null;
+    return <div className={className}>{children}</div>;
+  }
+
+  return (
+    <AnimatePresence initial={false}>
+      {show && (
+        <motion.div
+          key="results-panel"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 12 }}
+          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className={className}
+        >
+          {children}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 // ─── Framer Motion Re-exports ─────────────────────────────────────────────────
-export { motion };
+export { motion, AnimatePresence };

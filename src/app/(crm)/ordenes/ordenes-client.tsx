@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, CheckCircle2, ChevronDown, Clock, Loader2, Pencil, Plus, Trash2, User } from "lucide-react";
+import { Bell, Calendar, CheckCircle2, ChevronDown, Clock, Loader2, Pencil, Plus, Trash2, User } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 import Drawer from "@/components/ui/drawer";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import type { UserRole } from "@/lib/roles";
-import { DEFAULT_ACTIVITY_TIME, normalizeTime } from "@/lib/local-date-time";
+import { DEFAULT_ACTIVITY_TIME, normalizeTime, calcDurationMinutes, formatDuration, formatReminderLabel, REMINDER_OPTIONS } from "@/lib/local-date-time";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { isActivityPriority, isActivityType, normalizeActivityPriority, normalizeActivityType, type ActivityType } from "@/lib/activity-options";
 
@@ -18,10 +18,12 @@ type Actividad = {
   description: string;
   event_date: string;
   time: string | null;
+  time_end: string | null;
   priority: string;
   tipo: string;
   completed: boolean;
   result: string | null;
+  reminder_minutes_before: number | null;
   user_id?: number | null;
   owner_user_id: number | null;
   agenda_usuarios?: Array<{
@@ -96,11 +98,13 @@ export default function OrdenesClient({
   const [form, setForm] = useState({
     description: "",
     time: DEFAULT_ACTIVITY_TIME,
+    time_end: "",
     priority: "media",
     tipo: "actividad",
     result: "",
     completed: false,
     assignedUserIds: [currentUserId],
+    reminderMinutes: null as number | null,
   });
 
   const userMap = useMemo(() => {
@@ -127,11 +131,13 @@ export default function OrdenesClient({
     setForm({
       description: "",
       time: DEFAULT_ACTIVITY_TIME,
+      time_end: "",
       priority: "media",
       tipo: "actividad",
       result: "",
       completed: false,
       assignedUserIds: [filterUserId ?? currentUserId],
+      reminderMinutes: null,
     });
     setShowModal(true);
   }
@@ -142,11 +148,13 @@ export default function OrdenesClient({
     setForm({
       description: actividad.description,
       time: normalizeTime(actividad.time, DEFAULT_ACTIVITY_TIME),
+      time_end: actividad.time_end ?? "",
       priority: actividad.priority ?? "media",
       tipo: actividad.tipo ?? "actividad",
       result: actividad.result ?? "",
       completed: actividad.completed,
       assignedUserIds: ids.length ? ids : [actividad.owner_user_id ?? currentUserId],
+      reminderMinutes: actividad.reminder_minutes_before ?? null,
     });
     setShowModal(true);
   }
@@ -174,20 +182,34 @@ export default function OrdenesClient({
       return;
     }
 
+    // Validar hora fin
+    const normalizedStart = normalizeTime(form.time, DEFAULT_ACTIVITY_TIME);
+    const normalizedEnd = form.time_end ? normalizeTime(form.time_end, "") : null;
+    if (normalizedEnd && normalizedEnd <= normalizedStart) {
+      toast("La hora de fin debe ser posterior a la hora de inicio", "error");
+      return;
+    }
+    if (form.reminderMinutes != null && !form.time.trim()) {
+      toast("Se requiere hora de inicio para configurar un recordatorio", "error");
+      return;
+    }
+
     setSaving(true);
     const args = {
       p_description: form.description.trim(),
       p_event_date: today,
-      p_time: normalizeTime(form.time, DEFAULT_ACTIVITY_TIME),
+      p_time: normalizedStart,
+      p_time_end: normalizedEnd ?? undefined,
       p_priority: priority,
       p_tipo: tipo,
       p_result: form.result.trim() || undefined,
       p_completed: form.completed,
       p_assigned_user_ids: form.assignedUserIds,
+      p_reminder_minutes: form.reminderMinutes ?? undefined,
     };
 
     const { data, error } = editing
-      ? await supabase.rpc("update_agenda_activity", { p_agenda_id: editing.id, ...args })
+      ? await supabase.rpc("update_agenda_activity", { p_agenda_id: editing.id, ...args, p_reminder_minutes: form.reminderMinutes ?? -1 })
       : await supabase.rpc("create_agenda_activity", { ...args, p_visibility: "private" });
 
     setSaving(false);
@@ -318,8 +340,18 @@ export default function OrdenesClient({
                         {actividad.description}
                       </p>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-text-secondary">
-                        <span>{normalizeTime(actividad.time, DEFAULT_ACTIVITY_TIME)}</span>
+                        <span>
+                          {normalizeTime(actividad.time, DEFAULT_ACTIVITY_TIME)}
+                          {actividad.time_end ? ` – ${actividad.time_end}` : ""}
+                          {(() => { const d = calcDurationMinutes(actividad.time, actividad.time_end); return d ? ` (${formatDuration(d)})` : ""; })()}
+                        </span>
                         <span>{tipoLabel(actividad.tipo)}</span>
+                        {actividad.reminder_minutes_before != null && (
+                          <span className="inline-flex items-center gap-0.5 text-primary">
+                            <Bell className="h-3 w-3" />
+                            {formatReminderLabel(actividad.reminder_minutes_before)}
+                          </span>
+                        )}
                         {ids.map((id) => <span key={id}>{userMap.get(id) ?? `Usuario ${id}`}</span>)}
                       </div>
                       {actividad.completed && actividad.result && (
@@ -371,7 +403,7 @@ export default function OrdenesClient({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-text-secondary">Hora *</label>
+              <label className="mb-1 block text-xs font-medium text-text-secondary">Hora inicio *</label>
               <input
                 type="time"
                 value={form.time}
@@ -381,15 +413,47 @@ export default function OrdenesClient({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-text-secondary">Prioridad</label>
-              <select
-                value={form.priority}
-                onChange={(e) => setForm((prev) => ({ ...prev, priority: e.target.value }))}
+              <label className="mb-1 block text-xs font-medium text-text-secondary">Hora fin</label>
+              <input
+                type="time"
+                value={form.time_end}
+                onChange={(e) => setForm((prev) => ({ ...prev, time_end: e.target.value }))}
                 className="input text-sm"
-              >
-                {PRIORIDADES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </select>
+              />
             </div>
+          </div>
+          {(() => {
+            const dur = calcDurationMinutes(form.time, form.time_end);
+            return dur ? (
+              <p className="flex items-center gap-1 text-xs text-text-secondary -mt-2">
+                <Clock className="h-3 w-3" />
+                Duración: <span className="font-medium text-text-primary">{formatDuration(dur)}</span>
+              </p>
+            ) : null;
+          })()}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">Prioridad</label>
+            <select
+              value={form.priority}
+              onChange={(e) => setForm((prev) => ({ ...prev, priority: e.target.value }))}
+              className="input text-sm"
+            >
+              {PRIORIDADES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">Recordatorio</label>
+            <select
+              value={form.reminderMinutes == null ? "" : String(form.reminderMinutes)}
+              onChange={(e) => setForm((prev) => ({ ...prev, reminderMinutes: e.target.value === "" ? null : Number(e.target.value) }))}
+              className="input text-sm"
+            >
+              {REMINDER_OPTIONS.map((opt) => (
+                <option key={opt.label} value={opt.value == null ? "" : String(opt.value)}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-text-secondary">Tipo de actividad</label>
@@ -495,18 +559,33 @@ export default function OrdenesClient({
               </span>
             </div>
 
-            <div className="flex items-center gap-2 text-sm text-text-secondary">
-              <Calendar className="h-4 w-4" />
-              <span>
-                {new Date(detailActividad.event_date + "T12:00:00").toLocaleDateString("es-ES", {
-                  weekday: "long", day: "numeric", month: "long", year: "numeric",
-                })}
-              </span>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-sm text-text-secondary">
+                <Calendar className="h-4 w-4 shrink-0" />
+                <span>
+                  {new Date(detailActividad.event_date + "T12:00:00").toLocaleDateString("es-ES", {
+                    weekday: "long", day: "numeric", month: "long", year: "numeric",
+                  })}
+                </span>
+              </div>
               {detailActividad.time && (
-                <>
-                  <Clock className="h-4 w-4 text-text-secondary" />
-                  <span>{normalizeTime(detailActividad.time, "")}</span>
-                </>
+                <div className="flex items-center gap-2 text-sm text-text-secondary">
+                  <Clock className="h-4 w-4 shrink-0" />
+                  <span>
+                    {normalizeTime(detailActividad.time, "")}
+                    {detailActividad.time_end && ` – ${normalizeTime(detailActividad.time_end, "")}`}
+                    {(() => {
+                      const d = calcDurationMinutes(detailActividad.time, detailActividad.time_end);
+                      return d ? <span className="ml-1 rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium">{formatDuration(d)}</span> : null;
+                    })()}
+                  </span>
+                </div>
+              )}
+              {detailActividad.reminder_minutes_before != null && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Bell className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="font-medium text-primary">{formatReminderLabel(detailActividad.reminder_minutes_before)}</span>
+                </div>
               )}
             </div>
 

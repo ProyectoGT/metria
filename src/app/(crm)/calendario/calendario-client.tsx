@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   Phone, Users, Home, Clock, BookOpen, Star, Activity, Calendar,
-  ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter, Pencil, CheckCircle2, User,
+  ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter, Pencil, CheckCircle2, User, Bell,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
@@ -11,7 +11,7 @@ import { useToast, Toaster } from "@/components/ui/toast";
 import { updateTareaEstadoAction } from "@/app/(crm)/dashboard/actions";
 import { saveAgendaGoogleEventIdAction } from "@/app/(crm)/calendario/actions";
 import type { UserRole } from "@/lib/roles";
-import { DEFAULT_ACTIVITY_TIME, normalizeTime } from "@/lib/local-date-time";
+import { DEFAULT_ACTIVITY_TIME, normalizeTime, calcDurationMinutes, formatDuration, formatReminderLabel, REMINDER_OPTIONS } from "@/lib/local-date-time";
 import { isActivityPriority, isActivityType, normalizeActivityPriority, normalizeActivityType } from "@/lib/activity-options";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import Drawer from "@/components/ui/drawer";
@@ -23,10 +23,12 @@ type AgendaEvent = {
   description: string;
   event_date: string;
   time: string | null;
+  time_end: string | null;
   priority: string;
   tipo: string;
   completed: boolean;
   result: string | null;
+  reminder_minutes_before: number | null;
   gcal_event_id: string | null;
   tarea_id?: number | null;
   owner_user_id: number | null;
@@ -68,12 +70,14 @@ type FormState = {
   description: string;
   event_date: string;
   time: string;
+  time_end: string;
   priority: string;
   tipo: string;
   completed: boolean;
   result: string;
   syncToGcal: boolean;
   assignedUserIds: number[];
+  reminderMinutes: number | null;
 };
 
 type ViewMode = "month" | "week";
@@ -161,12 +165,14 @@ function emptyForm(date?: Date, syncToGcal = false): FormState {
     description: "",
     event_date: toDateStr(date ?? new Date()),
     time: "",
+    time_end: "",
     priority: "media",
     tipo: "actividad",
     completed: false,
     result: "",
     syncToGcal,
     assignedUserIds: [],
+    reminderMinutes: null,
   };
 }
 
@@ -191,9 +197,11 @@ function normalizeCalendarEvent(ev: AgendaEvent): AgendaEvent {
     ...ev,
     event_date: (ev.event_date ?? "").slice(0, 10) || toDateStr(new Date()),
     time: normalizeTime(ev.time ?? "", "") || null,
+    time_end: normalizeTime(ev.time_end ?? "", "") || null,
     tipo: ev.tipo ?? "actividad",
     priority: ev.priority ?? "media",
     description: ev.description ?? `Actividad #${ev.id}`,
+    reminder_minutes_before: ev.reminder_minutes_before ?? null,
   };
 }
 
@@ -426,12 +434,14 @@ export default function CalendarioClient({
       description: ev.description,
       event_date: ev.event_date,
       time: ev.time ?? "",
+      time_end: ev.time_end ?? "",
       priority: ev.priority,
       tipo: ev.tipo ?? "actividad",
       completed: ev.completed,
       result: ev.result ?? "",
       syncToGcal: false,
       assignedUserIds: agendaAssignedIds(ev).length ? agendaAssignedIds(ev) : [ev.owner_user_id ?? currentUserId],
+      reminderMinutes: ev.reminder_minutes_before ?? null,
     });
     setSaveError(null); setModalOpen(true);
   }
@@ -463,14 +473,31 @@ export default function CalendarioClient({
     }
     setSaving(true); setSaveError(null);
 
+    // Validar hora de fin si se introduce
+    const normalizedEnd = form.time_end ? normalizeTime(form.time_end, "") : null;
+    const normalizedStart = normalizeTime(form.time, DEFAULT_ACTIVITY_TIME);
+    if (normalizedEnd && normalizedEnd <= normalizedStart) {
+      setSaveError("La hora de fin debe ser posterior a la hora de inicio");
+      setSaving(false);
+      return;
+    }
+    // Validar recordatorio requiere hora inicio
+    if (form.reminderMinutes != null && !form.time.trim()) {
+      setSaveError("Se requiere hora de inicio para configurar un recordatorio");
+      setSaving(false);
+      return;
+    }
+
     const payload = {
       description: form.description.trim(),
       event_date: form.event_date,
-      time: normalizeTime(form.time, DEFAULT_ACTIVITY_TIME),
+      time: normalizedStart,
+      time_end: normalizedEnd,
       priority,
       tipo,
       completed: form.completed,
       result: form.result || null,
+      reminderMinutes: form.reminderMinutes,
     };
 
     async function insertOrUpdate(p: typeof payload) {
@@ -481,23 +508,27 @@ export default function CalendarioClient({
           p_description: p.description,
           p_event_date: p.event_date,
           p_time: p.time,
+          p_time_end: p.time_end ?? undefined,
           p_priority: p.priority,
           p_tipo: p.tipo,
           p_completed: p.completed,
           p_result: p.result ?? undefined,
           p_assigned_user_ids: assignedUserIds,
+          p_reminder_minutes: p.reminderMinutes ?? -1,
         });
       }
       return supabase.rpc("create_agenda_activity", {
         p_description: p.description,
         p_event_date: p.event_date,
         p_time: p.time,
+        p_time_end: p.time_end ?? undefined,
         p_priority: p.priority,
         p_tipo: p.tipo,
         p_completed: p.completed,
         p_result: p.result ?? undefined,
         p_assigned_user_ids: assignedUserIds,
         p_visibility: "private",
+        p_reminder_minutes: p.reminderMinutes ?? undefined,
       });
     }
 
@@ -523,7 +554,9 @@ export default function CalendarioClient({
               description: payload.result ?? "",
               date: payload.event_date,
               time: payload.time,
+              timeEnd: payload.time_end ?? undefined,
               agendaId: editId,
+              reminderMinutes: payload.reminderMinutes ?? undefined,
             }),
           });
 
@@ -571,7 +604,14 @@ export default function CalendarioClient({
           const gcalRes = await fetch("/api/google/events", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ summary: form.description, date: form.event_date, time: normalizeTime(form.time, DEFAULT_ACTIVITY_TIME), agendaId: saved.id }),
+            body: JSON.stringify({
+              summary: form.description,
+              date: form.event_date,
+              time: normalizeTime(form.time, DEFAULT_ACTIVITY_TIME),
+              timeEnd: form.time_end || undefined,
+              agendaId: saved.id,
+              reminderMinutes: form.reminderMinutes ?? undefined,
+            }),
           });
           if (gcalRes.ok) {
             const gcalData = await gcalRes.json();
@@ -776,9 +816,20 @@ export default function CalendarioClient({
                     {ev.description}
                   </p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    {ev.time && <span className="text-xs font-medium text-text-secondary">{ev.time}</span>}
+                    {ev.time && (
+                      <span className="text-xs font-medium text-text-secondary">
+                        {ev.time}{ev.time_end ? ` – ${ev.time_end}` : ""}
+                        {(() => { const d = calcDurationMinutes(ev.time, ev.time_end); return d ? ` (${formatDuration(d)})` : ""; })()}
+                      </span>
+                    )}
                     <span className={`rounded-full px-1.5 py-px text-[10px] font-medium ${t.bg} ${t.text}`}>{t.label}</span>
                     <span className={`rounded-full px-1.5 py-px text-[10px] font-medium ${p.badge}`}>{p.label}</span>
+                    {ev.reminder_minutes_before != null && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary">
+                        <Bell className="h-2.5 w-2.5" />
+                        {formatReminderLabel(ev.reminder_minutes_before)}
+                      </span>
+                    )}
                     {ev.gcal_event_id && <span className="rounded-full bg-blue-500/15 px-1.5 py-px text-[10px] font-medium text-blue-700 dark:text-blue-400">GCal</span>}
                     {ev.completed && <span className="rounded-full bg-success/15 px-1.5 py-px text-[10px] font-medium text-success">Completada</span>}
                     {ownerName && <span className="text-[10px] text-text-secondary">{ownerName}</span>}
@@ -1251,16 +1302,54 @@ export default function CalendarioClient({
             />
           </div>
 
-          {/* Date + Time */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-text-secondary">Fecha</label>
-              <input type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} className="input mt-1.5" />
+          {/* Date */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary">Fecha</label>
+            <input type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} className="input mt-1.5" />
+          </div>
+
+          {/* Hora inicio / fin / duración */}
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-text-secondary">Hora inicio</label>
+                <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="input mt-1.5" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-text-secondary">Hora fin</label>
+                <input type="time" value={form.time_end} onChange={(e) => setForm({ ...form, time_end: e.target.value })} className="input mt-1.5" />
+              </div>
             </div>
-            <div>
-              <label className="text-xs font-medium text-text-secondary">Hora</label>
-              <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="input mt-1.5" />
-            </div>
+            {(() => {
+              const dur = calcDurationMinutes(form.time, form.time_end);
+              if (!dur) return null;
+              return (
+                <p className="flex items-center gap-1 text-xs text-text-secondary">
+                  <Clock className="h-3 w-3" />
+                  Duración: <span className="font-medium text-text-primary">{formatDuration(dur)}</span>
+                </p>
+              );
+            })()}
+          </div>
+
+          {/* Recordatorio */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary">Recordatorio</label>
+            <select
+              value={form.reminderMinutes == null ? "" : String(form.reminderMinutes)}
+              onChange={(e) => setForm({ ...form, reminderMinutes: e.target.value === "" ? null : Number(e.target.value) })}
+              className="input mt-1.5"
+              disabled={!form.time.trim()}
+            >
+              {REMINDER_OPTIONS.map((opt) => (
+                <option key={opt.label} value={opt.value == null ? "" : String(opt.value)}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            {!form.time.trim() && (
+              <p className="mt-1 text-[10px] text-text-secondary">Introduce una hora de inicio para activar el recordatorio.</p>
+            )}
           </div>
 
           {/* Priority */}
@@ -1409,18 +1498,33 @@ export default function CalendarioClient({
               })()}
             </div>
 
-            <div className="flex items-center gap-2 text-sm text-text-secondary">
-              <Calendar className="h-4 w-4" />
-              <span>
-                {new Date(detailEvent.event_date + "T12:00:00").toLocaleDateString("es-ES", {
-                  weekday: "long", day: "numeric", month: "long", year: "numeric",
-                })}
-              </span>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-sm text-text-secondary">
+                <Calendar className="h-4 w-4 shrink-0" />
+                <span>
+                  {new Date(detailEvent.event_date + "T12:00:00").toLocaleDateString("es-ES", {
+                    weekday: "long", day: "numeric", month: "long", year: "numeric",
+                  })}
+                </span>
+              </div>
               {detailEvent.time && (
-                <>
-                  <Clock className="h-4 w-4 text-text-secondary" />
-                  <span>{normalizeTime(detailEvent.time, "")}</span>
-                </>
+                <div className="flex items-center gap-2 text-sm text-text-secondary">
+                  <Clock className="h-4 w-4 shrink-0" />
+                  <span>
+                    {normalizeTime(detailEvent.time, "")}
+                    {detailEvent.time_end && ` – ${normalizeTime(detailEvent.time_end, "")}`}
+                    {(() => {
+                      const d = calcDurationMinutes(detailEvent.time, detailEvent.time_end);
+                      return d ? <span className="ml-1 rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium">{formatDuration(d)}</span> : null;
+                    })()}
+                  </span>
+                </div>
+              )}
+              {detailEvent.reminder_minutes_before != null && (
+                <div className="flex items-center gap-2 text-sm text-text-secondary">
+                  <Bell className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="text-primary font-medium">{formatReminderLabel(detailEvent.reminder_minutes_before)}</span>
+                </div>
               )}
             </div>
 

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, Clock, User, AlertCircle, Pencil, Trash2, CheckCircle2 } from "lucide-react";
+import { Bell, Calendar, Clock, User, AlertCircle, Pencil, Trash2, CheckCircle2 } from "lucide-react";
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
-import { normalizeTime } from "@/lib/local-date-time";
+import { normalizeTime, calcDurationMinutes, formatDuration, formatReminderLabel } from "@/lib/local-date-time";
 import { ACTIVITY_TYPES } from "@/lib/activity-options";
 import Drawer from "@/components/ui/drawer";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
@@ -114,30 +114,45 @@ export default function KanbanDetailDrawer({
 
           {/* Fecha y hora */}
           {card.dueDate && (
-            <div className="flex items-center gap-2 text-sm text-text-secondary">
-              {(() => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const d = new Date(card.dueDate.split("T")[0]);
-                d.setHours(0, 0, 0, 0);
-                const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
-                const IconComponent = diff < 0 ? AlertCircle : Calendar;
-                const color = diff < 0 ? "text-danger" : diff === 0 ? "text-amber-600 dark:text-amber-400" : "text-text-secondary";
-                return (
-                  <>
-                    <IconComponent className={`h-4 w-4 ${color}`} />
-                    <span className={color}>
-                      {diff < 0 ? "Vencida · " : diff === 0 ? "Hoy · " : ""}
-                      {formatDateTime(card.dueDate)}
-                    </span>
-                  </>
-                );
-              })()}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-sm text-text-secondary">
+                {(() => {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const d = new Date(card.dueDate.split("T")[0]);
+                  d.setHours(0, 0, 0, 0);
+                  const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+                  const IconComponent = diff < 0 ? AlertCircle : Calendar;
+                  const color = diff < 0 ? "text-danger" : diff === 0 ? "text-amber-600 dark:text-amber-400" : "text-text-secondary";
+                  return (
+                    <>
+                      <IconComponent className={`h-4 w-4 ${color}`} />
+                      <span className={color}>
+                        {diff < 0 ? "Vencida · " : diff === 0 ? "Hoy · " : ""}
+                        {formatDateTime(card.dueDate)}
+                      </span>
+                    </>
+                  );
+                })()}
+              </div>
               {card.time && (
-                <>
-                  <Clock className="h-4 w-4 text-text-secondary" />
-                  <span>{normalizeTime(card.time, "")}</span>
-                </>
+                <div className="flex items-center gap-2 text-sm text-text-secondary">
+                  <Clock className="h-4 w-4 shrink-0" />
+                  <span>
+                    {normalizeTime(card.time, "")}
+                    {card.timeEnd && ` – ${normalizeTime(card.timeEnd, "")}`}
+                    {(() => {
+                      const d = calcDurationMinutes(card.time, card.timeEnd);
+                      return d ? <span className="ml-1 rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium">{formatDuration(d)}</span> : null;
+                    })()}
+                  </span>
+                </div>
+              )}
+              {card.reminderMinutesBefore != null && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Bell className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="font-medium text-primary">{formatReminderLabel(card.reminderMinutesBefore)}</span>
+                </div>
               )}
             </div>
           )}

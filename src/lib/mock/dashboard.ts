@@ -63,6 +63,8 @@ export type KanbanCardData = {
   tipo?: ActivityType;
   dueDate?: string;
   time?: string | null;
+  timeEnd?: string | null;
+  reminderMinutesBefore?: number | null;
   assignedBy?: string | null;
   assignedTo?: string | null;
   assignedUserIds?: number[];

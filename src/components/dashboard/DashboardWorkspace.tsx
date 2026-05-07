@@ -18,6 +18,7 @@ import {
   Newspaper,
   X,
 } from "lucide-react";
+import { AnimatedResults, AnimatedList, AnimatedListItem } from "@/components/ui/animated";
 import type { UserRole } from "@/lib/roles";
 import type { NextBestAction } from "@/lib/next-actions";
 import type { PipelineSuggestion } from "@/lib/pipeline-suggestions";
@@ -390,41 +391,44 @@ export default function DashboardWorkspace(props: Props) {
 
       {showFeaturedAgentFirst && agentOfMonthSection}
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <AnimatedList className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {metricCards.map((card) => (
-          <DashboardMetricCard
-            key={card.key}
-            card={card}
-            isActive={activeFilter === card.key}
-            onClick={() => handleMetricClick(card.key)}
-          />
+          <AnimatedListItem key={card.key}>
+            <DashboardMetricCard
+              card={card}
+              isActive={activeFilter === card.key}
+              onClick={() => handleMetricClick(card.key)}
+            />
+          </AnimatedListItem>
         ))}
-      </section>
+      </AnimatedList>
 
       {/* Panel de listado filtrado */}
-      {activeFilter && (
-        <div className="overflow-hidden rounded-2xl border border-primary/30 bg-surface shadow-sm">
-          <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-            <div>
-              <h2 className="text-sm font-semibold text-text-primary">
-                {metricCards.find((c) => c.key === activeFilter)?.title ?? "Filtro"}
-              </h2>
-              <p className="mt-0.5 text-xs text-text-secondary">
-                {listings[activeFilter as SummaryType].length} resultado{listings[activeFilter as SummaryType].length !== 1 ? "s" : ""} visibles
-              </p>
+      <AnimatedResults show={activeFilter !== null}>
+        {activeFilter && (
+          <div className="overflow-hidden rounded-2xl border border-primary/30 bg-surface shadow-sm">
+            <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+              <div>
+                <h2 className="text-sm font-semibold text-text-primary">
+                  {metricCards.find((c) => c.key === activeFilter)?.title ?? "Filtro"}
+                </h2>
+                <p className="mt-0.5 text-xs text-text-secondary">
+                  {listings[activeFilter as SummaryType].length} resultado{listings[activeFilter as SummaryType].length !== 1 ? "s" : ""} visibles
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveFilter(null)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+              >
+                <X className="h-3.5 w-3.5" />
+                Quitar filtro
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setActiveFilter(null)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
-            >
-              <X className="h-3.5 w-3.5" />
-              Quitar filtro
-            </button>
+            <ListingTable rows={listings[activeFilter as SummaryType]} titleKey={activeFilter} />
           </div>
-          <ListingTable rows={listings[activeFilter as SummaryType]} titleKey={activeFilter} />
-        </div>
-      )}
+        )}
+      </AnimatedResults>
 
       <SectionCard
         title="Kanban"

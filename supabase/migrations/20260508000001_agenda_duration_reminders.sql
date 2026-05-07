@@ -1,0 +1,342 @@
+-- ─── Duración y Recordatorios en Agenda ──────────────────────────────────────
+-- Añade hora de fin y recordatorios a actividades de calendario y órdenes del día.
+-- Compatible con datos existentes: nuevos campos son nullable con default NULL.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- ── 1. Campos nuevos en agenda ────────────────────────────────────────────────
+
+ALTER TABLE agenda
+  ADD COLUMN IF NOT EXISTS time_end TEXT DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS reminder_minutes_before INTEGER DEFAULT NULL;
+
+-- time_end:                 Hora de fin en formato HH:MM (text, consistente con time)
+-- reminder_minutes_before:  NULL = sin recordatorio
+--                           0    = al inicio del evento
+--                           5    = 5 minutos antes
+--                           15   = 15 minutos antes
+--                           30   = 30 minutos antes
+--                           60   = 1 hora antes
+--                           1440 = 1 día antes
+
+-- ── 2. Tabla de notificaciones pendientes ─────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS agenda_notificaciones (
+  id              BIGSERIAL PRIMARY KEY,
+  agenda_id       INTEGER       NOT NULL REFERENCES agenda(id) ON DELETE CASCADE,
+  usuario_id      INTEGER       NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  empresa_id      INTEGER       NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
+  scheduled_at    TIMESTAMPTZ   NOT NULL,           -- momento en que debe enviarse
+  notified_at     TIMESTAMPTZ   DEFAULT NULL,        -- momento real de envío (NULL = pendiente)
+  cancelled_at    TIMESTAMPTZ   DEFAULT NULL,        -- cancelada si se edita/elimina
+  created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ   DEFAULT NULL,
+  CONSTRAINT unique_agenda_user_notification UNIQUE (agenda_id, usuario_id)
+);
+
+COMMENT ON TABLE  agenda_notificaciones IS 'Recordatorios pendientes/enviados para actividades de agenda. Una fila por (actividad × usuario asignado). UNIQUE evita duplicados.';
+COMMENT ON COLUMN agenda_notificaciones.scheduled_at IS 'Timestamp UTC en que debe dispararse la notificación (calculado de event_date + time - reminder_minutes_before)';
+COMMENT ON COLUMN agenda_notificaciones.notified_at  IS 'NULL = pendiente. Relleno cuando se entrega la notificación.';
+COMMENT ON COLUMN agenda_notificaciones.cancelled_at IS 'Relleno cuando la actividad se edita (cambia el horario o el recordatorio) o se archiva.';
+
+-- ── 3. Índices ────────────────────────────────────────────────────────────────
+
+CREATE INDEX IF NOT EXISTS idx_agenda_notif_scheduled
+  ON agenda_notificaciones (scheduled_at)
+  WHERE notified_at IS NULL AND cancelled_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_agenda_notif_agenda
+  ON agenda_notificaciones (agenda_id);
+
+CREATE INDEX IF NOT EXISTS idx_agenda_notif_usuario
+  ON agenda_notificaciones (usuario_id)
+  WHERE notified_at IS NULL AND cancelled_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_agenda_notif_empresa
+  ON agenda_notificaciones (empresa_id);
+
+-- ── 4. RLS en agenda_notificaciones ──────────────────────────────────────────
+
+ALTER TABLE agenda_notificaciones ENABLE ROW LEVEL SECURITY;
+
+-- Un usuario solo ve sus propias notificaciones
+CREATE POLICY agenda_notif_select ON agenda_notificaciones
+  FOR SELECT USING (
+    usuario_id = current_usuario_id()
+    OR current_user_role() IN ('Administrador', 'Director')
+  );
+
+-- Solo el sistema (service role) puede insertar/actualizar/borrar
+-- Las server actions usan createAdminClient() → bypass RLS
+CREATE POLICY agenda_notif_insert ON agenda_notificaciones
+  FOR INSERT WITH CHECK (false);
+
+CREATE POLICY agenda_notif_update ON agenda_notificaciones
+  FOR UPDATE USING (false);
+
+CREATE POLICY agenda_notif_delete ON agenda_notificaciones
+  FOR DELETE USING (false);
+
+-- ── 5. updated_at trigger en agenda_notificaciones ────────────────────────────
+
+CREATE OR REPLACE FUNCTION trg_agenda_notif_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER set_agenda_notif_updated_at
+  BEFORE UPDATE ON agenda_notificaciones
+  FOR EACH ROW EXECUTE FUNCTION trg_agenda_notif_updated_at();
+
+-- ── 6. Función helper: calcular scheduled_at de un recordatorio ───────────────
+
+CREATE OR REPLACE FUNCTION calc_reminder_scheduled_at(
+  p_event_date DATE,
+  p_time       TEXT,          -- "HH:MM" o NULL
+  p_minutes    INTEGER        -- reminder_minutes_before
+)
+RETURNS TIMESTAMPTZ
+LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE
+  v_time  TEXT;
+  v_start TIMESTAMPTZ;
+BEGIN
+  v_time := COALESCE(NULLIF(TRIM(p_time), ''), '09:00');
+  v_start := (p_event_date::TEXT || ' ' || v_time || ':00')::TIMESTAMP AT TIME ZONE 'Europe/Madrid';
+  RETURN v_start - (p_minutes || ' minutes')::INTERVAL;
+END;
+$$;
+
+-- ── 7. Función helper: upsert de notificaciones para una actividad ─────────────
+--
+-- Llamada desde create/update de agenda cuando reminder_minutes_before IS NOT NULL.
+-- Cancela notificaciones previas y crea/actualiza nuevas para cada usuario asignado.
+
+CREATE OR REPLACE FUNCTION upsert_agenda_reminders(
+  p_agenda_id     INTEGER,
+  p_event_date    DATE,
+  p_time          TEXT,
+  p_minutes       INTEGER,      -- NULL = sin recordatorio (cancelar existentes)
+  p_empresa_id    INTEGER
+)
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_scheduled_at TIMESTAMPTZ;
+  v_user_ids     INTEGER[];
+BEGIN
+  -- Cancelar todas las notificaciones previas de esta actividad
+  UPDATE agenda_notificaciones
+  SET cancelled_at = NOW()
+  WHERE agenda_id = p_agenda_id
+    AND cancelled_at IS NULL;
+
+  -- Si no hay recordatorio, terminamos aquí
+  IF p_minutes IS NULL THEN
+    RETURN;
+  END IF;
+
+  -- Calcular timestamp del recordatorio
+  v_scheduled_at := calc_reminder_scheduled_at(p_event_date, p_time, p_minutes);
+
+  -- Obtener usuarios asignados a esta actividad
+  SELECT ARRAY_AGG(usuario_id)
+  INTO v_user_ids
+  FROM agenda_usuarios
+  WHERE agenda_id = p_agenda_id;
+
+  IF v_user_ids IS NULL OR array_length(v_user_ids, 1) = 0 THEN
+    RETURN;
+  END IF;
+
+  -- Insertar/actualizar una notificación por usuario
+  -- ON CONFLICT actualiza el scheduled_at y descancela si estaba cancelada
+  INSERT INTO agenda_notificaciones (agenda_id, usuario_id, empresa_id, scheduled_at)
+  SELECT p_agenda_id, uid, p_empresa_id, v_scheduled_at
+  FROM UNNEST(v_user_ids) AS uid
+  ON CONFLICT (agenda_id, usuario_id) DO UPDATE
+    SET scheduled_at  = EXCLUDED.scheduled_at,
+        notified_at   = NULL,
+        cancelled_at  = NULL,
+        updated_at    = NOW();
+END;
+$$;
+
+-- ── 8. Actualizar RPC create_agenda_activity ──────────────────────────────────
+
+CREATE OR REPLACE FUNCTION create_agenda_activity(
+  p_description       TEXT,
+  p_event_date        DATE,
+  p_time              TEXT          DEFAULT NULL,
+  p_time_end          TEXT          DEFAULT NULL,
+  p_priority          TEXT          DEFAULT 'media',
+  p_tipo              TEXT          DEFAULT 'actividad',
+  p_completed         BOOLEAN       DEFAULT FALSE,
+  p_result            TEXT          DEFAULT NULL,
+  p_assigned_user_ids INTEGER[]     DEFAULT NULL,
+  p_visibility        TEXT          DEFAULT 'private',
+  p_reminder_minutes  INTEGER       DEFAULT NULL
+)
+RETURNS JSON
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_user_id     INTEGER;
+  v_empresa_id  INTEGER;
+  v_equipo_id   INTEGER;
+  v_agenda_id   INTEGER;
+  v_assigned    INTEGER[];
+BEGIN
+  -- Contexto del usuario actual
+  SELECT id, empresa_id, equipo_id
+  INTO v_user_id, v_empresa_id, v_equipo_id
+  FROM usuarios
+  WHERE auth_id = auth.uid()
+    AND activo = TRUE
+  LIMIT 1;
+
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Usuario no encontrado o inactivo';
+  END IF;
+
+  -- Al menos un usuario asignado (obligatorio)
+  v_assigned := COALESCE(p_assigned_user_ids, ARRAY[v_user_id]);
+  IF array_length(v_assigned, 1) = 0 THEN
+    RAISE EXCEPTION 'Debe asignarse al menos un usuario';
+  END IF;
+
+  -- Insertar actividad
+  INSERT INTO agenda (
+    description, event_date, time, time_end,
+    priority, tipo, completed, result,
+    user_id, owner_user_id, empresa_id, equipo_id,
+    visibility, reminder_minutes_before
+  )
+  VALUES (
+    TRIM(p_description),
+    p_event_date,
+    NULLIF(TRIM(COALESCE(p_time, '')), ''),
+    NULLIF(TRIM(COALESCE(p_time_end, '')), ''),
+    p_priority,
+    p_tipo,
+    p_completed,
+    NULLIF(TRIM(COALESCE(p_result, '')), ''),
+    v_assigned[1],
+    v_user_id,
+    v_empresa_id,
+    v_equipo_id,
+    p_visibility,
+    p_reminder_minutes
+  )
+  RETURNING id INTO v_agenda_id;
+
+  -- Insertar asignaciones
+  INSERT INTO agenda_usuarios (agenda_id, usuario_id)
+  SELECT v_agenda_id, uid
+  FROM UNNEST(v_assigned) AS uid
+  ON CONFLICT (agenda_id, usuario_id) DO NOTHING;
+
+  -- Upsert recordatorio si aplica
+  IF p_reminder_minutes IS NOT NULL THEN
+    PERFORM upsert_agenda_reminders(v_agenda_id, p_event_date, p_time, p_reminder_minutes, v_empresa_id);
+  END IF;
+
+  RETURN json_build_object('id', v_agenda_id);
+END;
+$$;
+
+-- ── 9. Actualizar RPC update_agenda_activity ──────────────────────────────────
+
+CREATE OR REPLACE FUNCTION update_agenda_activity(
+  p_agenda_id         INTEGER,
+  p_description       TEXT          DEFAULT NULL,
+  p_event_date        DATE          DEFAULT NULL,
+  p_time              TEXT          DEFAULT NULL,
+  p_time_end          TEXT          DEFAULT NULL,
+  p_priority          TEXT          DEFAULT NULL,
+  p_tipo              TEXT          DEFAULT NULL,
+  p_completed         BOOLEAN       DEFAULT NULL,
+  p_result            TEXT          DEFAULT NULL,
+  p_assigned_user_ids INTEGER[]     DEFAULT NULL,
+  p_reminder_minutes  INTEGER       DEFAULT -1    -- -1 = no tocar; NULL = quitar; >= 0 = actualizar
+)
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_existing      agenda%ROWTYPE;
+  v_new_reminder  INTEGER;
+  v_empresa_id    INTEGER;
+BEGIN
+  SELECT * INTO v_existing FROM agenda WHERE id = p_agenda_id AND archived_at IS NULL;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Actividad no encontrada';
+  END IF;
+
+  v_empresa_id := v_existing.empresa_id;
+
+  -- Resolver reminder: -1 = conservar el existente
+  IF p_reminder_minutes = -1 THEN
+    v_new_reminder := v_existing.reminder_minutes_before;
+  ELSE
+    v_new_reminder := p_reminder_minutes;  -- NULL quita, >= 0 actualiza
+  END IF;
+
+  UPDATE agenda SET
+    description              = COALESCE(NULLIF(TRIM(p_description), ''), v_existing.description),
+    event_date               = COALESCE(p_event_date, v_existing.event_date),
+    time                     = CASE
+                                 WHEN p_time IS NOT NULL THEN NULLIF(TRIM(p_time), '')
+                                 ELSE v_existing.time
+                               END,
+    time_end                 = CASE
+                                 WHEN p_time_end IS NOT NULL THEN NULLIF(TRIM(p_time_end), '')
+                                 ELSE v_existing.time_end
+                               END,
+    priority                 = COALESCE(p_priority, v_existing.priority),
+    tipo                     = COALESCE(p_tipo, v_existing.tipo),
+    completed                = COALESCE(p_completed, v_existing.completed),
+    result                   = CASE
+                                 WHEN p_result IS NOT NULL THEN NULLIF(TRIM(p_result), '')
+                                 ELSE v_existing.result
+                               END,
+    reminder_minutes_before  = v_new_reminder
+  WHERE id = p_agenda_id;
+
+  -- Gestionar asignaciones si se proporcionan
+  IF p_assigned_user_ids IS NOT NULL AND array_length(p_assigned_user_ids, 1) > 0 THEN
+    -- Actualizar user_id principal
+    UPDATE agenda SET user_id = p_assigned_user_ids[1] WHERE id = p_agenda_id;
+    -- Borrar los que ya no están
+    DELETE FROM agenda_usuarios
+    WHERE agenda_id = p_agenda_id
+      AND usuario_id != ALL(p_assigned_user_ids);
+    -- Insertar los nuevos
+    INSERT INTO agenda_usuarios (agenda_id, usuario_id)
+    SELECT p_agenda_id, uid
+    FROM UNNEST(p_assigned_user_ids) AS uid
+    ON CONFLICT (agenda_id, usuario_id) DO NOTHING;
+  END IF;
+
+  -- Upsert recordatorios (siempre que se hayan actualizado campos de tiempo o reminder)
+  PERFORM upsert_agenda_reminders(
+    p_agenda_id,
+    COALESCE(p_event_date, v_existing.event_date),
+    COALESCE(NULLIF(TRIM(COALESCE(p_time, '')), ''), v_existing.time),
+    v_new_reminder,
+    v_empresa_id
+  );
+END;
+$$;
+
+-- ── 10. Migrar datos existentes: compatibilidad hacia atrás ──────────────────
+
+-- Nada que migrar: time_end y reminder_minutes_before son NULL por defecto,
+-- lo que significa "sin hora de fin" y "sin recordatorio", que es el estado
+-- correcto para todas las actividades existentes.
+
+-- ── 11. Índice en agenda para consultas de recordatorio ───────────────────────
+
+CREATE INDEX IF NOT EXISTS idx_agenda_reminder
+  ON agenda (reminder_minutes_before, event_date)
+  WHERE reminder_minutes_before IS NOT NULL AND archived_at IS NULL;

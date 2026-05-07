@@ -2,8 +2,9 @@
 
 import { memo, useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, User, CheckCircle2, Circle, ExternalLink, AlertCircle, GripVertical } from "lucide-react";
+import { Bell, Calendar, User, CheckCircle2, Circle, ExternalLink, AlertCircle, GripVertical } from "lucide-react";
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
+import { calcDurationMinutes, formatDuration, formatReminderLabel } from "@/lib/local-date-time";
 
 const priorityBadge: Record<KanbanPriority, { cls: string; label: string; dot: string }> = {
   alta:  { cls: "bg-danger/10  text-danger",                            label: "Alta",  dot: "bg-danger" },
@@ -100,14 +101,17 @@ function KanbanCard({
       onClick={handleClick}
       className={[
         "group relative rounded-2xl border bg-surface p-4 shadow-sm",
-        "select-none",
+        "select-none transition-shadow duration-150",
         onClick && !done ? "cursor-pointer" : "",
         done
           ? "border-border bg-surface-raised opacity-60"
-          : "border-border",
-        isDragging ? "shadow-xl rotate-[1.5deg] scale-[1.02] border-primary/20 opacity-95" : "",
+          : "border-border hover:border-primary/20",
+        isDragging ? "z-50 shadow-2xl rotate-[2deg] scale-[1.03] border-primary/25 bg-surface" : "",
         completing && !isCompleted ? "scale-95 opacity-40" : "",
       ].join(" ")}
+      style={isDragging ? { pointerEvents: "none" } : undefined}
+      layout
+      layoutId={card.id}
     >
       {/* Drag handle decorativo */}
       {!done && (
@@ -173,12 +177,13 @@ function KanbanCard({
         </p>
       )}
 
-      {/* ── Footer: fecha + asignados ─────────────────────────────── */}
-      {!done && (card.dueDate || card.assignedUsers?.length || card.assignedBy) && (
+      {/* ── Footer: fecha + duración + recordatorio + asignados ─────── */}
+      {!done && (card.dueDate || card.assignedUsers?.length || card.assignedBy || card.reminderMinutesBefore != null) && (
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-2.5">
           {card.dueDate && (() => {
             const status = getDateStatus(card.dueDate);
             const style  = DATE_STYLES[status];
+            const dur = calcDurationMinutes(card.time, card.timeEnd);
             return (
               <span className={`flex items-center gap-1 text-[11px] ${style.cls}`}>
                 {status === "overdue"
@@ -189,6 +194,7 @@ function KanbanCard({
                   ? <>{style.label} · {formatDate(card.dueDate)}</>
                   : formatDate(card.dueDate)
                 }
+                {dur && <span className="ml-0.5 text-text-secondary">({formatDuration(dur)})</span>}
                 <a
                   href={googleCalendarUrl(card.title, card.dueDate)}
                   target="_blank"
@@ -202,6 +208,12 @@ function KanbanCard({
               </span>
             );
           })()}
+          {card.reminderMinutesBefore != null && (
+            <span className="flex items-center gap-1 text-[11px] font-medium text-primary">
+              <Bell className="h-3 w-3" />
+              {formatReminderLabel(card.reminderMinutesBefore)}
+            </span>
+          )}
           {(card.assignedUsers?.length || card.assignedBy) && (
             <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
               <User className="h-3 w-3" />

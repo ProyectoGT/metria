@@ -33,7 +33,7 @@ ALTER TABLE global_search_index ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Ver busqueda propia o de empresa" ON global_search_index
 FOR SELECT USING (
-  empresa_id = (SELECT empresa_id FROM usuarios WHERE id = auth.uid())
+  empresa_id = (SELECT empresa_id FROM usuarios WHERE auth_id = auth.uid())
 );
 
 -- ==============================================================================
@@ -176,7 +176,7 @@ BEGIN
     'agenda', 
     NEW.id::text, 
     COALESCE(NEW.description, 'Actividad #' || NEW.id), 
-    COALESCE(NEW.tipo, '') || ' · ' || COALESCE(NEW.event_date, ''), 
+    COALESCE(NEW.tipo, '') || ' · ' ||     COALESCE(NEW.event_date::text, ''), 
     unaccent_lower(COALESCE(NEW.description, '') || ' ' || COALESCE(NEW.tipo, '') || ' ' || COALESCE(NEW.result, '')),
     '/calendario',
     NEW.empresa_id,
@@ -245,5 +245,5 @@ FROM tareas ON CONFLICT DO NOTHING;
 
 -- Agenda
 INSERT INTO global_search_index (entity_type, entity_id, title, subtitle, search_text, href, empresa_id, owner_user_id)
-SELECT 'agenda', id::text, COALESCE(description, 'Actividad #' || id), COALESCE(tipo, '') || ' · ' || COALESCE(event_date, ''), unaccent_lower(COALESCE(description, '') || ' ' || COALESCE(tipo, '') || ' ' || COALESCE(result, '')), '/calendario', empresa_id, owner_user_id
+SELECT 'agenda', id::text, COALESCE(description, 'Actividad #' || id), COALESCE(tipo, '') || ' · ' || COALESCE(event_date::text, ''), unaccent_lower(COALESCE(description, '') || ' ' || COALESCE(tipo, '') || ' ' || COALESCE(result, '')), '/calendario', empresa_id, owner_user_id
 FROM agenda ON CONFLICT DO NOTHING;

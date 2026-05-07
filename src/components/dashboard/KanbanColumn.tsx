@@ -37,8 +37,8 @@ function KanbanColumn({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* ── Cabecera de columna ───────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+      {/* ── Cabecera de columna (sticky) ──────────────────────────── */}
+      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3.5 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.08)]">
         <div className="flex min-w-0 items-center gap-2.5">
           <h3 className="truncate text-sm font-semibold text-text-primary">{column.title}</h3>
           <div className="flex items-center gap-1">
@@ -68,8 +68,9 @@ function KanbanColumn({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={[
-              "flex max-h-[420px] min-h-[72px] flex-1 flex-col gap-2.5 overflow-y-auto px-3 pb-3 transition-colors duration-150",
-              snapshot.isDraggingOver ? "bg-primary/5 rounded-xl" : "",
+              "flex min-h-[72px] flex-1 flex-col gap-2.5 overflow-y-auto px-3 py-2 transition-colors duration-150",
+              "scrollbar-thin max-h-[420px]",
+              snapshot.isDraggingOver ? "bg-primary/5" : "",
             ].join(" ")}
           >
             {/* Empty state */}

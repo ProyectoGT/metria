@@ -182,8 +182,10 @@ export type Database = {
           id: number
           owner_user_id: number | null
           priority: string
+          reminder_minutes_before: number | null
           result: string | null
           time: string | null
+          time_end: string | null
           tipo: string
           user_id: number | null
           visibility: string
@@ -202,8 +204,10 @@ export type Database = {
           id?: number
           owner_user_id?: number | null
           priority?: string
+          reminder_minutes_before?: number | null
           result?: string | null
           time?: string | null
+          time_end?: string | null
           tipo?: string
           user_id?: number | null
           visibility?: string
@@ -222,8 +226,10 @@ export type Database = {
           id?: number
           owner_user_id?: number | null
           priority?: string
+          reminder_minutes_before?: number | null
           result?: string | null
           time?: string | null
+          time_end?: string | null
           tipo?: string
           user_id?: number | null
           visibility?: string
@@ -260,6 +266,64 @@ export type Database = {
           {
             foreignKeyName: "agenda_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agenda_notificaciones: {
+        Row: {
+          agenda_id: number
+          cancelled_at: string | null
+          created_at: string
+          empresa_id: number
+          id: number
+          notified_at: string | null
+          scheduled_at: string
+          updated_at: string | null
+          usuario_id: number
+        }
+        Insert: {
+          agenda_id: number
+          cancelled_at?: string | null
+          created_at?: string
+          empresa_id: number
+          id?: number
+          notified_at?: string | null
+          scheduled_at: string
+          updated_at?: string | null
+          usuario_id: number
+        }
+        Update: {
+          agenda_id?: number
+          cancelled_at?: string | null
+          created_at?: string
+          empresa_id?: number
+          id?: number
+          notified_at?: string | null
+          scheduled_at?: string
+          updated_at?: string | null
+          usuario_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_notificaciones_agenda_id_fkey"
+            columns: ["agenda_id"]
+            isOneToOne: false
+            referencedRelation: "agenda"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_notificaciones_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_notificaciones_usuario_id_fkey"
+            columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
@@ -2828,6 +2892,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      upsert_agenda_reminders: {
+        Args: {
+          p_agenda_id: number
+          p_event_date: string
+          p_time: string
+          p_minutes: number | null
+          p_empresa_id: number
+        }
+        Returns: undefined
       }
       upsert_facturado_activity: {
         Args: {

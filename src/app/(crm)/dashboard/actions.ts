@@ -40,27 +40,44 @@ export async function createAgendaAction(data: {
   description: string;
   eventDate: string;
   time?: string | null;
+  timeEnd?: string | null;
   priority?: string;
   tipo?: string;
   completed?: boolean;
   result?: string | null;
   assignedUserIds?: number[];
+  reminderMinutes?: number | null;
 }): Promise<{ id: number }> {
   const supabase = await createClient();
   const yo = await getCurrentUserContext();
   if (!yo) throw new Error("No autenticado");
 
-  const assignedUserIds = data.assignedUserIds?.length ? data.assignedUserIds : [yo.id];
+  if (!data.assignedUserIds?.length) throw new Error("Debe asignarse al menos un usuario");
+
+  // Validar que si hay hora fin, sea posterior a la hora inicio
+  const normalizedStart = normalizeTime(data.time, DEFAULT_ACTIVITY_TIME);
+  const normalizedEnd = data.timeEnd ? normalizeTime(data.timeEnd, "") : null;
+  if (normalizedEnd && normalizedEnd <= normalizedStart) {
+    throw new Error("La hora de fin debe ser posterior a la hora de inicio");
+  }
+
+  // No crear recordatorio sin hora de inicio
+  if (data.reminderMinutes != null && !data.time?.trim()) {
+    throw new Error("Se requiere hora de inicio para configurar un recordatorio");
+  }
+
   const { data: row, error } = await supabase.rpc("create_agenda_activity", {
     p_description: data.description,
     p_event_date: normalizeDateKey(data.eventDate),
-    p_time: normalizeTime(data.time, DEFAULT_ACTIVITY_TIME),
+    p_time: normalizedStart,
+    p_time_end: normalizedEnd ?? undefined,
     p_priority: normalizeActivityPriority(data.priority),
     p_tipo: normalizeActivityType(data.tipo),
     p_completed: data.completed ?? false,
     p_result: data.result ?? undefined,
-    p_assigned_user_ids: assignedUserIds,
+    p_assigned_user_ids: data.assignedUserIds,
     p_visibility: "private",
+    p_reminder_minutes: data.reminderMinutes ?? undefined,
   });
 
   if (error) throw new Error(error.message);
@@ -76,11 +93,13 @@ export async function updateAgendaAction(
     description?: string;
     eventDate?: string;
     time?: string | null;
+    timeEnd?: string | null;
     priority?: string;
     tipo?: string;
     completed?: boolean;
     result?: string | null;
     assignedUserIds?: number[];
+    reminderMinutes?: number | null;
   },
 ): Promise<void> {
   const yo = await getCurrentUserContext();
@@ -89,7 +108,7 @@ export async function updateAgendaAction(
   const supabase = createAdminClient();
   const { data: existing, error: readError } = await supabase
     .from("agenda")
-    .select("id, description, event_date, time, priority, tipo, completed, result, user_id, owner_user_id, empresa_id, archived_at, agenda_usuarios(usuario_id)")
+    .select("id, description, event_date, time, time_end, priority, tipo, completed, result, reminder_minutes_before, user_id, owner_user_id, empresa_id, archived_at, agenda_usuarios(usuario_id)")
     .eq("id", id)
     .is("archived_at", null)
     .single();
@@ -116,6 +135,21 @@ export async function updateAgendaAction(
     );
 
   if (!canEdit) throw new Error("Sin permisos para editar la actividad");
+
+  // Validar hora inicio/fin
+  const resolvedTime = updates.time !== undefined ? updates.time : existing.time;
+  const resolvedTimeEnd = updates.timeEnd !== undefined ? updates.timeEnd : existing.time_end;
+  const normalizedStart = normalizeTime(resolvedTime, DEFAULT_ACTIVITY_TIME);
+  const normalizedEnd = resolvedTimeEnd ? normalizeTime(resolvedTimeEnd, "") : null;
+  if (normalizedEnd && normalizedEnd <= normalizedStart) {
+    throw new Error("La hora de fin debe ser posterior a la hora de inicio");
+  }
+
+  // Validar recordatorio
+  const resolvedReminder = updates.reminderMinutes !== undefined ? updates.reminderMinutes : existing.reminder_minutes_before;
+  if (resolvedReminder != null && !resolvedTime?.trim()) {
+    throw new Error("Se requiere hora de inicio para configurar un recordatorio");
+  }
 
   const fallbackAssigned = currentAssigned.length
     ? currentAssigned
@@ -148,12 +182,14 @@ export async function updateAgendaAction(
     .update({
       description: (updates.description ?? existing.description).trim(),
       event_date: normalizeDateKey(updates.eventDate ?? existing.event_date),
-      time: normalizeTime(updates.time ?? existing.time, DEFAULT_ACTIVITY_TIME),
+      time: normalizedStart,
+      time_end: normalizedEnd,
       priority: normalizeActivityPriority(updates.priority ?? existing.priority),
       tipo: normalizeActivityType(updates.tipo ?? existing.tipo),
       completed: updates.completed ?? existing.completed,
       result: (updates.result ?? existing.result)?.trim() || null,
       user_id: firstAssigned,
+      reminder_minutes_before: resolvedReminder,
     })
     .eq("id", id);
   if (updateError) throw new Error(updateError.message);
@@ -170,6 +206,15 @@ export async function updateAgendaAction(
       { onConflict: "agenda_id,usuario_id" },
     );
   if (assignError) throw new Error(assignError.message);
+
+  // Actualizar recordatorios (anti-duplicados vía UNIQUE constraint en DB)
+  await supabase.rpc("upsert_agenda_reminders", {
+    p_agenda_id: id,
+    p_event_date: normalizeDateKey(updates.eventDate ?? existing.event_date),
+    p_time: normalizedStart,
+    p_minutes: resolvedReminder,
+    p_empresa_id: existing.empresa_id!,
+  });
 
   revalidatePath("/dashboard");
   revalidatePath("/ordenes");
@@ -413,27 +458,38 @@ export async function convertTareaToAgendaFullAction(
     description: string;
     eventDate: string;
     time: string;
+    timeEnd?: string | null;
     priority: string;
     tipo: string;
     assignedUserIds: number[];
+    reminderMinutes?: number | null;
   },
 ): Promise<{ id: number }> {
   const supabase = await createClient();
   const yo = await getCurrentUserContext();
   if (!yo) throw new Error("No autenticado");
 
-  const assignedUserIds = data.assignedUserIds.length ? data.assignedUserIds : [yo.id];
+  if (!data.assignedUserIds.length) throw new Error("Debe asignarse al menos un usuario");
+  const assignedUserIds = data.assignedUserIds;
+
+  const normalizedStart = normalizeTime(data.time, DEFAULT_ACTIVITY_TIME);
+  const normalizedEnd = data.timeEnd ? normalizeTime(data.timeEnd, "") : null;
+  if (normalizedEnd && normalizedEnd <= normalizedStart) {
+    throw new Error("La hora de fin debe ser posterior a la hora de inicio");
+  }
 
   const { data: agendaRow, error: createError } = await supabase.rpc("create_agenda_activity", {
     p_description: data.description,
     p_event_date: normalizeDateKey(data.eventDate),
-    p_time: normalizeTime(data.time, DEFAULT_ACTIVITY_TIME),
+    p_time: normalizedStart,
+    p_time_end: normalizedEnd ?? undefined,
     p_priority: normalizeActivityPriority(data.priority),
     p_tipo: normalizeActivityType(data.tipo),
     p_completed: false,
     p_result: undefined,
     p_assigned_user_ids: assignedUserIds,
     p_visibility: "private",
+    p_reminder_minutes: data.reminderMinutes ?? undefined,
   });
 
   if (createError) throw new Error(createError.message);

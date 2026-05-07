@@ -12,6 +12,7 @@ import { updatePropiedadesPosicionesAction, upsertPropiedadAction, toggleContact
 import { canSetVendido, type UserRole } from "@/lib/roles";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
+import { AnimatedAccordion } from "@/components/ui/animated";
 import EncargoPanel from "@/components/propiedades/EncargoPanel";
 import RelatedEmailsPanel from "@/components/email/RelatedEmailsPanel";
 import Drawer from "@/components/ui/drawer";
@@ -673,7 +674,7 @@ export default function PropiedadesClient({
       </div>
 
       {/* ── Barra de filtros avanzados ── */}
-      {filtrosOpen && (
+      <AnimatedAccordion isOpen={filtrosOpen}>
         <div className="mb-4 rounded-xl border border-border bg-surface p-4 space-y-4">
           {/* Estados */}
           <div>
@@ -749,7 +750,7 @@ export default function PropiedadesClient({
             </div>
           )}
         </div>
-      )}
+      </AnimatedAccordion>
 
       {propiedadesFiltradas.length === 0 ? (
         <div className="rounded-xl border border-border bg-surface py-16 text-center">
