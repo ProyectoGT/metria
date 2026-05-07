@@ -6,26 +6,21 @@ import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { CheckCircle2, Plus, X } from "lucide-react";
 import KanbanCard from "./KanbanCard";
 import type { KanbanColumnData, KanbanCardData } from "@/lib/mock/dashboard";
-import type { UserRole } from "@/lib/roles";
 
 type KanbanColumnProps = {
   column: KanbanColumnData;
-  role: UserRole;
-  currentUserId: string;
   onDeleteColumn: (columnId: string) => void;
   onAddCard?: (columnId: string) => void;
-  onDeleteCard: (columnId: string, cardId: string) => void;
-  onEditCard: (columnId: string, card: KanbanCardData) => void;
   onCompleteCard?: (columnId: string, cardId: string, card: KanbanCardData) => void;
+  onDetailCard: (columnId: string, card: KanbanCardData) => void;
 };
 
 function KanbanColumn({
   column,
   onDeleteColumn,
   onAddCard,
-  onDeleteCard,
-  onEditCard,
   onCompleteCard,
+  onDetailCard,
 }: KanbanColumnProps) {
   const [hovered, setHovered] = useState(false);
 
@@ -100,10 +95,8 @@ function KanbanColumn({
                   >
                     <KanbanCard
                       card={card}
-                      canDelete={card.source === "tarea" && !card.assignedBy}
                       isCompleted={card.isCompleted ?? false}
-                      onDelete={(id) => onDeleteCard(column.id, id)}
-                      onEdit={(id) => { const c = column.cards.find((x) => x.id === id); if (c) onEditCard(column.id, c); }}
+                      onClick={(id) => { const c = column.cards.find((x) => x.id === id); if (c) onDetailCard(column.id, c); }}
                       onComplete={onCompleteCard ? (id) => onCompleteCard(column.id, id, card) : undefined}
                       dragHandleProps={dragProvided.dragHandleProps ?? undefined}
                       isDragging={dragSnapshot.isDragging}

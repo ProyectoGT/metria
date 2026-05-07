@@ -3,10 +3,13 @@
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
-import { Calendar, Clock, Plus, X, Trash2 } from "lucide-react";
+import { X, Plus } from "lucide-react";
 import KanbanColumn from "./KanbanColumn";
 import KanbanAddCard from "./KanbanAddCard";
 import KanbanEditCard from "./KanbanEditCard";
+import KanbanDetailDrawer from "./KanbanDetailDrawer";
+import KanbanConvertCard from "./KanbanConvertCard";
+import Drawer from "@/components/ui/drawer";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import type { KanbanData, KanbanColumnData, KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import type { UserRole } from "@/lib/roles";
@@ -16,11 +19,12 @@ import {
   completeAgendaAction,
   completeTareaAction,
   convertAgendaToTareaAction,
-  convertTareaToAgendaAction,
+  convertTareaToAgendaFullAction,
   createAgendaAction,
   createTareaAction,
   deleteKanbanColumnAction,
   deleteTareaAction,
+  archiveAgendaAction,
   updateAgendaAction,
   updateTareaAction,
 } from "@/app/(crm)/dashboard/actions";
@@ -55,18 +59,18 @@ export default function KanbanBoard({
   });
   const [addingCardCol, setAddingCardCol] = useState<string | null>(null);
   const [editingCard, setEditingCard] = useState<{ columnId: string; card: KanbanCardData } | null>(null);
+  const [detailCard, setDetailCard] = useState<{ columnId: string; card: KanbanCardData } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "column" | "card"; columnId: string; cardId?: string; isAgenda?: boolean } | null>(null);
+  const [confirmDeleteCard, setConfirmDeleteCard] = useState<{ columnId: string; card: KanbanCardData } | null>(null);
   const [resultadoModal, setResultadoModal] = useState<{ columnId: string; cardId: string; titulo: string } | null>(null);
   const [resultadoText, setResultadoText] = useState("");
-  const [convertModal, setConvertModal] = useState<{
+  const [convertingCard, setConvertingCard] = useState<{
     card: KanbanCardData;
     sourceColId: string;
     destColId: string;
     sourceIndex: number;
     destIndex: number;
   } | null>(null);
-  const [convertDate, setConvertDate] = useState(localDateKey());
-  const [convertTime, setConvertTime] = useState(DEFAULT_ACTIVITY_TIME);
   const [addingColumn, setAddingColumn] = useState(false);
   const [newColTitle, setNewColTitle] = useState("");
   const newColInputRef = useRef<HTMLInputElement>(null);
@@ -83,11 +87,9 @@ export default function KanbanBoard({
     const moved = findCard(source.droppableId, draggableId);
     if (!moved) return;
 
-    // Tarea → Orden del dia: pedir fecha/hora antes de convertir
+    // Tarea → Orden del dia: abrir drawer completo de conversion
     if (moved.source === "tarea" && destination.droppableId === "en_progreso") {
-      setConvertDate(localDateKey());
-      setConvertTime(DEFAULT_ACTIVITY_TIME);
-      setConvertModal({
+      setConvertingCard({
         card: moved,
         sourceColId: source.droppableId,
         destColId: destination.droppableId,
@@ -97,6 +99,7 @@ export default function KanbanBoard({
       return;
     }
 
+    // Movimiento local (misma columna o columna custom)
     setColumns((prev) => {
       const next = prev.map((col) => ({ ...col, cards: [...col.cards] }));
       const sourceCol = next.find((c) => c.id === source.droppableId);
@@ -107,8 +110,7 @@ export default function KanbanBoard({
       return next;
     });
 
-    if (source.droppableId === destination.droppableId) return;
-
+    // Agenda → Pendientes: conversion inmediata
     if (moved.source === "agenda" && destination.droppableId === "pendientes") {
       convertAgendaToTareaAction(moved.dbId, moved.assignedUserIds)
         .then(() => router.refresh())
@@ -116,11 +118,27 @@ export default function KanbanBoard({
     }
   }
 
-  function handleConfirmConvert() {
-    if (!convertModal) return;
-    const { card, sourceColId, destColId, sourceIndex, destIndex } = convertModal;
-    setConvertModal(null);
+  async function handleConfirmConvert(data: {
+    description: string;
+    tipo: ActivityType;
+    date: string;
+    time: string;
+    priority: KanbanPriority;
+    assignedUserIds: number[];
+  }) {
+    if (!convertingCard) return;
+    const { card, sourceColId, destColId, sourceIndex, destIndex } = convertingCard;
 
+    await convertTareaToAgendaFullAction(card.dbId, {
+      description: data.description,
+      eventDate: data.date,
+      time: data.time,
+      priority: data.priority,
+      tipo: data.tipo,
+      assignedUserIds: data.assignedUserIds,
+    });
+
+    // Solo actualizar estado local si la conversion fue exitosa
     setColumns((prev) => {
       const next = prev.map((col) => ({ ...col, cards: [...col.cards] }));
       const sourceCol = next.find((c) => c.id === sourceColId);
@@ -131,11 +149,12 @@ export default function KanbanBoard({
       return next;
     });
 
-    convertTareaToAgendaAction(card.dbId, {
-      date: convertDate,
-      time: convertTime,
-      assignedUserIds: card.assignedUserIds,
-    }).then(() => router.refresh()).catch(() => router.refresh());
+    setConvertingCard(null);
+    router.refresh();
+  }
+
+  function handleCancelConvert() {
+    setConvertingCard(null);
   }
 
   function requestDeleteColumn(columnId: string) {
@@ -205,34 +224,45 @@ export default function KanbanBoard({
     }
   }, [router]);
 
-  function requestDeleteCard(columnId: string, cardId: string) {
-    const card = findCard(columnId, cardId);
-    setDeleteTarget({ type: "card", columnId, cardId, isAgenda: card?.source === "agenda" });
+  function handleOpenDetail(columnId: string, card: KanbanCardData) {
+    setDetailCard({ columnId, card });
   }
 
-  function handleDeleteCard(columnId: string, cardId: string, isAgenda: boolean) {
-    const card = findCard(columnId, cardId);
-    setColumns((prev) =>
-      prev.map((col) => col.id === columnId ? { ...col, cards: col.cards.filter((c) => c.id !== cardId) } : col),
-    );
-    if (!isAgenda && card?.source === "tarea") {
-      deleteTareaAction(card.dbId).then(() => router.refresh()).catch(() => router.refresh());
+  function handleEditFromDetail() {
+    if (!detailCard) return;
+    const { columnId, card } = detailCard;
+    setDetailCard(null);
+    // Pequeño retraso para permitir que el drawer de detalle se cierre antes de abrir el de edicion
+    setTimeout(() => setEditingCard({ columnId, card }), 150);
+  }
+
+  function handleRequestDeleteFromDetail() {
+    if (!detailCard) return;
+    setConfirmDeleteCard(detailCard);
+  }
+
+  async function handleConfirmDeleteCard() {
+    if (!confirmDeleteCard) return;
+    const { columnId, card } = confirmDeleteCard;
+    setConfirmDeleteCard(null);
+    setDetailCard(null);
+
+    try {
+      if (card.source === "agenda") {
+        await archiveAgendaAction(card.dbId);
+      } else {
+        await deleteTareaAction(card.dbId);
+      }
+      setColumns((prev) =>
+        prev.map((col) =>
+          col.id === columnId ? { ...col, cards: col.cards.filter((c) => c.id !== card.id) } : col,
+        ),
+      );
+      router.refresh();
+    } catch {
+      router.refresh();
     }
   }
-
-  function handleConfirmDelete() {
-    if (!deleteTarget) return;
-    if (deleteTarget.type === "column") {
-      handleDeleteColumn(deleteTarget.columnId);
-    } else if (deleteTarget.type === "card" && deleteTarget.cardId) {
-      handleDeleteCard(deleteTarget.columnId, deleteTarget.cardId, !!deleteTarget.isAgenda);
-    }
-    setDeleteTarget(null);
-  }
-
-  const handleOpenEdit = useCallback((columnId: string, card: KanbanCardData) => {
-    setEditingCard({ columnId, card });
-  }, []);
 
   const handleSaveEdit = useCallback((updates: {
     title: string;
@@ -312,6 +342,38 @@ export default function KanbanBoard({
     }
   }
 
+  function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === "column") {
+      handleDeleteColumn(deleteTarget.columnId);
+    } else if (deleteTarget.type === "card" && deleteTarget.cardId) {
+      const card = findCard(deleteTarget.columnId, deleteTarget.cardId);
+      setColumns((prev) =>
+        prev.map((col) =>
+          col.id === deleteTarget.columnId
+            ? { ...col, cards: col.cards.filter((c) => c.id !== deleteTarget.cardId) }
+            : col,
+        ),
+      );
+      if (!deleteTarget.isAgenda && card?.source === "tarea") {
+        deleteTareaAction(card.dbId).then(() => router.refresh()).catch(() => router.refresh());
+      }
+      if (deleteTarget.isAgenda && card?.source === "agenda") {
+        archiveAgendaAction(card.dbId).then(() => router.refresh()).catch(() => router.refresh());
+      }
+    }
+    setDeleteTarget(null);
+  }
+
+  const isManager = role === "Administrador" || role === "Director";
+  const isOwnerOrAssigned = (card: KanbanCardData) => {
+    const uid = Number(_currentUserId);
+    return card.assignedUserIds?.includes(uid) || false;
+  };
+  const canDeleteAgenda = (card: KanbanCardData) => {
+    return isManager || isOwnerOrAssigned(card);
+  };
+
   return (
     <>
       <DragDropContext onDragEnd={handleDragEnd}>
@@ -320,13 +382,10 @@ export default function KanbanBoard({
             <KanbanColumn
               key={column.id}
               column={column}
-              role={role}
-              currentUserId={_currentUserId}
               onDeleteColumn={requestDeleteColumn}
               onAddCard={(colId) => setAddingCardCol(colId)}
-              onDeleteCard={requestDeleteCard}
-              onEditCard={handleOpenEdit}
               onCompleteCard={handleCompleteCard}
+              onDetailCard={handleOpenDetail}
             />
           ))}
 
@@ -375,6 +434,37 @@ export default function KanbanBoard({
         </div>
       </DragDropContext>
 
+      {/* Drawer detalle de tarjeta */}
+      {detailCard && (
+        <KanbanDetailDrawer
+          card={detailCard.card}
+          open
+          onClose={() => setDetailCard(null)}
+          onEdit={handleEditFromDetail}
+          onDelete={handleRequestDeleteFromDetail}
+          isManager={isManager}
+          isOwnerOrAssigned={isOwnerOrAssigned(detailCard.card)}
+          canDelete={
+            detailCard.card.source === "tarea"
+              ? (isManager || isOwnerOrAssigned(detailCard.card))
+              : canDeleteAgenda(detailCard.card)
+          }
+        />
+      )}
+
+      {/* Convertir tarea → agenda (desde drag & drop) */}
+      {convertingCard && (
+        <KanbanConvertCard
+          card={convertingCard.card}
+          onConfirm={handleConfirmConvert}
+          onClose={handleCancelConvert}
+          agents={agents}
+          currentUserId={_currentUserId}
+          role={role}
+        />
+      )}
+
+      {/* Añadir tarjeta */}
       {addingCardCol && (
         <KanbanAddCard
           role={role}
@@ -386,6 +476,7 @@ export default function KanbanBoard({
         />
       )}
 
+      {/* Editar tarjeta */}
       {editingCard && (
         <KanbanEditCard
           card={editingCard.card}
@@ -396,120 +487,83 @@ export default function KanbanBoard({
         />
       )}
 
+      {/* Confirmacion eliminar tarjeta (desde detalle) */}
+      {confirmDeleteCard && (
+        <ConfirmDialog
+          open
+          title="Eliminar actividad"
+          description={
+            confirmDeleteCard.card.source === "agenda"
+              ? "Esta actividad se archivara y desaparecera del tablero. Esta accion no se puede deshacer."
+              : "Esta tarea se eliminara permanentemente. Esta accion no se puede deshacer."
+          }
+          confirmLabel="Eliminar"
+          onCancel={() => { setConfirmDeleteCard(null); }}
+          onConfirm={handleConfirmDeleteCard}
+        />
+      )}
+
+      {/* Resultado al completar */}
       {resultadoModal && (
-        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/8 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl border border-border">
-            <div className="border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">Como ha ido?</h2>
-              <p className="mt-0.5 truncate text-sm text-text-secondary">{resultadoModal.titulo}</p>
+        <Drawer
+          open
+          onClose={() => setResultadoModal(null)}
+          title="Como ha ido?"
+          subtitle={resultadoModal.titulo}
+          width="sm"
+          footer={
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setResultadoModal(null)}
+                className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmResultado}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+              >
+                Marcar como realizada
+              </button>
             </div>
-            <div className="space-y-4 p-6">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-text-secondary">
-                  Resultado / nota de lo realizado
-                </label>
-                <textarea
-                  autoFocus
-                  value={resultadoText}
-                  onChange={(e) => setResultadoText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleConfirmResultado();
-                    if (e.key === "Escape") setResultadoModal(null);
-                  }}
-                  placeholder="Ej: Llamada realizada, cliente interesado. Proxima visita el martes."
-                  rows={4}
-                  className="input w-full resize-none text-sm"
-                />
-                <p className="text-xs text-text-secondary">Opcional · Ctrl+Enter para confirmar</p>
-              </div>
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setResultadoModal(null)}
-                  className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmResultado}
-                  className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
-                >
-                  Marcar como realizada
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {convertModal && (
-        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/8 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-surface shadow-xl border border-border">
-            <div className="border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">Programar en el Orden del dia</h2>
-              <p className="mt-0.5 truncate text-sm text-text-secondary">{convertModal.card.title}</p>
-            </div>
-            <div className="space-y-4 p-6">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-text-secondary">
-                    <Calendar className="h-3.5 w-3.5" />
-                    Fecha
-                  </label>
-                  <input
-                    type="date"
-                    value={convertDate}
-                    onChange={(e) => setConvertDate(e.target.value)}
-                    className="input"
-                    autoFocus
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-text-secondary">
-                    <Clock className="h-3.5 w-3.5" />
-                    Hora
-                  </label>
-                  <input
-                    type="time"
-                    value={convertTime}
-                    onChange={(e) => setConvertTime(e.target.value)}
-                    className="input"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setConvertModal(null)}
-                  className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmConvert}
-                  disabled={!convertDate}
-                  className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-50"
-                >
-                  Programar
-                </button>
-              </div>
+          }
+        >
+          <div className="space-y-4 p-6">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-text-secondary">
+                Resultado / nota de lo realizado
+              </label>
+              <textarea
+                autoFocus
+                value={resultadoText}
+                onChange={(e) => setResultadoText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleConfirmResultado();
+                  if (e.key === "Escape") setResultadoModal(null);
+                }}
+                placeholder="Ej: Llamada realizada, cliente interesado. Proxima visita el martes."
+                rows={4}
+                className="input w-full resize-none text-sm"
+              />
+              <p className="text-xs text-text-secondary">Opcional · Ctrl+Enter para confirmar</p>
             </div>
           </div>
-        </div>
+        </Drawer>
       )}
 
+      {/* Confirmacion eliminar tarjeta/columna (desde hover) */}
       {deleteTarget && (
         <ConfirmDialog
           open={!!deleteTarget}
-          title={deleteTarget.type === "column" ? "Eliminar columna" : "Eliminar tarea"}
+          title={deleteTarget.type === "column" ? "Eliminar columna" : "Eliminar actividad"}
           description={
             deleteTarget.type === "column"
-              ? "Esta columna desaparecerá de tu tablero. Las tareas dentro NO se eliminarán de la base de datos y quedarán sin columna asignada. ¿Seguro?"
+              ? "Esta columna desaparecera de tu tablero. Las tareas dentro NO se eliminaran de la base de datos y quedaran sin columna asignada. ¿Seguro?"
               : deleteTarget.isAgenda
-                ? "Esta tarea proviene de la agenda. Solo las 'Tareas' creadas explícitamente se pueden eliminar. ¿Quieres continuar?"
-                : "¿Estás seguro de que quieres eliminar esta tarea? Esta acción no se puede deshacer."
+                ? "Esta actividad se archivara. ¿Quieres continuar?"
+                : "¿Estas seguro de que quieres eliminar esta tarea? Esta accion no se puede deshacer."
           }
           confirmLabel="Eliminar"
           onCancel={() => setDeleteTarget(null)}

@@ -148,7 +148,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
   const unreadCount = notifications.length;
 
   return (
-    <header className="sticky top-0 z-[20] flex h-16 shrink-0 items-center gap-3 border-b border-border/60 bg-surface/95 px-4 backdrop-blur-sm md:px-5">
+    <header className="sticky top-0 z-[20] flex h-16 shrink-0 items-center gap-3 border-b border-border/60 bg-surface px-4 md:px-5">
 
       {/* ── Hamburger (solo móvil) ─────────────────────────────────── */}
       <button

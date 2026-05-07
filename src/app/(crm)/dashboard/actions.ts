@@ -391,6 +391,82 @@ export async function clearAgentOfMonthAction(): Promise<void> {
   revalidatePath("/dashboard");
 }
 
+// ─── Archivar actividad (agenda) ──────────────────────────────────────────────
+
+export async function archiveAgendaAction(id: number): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("archive_agenda", {
+    p_agenda_id: id,
+    p_reason: "archived_from_dashboard",
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard");
+  revalidatePath("/ordenes");
+  revalidatePath("/calendario");
+}
+
+// ─── Convertir tarea a agenda (con tipo y campos completos) ───────────────────
+
+export async function convertTareaToAgendaFullAction(
+  tareaId: number,
+  data: {
+    description: string;
+    eventDate: string;
+    time: string;
+    priority: string;
+    tipo: string;
+    assignedUserIds: number[];
+  },
+): Promise<{ id: number }> {
+  const supabase = await createClient();
+  const yo = await getCurrentUserContext();
+  if (!yo) throw new Error("No autenticado");
+
+  const assignedUserIds = data.assignedUserIds.length ? data.assignedUserIds : [yo.id];
+
+  const { data: agendaRow, error: createError } = await supabase.rpc("create_agenda_activity", {
+    p_description: data.description,
+    p_event_date: normalizeDateKey(data.eventDate),
+    p_time: normalizeTime(data.time, DEFAULT_ACTIVITY_TIME),
+    p_priority: normalizeActivityPriority(data.priority),
+    p_tipo: normalizeActivityType(data.tipo),
+    p_completed: false,
+    p_result: undefined,
+    p_assigned_user_ids: assignedUserIds,
+    p_visibility: "private",
+  });
+
+  if (createError) throw new Error(createError.message);
+
+  const agendaId = (agendaRow as unknown as { id: number }).id;
+
+  // Archivar la tarea original (atomicidad: si falla, limpiamos la agenda creada)
+  const { error: archiveError } = await supabase.rpc("archive_tarea", {
+    p_tarea_id: tareaId,
+    p_reason: "converted_to_agenda",
+  });
+
+  if (archiveError) {
+    const adminClient = createAdminClient();
+    await adminClient.from("agenda").delete().eq("id", agendaId);
+    throw new Error("No se pudo completar la conversion. La tarea ya fue procesada.");
+  }
+
+  // Establecer enlace para trazabilidad
+  const adminClient = createAdminClient();
+  await adminClient.from("tareas").update({
+    converted_to_agenda_id: agendaId,
+    archived_at: new Date().toISOString(),
+    archived_reason: "converted_to_agenda",
+  }).eq("id", tareaId);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/ordenes");
+  revalidatePath("/calendario");
+
+  return { id: agendaId };
+}
+
 export async function deleteKanbanColumnAction(col_id: string): Promise<void> {
   const supabase = await createClient();
   const yo = await getCurrentUserContext();

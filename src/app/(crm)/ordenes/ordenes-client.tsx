@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ChevronDown, Clock, Loader2, Plus, Trash2 } from "lucide-react";
+import { Calendar, CheckCircle2, ChevronDown, Clock, Loader2, Pencil, Plus, Trash2, User } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 import Drawer from "@/components/ui/drawer";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import type { UserRole } from "@/lib/roles";
 import { DEFAULT_ACTIVITY_TIME, normalizeTime } from "@/lib/local-date-time";
 import { useToast, Toaster } from "@/components/ui/toast";
@@ -88,8 +89,9 @@ export default function OrdenesClient({
   const [filterUserId, setFilterUserId] = useState<number | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Actividad | null>(null);
+  const [detailActividad, setDetailActividad] = useState<Actividad | null>(null);
+  const [confirmDeleteActividad, setConfirmDeleteActividad] = useState<Actividad | null>(null);
   const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [completingId, setCompletingId] = useState<number | null>(null);
   const [form, setForm] = useState({
     description: "",
@@ -229,9 +231,7 @@ export default function OrdenesClient({
   }
 
   async function archiveActividad(id: number) {
-    setDeletingId(id);
     const { error } = await supabase.rpc("archive_agenda", { p_agenda_id: id, p_reason: "archived_from_ordenes" });
-    setDeletingId(null);
     if (error) {
       toast(error.message, "error");
       return;
@@ -298,7 +298,7 @@ export default function OrdenesClient({
               return (
                 <div key={actividad.id} className="p-2">
                   <div
-                    onClick={() => openEdit(actividad)}
+                    onClick={() => setDetailActividad(actividad)}
                     className={`group flex cursor-pointer items-start gap-3 rounded-xl border border-l-4 bg-surface px-4 py-3 transition-all hover:bg-background hover:shadow-sm ${meta.border} border-border`}
                   >
                     <button
@@ -329,18 +329,6 @@ export default function OrdenesClient({
                     <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${meta.badge}`}>
                       {meta.label}
                     </span>
-                    {canManageOthers(currentUserRole) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          archiveActividad(actividad.id);
-                        }}
-                        disabled={deletingId === actividad.id}
-                        className="shrink-0 rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100 disabled:opacity-50"
-                      >
-                        {deletingId === actividad.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                      </button>
-                    )}
                   </div>
                 </div>
               );
@@ -453,6 +441,122 @@ export default function OrdenesClient({
           </div>
         </form>
       </Drawer>
+
+      {/* Detalle de actividad */}
+      <Drawer
+        open={detailActividad !== null}
+        onClose={() => setDetailActividad(null)}
+        title={detailActividad?.description ?? ""}
+        subtitle="Orden del dia"
+        width="md"
+        headerActions={
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (!detailActividad) return;
+                const a = detailActividad;
+                setDetailActividad(null);
+                setTimeout(() => openEdit(a), 150);
+              }}
+              className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
+              aria-label="Editar"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            {canManageOthers(currentUserRole) && (
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteActividad(detailActividad)}
+                className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
+                aria-label="Eliminar"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        }
+      >
+        {detailActividad && (
+          <div className="space-y-5 px-5 py-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${priorityMeta(detailActividad.priority).badge}`}>
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                {priorityMeta(detailActividad.priority).label}
+              </span>
+              {detailActividad.completed && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Completada
+                </span>
+              )}
+              <span className="rounded-full bg-surface-raised px-2.5 py-1 text-xs font-medium text-text-secondary">
+                {tipoLabel(detailActividad.tipo)}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 text-sm text-text-secondary">
+              <Calendar className="h-4 w-4" />
+              <span>
+                {new Date(detailActividad.event_date + "T12:00:00").toLocaleDateString("es-ES", {
+                  weekday: "long", day: "numeric", month: "long", year: "numeric",
+                })}
+              </span>
+              {detailActividad.time && (
+                <>
+                  <Clock className="h-4 w-4 text-text-secondary" />
+                  <span>{normalizeTime(detailActividad.time, "")}</span>
+                </>
+              )}
+            </div>
+
+            {assignedIds(detailActividad).length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Asignado a</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {assignedIds(detailActividad).map((uid) => (
+                    <span key={uid} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                      <User className="h-3 w-3" />
+                      {userMap.get(uid) ?? `Usuario ${uid}`}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {detailActividad.completed && detailActividad.result && (
+              <div className="rounded-xl bg-success/8 px-4 py-3">
+                <p className="text-xs font-semibold text-success">Resultado</p>
+                <p className="mt-1 text-sm text-text-primary">{detailActividad.result}</p>
+              </div>
+            )}
+
+            <div className="rounded-xl bg-surface-raised px-4 py-3 text-xs text-text-secondary">
+              <p>Actividad de calendario · ID: {detailActividad.id}</p>
+            </div>
+          </div>
+        )}
+      </Drawer>
+
+      {confirmDeleteActividad && (
+        <ConfirmDialog
+          open
+          title="Eliminar actividad"
+          description="Esta actividad se archivara. Esta accion no se puede deshacer."
+          confirmLabel="Eliminar"
+          onCancel={() => {
+            setConfirmDeleteActividad(null);
+            setDetailActividad(null);
+          }}
+          onConfirm={() => {
+            if (!confirmDeleteActividad) return;
+            const id = confirmDeleteActividad.id;
+            setConfirmDeleteActividad(null);
+            setDetailActividad(null);
+            archiveActividad(id);
+          }}
+        />
+      )}
     </div>
   );
 }

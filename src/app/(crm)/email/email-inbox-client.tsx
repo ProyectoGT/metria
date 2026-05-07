@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import { Archive, CheckCircle2, ExternalLink, Inbox, Mail, Paperclip, RefreshCw, Search, Send, Tag, Undo2 } from "lucide-react";
+import Drawer from "@/components/ui/drawer";
 
 type Account = { id: number; email: string; status: string; last_sync_at: string | null; last_error: string | null };
 type LinkRow = { id: number; email_message_id: number; entity_type: string; entity_id: number; confidence_score: number; linked_by: string };
@@ -464,45 +465,44 @@ export default function EmailInboxClient({
         )}
       </section>
 
-      {composeOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="w-full max-w-2xl rounded-2xl border border-border bg-surface p-5 shadow-xl">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold text-text-primary">Nuevo email</h2>
-              <button type="button" onClick={() => setComposeOpen(false)} className="rounded-lg px-3 py-1.5 text-sm text-text-secondary hover:bg-surface-raised">Cerrar</button>
-            </div>
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <select onChange={(event) => applyTemplate(event.target.value)} className="input">
-                <option value="">Usar plantilla</option>
-                {templates.map((template) => (
-                  <option key={template.id} value={template.id}>{template.name}</option>
-                ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const template = smartTemplateForSelected();
-                    if (template) setCompose((current) => ({ ...current, subject: template.subject, bodyText: template.body_text }));
-                  }}
-                  className="shrink-0 rounded-lg border border-border px-3 text-sm font-medium text-text-secondary hover:bg-surface-raised hover:text-text-primary"
-                >
-                  Inteligente
-                </button>
-              </div>
-              <input value={compose.to} onChange={(e) => setCompose((c) => ({ ...c, to: e.target.value }))} className="input" placeholder="Para" />
-              <input value={compose.subject} onChange={(e) => setCompose((c) => ({ ...c, subject: e.target.value }))} className="input" placeholder="Asunto" />
-              <textarea value={compose.bodyText} onChange={(e) => setCompose((c) => ({ ...c, bodyText: e.target.value }))} className="input min-h-48 resize-y" placeholder="Mensaje" />
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button type="button" onClick={sendEmail} disabled={isPending} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60">
-                <Send className="h-4 w-4" />
-                Enviar
-              </button>
-            </div>
+      <Drawer
+        open={composeOpen}
+        onClose={() => setComposeOpen(false)}
+        title="Nuevo email"
+        width="lg"
+      >
+        <div className="flex flex-col gap-3 p-5">
+          <div className="flex gap-2">
+            <select onChange={(event) => applyTemplate(event.target.value)} className="input">
+            <option value="">Usar plantilla</option>
+            {templates.map((template) => (
+              <option key={template.id} value={template.id}>{template.name}</option>
+            ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                const template = smartTemplateForSelected();
+                if (template) setCompose((current) => ({ ...current, subject: template.subject, bodyText: template.body_text }));
+              }}
+              className="shrink-0 rounded-lg border border-border px-3 text-sm font-medium text-text-secondary hover:bg-surface-raised hover:text-text-primary"
+            >
+              Inteligente
+            </button>
+          </div>
+          <input value={compose.to} onChange={(e) => setCompose((c) => ({ ...c, to: e.target.value }))} className="input" placeholder="Para" />
+          <input value={compose.subject} onChange={(e) => setCompose((c) => ({ ...c, subject: e.target.value }))} className="input" placeholder="Asunto" />
+          <textarea value={compose.bodyText} onChange={(e) => setCompose((c) => ({ ...c, bodyText: e.target.value }))} className="input min-h-48 resize-y" placeholder="Mensaje" />
+        </div>
+        <div className="border-t border-border px-5 py-4">
+          <div className="flex justify-end">
+            <button type="button" onClick={sendEmail} disabled={isPending} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60">
+              <Send className="h-4 w-4" />
+              Enviar
+            </button>
           </div>
         </div>
-      )}
+      </Drawer>
     </div>
   );
 }

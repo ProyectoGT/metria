@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Loader2, X, Printer } from "lucide-react";
+import { Loader2, Printer } from "lucide-react";
+import Drawer from "@/components/ui/drawer";
 import { DOCUMENT_TYPES, type DocumentType } from "@/lib/document-templates";
 import { generateDocumentAction, type GenerateDocumentInput } from "@/app/(crm)/documents/generate-action";
 
@@ -67,67 +68,14 @@ export default function DocumentGeneratorModal({ subject, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <div>
-            <h2 className="flex items-center gap-2 text-base font-semibold text-text-primary">
-              <FileText className="h-4 w-4 text-primary" />
-              Generar documento
-            </h2>
-            <p className="mt-0.5 text-xs text-text-secondary">{subject.label}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Selección de plantilla */}
-        <div className="space-y-2 px-6 py-5">
-          <p className="mb-3 text-xs font-medium text-text-secondary">Selecciona la plantilla:</p>
-
-          {available.map((doc) => (
-            <button
-              key={doc.value}
-              type="button"
-              onClick={() => setSelected(doc.value)}
-              className={`w-full rounded-xl border p-4 text-left transition-colors ${
-                selected === doc.value
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-primary/40 hover:bg-background"
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                  selected === doc.value ? "border-primary bg-primary" : "border-border"
-                }`}>
-                  {selected === doc.value && (
-                    <div className="h-1.5 w-1.5 rounded-full bg-white" />
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-text-primary">{doc.label}</p>
-                  <p className="mt-0.5 text-xs text-text-secondary">{doc.description}</p>
-                </div>
-              </div>
-            </button>
-          ))}
-
-          {error && (
-            <p className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>
-          )}
-
-          <p className="mt-3 text-[11px] text-text-secondary">
-            El documento se abrira en una nueva pestana listo para imprimir o guardar como PDF.
-          </p>
-        </div>
-
-        {/* Footer */}
-        <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+    <Drawer
+      open
+      onClose={onClose}
+      title="Generar documento"
+      subtitle={subject.label}
+      width="md"
+      footer={
+        <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
             disabled={loading}
@@ -148,7 +96,47 @@ export default function DocumentGeneratorModal({ subject, onClose }: Props) {
             {loading ? "Generando..." : "Generar e imprimir"}
           </button>
         </div>
+      }
+    >
+      {/* Selección de plantilla */}
+      <div className="space-y-2 px-6 py-5">
+        <p className="mb-3 text-xs font-medium text-text-secondary">Selecciona la plantilla:</p>
+
+        {available.map((doc) => (
+          <button
+            key={doc.value}
+            type="button"
+            onClick={() => setSelected(doc.value)}
+            className={`w-full rounded-xl border p-4 text-left transition-colors ${
+              selected === doc.value
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/40 hover:bg-background"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                selected === doc.value ? "border-primary bg-primary" : "border-border"
+              }`}>
+                {selected === doc.value && (
+                  <div className="h-1.5 w-1.5 rounded-full bg-white" />
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-text-primary">{doc.label}</p>
+                <p className="mt-0.5 text-xs text-text-secondary">{doc.description}</p>
+              </div>
+            </div>
+          </button>
+        ))}
+
+        {error && (
+          <p className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>
+        )}
+
+        <p className="mt-3 text-[11px] text-text-secondary">
+          El documento se abrira en una nueva pestana listo para imprimir o guardar como PDF.
+        </p>
       </div>
-    </div>
+    </Drawer>
   );
 }

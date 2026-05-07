@@ -2,10 +2,9 @@
 
 import { memo, useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, User, Trash2, CheckCircle2, Circle, ExternalLink, AlertCircle, Pencil, GripVertical } from "lucide-react";
+import { Calendar, User, CheckCircle2, Circle, ExternalLink, AlertCircle, GripVertical } from "lucide-react";
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 
-// Badges con tokens semánticos del design system
 const priorityBadge: Record<KanbanPriority, { cls: string; label: string; dot: string }> = {
   alta:  { cls: "bg-danger/10  text-danger",                            label: "Alta",  dot: "bg-danger" },
   media: { cls: "bg-accent/15  text-amber-700 dark:text-amber-300",     label: "Media", dot: "bg-accent" },
@@ -59,23 +58,18 @@ function googleCalendarUrl(title: string, dateIso: string) {
 
 type KanbanCardProps = {
   card: KanbanCardData;
-  canDelete: boolean;
   isCompleted?: boolean;
-  onDelete: (id: string) => void;
-  /** Abre el modal de edición completo */
-  onEdit: (id: string) => void;
   onComplete?: (id: string) => void;
+  onClick?: (id: string) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   isDragging?: boolean;
 };
 
 function KanbanCard({
   card,
-  canDelete,
   isCompleted = false,
-  onDelete,
-  onEdit,
   onComplete,
+  onClick,
   dragHandleProps,
   isDragging,
 }: KanbanCardProps) {
@@ -90,7 +84,12 @@ function KanbanCard({
     setTimeout(() => { onComplete(card.id); }, 700);
   }
 
-  // CRÍTICO: dragHandleProps debe ir en el elemento raíz para @hello-pangea/dnd
+  function handleClick() {
+    if (!completing && !isCompleted && onClick) {
+      onClick(card.id);
+    }
+  }
+
   return (
     <motion.div
       {...(dragHandleProps as Record<string, unknown>)}
@@ -98,9 +97,11 @@ function KanbanCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
       whileHover={{ y: -2, boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}
+      onClick={handleClick}
       className={[
         "group relative rounded-2xl border bg-surface p-4 shadow-sm",
         "select-none",
+        onClick && !done ? "cursor-pointer" : "",
         done
           ? "border-border bg-surface-raised opacity-60"
           : "border-border",
@@ -130,44 +131,22 @@ function KanbanCard({
           )}
         </div>
 
-        {/* Acciones — visibles en hover */}
-        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        {/* Acciones */}
+        <div className="flex shrink-0 items-center gap-0.5">
           {isCompleted && (
             <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />
           )}
-          {!completing && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onEdit(card.id); }}
-              className="rounded-lg p-1 text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
-              aria-label="Editar"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-          )}
-          {onComplete && !isCompleted && (
+          {onComplete && !isCompleted && !completing && (
             <button
               onClick={handleComplete}
-              className={`rounded-lg p-1 transition-colors ${
-                completing
-                  ? "text-success"
-                  : "text-text-secondary hover:bg-success/10 hover:text-success"
-              }`}
+              className="rounded-lg p-1 text-text-secondary transition-colors hover:bg-success/10 hover:text-success"
               aria-label="Marcar como realizada"
             >
-              {completing
-                ? <CheckCircle2 className="h-3.5 w-3.5" />
-                : <Circle className="h-3.5 w-3.5" />
-              }
+              <Circle className="h-3.5 w-3.5" />
             </button>
           )}
-          {canDelete && (isCompleted || !completing) && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(card.id); }}
-              className="rounded-lg p-1 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
-              aria-label="Eliminar"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+          {completing && (
+            <CheckCircle2 className="h-3.5 w-3.5 text-success" />
           )}
         </div>
       </div>

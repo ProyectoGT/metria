@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { BarChart3 } from "lucide-react";
+import Drawer from "@/components/ui/drawer";
 import { createClient } from "@/lib/supabase-browser";
 import { canViewInsights, normalizeUserRole } from "@/lib/roles";
 import {
@@ -424,24 +425,14 @@ export default function DesarrolloClient({
       )}
 
       {/* ── Modal de objetivos ──────────────────────────────────────── */}
-      {editAgente && editForm && (
-        <div className="fixed inset-0 z-[40] flex items-center justify-center bg-black/8 p-4">
-          <div className="w-full max-w-lg rounded-xl border border-border bg-surface p-6 shadow-xl">
-            <div className="mb-1 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-text-primary">
-                Objetivos — {editAgente.nombre} {editAgente.apellidos}
-              </h2>
-              <button
-                onClick={() => setEditAgente(null)}
-                className="rounded-lg p-1 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
-                aria-label="Cerrar"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
+      <Drawer
+        open={!!(editAgente && editForm)}
+        onClose={() => setEditAgente(null)}
+        title={editAgente ? `Objetivos — ${editAgente.nombre} ${editAgente.apellidos}` : ""}
+        width="md"
+      >
+        {editForm && (
+          <div className="p-5">
             {mes === 0 ? (
               <p className="mb-4 rounded-lg bg-primary/8 px-3 py-2 text-xs text-primary">
                 Vista anual — los objetivos mensuales se aplicaran a los 12 meses del ano {anio}. El objetivo anual es la suma de los 12 meses.
@@ -452,7 +443,6 @@ export default function DesarrolloClient({
               </p>
             )}
 
-            {/* Cabeceras */}
             <div className={`mb-2 grid gap-3 text-xs font-semibold uppercase tracking-wide text-text-secondary ${mes === 0 ? "grid-cols-4" : "grid-cols-3"}`}>
               <span>Metrica</span>
               <span className="text-center">Actual</span>
@@ -508,8 +498,8 @@ export default function DesarrolloClient({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Drawer>
     </div>
   );
 }

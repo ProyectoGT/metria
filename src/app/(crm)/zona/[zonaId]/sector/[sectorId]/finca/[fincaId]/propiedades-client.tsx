@@ -14,6 +14,7 @@ import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog
 import { useToast, Toaster } from "@/components/ui/toast";
 import EncargoPanel from "@/components/propiedades/EncargoPanel";
 import RelatedEmailsPanel from "@/components/email/RelatedEmailsPanel";
+import Drawer from "@/components/ui/drawer";
 
 type Agente = {
   id: number;
@@ -1161,362 +1162,326 @@ export default function PropiedadesClient({
       )}
 
       {/* ── Modal confirmar contactado ── */}
-      {contactadoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-surface shadow-xl">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-text-primary">Marcar como contactado</h2>
-                <p className="mt-0.5 text-xs text-text-secondary">
-                  {contactadoModal.propietario ?? `Planta ${contactadoModal.planta ?? "-"} Puerta ${contactadoModal.puerta ?? "-"}`}
-                </p>
-              </div>
-              <button
-                onClick={() => setContactadoModal(null)}
-                className="rounded-lg p-1.5 text-text-secondary hover:bg-background hover:text-text-primary"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      <Drawer
+        open={!!contactadoModal}
+        onClose={() => setContactadoModal(null)}
+        title="Marcar como contactado"
+        subtitle={contactadoModal?.propietario ?? `Planta ${contactadoModal?.planta ?? "-"} Puerta ${contactadoModal?.puerta ?? "-"}`}
+        width="sm"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setContactadoModal(null)}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleConfirmContactado}
+              disabled={contactadoSaving}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60"
+            >
+              {contactadoSaving ? "Guardando..." : "Confirmar"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 px-6 py-5">
+          <p className="text-sm text-text-secondary">
+            La casilla se desmarcara automaticamente tras el periodo indicado.
+          </p>
 
-            <div className="space-y-4 px-6 py-5">
-              <p className="text-sm text-text-secondary">
-                La casilla se desmarcara automaticamente tras el periodo indicado.
-              </p>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-text-secondary">
-                  Dias hasta el desmarque automatico
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    min={1}
-                    max={730}
-                    value={contactadoDias}
-                    onChange={(e) => setContactadoDias(Math.max(1, Math.min(730, Number(e.target.value))))}
-                    className="input w-24 text-center text-sm"
-                  />
-                  <span className="text-sm text-text-secondary">dias</span>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-border bg-background px-4 py-3">
-                <p className="text-xs text-text-secondary">Se desmarcara el</p>
-                <p className="mt-0.5 text-sm font-semibold text-text-primary">
-                  {addDays(new Date(), contactadoDias).toLocaleDateString("es-ES", {
-                    weekday: "long", day: "numeric", month: "long", year: "numeric",
-                  })}
-                </p>
-              </div>
-
-              {contactadoDias !== 90 && (
-                <button
-                  onClick={() => setContactadoDias(90)}
-                  className="text-xs text-primary hover:underline"
-                >
-                  Restablecer a 90 dias
-                </button>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
-              <button
-                onClick={() => setContactadoModal(null)}
-                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmContactado}
-                disabled={contactadoSaving}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60"
-              >
-                {contactadoSaving ? "Guardando..." : "Confirmar"}
-              </button>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-text-secondary">
+              Dias hasta el desmarque automatico
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min={1}
+                max={730}
+                value={contactadoDias}
+                onChange={(e) => setContactadoDias(Math.max(1, Math.min(730, Number(e.target.value))))}
+                className="input w-24 text-center text-sm"
+              />
+              <span className="text-sm text-text-secondary">dias</span>
             </div>
           </div>
+
+          <div className="rounded-xl border border-border bg-background px-4 py-3">
+            <p className="text-xs text-text-secondary">Se desmarcara el</p>
+            <p className="mt-0.5 text-sm font-semibold text-text-primary">
+              {addDays(new Date(), contactadoDias).toLocaleDateString("es-ES", {
+                weekday: "long", day: "numeric", month: "long", year: "numeric",
+              })}
+            </p>
+          </div>
+
+          {contactadoDias !== 90 && (
+            <button
+              onClick={() => setContactadoDias(90)}
+              className="text-xs text-primary hover:underline"
+            >
+              Restablecer a 90 dias
+            </button>
+          )}
         </div>
-      )}
+      </Drawer>
 
       {/* Modal recordatorio */}
-      {reminderPropiedad && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-surface shadow-xl">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-text-primary">
-                  Recordatorio / Cita
-                </h2>
-                <p className="mt-0.5 text-xs text-text-secondary">
-                  {reminderPropiedad.propietario ?? `Planta ${reminderPropiedad.planta ?? "-"} Puerta ${reminderPropiedad.puerta ?? "-"}`}
-                </p>
-              </div>
-              <button
-                onClick={closeReminder}
-                className="text-text-secondary transition-colors hover:text-text-primary"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="space-y-4 px-6 py-5">
-              {isOverdue(reminderPropiedad.fecha_visita) && (
-                <div className="flex items-start gap-2 rounded-lg bg-accent/10 px-3 py-2.5 text-xs text-accent">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="mt-0.5 h-3.5 w-3.5 shrink-0"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  <span>
-                    Han pasado mas de 90 dias desde la ultima visita. La fecha sugerida es
-                    a los 90 dias de la ultima visita.
-                  </span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <FormField label="Fecha *">
-                  <input
-                    type="date"
-                    value={reminderForm.fecha}
-                    onChange={(e) =>
-                      setReminderForm((prev) => ({ ...prev, fecha: e.target.value }))
-                    }
-                    className="input"
-                  />
-                </FormField>
-                <FormField label="Hora">
-                  <input
-                    type="time"
-                    value={reminderForm.hora}
-                    onChange={(e) =>
-                      setReminderForm((prev) => ({ ...prev, hora: e.target.value }))
-                    }
-                    className="input"
-                  />
-                </FormField>
-              </div>
-
-              <FormField label="Nota (opcional)">
-                <textarea
-                  value={reminderForm.nota}
-                  onChange={(e) =>
-                    setReminderForm((prev) => ({ ...prev, nota: e.target.value }))
-                  }
-                  placeholder="Motivo de la cita o recordatorio..."
-                  rows={2}
-                  className="input resize-none"
-                />
-              </FormField>
-
-              <p className="text-xs text-text-secondary">
-                El recordatorio aparecera como tarea pendiente en el icono de notificaciones
-                de la barra superior.
-              </p>
-            </div>
-
-            <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
-              <button
-                onClick={closeReminder}
-                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveReminder}
-                disabled={reminderSaving || !reminderForm.fecha}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
-              >
-                {reminderSaving ? "Guardando..." : "Crear recordatorio"}
-              </button>
-            </div>
+      <Drawer
+        open={!!reminderPropiedad}
+        onClose={closeReminder}
+        title="Recordatorio / Cita"
+        subtitle={reminderPropiedad?.propietario ?? (reminderPropiedad ? `Planta ${reminderPropiedad.planta ?? "-"} Puerta ${reminderPropiedad.puerta ?? "-"}` : undefined)}
+        width="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={closeReminder}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSaveReminder}
+              disabled={reminderSaving || !reminderForm.fecha}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
+            >
+              {reminderSaving ? "Guardando..." : "Crear recordatorio"}
+            </button>
           </div>
-        </div>
-      )}
-
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface shadow-xl">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">
-                {editTarget ? "Editar propiedad" : "Nueva propiedad"}
-              </h2>
-              <button
-                onClick={closeModal}
-                className="text-text-secondary transition-colors hover:text-text-primary"
+        }
+      >
+        <div className="space-y-4 px-6 py-5">
+          {reminderPropiedad && isOverdue(reminderPropiedad.fecha_visita) && (
+            <div className="flex items-start gap-2 rounded-lg bg-accent/10 px-3 py-2.5 text-xs text-accent">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                viewBox="0 0 20 20"
+                fill="currentColor"
               >
-                ×
-              </button>
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span>
+                Han pasado mas de 90 dias desde la ultima visita. La fecha sugerida es
+                a los 90 dias de la ultima visita.
+              </span>
             </div>
+          )}
 
-            <div className="space-y-4 px-6 py-5">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <FormField label="Planta">
-                  <input
-                    type="text"
-                    value={form.planta}
-                    onChange={(e) => setField("planta", e.target.value)}
-                    placeholder="Ej: 3A"
-                    className="input"
-                  />
-                </FormField>
-                <FormField label="Puerta">
-                  <input
-                    type="text"
-                    value={form.puerta}
-                    onChange={(e) => setField("puerta", e.target.value)}
-                    placeholder="Ej: B"
-                    className="input"
-                  />
-                </FormField>
-              </div>
-
-              <FormField label="Propietario">
-                <input
-                  type="text"
-                  value={form.propietario}
-                  onChange={(e) => setField("propietario", e.target.value)}
-                  placeholder="Nombre del propietario"
-                  className="input"
-                />
-              </FormField>
-
-              <FormField label="Telefono">
-                <input
-                  type="tel"
-                  value={form.telefono}
-                  onChange={(e) => setField("telefono", e.target.value)}
-                  placeholder="600 000 000"
-                  className="input"
-                />
-              </FormField>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <FormField label="Estado">
-                  <select
-                    value={form.estado}
-                    onChange={(e) => setField("estado", e.target.value)}
-                    className="input"
-                  >
-                    {ESTADOS.filter((estado) => {
-                      if (estado.value !== "vendido") return true;
-                      const agenteId = form.agente_asignado ? parseInt(form.agente_asignado) : null;
-                      return canSetVendido(currentUserRole, agenteId, currentUserId, supervisedAgentIds);
-                    }).map((estado) => (
-                      <option key={estado.value} value={estado.value}>
-                        {estado.label}
-                      </option>
-                    ))}
-                  </select>
-                </FormField>
-                <FormField
-                  label="Fecha de visita"
-                  hint={!editTarget && nowDisplay ? `Ahora: ${nowDisplay}` : undefined}
-                >
-                  <input
-                    type="datetime-local"
-                    value={form.fecha_visita}
-                    onChange={(e) => setField("fecha_visita", e.target.value)}
-                    className="input"
-                  />
-                </FormField>
-              </div>
-
-              {form.estado === "vendido" && (
-                <FormField label="Honorarios (€)" hint="Comision o honorarios obtenidos en la venta. Se usa para calcular el facturado en Desarrollo.">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.honorarios}
-                    onChange={(e) => setField("honorarios", e.target.value)}
-                    placeholder="Ej: 5000"
-                    className="input"
-                  />
-                </FormField>
-              )}
-
-              <FormField label="Agente asignado">
-                <select
-                  value={form.agente_asignado}
-                  onChange={(e) => setField("agente_asignado", e.target.value)}
-                  className="input"
-                >
-                  <option value="">Sin asignar</option>
-                  {agentes.map((agente) => (
-                    <option key={agente.id} value={agente.id}>
-                      {agente.nombre} {agente.apellidos}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-
-              <FormField label="Notas">
-                <textarea
-                  value={form.notas}
-                  onChange={(e) => setField("notas", e.target.value)}
-                  placeholder="Observaciones adicionales..."
-                  rows={3}
-                  className="input resize-none"
-                />
-              </FormField>
-
-              {(form.estado === "noticia" || form.estado === "encargo") && (
-                <LocationPicker
-                  latitud={form.latitud}
-                  longitud={form.longitud}
-                  onChange={(lat, lng) => {
-                    setField("latitud", lat);
-                    setField("longitud", lng);
-                  }}
-                />
-              )}
-
-              {saveError && (
-                <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
-                  {saveError}
-                </p>
-              )}
-
-              {editTarget && (
-                <RelatedEmailsPanel
-                  entityType="propiedad"
-                  entityId={editTarget.id}
-                  replyTo={null}
-                />
-              )}
-            </div>
-
-            <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
-              <button
-                onClick={closeModal}
-                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
-              >
-                {saving
-                  ? "Guardando..."
-                  : editTarget
-                    ? "Guardar cambios"
-                    : "Crear propiedad"}
-              </button>
-            </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField label="Fecha *">
+              <input
+                type="date"
+                value={reminderForm.fecha}
+                onChange={(e) =>
+                  setReminderForm((prev) => ({ ...prev, fecha: e.target.value }))
+                }
+                className="input"
+              />
+            </FormField>
+            <FormField label="Hora">
+              <input
+                type="time"
+                value={reminderForm.hora}
+                onChange={(e) =>
+                  setReminderForm((prev) => ({ ...prev, hora: e.target.value }))
+                }
+                className="input"
+              />
+            </FormField>
           </div>
+
+          <FormField label="Nota (opcional)">
+            <textarea
+              value={reminderForm.nota}
+              onChange={(e) =>
+                setReminderForm((prev) => ({ ...prev, nota: e.target.value }))
+              }
+              placeholder="Motivo de la cita o recordatorio..."
+              rows={2}
+              className="input resize-none"
+            />
+          </FormField>
+
+          <p className="text-xs text-text-secondary">
+            El recordatorio aparecera como tarea pendiente en el icono de notificaciones
+            de la barra superior.
+          </p>
         </div>
-      )}
+      </Drawer>
+
+      <Drawer
+        open={modalOpen}
+        onClose={closeModal}
+        title={editTarget ? "Editar propiedad" : "Nueva propiedad"}
+        width="lg"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={closeModal}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
+            >
+              {saving
+                ? "Guardando..."
+                : editTarget
+                  ? "Guardar cambios"
+                  : "Crear propiedad"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 px-6 py-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField label="Planta">
+              <input
+                type="text"
+                value={form.planta}
+                onChange={(e) => setField("planta", e.target.value)}
+                placeholder="Ej: 3A"
+                className="input"
+              />
+            </FormField>
+            <FormField label="Puerta">
+              <input
+                type="text"
+                value={form.puerta}
+                onChange={(e) => setField("puerta", e.target.value)}
+                placeholder="Ej: B"
+                className="input"
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Propietario">
+            <input
+              type="text"
+              value={form.propietario}
+              onChange={(e) => setField("propietario", e.target.value)}
+              placeholder="Nombre del propietario"
+              className="input"
+            />
+          </FormField>
+
+          <FormField label="Telefono">
+            <input
+              type="tel"
+              value={form.telefono}
+              onChange={(e) => setField("telefono", e.target.value)}
+              placeholder="600 000 000"
+              className="input"
+            />
+          </FormField>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField label="Estado">
+              <select
+                value={form.estado}
+                onChange={(e) => setField("estado", e.target.value)}
+                className="input"
+              >
+                {ESTADOS.filter((estado) => {
+                  if (estado.value !== "vendido") return true;
+                  const agenteId = form.agente_asignado ? parseInt(form.agente_asignado) : null;
+                  return canSetVendido(currentUserRole, agenteId, currentUserId, supervisedAgentIds);
+                }).map((estado) => (
+                  <option key={estado.value} value={estado.value}>
+                    {estado.label}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            <FormField
+              label="Fecha de visita"
+              hint={!editTarget && nowDisplay ? `Ahora: ${nowDisplay}` : undefined}
+            >
+              <input
+                type="datetime-local"
+                value={form.fecha_visita}
+                onChange={(e) => setField("fecha_visita", e.target.value)}
+                className="input"
+              />
+            </FormField>
+          </div>
+
+          {form.estado === "vendido" && (
+            <FormField label="Honorarios (€)" hint="Comision o honorarios obtenidos en la venta. Se usa para calcular el facturado en Desarrollo.">
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.honorarios}
+                onChange={(e) => setField("honorarios", e.target.value)}
+                placeholder="Ej: 5000"
+                className="input"
+              />
+            </FormField>
+          )}
+
+          <FormField label="Agente asignado">
+            <select
+              value={form.agente_asignado}
+              onChange={(e) => setField("agente_asignado", e.target.value)}
+              className="input"
+            >
+              <option value="">Sin asignar</option>
+              {agentes.map((agente) => (
+                <option key={agente.id} value={agente.id}>
+                  {agente.nombre} {agente.apellidos}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Notas">
+            <textarea
+              value={form.notas}
+              onChange={(e) => setField("notas", e.target.value)}
+              placeholder="Observaciones adicionales..."
+              rows={3}
+              className="input resize-none"
+            />
+          </FormField>
+
+          {(form.estado === "noticia" || form.estado === "encargo") && (
+            <LocationPicker
+              latitud={form.latitud}
+              longitud={form.longitud}
+              onChange={(lat, lng) => {
+                setField("latitud", lat);
+                setField("longitud", lng);
+              }}
+            />
+          )}
+
+          {saveError && (
+            <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
+              {saveError}
+            </p>
+          )}
+
+          {editTarget && (
+            <RelatedEmailsPanel
+              entityType="propiedad"
+              entityId={editTarget.id}
+              replyTo={null}
+            />
+          )}
+        </div>
+      </Drawer>
 
       {deleteId !== null && (
         <DeleteConfirmationDialog

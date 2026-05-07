@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import type { UserRole } from "@/lib/roles";
+import Drawer from "@/components/ui/drawer";
 import { useToast, Toaster } from "@/components/ui/toast";
 import {
   Phone,
@@ -15,7 +16,6 @@ import {
   Plus,
   Pencil,
   Trash2,
-  X,
   LifeBuoy,
 } from "lucide-react";
 
@@ -1029,28 +1029,16 @@ export default function SoporteClient({
       ═══════════════════════════════════════════════════════════════════════ */}
 
       {/* Modal: detalle de ticket (admin) */}
-      {detailTicket && (
-        <div className="fixed inset-0 z-[40] flex items-center justify-center bg-black/8 p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-surface shadow-xl border border-border">
-            <div className="flex items-start justify-between border-b border-border px-6 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-text-primary">
-                  Ticket #{detailTicket.id} — {detailTicket.asunto}
-                </h2>
-                <p className="mt-0.5 text-xs text-text-secondary">
-                  {detailTicket.nombre_usuario} ·{" "}
-                  {formatDate(detailTicket.created_at)}
-                </p>
-              </div>
-              <button
-                onClick={() => setDetailTicket(null)}
-                className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="max-h-[65vh] space-y-5 overflow-y-auto px-6 py-5">
+      {detailTicket !== null && (
+        <Drawer
+          open={true}
+          onClose={() => setDetailTicket(null)}
+          width="lg"
+          title={`Ticket #${detailTicket.id} — ${detailTicket.asunto}`}
+          subtitle={`${detailTicket.nombre_usuario} · ${formatDate(detailTicket.created_at)}`}
+        >
+          <>
+            <div className="space-y-5 px-6 py-5">
               {/* Badges info */}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-text-secondary">
@@ -1152,26 +1140,19 @@ export default function SoporteClient({
                 {updatingTicket ? "Guardando..." : "Guardar cambios"}
               </button>
             </div>
-          </div>
-        </div>
+          </>
+        </Drawer>
       )}
 
       {/* Modal: crear/editar contacto (admin) */}
       {contactoModalOpen && (
-        <div className="fixed inset-0 z-[40] flex items-center justify-center bg-black/8 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl border border-border">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">
-                {editContactoId !== null ? "Editar contacto" : "Nuevo contacto"}
-              </h2>
-              <button
-                onClick={() => setContactoModalOpen(false)}
-                className="text-text-secondary transition-colors hover:text-text-primary"
-              >
-                ×
-              </button>
-            </div>
-
+        <Drawer
+          open={true}
+          onClose={() => setContactoModalOpen(false)}
+          width="md"
+          title={editContactoId !== null ? "Editar contacto" : "Nuevo contacto"}
+        >
+          <>
             <div className="space-y-4 px-6 py-5">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1288,18 +1269,20 @@ export default function SoporteClient({
                     : "Añadir contacto"}
               </button>
             </div>
-          </div>
-        </div>
+          </>
+        </Drawer>
       )}
 
       {/* Confirmación eliminar contacto */}
       {deleteContactoId !== null && (
-        <div className="fixed inset-0 z-[40] flex items-center justify-center bg-black/8 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl border border-border">
-            <h2 className="text-base font-semibold text-text-primary">
-              Eliminar contacto
-            </h2>
-            <p className="mt-2 text-sm text-text-secondary">
+        <Drawer
+          open={true}
+          onClose={() => setDeleteContactoId(null)}
+          width="sm"
+          title="Eliminar contacto"
+        >
+          <div className="px-6 py-5">
+            <p className="text-sm text-text-secondary">
               Esta acción no se puede deshacer.
             </p>
             <div className="mt-5 flex justify-end gap-3">
@@ -1317,7 +1300,7 @@ export default function SoporteClient({
               </button>
             </div>
           </div>
-        </div>
+        </Drawer>
       )}
 
       <Toaster toasts={toasts} />

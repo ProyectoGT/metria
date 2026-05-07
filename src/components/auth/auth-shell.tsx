@@ -31,7 +31,7 @@ export default function AuthShell({
       </section>
 
       <section className="flex min-h-screen items-center justify-center px-6 py-12 sm:px-10 lg:px-16">
-        <div className="w-full max-w-md rounded-[2rem] border border-white/70 bg-white/80 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur transition-colors dark:border-border dark:bg-surface/90 dark:shadow-xl md:p-10">
+        <div className="w-full max-w-md rounded-[2rem] border border-white/70 bg-white p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] transition-colors dark:border-border dark:bg-surface dark:shadow-xl md:p-10">
           <div className="mb-4 space-y-1">
             <div className="mb-1 flex justify-center lg:hidden">
               <Image

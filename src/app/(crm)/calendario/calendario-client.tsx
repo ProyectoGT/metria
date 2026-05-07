@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   Phone, Users, Home, Clock, BookOpen, Star, Activity, Calendar,
-  ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter,
+  ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter, Pencil, CheckCircle2, User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
@@ -225,6 +225,8 @@ export default function CalendarioClient({
 
   const [modalOpen, setModalOpen]   = useState(false);
   const [editId, setEditId]         = useState<number | null>(null);
+  const [detailEvent, setDetailEvent] = useState<AgendaEvent | null>(null);
+  const [confirmDeleteEvent, setConfirmDeleteEvent] = useState<AgendaEvent | null>(null);
   const [form, setForm] = useState<FormState>(() => emptyForm(undefined, isConnected));
   const [saving, setSaving]         = useState(false);
   const [saveError, setSaveError]   = useState<string | null>(null);
@@ -621,10 +623,11 @@ export default function CalendarioClient({
 
   // ── Delete ─────────────────────────────────────────────────────────────────
 
-  async function handleDelete() {
-    if (deleteId === null) return;
+  async function handleDelete(eventId?: number) {
+    const id = eventId ?? deleteId;
+    if (id === null) return;
     setDeleting(true);
-    const target = events.find((e) => e.id === deleteId);
+    const target = events.find((e) => e.id === id);
     if (target?.gcal_event_id && isConnected) {
       const gcalDelete = await fetch("/api/google/events", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventId: target.gcal_event_id }) });
       if (!gcalDelete.ok) {
@@ -635,9 +638,9 @@ export default function CalendarioClient({
       }
       setGcalEvents((prev) => prev.filter((ev) => ev.id !== target.gcal_event_id));
     }
-    const { error } = await supabase.rpc("archive_agenda", { p_agenda_id: deleteId, p_reason: "archived_from_calendar" });
+    const { error } = await supabase.rpc("archive_agenda", { p_agenda_id: id, p_reason: "archived_from_calendar" });
     if (error) toast("Error al eliminar: " + error.message, "error");
-    else { setEvents((prev) => prev.filter((e) => e.id !== deleteId)); toast("Actividad eliminada"); setDeleteId(null); }
+    else { setEvents((prev) => prev.filter((e) => e.id !== id)); if (!eventId) setDeleteId(null); toast("Actividad eliminada"); }
     setDeleting(false);
   }
 
@@ -761,7 +764,7 @@ export default function CalendarioClient({
           return (
             <div
               key={ev.id}
-              onClick={() => openEdit(ev)}
+              onClick={() => setDetailEvent(ev)}
               className={`group relative cursor-pointer rounded-xl border p-3 transition-colors hover:brightness-95 ${t.bg} ${t.border}`}
             >
               <div className="flex items-start gap-2">
@@ -782,12 +785,6 @@ export default function CalendarioClient({
                   </div>
                   {ev.result && <p className="mt-1.5 text-xs text-text-secondary line-clamp-2">{ev.result}</p>}
                 </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setDeleteId(ev.id); }}
-                  className="shrink-0 rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
               </div>
             </div>
           );
@@ -1128,7 +1125,7 @@ export default function CalendarioClient({
                       return (
                         <div
                           key={ev.id}
-                          onClick={(e) => { e.stopPropagation(); openEdit(ev); }}
+                          onClick={(e) => { e.stopPropagation(); setDetailEvent(ev); }}
                           className={`flex cursor-pointer items-start gap-1 rounded-lg border px-1.5 py-1 transition-colors hover:brightness-95 ${t.bg} ${t.border}`}
                         >
                           <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${t.dot}`} />
@@ -1345,7 +1342,147 @@ export default function CalendarioClient({
         </div>
       </Drawer>
 
-      {/* ── Delete Confirmation ── */}
+      {/* ── Detail Drawer ── */}
+      <Drawer
+        open={detailEvent !== null}
+        onClose={() => setDetailEvent(null)}
+        title={detailEvent?.description ?? ""}
+        subtitle="Actividad de calendario"
+        width="md"
+        headerActions={
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (!detailEvent) return;
+                const ev = detailEvent;
+                setDetailEvent(null);
+                setTimeout(() => openEdit(ev), 150);
+              }}
+              className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
+              aria-label="Editar"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            {canSeeOthers(role) && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!detailEvent) return;
+                  setConfirmDeleteEvent(detailEvent);
+                }}
+                className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
+                aria-label="Eliminar"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        }
+      >
+        {detailEvent && (
+          <div className="space-y-5 px-5 py-5">
+            <div className="flex flex-wrap items-center gap-2">
+              {(() => {
+                const t = tipoMeta(detailEvent.tipo);
+                const p = priorityMeta(detailEvent.priority);
+                return (
+                  <>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${t.bg} ${t.text}`}>
+                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                      {t.label}
+                    </span>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${p.badge}`}>
+                      {p.label}
+                    </span>
+                    {detailEvent.completed && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Completada
+                      </span>
+                    )}
+                    {detailEvent.gcal_event_id && (
+                      <span className="rounded-full bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-400">GCal</span>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+
+            <div className="flex items-center gap-2 text-sm text-text-secondary">
+              <Calendar className="h-4 w-4" />
+              <span>
+                {new Date(detailEvent.event_date + "T12:00:00").toLocaleDateString("es-ES", {
+                  weekday: "long", day: "numeric", month: "long", year: "numeric",
+                })}
+              </span>
+              {detailEvent.time && (
+                <>
+                  <Clock className="h-4 w-4 text-text-secondary" />
+                  <span>{normalizeTime(detailEvent.time, "")}</span>
+                </>
+              )}
+            </div>
+
+            {(() => {
+              const ids = agendaAssignedIds(detailEvent);
+              if (ids.length === 0) return null;
+              return (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Asignado a</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ids.map((uid) => (
+                      <span key={uid} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                        <User className="h-3 w-3" />
+                        {usersMap[uid] ?? `Usuario ${uid}`}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {detailEvent.completed && detailEvent.result && (
+              <div className="rounded-xl bg-success/8 px-4 py-3">
+                <p className="text-xs font-semibold text-success">Resultado</p>
+                <p className="mt-1 text-sm text-text-primary">{detailEvent.result}</p>
+              </div>
+            )}
+
+            <div className="rounded-xl bg-surface-raised px-4 py-3 text-xs text-text-secondary">
+              <p>Actividad de calendario · ID: {detailEvent.id}</p>
+            </div>
+          </div>
+        )}
+      </Drawer>
+
+      {/* ── Detail Delete Confirmation ── */}
+      {confirmDeleteEvent !== null && (
+        <ConfirmDialog
+          open
+          title="Eliminar actividad"
+          description={
+            confirmDeleteEvent.gcal_event_id && isConnected
+              ? "Se eliminara tambien de Google Calendar. Esta accion no se puede deshacer."
+              : "Esta accion no se puede deshacer."
+          }
+          confirmLabel="Eliminar"
+          pending={deleting}
+          onCancel={() => {
+            setConfirmDeleteEvent(null);
+            setDetailEvent(null);
+          }}
+          onConfirm={async () => {
+            if (!confirmDeleteEvent) return;
+            const ev = confirmDeleteEvent;
+            setConfirmDeleteEvent(null);
+            setDetailEvent(null);
+            await handleDelete(ev.id);
+          }}
+        />
+      )}
+
+      {/* ── Delete Confirmation (legacy) ── */}
       {deleteId !== null && (
         <ConfirmDialog
           open={deleteId !== null}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileText, History, Users, X, Phone } from "lucide-react";
+import { FileText, History, Users, Phone } from "lucide-react";
 import Drawer from "@/components/ui/drawer";
 import DocumentGeneratorModal from "@/components/documents/DocumentGeneratorModal";
 import ColaboracionesPanel from "@/components/colaboraciones/ColaboracionesPanel";
@@ -660,20 +660,22 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
       </Drawer>
 
       {/* Confirmar borrado */}
-      {deleteId !== null && (
-        <div className="fixed inset-0 z-[30] flex items-center justify-center bg-black/8 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl border border-border">
-            <h2 className="text-base font-semibold text-text-primary">Eliminar solicitud</h2>
-            <p className="mt-2 text-sm text-text-secondary">Esta accion no se puede deshacer.</p>
-            <div className="mt-5 flex justify-end gap-3">
-              <button onClick={() => setDeleteId(null)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background">Cancelar</button>
-              <button onClick={handleDelete} disabled={deleting} className="rounded-lg bg-danger px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">
-                {deleting ? "Eliminando..." : "Eliminar"}
-              </button>
-            </div>
+      <Drawer
+        open={deleteId !== null}
+        onClose={() => setDeleteId(null)}
+        title="Eliminar solicitud"
+        width="sm"
+      >
+        <div className="p-5">
+          <p className="text-sm text-text-secondary">Esta accion no se puede deshacer.</p>
+          <div className="mt-5 flex justify-end gap-3">
+            <button onClick={() => setDeleteId(null)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background">Cancelar</button>
+            <button onClick={handleDelete} disabled={deleting} className="rounded-lg bg-danger px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">
+              {deleting ? "Eliminando..." : "Eliminar"}
+            </button>
           </div>
         </div>
-      )}
+      </Drawer>
 
       {/* Timeline en Drawer */}
       <Drawer

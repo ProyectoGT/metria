@@ -70,14 +70,14 @@ export default function Drawer({
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[40] flex justify-end">
+        <div className={`fixed inset-0 ${zIndex} flex justify-end`}>
           {/* Overlay */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="absolute inset-0 bg-slate-950/55 backdrop-blur-[3px]"
+            className="absolute inset-0 bg-black/8"
             onClick={onClose}
             aria-hidden="true"
           />
