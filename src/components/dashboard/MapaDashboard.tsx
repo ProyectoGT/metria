@@ -2,7 +2,7 @@
 
 
 import { APIProvider, Map, AdvancedMarker, InfoWindow, Polygon, useMap } from "@vis.gl/react-google-maps";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Navigation, FileText } from "lucide-react";
 
 const OFICINA = { lat: 41.365795, lng: 2.053508 };
@@ -101,30 +101,15 @@ function SquarePin() {
 // Zoom aproximado para un radio de 10 km
 const ZOOM_10KM = 12;
 
-// Centra el mapa en la ubicación del usuario (radio ~10 km).
-// Si el usuario no da permiso, hace fitBounds sobre los puntos como antes.
-function MapLocationInit({ points }: { points: { lat: number; lng: number }[] }) {
+// El mapa del dashboard encuadra los datos CRM visibles para el usuario.
+// La geolocalizacion del navegador puede centrarlo lejos de las propiedades.
+function MapBoundsInit({ points }: { points: { lat: number; lng: number }[] }) {
   const map = useMap();
 
   useEffect(() => {
     if (!map) return;
-
-    if (!navigator.geolocation) {
-      fallbackFit(map, points);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        map.setZoom(ZOOM_10KM);
-      },
-      () => fallbackFit(map, points),
-      { timeout: 5000 }
-    );
-  // Solo al montar — no queremos re-centrar si los puntos cambian
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map]);
+    fallbackFit(map, points);
+  }, [map, points]);
 
   return null;
 }
@@ -152,10 +137,13 @@ export default function MapaDashboard({
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
   const [selected, setSelected] = useState<Selected | null>(null);
 
-  const allPoints = [
-    ...noticias.map((n) => ({ lat: n.latitud, lng: n.longitud })),
-    ...encargos.map((e) => ({ lat: e.latitud, lng: e.longitud })),
-  ];
+  const allPoints = useMemo(
+    () => [
+      ...noticias.map((n) => ({ lat: n.latitud, lng: n.longitud })),
+      ...encargos.map((e) => ({ lat: e.latitud, lng: e.longitud })),
+    ],
+    [noticias, encargos]
+  );
 
   return (
     <section className="flex h-full w-full flex-col rounded-2xl border border-border bg-surface shadow-sm overflow-hidden">
@@ -203,16 +191,17 @@ export default function MapaDashboard({
       </div>
 
       {/* Mapa */}
-      <div className="min-h-[300px] flex-1">
-        <APIProvider apiKey={apiKey}>
-          <Map
-            defaultCenter={OFICINA}
-            defaultZoom={13}
-            gestureHandling="greedy"
-            mapId="metria-dashboard-map"
-            style={{ width: "100%", height: "100%" }}
-          >
-            <MapLocationInit points={allPoints} />
+      <div className="relative h-[420px] min-h-[300px] flex-1">
+        {apiKey ? (
+          <APIProvider apiKey={apiKey}>
+            <Map
+              defaultCenter={OFICINA}
+              defaultZoom={13}
+              gestureHandling="greedy"
+              mapId="metria-dashboard-map"
+              style={{ width: "100%", height: "100%" }}
+            >
+              <MapBoundsInit points={allPoints} />
 
             {/* Polígonos de zonas */}
             {ZONA_POLIGONOS.map((z) => (
@@ -352,8 +341,19 @@ export default function MapaDashboard({
                 </div>
               </InfoWindow>
             )}
-          </Map>
-        </APIProvider>
+            </Map>
+          </APIProvider>
+        ) : (
+          <div className="flex h-full min-h-[300px] items-center justify-center bg-surface-hover px-4 text-center text-sm text-text-secondary">
+            Falta configurar la clave de Google Maps.
+          </div>
+        )}
+
+        {apiKey && allPoints.length === 0 && (
+          <div className="pointer-events-none absolute inset-x-4 bottom-4 rounded-lg border border-border bg-surface/95 px-4 py-3 text-sm text-text-secondary shadow-sm backdrop-blur">
+            No hay noticias o encargos con ubicacion visible para este usuario.
+          </div>
+        )}
       </div>
     </section>
   );
