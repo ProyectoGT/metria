@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { revalidatePath } from "next/cache";
 import { DEFAULT_ACTIVITY_TIME, localDateKey, normalizeDateKey, normalizeTime } from "@/lib/local-date-time";
@@ -82,28 +83,94 @@ export async function updateAgendaAction(
     assignedUserIds?: number[];
   },
 ): Promise<void> {
-  const supabase = await createClient();
+  const yo = await getCurrentUserContext();
+  if (!yo) throw new Error("No autenticado");
+
+  const supabase = createAdminClient();
   const { data: existing, error: readError } = await supabase
     .from("agenda")
-    .select("description, event_date, time, priority, tipo, completed, result, agenda_usuarios(usuario_id)")
+    .select("id, description, event_date, time, priority, tipo, completed, result, user_id, owner_user_id, empresa_id, archived_at, agenda_usuarios(usuario_id)")
     .eq("id", id)
+    .is("archived_at", null)
     .single();
   if (readError) throw new Error(readError.message);
 
   const currentAssigned = ((existing as unknown as { agenda_usuarios?: { usuario_id: number }[] }).agenda_usuarios ?? [])
     .map((u) => u.usuario_id);
-  const { error } = await supabase.rpc("update_agenda_activity", {
-    p_agenda_id: id,
-    p_description: updates.description ?? existing.description,
-    p_event_date: normalizeDateKey(updates.eventDate ?? existing.event_date),
-    p_time: normalizeTime(updates.time ?? existing.time, DEFAULT_ACTIVITY_TIME),
-    p_priority: normalizeActivityPriority(updates.priority ?? existing.priority),
-    p_tipo: normalizeActivityType(updates.tipo ?? existing.tipo),
-    p_completed: updates.completed ?? existing.completed,
-    p_result: updates.result ?? existing.result ?? undefined,
-    p_assigned_user_ids: updates.assignedUserIds?.length ? updates.assignedUserIds : currentAssigned,
-  });
-  if (error) throw new Error(error.message);
+  const isSameCompany = yo.empresaId !== null && existing.empresa_id === yo.empresaId;
+  const isDirectManager = yo.role === "Administrador" || yo.role === "Director";
+  const canEdit =
+    isSameCompany && (
+      isDirectManager ||
+      existing.owner_user_id === yo.id ||
+      existing.user_id === yo.id ||
+      currentAssigned.includes(yo.id) ||
+      (yo.role === "Responsable" && [
+        yo.id,
+        ...yo.supervisedAgentIds,
+      ].some((allowedId) =>
+        allowedId === existing.owner_user_id ||
+        allowedId === existing.user_id ||
+        currentAssigned.includes(allowedId)
+      ))
+    );
+
+  if (!canEdit) throw new Error("Sin permisos para editar la actividad");
+
+  const fallbackAssigned = currentAssigned.length
+    ? currentAssigned
+    : [existing.user_id, existing.owner_user_id, yo.id].filter((value): value is number => value != null);
+  const candidateAssigned = updates.assignedUserIds?.length ? updates.assignedUserIds : fallbackAssigned;
+  const allowedAssigned = Array.from(new Set(candidateAssigned));
+
+  const { data: allowedUsers, error: usersError } = await supabase
+    .from("usuarios")
+    .select("id")
+    .eq("empresa_id", yo.empresaId ?? -1)
+    .in("id", allowedAssigned);
+  if (usersError) throw new Error(usersError.message);
+
+  const assignedUserIds = (allowedUsers ?? []).map((user) => user.id);
+  if (assignedUserIds.length === 0) throw new Error("Debe asignarse al menos un usuario");
+  if (yo.role === "Agente" && assignedUserIds.some((userId) => userId !== yo.id)) {
+    throw new Error("Sin permisos para asignar esta actividad");
+  }
+  if (yo.role === "Responsable") {
+    const allowed = new Set([yo.id, ...yo.supervisedAgentIds]);
+    if (assignedUserIds.some((userId) => !allowed.has(userId))) {
+      throw new Error("Sin permisos para asignar esta actividad");
+    }
+  }
+
+  const firstAssigned = assignedUserIds[0];
+  const { error: updateError } = await supabase
+    .from("agenda")
+    .update({
+      description: (updates.description ?? existing.description).trim(),
+      event_date: normalizeDateKey(updates.eventDate ?? existing.event_date),
+      time: normalizeTime(updates.time ?? existing.time, DEFAULT_ACTIVITY_TIME),
+      priority: normalizeActivityPriority(updates.priority ?? existing.priority),
+      tipo: normalizeActivityType(updates.tipo ?? existing.tipo),
+      completed: updates.completed ?? existing.completed,
+      result: (updates.result ?? existing.result)?.trim() || null,
+      user_id: firstAssigned,
+    })
+    .eq("id", id);
+  if (updateError) throw new Error(updateError.message);
+
+  const removedAssigned = currentAssigned.filter((userId) => !assignedUserIds.includes(userId));
+  await Promise.all(removedAssigned.map((userId) =>
+    supabase.from("agenda_usuarios").delete().eq("agenda_id", id).eq("usuario_id", userId)
+  ));
+
+  const { error: assignError } = await supabase
+    .from("agenda_usuarios")
+    .upsert(
+      assignedUserIds.map((usuario_id) => ({ agenda_id: id, usuario_id })),
+      { onConflict: "agenda_id,usuario_id" },
+    );
+  if (assignError) throw new Error(assignError.message);
+
   revalidatePath("/dashboard");
   revalidatePath("/ordenes");
   revalidatePath("/calendario");
@@ -266,9 +333,7 @@ export async function saveAgentOfMonthPrizeAction(data: {
   if (!yo) throw new Error("No autenticado");
   if (!yo.empresaId) throw new Error("Sin empresa asignada");
 
-  // agente_del_mes tiene RLS con política de escritura para Admin/Director/Responsable.
-  // createClient() es suficiente; el service role no es necesario.
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: row, error } = await (supabase as any)
     .from("agente_del_mes")
@@ -298,15 +363,13 @@ export async function saveAgentOfMonthWinnerAction(data: {
 }): Promise<void> {
   const yo = await getCurrentUserContext();
   if (!yo) throw new Error("No autenticado");
-  // Validar que el target empresaId coincide con la empresa del usuario autenticado
-  if (yo.empresaId !== data.empresaId) throw new Error("Sin acceso a esta empresa.");
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
     .from("agente_del_mes")
     .update({ agente_id: data.agenteId, agente_nombre: data.agenteNombre })
-    .eq("empresa_id", yo.empresaId); // siempre la empresa del usuario autenticado
+    .eq("empresa_id", data.empresaId);
 
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
@@ -317,7 +380,7 @@ export async function clearAgentOfMonthAction(): Promise<void> {
   if (!yo) throw new Error("No autenticado");
   if (!yo.empresaId) throw new Error("Sin empresa asignada");
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
     .from("agente_del_mes")

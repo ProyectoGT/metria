@@ -57,6 +57,14 @@ export function canManageConfirmationPassword(role: UserRole) {
   return role === "Administrador";
 }
 
+export function canAccessContactos(role: UserRole) {
+  return role === "Administrador";
+}
+
+export function canViewIdealistaLeads(role: UserRole) {
+  return role === "Administrador";
+}
+
 export function canManageUsers(role: UserRole) {
   return role === "Administrador" || role === "Director";
 }
@@ -71,19 +79,6 @@ export function canViewAllAgents(role: UserRole) {
 
 export function canViewSupervisedAgents(role: UserRole) {
   return role === "Responsable";
-}
-
-export function canViewOrgChart(role: UserRole) {
-  return role === "Administrador" || role === "Director" || role === "Responsable";
-}
-
-export function canViewInsights(role: UserRole) {
-  return canViewOrgChart(role);
-}
-
-export function canAccessEmail(_role: UserRole) {
-  void _role;
-  return true;
 }
 
 /**

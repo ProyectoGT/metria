@@ -18,7 +18,6 @@ export default async function CalendarioPage() {
   const empresaId = yo?.empresaId ?? null;
   const supervisedIds = yo?.supervisedAgentIds ?? [];
 
-  // ── Agenda events: siempre admin client para bypasear RLS ─────────────────
   let eventsQuery;
 
   if (role === "Administrador" || role === "Director") {
@@ -49,17 +48,7 @@ export default async function CalendarioPage() {
     if (empresaId !== null) eventsQuery = eventsQuery.eq("empresa_id", empresaId);
   }
 
-  // ── Tareas con fecha (para mostrar en el calendario) ──────────────────────
-  const adminSupa = createAdminClient();
-  const tareasQuery = adminSupa
-    .from("tareas")
-    .select("id, titulo, prioridad, fecha, estado, owner_user_id, tarea_usuarios(usuario_id)")
-    .is("archived_at", null)
-    .not("fecha", "is", null)
-    .in("estado", ["pendiente", "completado"])
-    .order("fecha", { ascending: true });
-
-  const [{ data: events }, { data: usersData }, { data: archivedGoogleEvents }, { data: tareasData }] = await Promise.all([
+  const [{ data: events }, { data: usersData }, { data: archivedGoogleEvents }] = await Promise.all([
     eventsQuery,
     supabase.from("usuarios").select("id, nombre, apellidos"),
     supabase
@@ -68,10 +57,8 @@ export default async function CalendarioPage() {
       .not("archived_at", "is", null)
       .not("gcal_event_id", "is", null)
       .eq("owner_user_id", userId),
-    tareasQuery,
   ]);
 
-  // ── Filtro JS según rol (ya que usamos admin client) ──────────────────────
   type EventWithAssignments = {
     id: number;
     description?: string | null;
@@ -99,26 +86,6 @@ export default async function CalendarioPage() {
         })
     : (events ?? []);
 
-  // ── Filtrar tareas según rol ──────────────────────────────────────────────
-  type TareaRow = {
-    id: number;
-    titulo: string;
-    prioridad: string | null;
-    fecha: string;
-    estado: string | null;
-    owner_user_id: number | null;
-    tarea_usuarios?: { usuario_id: number }[];
-  };
-  const allTareas = (tareasData ?? []) as unknown as TareaRow[];
-  const visibleTareas = allTareas.filter((t) => {
-    if (role === "Administrador" || role === "Director") return true;
-    const assigned = t.tarea_usuarios?.map((u) => u.usuario_id) ?? [];
-    if (role === "Responsable") {
-      return assigned.some((id) => visibleIds.includes(id)) || visibleIds.includes(t.owner_user_id ?? -1);
-    }
-    return assigned.includes(userId) || t.owner_user_id === userId;
-  });
-
   if (process.env.NODE_ENV !== "production") {
     const rows = (events ?? []) as unknown as EventWithAssignments[];
     const visibleRows = visibleEvents as EventWithAssignments[];
@@ -130,7 +97,20 @@ export default async function CalendarioPage() {
       visibleRows: visibleRows.length,
       discardedRows: rows.length - visibleRows.length,
       withoutEventDate: rows.filter((event) => !event.event_date).length,
-      tareasCount: visibleTareas.length,
+    });
+    console.log("[calendario:server] initialEvents", {
+      count: visibleEvents.length,
+      ids: visibleEvents.map((event) => event.id),
+      rows: visibleEvents.slice(0, 10).map((event) => ({
+        id: event.id,
+        description: event.description,
+        event_date: event.event_date,
+        time: event.time,
+        tipo: event.tipo,
+        user_id: event.user_id,
+        owner_user_id: event.owner_user_id,
+        gcal_event_id: event.gcal_event_id,
+      })),
     });
   }
 
@@ -151,7 +131,7 @@ export default async function CalendarioPage() {
   return (
     <CalendarioClient
       initialEvents={visibleEvents as unknown as Parameters<typeof CalendarioClient>[0]["initialEvents"]}
-      initialTareas={visibleTareas}
+      initialTareas={[]}
       isConnected={isConnected}
       role={role}
       currentUserId={userId}
