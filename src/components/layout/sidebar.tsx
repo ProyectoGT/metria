@@ -22,6 +22,7 @@ import {
   BookUser,
   Building2,
   Mail,
+  Settings,
   X,
 } from "lucide-react";
 
@@ -36,19 +37,19 @@ const THEMES: { value: Theme; label: string; icon: React.ElementType }[] = [
 // ─── Grupos de navegación ─────────────────────────────────────────────────────
 
 const MAIN_NAV = [
-  { label: "Dashboard",      href: "/dashboard",    icon: LayoutDashboard },
-  { label: "Zona",           href: "/zona",          icon: MapPin },
-  { label: "Propiedades",    href: "/propiedades",   icon: Building2 },
-  { label: "Solicitudes",    href: "/solicitudes",   icon: ClipboardList },
-  { label: "Contactos",      href: "/contactos",     icon: BookUser },
-  { label: "Email",          href: "/email",          icon: Mail },
+  { label: "Dashboard",      href: "/dashboard",    resourceKey: "dashboard",    icon: LayoutDashboard },
+  { label: "Zona",           href: "/zona",          resourceKey: "zona",         icon: MapPin },
+  { label: "Propiedades",    href: "/propiedades",   resourceKey: "propiedades",  icon: Building2 },
+  { label: "Solicitudes",    href: "/solicitudes",   resourceKey: "solicitudes",  icon: ClipboardList },
+  { label: "Contactos",      href: "/contactos",     resourceKey: "contactos",    icon: BookUser },
+  { label: "Email",          href: "/email",          resourceKey: "email",        icon: Mail },
 ];
 
 const TOOLS_NAV = [
-  { label: "Desarrollo",      href: "/desarrollo",  icon: TrendingUp },
-  { label: "Calendario",      href: "/calendario",  icon: Calendar },
-  { label: "Ordenes del dia", href: "/ordenes",     icon: FileText },
-  { label: "Calculadora",     href: "/calculadora", icon: Calculator },
+  { label: "Desarrollo",      href: "/desarrollo",  resourceKey: "desarrollo",  icon: TrendingUp },
+  { label: "Calendario",      href: "/calendario",  resourceKey: "calendario",  icon: Calendar },
+  { label: "Ordenes del dia", href: "/ordenes",     resourceKey: "ordenes",     icon: FileText },
+  { label: "Calculadora",     href: "/calculadora", resourceKey: "calculadora", icon: Calculator },
 ];
 
 // ─── Estilos compartidos de item ──────────────────────────────────────────────
@@ -105,17 +106,25 @@ function NavGroup({ label, children }: { label?: string; children: React.ReactNo
 
 interface Props {
   userRole?: string | null;
+  deniedResourceKeys?: string[];
 }
 
-export default function Sidebar({ userRole: _userRole }: Props) {
+export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }: Props) {
   const pathname = usePathname();
 
   const [theme, setTheme] = useState<Theme>("dark");
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const userRole = _userRole ? normalizeUserRole(_userRole) : null;
-  const canSeeUsers = canManageUsers(userRole ?? "Agente");
-  const canSeeOrganigrama = canViewOrgChart(userRole ?? "Agente");
+  const role = userRole ?? "Agente";
+  const canSeeUsers = canManageUsers(role);
+  const canSeeOrganigrama = canViewOrgChart(role);
+  const isAdmin = role === "Administrador";
+  const deniedSet = new Set(deniedResourceKeys);
+
+  function isNavVisible(key: string): boolean {
+    return !deniedSet.has(key);
+  }
 
   const applyTheme = useCallback((t: Theme, persist = true) => {
     const el = document.documentElement;
@@ -133,13 +142,11 @@ export default function Sidebar({ userRole: _userRole }: Props) {
     }
   }, []);
 
-  // Sincronizar estado del botón de tema desde localStorage al montar
   useEffect(() => {
     const saved = localStorage.getItem("metria-theme") as Theme | null;
     if (saved) setTheme(saved);
   }, []);
 
-  // Escuchar evento del botón hamburger del header
   useEffect(() => {
     function handleToggle() { setMobileOpen((prev) => !prev); }
     window.addEventListener("sidebar:toggle", handleToggle);
@@ -157,7 +164,6 @@ export default function Sidebar({ userRole: _userRole }: Props) {
     return () => { active = false; };
   }, [applyTheme]);
 
-  // Cerrar al navegar
   useEffect(() => {
     const id = window.requestAnimationFrame(() => setMobileOpen(false));
     return () => window.cancelAnimationFrame(id);
@@ -180,7 +186,6 @@ export default function Sidebar({ userRole: _userRole }: Props) {
           className="max-h-10 w-auto object-contain"
           priority
         />
-        {/* Cerrar — solo en móvil */}
         <button
           onClick={() => setMobileOpen(false)}
           className="absolute right-3 rounded-lg p-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white md:hidden"
@@ -194,31 +199,37 @@ export default function Sidebar({ userRole: _userRole }: Props) {
       <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
 
         <NavGroup>
-          {MAIN_NAV.map((item) => (
-            <NavItem key={item.href} {...item} active={isActive(item.href)} />
+          {MAIN_NAV.filter((item) => isNavVisible(item.resourceKey)).map((item) => (
+            <NavItem key={item.href} href={item.href} icon={item.icon} label={item.label} active={isActive(item.href)} />
           ))}
         </NavGroup>
 
         <NavGroup label="Herramientas">
-          {TOOLS_NAV.map((item) => (
-            <NavItem key={item.href} {...item} active={isActive(item.href)} />
+          {TOOLS_NAV.filter((item) => isNavVisible(item.resourceKey)).map((item) => (
+            <NavItem key={item.href} href={item.href} icon={item.icon} label={item.label} active={isActive(item.href)} />
           ))}
         </NavGroup>
 
+        {/* Gestión: base permission + configurable layer */}
         {(canSeeUsers || canSeeOrganigrama) && (
           <NavGroup label="Gestión">
-            {canSeeUsers && (
+            {canSeeUsers && isNavVisible("usuarios") && (
               <NavItem href="/usuarios" icon={Users} label="Usuarios" active={isActive("/usuarios")} />
             )}
-            {canSeeOrganigrama && (
+            {canSeeOrganigrama && isNavVisible("organigrama") && (
               <NavItem href="/empresa/organigrama" icon={Network} label="Organigrama" active={isActive("/empresa/organigrama")} />
             )}
           </NavGroup>
         )}
 
-        {/* Separador + Soporte */}
+        {/* Soporte + Configuración */}
         <div className="mt-3 border-t border-border/60 pt-3">
-          <NavItem href="/soporte" icon={LifeBuoy} label="Soporte" active={isActive("/soporte")} />
+          {isNavVisible("soporte") && (
+            <NavItem href="/soporte" icon={LifeBuoy} label="Soporte" active={isActive("/soporte")} />
+          )}
+          {isAdmin && isNavVisible("configuracion") && (
+            <NavItem href="/configuracion/control-acceso" icon={Settings} label="Control de Acceso" active={isActive("/configuracion/control-acceso")} />
+          )}
         </div>
       </nav>
 
@@ -255,12 +266,10 @@ export default function Sidebar({ userRole: _userRole }: Props) {
 
   return (
     <>
-      {/* ── Desktop ───────────────────────────────────────────────── */}
       <aside className={`${sidebarClass} ${borderClass} hidden md:flex`}>
         {navContent}
       </aside>
 
-      {/* ── Móvil: overlay con blur ───────────────────────────────── */}
       <div
         className={[
           "fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] transition-opacity duration-300 md:hidden",

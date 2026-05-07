@@ -13,6 +13,7 @@ import { saveAgendaGoogleEventIdAction } from "@/app/(crm)/calendario/actions";
 import type { UserRole } from "@/lib/roles";
 import { DEFAULT_ACTIVITY_TIME, normalizeTime } from "@/lib/local-date-time";
 import { isActivityPriority, isActivityType, normalizeActivityPriority, normalizeActivityType } from "@/lib/activity-options";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -502,11 +503,12 @@ export default function CalendarioClient({
       const { data, error } = await insertOrUpdate(payload);
       if (error) setSaveError(error.message);
       else if (data) {
-        const updated = {
+        const updated: AgendaEvent = {
           ...(data as unknown as AgendaEvent),
           agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
         };
-        const googleEventId = (updated as AgendaEvent).gcal_event_id ?? previousEvent?.gcal_event_id ?? null;
+        const normalizedUpdated = normalizeCalendarEvent(updated);
+        const googleEventId = normalizedUpdated.gcal_event_id ?? previousEvent?.gcal_event_id ?? null;
 
         if (isConnected && googleEventId) {
           const gcalRes = await fetch("/api/google/events", {
@@ -543,7 +545,7 @@ export default function CalendarioClient({
           }
         }
 
-        setEvents((prev) => prev.map((e) => e.id === editId ? updated : e));
+        setEvents((prev) => prev.map((e) => e.id === editId ? normalizedUpdated : e));
         router.refresh();
         toast("Actividad actualizada"); setModalOpen(false);
       }
@@ -551,10 +553,11 @@ export default function CalendarioClient({
       const { data, error } = await insertOrUpdate(payload);
       if (error) setSaveError(error.message);
       else if (data) {
-        let saved = {
+        let saved: AgendaEvent = {
           ...(data as unknown as AgendaEvent),
           agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
         };
+        saved = normalizeCalendarEvent(saved);
 
         setEvents((prev) =>
           [...prev.filter((event) => event.id !== saved.id), saved]
@@ -565,26 +568,47 @@ export default function CalendarioClient({
           const gcalRes = await fetch("/api/google/events", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ summary: form.description, date: form.event_date, time: form.time || null, agendaId: saved.id }),
+            body: JSON.stringify({ summary: form.description, date: form.event_date, time: normalizeTime(form.time, DEFAULT_ACTIVITY_TIME), agendaId: saved.id }),
           });
           if (gcalRes.ok) {
             const gcalData = await gcalRes.json();
             if (gcalData.id) {
-              const syncResult = await saveAgendaGoogleEventIdAction(saved.id, gcalData.id);
-              if (!syncResult.success) {
+              const localAgendaId = saved.id;
+              const googleEventId = gcalData.id;
+              if (process.env.NODE_ENV !== "production") {
+                console.log("[calendario] intentando guardar gcal_event_id", {
+                  localAgendaId,
+                  googleEventId,
+                  currentUserId,
+                  empresaId,
+                });
+              }
+
+              const syncUpdateResult = await saveAgendaGoogleEventIdAction(localAgendaId, googleEventId);
+              if (!syncUpdateResult.success) {
+                const syncUpdateError = syncUpdateResult.error;
+                if (process.env.NODE_ENV !== "production") {
+                  console.error("[calendario] Error guardando gcal_event_id:", {
+                    message: syncUpdateError?.message,
+                    details: syncUpdateError?.details,
+                    hint: syncUpdateError?.hint,
+                    code: syncUpdateError?.code,
+                    raw: JSON.stringify(syncUpdateError, Object.getOwnPropertyNames(syncUpdateError)),
+                  });
+                }
                 toast(
-                  `Actividad guardada en CRM, pero no enlazada con Google Calendar: ${syncResult.error.message}`,
+                  `Actividad guardada en CRM, pero no enlazada con Google Calendar: ${syncUpdateError.message}`,
                   "error",
                 );
               } else {
-                saved = { ...saved, gcal_event_id: syncResult.data.gcal_event_id ?? null };
+                saved = normalizeCalendarEvent({ ...saved, gcal_event_id: syncUpdateResult.data.gcal_event_id });
                 setEvents((prev) => prev.map((event) => event.id === saved.id ? saved : event));
-                await fetchGcalEvents();
               }
             }
           } else {
             const gcalData = await gcalRes.json().catch(() => null);
-            toast(`Actividad guardada localmente. ${gcalData?.error ?? "No se pudo sincronizar con Google Calendar"}`, "error");
+            const message = gcalData?.error ?? "No se pudo sincronizar con Google Calendar";
+            toast(`Actividad guardada localmente. ${message}`, "error");
           }
         }
         router.refresh();
@@ -1331,24 +1355,19 @@ export default function CalendarioClient({
 
       {/* ── Delete Confirmation ── */}
       {deleteId !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
-            <h2 className="text-base font-semibold text-text-primary">Eliminar actividad</h2>
-            <p className="mt-2 text-sm text-text-secondary">
-              {deleteTarget?.gcal_event_id && isConnected
-                ? "Se eliminara tambien de Google Calendar. Esta accion no se puede deshacer."
-                : "Esta accion no se puede deshacer."}
-            </p>
-            <div className="mt-5 flex justify-end gap-3">
-              <button onClick={() => setDeleteId(null)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">
-                Cancelar
-              </button>
-              <button onClick={handleDelete} disabled={deleting} className="rounded-lg bg-danger px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-60">
-                {deleting ? "Eliminando..." : "Eliminar"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          open={deleteId !== null}
+          title="Eliminar actividad"
+          description={
+            deleteTarget?.gcal_event_id && isConnected
+              ? "Se eliminara tambien de Google Calendar. Esta accion no se puede deshacer."
+              : "Esta accion no se puede deshacer."
+          }
+          confirmLabel="Eliminar"
+          pending={deleting}
+          onCancel={() => setDeleteId(null)}
+          onConfirm={handleDelete}
+        />
       )}
 
       <Toaster toasts={toasts} />

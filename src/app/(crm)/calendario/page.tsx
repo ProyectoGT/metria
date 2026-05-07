@@ -50,7 +50,7 @@ export default async function CalendarioPage() {
 
   const [{ data: events }, { data: usersData }, { data: archivedGoogleEvents }] = await Promise.all([
     eventsQuery,
-    supabase.from("usuarios").select("id, nombre, apellidos"),
+    supabase.from("usuarios").select("id, nombre, apellidos, rol"),
     supabase
       .from("agenda")
       .select("gcal_event_id")
@@ -121,9 +121,13 @@ export default async function CalendarioPage() {
 
   const filterableUsers = (usersData ?? [])
     .filter((u) => {
+      const isTargetAdmin = u.rol?.toLowerCase() === "administrador" || u.rol?.toLowerCase() === "admin";
+      if (isTargetAdmin) {
+        return role === "Administrador";
+      }
       if (role === "Administrador" || role === "Director") return true;
       if (role === "Responsable") return u.id === userId || supervisedIds.includes(u.id);
-      return false;
+      return u.id === userId;
     })
     .map((u) => ({ id: u.id, name: `${u.nombre} ${u.apellidos}`.trim() }))
     .sort((a, b) => a.name.localeCompare(b.name));

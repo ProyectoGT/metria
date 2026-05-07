@@ -90,6 +90,7 @@ type Props = {
     agente_id: number | null;
     anadido_por: string;
   } | null;
+  assignableAgents: Array<{ id: string; nombre: string }>;
 };
 
 const METRIC_ACCENT: Record<MetricKey, string> = {
@@ -314,6 +315,7 @@ export default function DashboardWorkspace(props: Props) {
     fullName,
     currentDateLabel,
     agenteMesData,
+    assignableAgents,
   } = props;
 
   const metricCards = useMemo(() => buildMetricCards(summary), [summary]);
@@ -439,7 +441,7 @@ export default function DashboardWorkspace(props: Props) {
           customColumns={kanbanCols}
           role={role}
           currentUserId={String(currentUserId)}
-          agents={agentMetrics.map((agent) => ({ id: agent.id, nombre: agent.nombre }))}
+          agents={assignableAgents}
         />
       </SectionCard>
 

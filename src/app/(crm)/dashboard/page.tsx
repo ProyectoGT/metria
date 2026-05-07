@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { getPeriodRange, mergeRendimientoRows } from "@/lib/desarrollo-metrics";
 import { getNextBestActions } from "@/lib/next-actions";
@@ -18,6 +19,8 @@ import {
 import DashboardWorkspace from "@/components/dashboard/DashboardWorkspace";
 import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
 import { combineLocalDateTime, formatLocalDateEs, localDateKey, normalizeTime } from "@/lib/local-date-time";
+import { normalizeAgendaEvent } from "@/lib/agenda/normalize-agenda-event";
+import { normalizeActivityType } from "@/lib/activity-options";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -178,11 +181,12 @@ export default async function DashboardPage() {
       .order("id", { ascending: false }),
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any)
+    createAdminClient()
       .from("agenda")
-      .select("id, description, event_date, time, priority, completed, result, owner_user_id, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .select("id, description, event_date, time, priority, tipo, completed, result, gcal_event_id, user_id, owner_user_id, empresa_id, created_at, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
       .eq("event_date", localDateKey())
+      .eq("empresa_id", yo?.empresaId ?? -1)
       .order("time", { ascending: true, nullsFirst: false }),
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -356,9 +360,14 @@ export default async function DashboardPage() {
     event_date: string;
     time: string | null;
     priority: string | null;
+    tipo: string | null;
     completed: boolean;
     result: string | null;
+    gcal_event_id?: string | null;
+    user_id: number | null;
     owner_user_id: number | null;
+    empresa_id?: number | null;
+    created_at?: string | null;
     agenda_usuarios?: Array<{ usuario_id: number; usuarios?: { nombre: string | null; apellidos: string | null } | null }>;
   };
 
@@ -373,9 +382,46 @@ export default async function DashboardPage() {
   }
 
   const tareas: TareaDbRow[] = (tareasData ?? []) as TareaDbRow[];
-  const agendaHoy: AgendaDbRow[] = (agendaData ?? []) as AgendaDbRow[];
+
+  // Filtrar filas de agenda por rol (usando admin client, aplicamos el filtro en JS)
+  if (process.env.NODE_ENV !== "production" && agendaData) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const agendaError = (agendaData as any)?.error;
+    if (agendaError) {
+      console.error("[dashboard] Error cargando agenda:", {
+        message: agendaError?.message,
+        details: agendaError?.details,
+        hint: agendaError?.hint,
+        code: agendaError?.code,
+        raw: JSON.stringify(agendaError, Object.getOwnPropertyNames(agendaError)),
+      });
+    }
+  }
+
+  const agendaRows = ((agendaData ?? []) as AgendaDbRow[]).filter((row) => {
+    if (role === "Administrador" || role === "Director") return true;
+    const assigned = assignedIdsFromRows(row.agenda_usuarios);
+    if (role === "Responsable") {
+      const allowed = new Set([userId, ...(yo?.supervisedAgentIds ?? [])]);
+      return assigned.some((id) => allowed.has(id))
+        || (row.owner_user_id != null && allowed.has(row.owner_user_id))
+        || (row.user_id != null && allowed.has(row.user_id));
+    }
+    return assigned.includes(userId) || row.owner_user_id === userId || row.user_id === userId;
+  });
+
+  const agendaHoy: AgendaDbRow[] = agendaRows.map((row) => {
+    const normalized = normalizeAgendaEvent(row);
+    return {
+      ...row,
+      description: normalized.title,
+      event_date: normalized.date,
+      time: normalized.timeLabel,
+    };
+  });
+
   const myTareas = tareas.filter((t) => assignedIdsFromRows(t.tarea_usuarios).includes(userId) || t.owner_user_id === userId);
-  const myAgendaHoy = agendaHoy.filter((a) => assignedIdsFromRows(a.agenda_usuarios).includes(userId) || a.owner_user_id === userId);
+  const myAgendaHoy = agendaHoy.filter((a) => assignedIdsFromRows(a.agenda_usuarios).includes(userId) || a.owner_user_id === userId || a.user_id === userId);
 
   function toCard(t: TareaDbRow) {
     return {
@@ -402,6 +448,7 @@ export default async function DashboardPage() {
       dbId: a.id,
       title: a.description,
       priority: normalizePriority(a.priority),
+      tipo: normalizeActivityType(a.tipo),
       dueDate: combineLocalDateTime(a.event_date, normalizeTime(a.time, "09:00")),
       time: normalizeTime(a.time, "09:00"),
       assignedBy: null,
@@ -410,6 +457,7 @@ export default async function DashboardPage() {
       resultado: a.result ?? null,
       isCompleted: a.completed,
       fromOrdenDia: true,
+      gcalEventId: a.gcal_event_id ?? null,
     };
   }
 
@@ -446,10 +494,7 @@ export default async function DashboardPage() {
         id: a.id,
         nombre: `${a.nombre} ${a.apellidos}`.trim(),
         tareas: agendaHoy
-          .filter((t) => {
-            const assigned = assignedIdsFromRows(t.agenda_usuarios);
-            return assigned.includes(a.id) || t.owner_user_id === a.id;
-          })
+          .filter((t) => assignedIdsFromRows(t.agenda_usuarios).includes(a.id) || t.owner_user_id === a.id || t.user_id === a.id)
           .map((t) => ({
             id: t.id,
             titulo: t.description,
@@ -496,6 +541,19 @@ export default async function DashboardPage() {
   const noticiasMap: NoticiaMapPoint[] = ((noticiasMapData ?? []) as unknown as NoticiasMapRow[]).map(mapRowToPoint);
   const encargosMap: NoticiaMapPoint[] = ((encargosMapData ?? []) as unknown as NoticiasMapRow[]).map(mapRowToPoint);
 
+  const assignableAgents = (todosAgentes ?? [])
+    .filter((a) => {
+      const isTargetAdmin = a.rol?.toLowerCase() === "administrador" || a.rol?.toLowerCase() === "admin";
+      if (isTargetAdmin) {
+        return role === "Administrador";
+      }
+      if (role === "Administrador" || role === "Director") return true;
+      if (role === "Responsable") return a.id === userId || (yo?.supervisedAgentIds ?? []).includes(a.id);
+      return a.id === userId;
+    })
+    .map((a) => ({ id: String(a.id), nombre: `${a.nombre} ${a.apellidos}`.trim() }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
   return (
     <DashboardWorkspace
       role={role}
@@ -520,6 +578,7 @@ export default async function DashboardPage() {
       fullName={fullName}
       currentDateLabel={currentDateLabel}
       agenteMesData={agenteMesData}
+      assignableAgents={assignableAgents}
     />
   );
 }

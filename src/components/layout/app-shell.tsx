@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase";
 import { normalizeUserRole } from "@/lib/roles";
+import { getDeniedResourceKeys } from "@/lib/access-control/can-access";
 import { redirect } from "next/navigation";
 import Sidebar from "./sidebar";
 import Header from "./header";
@@ -28,6 +29,8 @@ export default async function AppShell({
   let userRole: ReturnType<typeof normalizeUserRole> | null = null;
   let userId: number | null = null;
   let userAvatarUrl: string | null = null;
+  let empresaId: number | null = null;
+  let deniedKeys: string[] = [];
 
   if (user) {
     userEmail = user.email ?? null;
@@ -35,17 +38,17 @@ export default async function AppShell({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let { data: profile } = await (supabase as any)
       .from("usuarios")
-      .select("id, nombre, apellidos, rol, avatar_url")
+      .select("id, nombre, apellidos, rol, avatar_url, empresa_id")
       .eq("auth_id", user.id)
-      .maybeSingle() as { data: { id: number; nombre: string; apellidos: string; rol: string; avatar_url: string | null } | null };
+      .maybeSingle() as { data: { id: number; nombre: string; apellidos: string; rol: string; avatar_url: string | null; empresa_id: number | null } | null };
 
     if (!profile && user.email) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: byEmail } = await (supabase as any)
         .from("usuarios")
-        .select("id, nombre, apellidos, rol, avatar_url")
+        .select("id, nombre, apellidos, rol, avatar_url, empresa_id")
         .eq("correo", user.email)
-        .maybeSingle() as { data: { id: number; nombre: string; apellidos: string; rol: string; avatar_url: string | null } | null };
+        .maybeSingle() as { data: { id: number; nombre: string; apellidos: string; rol: string; avatar_url: string | null; empresa_id: number | null } | null };
       profile = byEmail;
     }
 
@@ -59,6 +62,13 @@ export default async function AppShell({
     userAvatarUrl = profile.avatar_url
       ?? (user.user_metadata?.avatar_url as string | undefined)
       ?? null;
+    empresaId = profile.empresa_id ?? null;
+
+    // Cargar recursos denegados desde access_control_rules (capa configurable)
+    if (empresaId && userRole) {
+      const deniedSet = await getDeniedResourceKeys(empresaId, userRole);
+      deniedKeys = Array.from(deniedSet);
+    }
   }
 
   // Notificaciones: tareas pendientes del usuario actual
@@ -78,7 +88,7 @@ export default async function AppShell({
 
   return (
     <div className="h-dvh overflow-hidden bg-background">
-      <Sidebar userRole={userRole} />
+      <Sidebar userRole={userRole} deniedResourceKeys={deniedKeys} />
       <div className="flex h-full min-w-0 flex-col md:pl-[260px]">
         <Header userName={userName} userEmail={userEmail} avatarUrl={userAvatarUrl} notifications={notifications} />
         <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background px-4 py-5 md:px-6 md:py-6 lg:px-7 lg:py-7">

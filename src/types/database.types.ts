@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -12,8 +12,87 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      access_control_rules: {
+        Row: {
+          action: string
+          created_at: string
+          empresa_id: number
+          enabled: boolean
+          id: number
+          resource_key: string
+          resource_type: string
+          role: string
+          updated_at: string
+          updated_by: number | null
+        }
+        Insert: {
+          action?: string
+          created_at?: string
+          empresa_id: number
+          enabled?: boolean
+          id?: number
+          resource_key: string
+          resource_type: string
+          role: string
+          updated_at?: string
+          updated_by?: number | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          empresa_id?: number
+          enabled?: boolean
+          id?: number
+          resource_key?: string
+          resource_type?: string
+          role?: string
+          updated_at?: string
+          updated_by?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_control_rules_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "access_control_rules_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       actividad_desarrollo: {
         Row: {
           action: string
@@ -277,8 +356,10 @@ export type Database = {
       archivos: {
         Row: {
           created_at: string
+          empresa_id: number | null
           id: number
           nombre: string
+          owner_user_id: number | null
           propiedad_id: number | null
           storage_path: string | null
           tipo: string
@@ -286,8 +367,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          empresa_id?: number | null
           id?: number
           nombre: string
+          owner_user_id?: number | null
           propiedad_id?: number | null
           storage_path?: string | null
           tipo?: string
@@ -295,8 +378,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          empresa_id?: number | null
           id?: number
           nombre?: string
+          owner_user_id?: number | null
           propiedad_id?: number | null
           storage_path?: string | null
           tipo?: string
@@ -304,10 +389,88 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "archivos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "archivos_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "archivos_propiedad_id_fkey"
             columns: ["propiedad_id"]
             isOneToOne: false
             referencedRelation: "propiedades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      colaboraciones: {
+        Row: {
+          agente_colaborador_id: number
+          agente_owner_id: number
+          created_at: string
+          empresa_id: number
+          entidad_id: number
+          entidad_tipo: string
+          estado: string
+          id: number
+          notas: string | null
+          porcentaje_comision: number | null
+          updated_at: string
+        }
+        Insert: {
+          agente_colaborador_id: number
+          agente_owner_id: number
+          created_at?: string
+          empresa_id: number
+          entidad_id: number
+          entidad_tipo: string
+          estado?: string
+          id?: number
+          notas?: string | null
+          porcentaje_comision?: number | null
+          updated_at?: string
+        }
+        Update: {
+          agente_colaborador_id?: number
+          agente_owner_id?: number
+          created_at?: string
+          empresa_id?: number
+          entidad_id?: number
+          entidad_tipo?: string
+          estado?: string
+          id?: number
+          notas?: string | null
+          porcentaje_comision?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "colaboraciones_agente_colaborador_id_fkey"
+            columns: ["agente_colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "colaboraciones_agente_owner_id_fkey"
+            columns: ["agente_owner_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "colaboraciones_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
         ]
@@ -335,6 +498,187 @@ export type Database = {
           {
             foreignKeyName: "configuracion_seguridad_updated_by_fkey"
             columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacto_timeline_events: {
+        Row: {
+          agente_id: number | null
+          contacto_id: number | null
+          created_at: string
+          descripcion: string | null
+          empresa_id: number | null
+          id: number
+          metadata: Json
+          pedido_id: number | null
+          propiedad_id: number | null
+          tipo_evento: string
+          titulo: string
+        }
+        Insert: {
+          agente_id?: number | null
+          contacto_id?: number | null
+          created_at?: string
+          descripcion?: string | null
+          empresa_id?: number | null
+          id?: number
+          metadata?: Json
+          pedido_id?: number | null
+          propiedad_id?: number | null
+          tipo_evento: string
+          titulo: string
+        }
+        Update: {
+          agente_id?: number | null
+          contacto_id?: number | null
+          created_at?: string
+          descripcion?: string | null
+          empresa_id?: number | null
+          id?: number
+          metadata?: Json
+          pedido_id?: number | null
+          propiedad_id?: number | null
+          tipo_evento?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacto_timeline_events_agente_id_fkey"
+            columns: ["agente_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacto_timeline_events_contacto_id_fkey"
+            columns: ["contacto_id"]
+            isOneToOne: false
+            referencedRelation: "contactos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacto_timeline_events_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacto_timeline_events_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacto_timeline_events_propiedad_id_fkey"
+            columns: ["propiedad_id"]
+            isOneToOne: false
+            referencedRelation: "propiedades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contactos: {
+        Row: {
+          apellidos: string | null
+          archived_at: string | null
+          cargo: string | null
+          ciudad: string | null
+          codigo_postal: string | null
+          created_at: string
+          direccion: string | null
+          email: string | null
+          empresa: string | null
+          empresa_id: number | null
+          equipo_id: number | null
+          estado: string
+          id: number
+          nombre: string
+          notas: string | null
+          origen: string | null
+          owner_user_id: number | null
+          pais: string
+          provincia: string | null
+          telefono: string | null
+          telefono_secundario: string | null
+          tipo: string
+          updated_at: string
+          visibility: string
+        }
+        Insert: {
+          apellidos?: string | null
+          archived_at?: string | null
+          cargo?: string | null
+          ciudad?: string | null
+          codigo_postal?: string | null
+          created_at?: string
+          direccion?: string | null
+          email?: string | null
+          empresa?: string | null
+          empresa_id?: number | null
+          equipo_id?: number | null
+          estado?: string
+          id?: number
+          nombre: string
+          notas?: string | null
+          origen?: string | null
+          owner_user_id?: number | null
+          pais?: string
+          provincia?: string | null
+          telefono?: string | null
+          telefono_secundario?: string | null
+          tipo?: string
+          updated_at?: string
+          visibility?: string
+        }
+        Update: {
+          apellidos?: string | null
+          archived_at?: string | null
+          cargo?: string | null
+          ciudad?: string | null
+          codigo_postal?: string | null
+          created_at?: string
+          direccion?: string | null
+          email?: string | null
+          empresa?: string | null
+          empresa_id?: number | null
+          equipo_id?: number | null
+          estado?: string
+          id?: number
+          nombre?: string
+          notas?: string | null
+          origen?: string | null
+          owner_user_id?: number | null
+          pais?: string
+          provincia?: string | null
+          telefono?: string | null
+          telefono_secundario?: string | null
+          tipo?: string
+          updated_at?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contactos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contactos_equipo_id_fkey"
+            columns: ["equipo_id"]
+            isOneToOne: false
+            referencedRelation: "equipos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contactos_owner_user_id_fkey"
+            columns: ["owner_user_id"]
             isOneToOne: false
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
@@ -370,6 +714,514 @@ export type Database = {
           telefono?: string | null
         }
         Relationships: []
+      }
+      documentos_generados: {
+        Row: {
+          contacto_id: number | null
+          created_at: string
+          empresa_id: number | null
+          generado_por: number | null
+          id: number
+          pedido_id: number | null
+          propiedad_id: number | null
+          tipo_documento: string
+        }
+        Insert: {
+          contacto_id?: number | null
+          created_at?: string
+          empresa_id?: number | null
+          generado_por?: number | null
+          id?: number
+          pedido_id?: number | null
+          propiedad_id?: number | null
+          tipo_documento: string
+        }
+        Update: {
+          contacto_id?: number | null
+          created_at?: string
+          empresa_id?: number | null
+          generado_por?: number | null
+          id?: number
+          pedido_id?: number | null
+          propiedad_id?: number | null
+          tipo_documento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentos_generados_contacto_id_fkey"
+            columns: ["contacto_id"]
+            isOneToOne: false
+            referencedRelation: "contactos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_generados_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_generados_generado_por_fkey"
+            columns: ["generado_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_generados_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_generados_propiedad_id_fkey"
+            columns: ["propiedad_id"]
+            isOneToOne: false
+            referencedRelation: "propiedades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_accounts: {
+        Row: {
+          access_token_encrypted: string | null
+          created_at: string
+          email: string
+          empresa_id: number | null
+          id: number
+          last_error: string | null
+          last_sync_at: string | null
+          provider: string
+          refresh_token_encrypted: string | null
+          status: string
+          token_expires_at: string | null
+          updated_at: string
+          user_id: number
+        }
+        Insert: {
+          access_token_encrypted?: string | null
+          created_at?: string
+          email: string
+          empresa_id?: number | null
+          id?: number
+          last_error?: string | null
+          last_sync_at?: string | null
+          provider?: string
+          refresh_token_encrypted?: string | null
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: number
+        }
+        Update: {
+          access_token_encrypted?: string | null
+          created_at?: string
+          email?: string
+          empresa_id?: number | null
+          id?: number
+          last_error?: string | null
+          last_sync_at?: string | null
+          provider?: string
+          refresh_token_encrypted?: string | null
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_accounts_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string
+          description: string | null
+          due_at: string | null
+          email_message_id: number
+          empresa_id: number | null
+          id: number
+          resolved_at: string | null
+          severity: string
+          status: string
+          title: string
+          user_id: number
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          email_message_id: number
+          empresa_id?: number | null
+          id?: number
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          title: string
+          user_id: number
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          email_message_id?: number
+          empresa_id?: number | null
+          id?: number
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          title?: string
+          user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_alerts_email_message_id_fkey"
+            columns: ["email_message_id"]
+            isOneToOne: false
+            referencedRelation: "email_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_alerts_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_alerts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_attachments: {
+        Row: {
+          created_at: string
+          document_type: string
+          email_message_id: number
+          empresa_id: number | null
+          filename: string
+          id: number
+          linked_entity_id: number | null
+          linked_entity_type: string | null
+          mime_type: string | null
+          provider_attachment_id: string | null
+          size_bytes: number | null
+          storage_path: string | null
+          user_id: number
+        }
+        Insert: {
+          created_at?: string
+          document_type?: string
+          email_message_id: number
+          empresa_id?: number | null
+          filename: string
+          id?: number
+          linked_entity_id?: number | null
+          linked_entity_type?: string | null
+          mime_type?: string | null
+          provider_attachment_id?: string | null
+          size_bytes?: number | null
+          storage_path?: string | null
+          user_id: number
+        }
+        Update: {
+          created_at?: string
+          document_type?: string
+          email_message_id?: number
+          empresa_id?: number | null
+          filename?: string
+          id?: number
+          linked_entity_id?: number | null
+          linked_entity_type?: string | null
+          mime_type?: string | null
+          provider_attachment_id?: string | null
+          size_bytes?: number | null
+          storage_path?: string | null
+          user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_attachments_email_message_id_fkey"
+            columns: ["email_message_id"]
+            isOneToOne: false
+            referencedRelation: "email_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_attachments_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_attachments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_entity_links: {
+        Row: {
+          confidence_score: number
+          created_at: string
+          email_message_id: number
+          empresa_id: number | null
+          entity_id: number
+          entity_type: string
+          id: number
+          linked_by: string
+        }
+        Insert: {
+          confidence_score?: number
+          created_at?: string
+          email_message_id: number
+          empresa_id?: number | null
+          entity_id: number
+          entity_type: string
+          id?: number
+          linked_by?: string
+        }
+        Update: {
+          confidence_score?: number
+          created_at?: string
+          email_message_id?: number
+          empresa_id?: number | null
+          entity_id?: number
+          entity_type?: string
+          id?: number
+          linked_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_entity_links_email_message_id_fkey"
+            columns: ["email_message_id"]
+            isOneToOne: false
+            referencedRelation: "email_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_entity_links_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_messages: {
+        Row: {
+          account_id: number
+          archived_at: string | null
+          body_html: string | null
+          body_text: string | null
+          captured_lead_id: number | null
+          cc_emails: Json
+          commercial_bucket: string
+          commercial_priority: number
+          created_at: string
+          direction: string
+          empresa_id: number | null
+          folder: string
+          from_email: string | null
+          from_name: string | null
+          has_attachments: boolean
+          id: number
+          intent: string | null
+          is_read: boolean
+          needs_response: boolean
+          portal_source: string | null
+          provider: string
+          provider_message_id: string
+          provider_thread_id: string | null
+          raw_metadata: Json
+          received_at: string | null
+          responded_at: string | null
+          response_due_at: string | null
+          sent_at: string | null
+          snippet: string | null
+          subject: string | null
+          to_emails: Json
+          urgency: string
+          user_id: number
+        }
+        Insert: {
+          account_id: number
+          archived_at?: string | null
+          body_html?: string | null
+          body_text?: string | null
+          captured_lead_id?: number | null
+          cc_emails?: Json
+          commercial_bucket?: string
+          commercial_priority?: number
+          created_at?: string
+          direction?: string
+          empresa_id?: number | null
+          folder?: string
+          from_email?: string | null
+          from_name?: string | null
+          has_attachments?: boolean
+          id?: number
+          intent?: string | null
+          is_read?: boolean
+          needs_response?: boolean
+          portal_source?: string | null
+          provider?: string
+          provider_message_id: string
+          provider_thread_id?: string | null
+          raw_metadata?: Json
+          received_at?: string | null
+          responded_at?: string | null
+          response_due_at?: string | null
+          sent_at?: string | null
+          snippet?: string | null
+          subject?: string | null
+          to_emails?: Json
+          urgency?: string
+          user_id: number
+        }
+        Update: {
+          account_id?: number
+          archived_at?: string | null
+          body_html?: string | null
+          body_text?: string | null
+          captured_lead_id?: number | null
+          cc_emails?: Json
+          commercial_bucket?: string
+          commercial_priority?: number
+          created_at?: string
+          direction?: string
+          empresa_id?: number | null
+          folder?: string
+          from_email?: string | null
+          from_name?: string | null
+          has_attachments?: boolean
+          id?: number
+          intent?: string | null
+          is_read?: boolean
+          needs_response?: boolean
+          portal_source?: string | null
+          provider?: string
+          provider_message_id?: string
+          provider_thread_id?: string | null
+          raw_metadata?: Json
+          received_at?: string | null
+          responded_at?: string | null
+          response_due_at?: string | null
+          sent_at?: string | null
+          snippet?: string | null
+          subject?: string | null
+          to_emails?: Json
+          urgency?: string
+          user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_messages_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_messages_captured_lead_id_fkey"
+            columns: ["captured_lead_id"]
+            isOneToOne: false
+            referencedRelation: "idealista_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_messages_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_templates: {
+        Row: {
+          body_html: string | null
+          body_text: string
+          category: string
+          created_at: string
+          created_by: number | null
+          empresa_id: number | null
+          id: number
+          name: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          body_html?: string | null
+          body_text: string
+          category: string
+          created_at?: string
+          created_by?: number | null
+          empresa_id?: number | null
+          id?: number
+          name: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          body_html?: string | null
+          body_text?: string
+          category?: string
+          created_at?: string
+          created_by?: number | null
+          empresa_id?: number | null
+          id?: number
+          name?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_templates_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       empresas: {
         Row: {
@@ -583,6 +1435,44 @@ export type Database = {
           },
         ]
       }
+      kanban_card_orden: {
+        Row: {
+          column_id: string
+          db_id: number
+          id: number
+          posicion: number
+          source: string
+          updated_at: string
+          user_id: number
+        }
+        Insert: {
+          column_id: string
+          db_id: number
+          id?: number
+          posicion: number
+          source: string
+          updated_at?: string
+          user_id: number
+        }
+        Update: {
+          column_id?: string
+          db_id?: number
+          id?: number
+          posicion?: number
+          source?: string
+          updated_at?: string
+          user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kanban_card_orden_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kanban_columnas: {
         Row: {
           col_id: string
@@ -722,10 +1612,133 @@ export type Database = {
           },
         ]
       }
+      pipeline_state_suggestions: {
+        Row: {
+          agente_id: number | null
+          created_at: string
+          dias_sin_actividad: number | null
+          empresa_id: number | null
+          estado_actual: string
+          estado_sugerido: string
+          id: number
+          pedido_id: number | null
+          propiedad_id: number | null
+          razon: string
+          resuelta_at: string | null
+          resuelta_por: number | null
+          status: string
+          tipo_regla: string
+        }
+        Insert: {
+          agente_id?: number | null
+          created_at?: string
+          dias_sin_actividad?: number | null
+          empresa_id?: number | null
+          estado_actual: string
+          estado_sugerido: string
+          id?: number
+          pedido_id?: number | null
+          propiedad_id?: number | null
+          razon: string
+          resuelta_at?: string | null
+          resuelta_por?: number | null
+          status?: string
+          tipo_regla: string
+        }
+        Update: {
+          agente_id?: number | null
+          created_at?: string
+          dias_sin_actividad?: number | null
+          empresa_id?: number | null
+          estado_actual?: string
+          estado_sugerido?: string
+          id?: number
+          pedido_id?: number | null
+          propiedad_id?: number | null
+          razon?: string
+          resuelta_at?: string | null
+          resuelta_por?: number | null
+          status?: string
+          tipo_regla?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_state_suggestions_agente_id_fkey"
+            columns: ["agente_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_state_suggestions_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_state_suggestions_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_state_suggestions_propiedad_id_fkey"
+            columns: ["propiedad_id"]
+            isOneToOne: false
+            referencedRelation: "propiedades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_state_suggestions_resuelta_por_fkey"
+            columns: ["resuelta_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      propiedad_usuarios: {
+        Row: {
+          created_at: string
+          id: number
+          propiedad_id: number
+          usuario_id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          propiedad_id: number
+          usuario_id: number
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          propiedad_id?: number
+          usuario_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "propiedad_usuarios_propiedad_id_fkey"
+            columns: ["propiedad_id"]
+            isOneToOne: false
+            referencedRelation: "propiedades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propiedad_usuarios_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       propiedades: {
         Row: {
           agente_asignado: number | null
-          calidad_ficha_score: number
+          calidad_ficha_score: number | null
           contactado: boolean
           contactado_hasta: string | null
           created_at: string
@@ -733,10 +1746,10 @@ export type Database = {
           empresa_id: number | null
           equipo_id: number | null
           estado: string | null
-          estado_publicacion_web: string
-          faltantes_ficha: unknown[]
+          estado_publicacion_web: string | null
+          faltantes_ficha: Json | null
           fecha_visita: string | null
-          ficha_completa: boolean
+          ficha_completa: boolean | null
           finca_id: number | null
           honorarios: number | null
           id: number
@@ -748,7 +1761,7 @@ export type Database = {
           posicion: number | null
           precio: number | null
           propietario: string | null
-          publicar_en_web: boolean
+          publicar_en_web: boolean | null
           puerta: string | null
           telefono: string | null
           tipo_operacion: string | null
@@ -756,15 +1769,15 @@ export type Database = {
           updated_at: string | null
           visibility: string
           web_descripcion: string | null
-          web_destacada: boolean
+          web_destacada: boolean | null
           web_error_sync: string | null
-          web_precio_visible: boolean
+          web_precio_visible: boolean | null
           web_titulo: string | null
           web_ultima_sincronizacion: string | null
         }
         Insert: {
           agente_asignado?: number | null
-          calidad_ficha_score?: number
+          calidad_ficha_score?: number | null
           contactado?: boolean
           contactado_hasta?: string | null
           created_at?: string
@@ -772,10 +1785,10 @@ export type Database = {
           empresa_id?: number | null
           equipo_id?: number | null
           estado?: string | null
-          estado_publicacion_web?: string
-          faltantes_ficha?: unknown[]
+          estado_publicacion_web?: string | null
+          faltantes_ficha?: Json | null
           fecha_visita?: string | null
-          ficha_completa?: boolean
+          ficha_completa?: boolean | null
           finca_id?: number | null
           honorarios?: number | null
           id?: number
@@ -787,7 +1800,7 @@ export type Database = {
           posicion?: number | null
           precio?: number | null
           propietario?: string | null
-          publicar_en_web?: boolean
+          publicar_en_web?: boolean | null
           puerta?: string | null
           telefono?: string | null
           tipo_operacion?: string | null
@@ -795,15 +1808,15 @@ export type Database = {
           updated_at?: string | null
           visibility?: string
           web_descripcion?: string | null
-          web_destacada?: boolean
+          web_destacada?: boolean | null
           web_error_sync?: string | null
-          web_precio_visible?: boolean
+          web_precio_visible?: boolean | null
           web_titulo?: string | null
           web_ultima_sincronizacion?: string | null
         }
         Update: {
           agente_asignado?: number | null
-          calidad_ficha_score?: number
+          calidad_ficha_score?: number | null
           contactado?: boolean
           contactado_hasta?: string | null
           created_at?: string
@@ -811,10 +1824,10 @@ export type Database = {
           empresa_id?: number | null
           equipo_id?: number | null
           estado?: string | null
-          estado_publicacion_web?: string
-          faltantes_ficha?: unknown[]
+          estado_publicacion_web?: string | null
+          faltantes_ficha?: Json | null
           fecha_visita?: string | null
-          ficha_completa?: boolean
+          ficha_completa?: boolean | null
           finca_id?: number | null
           honorarios?: number | null
           id?: number
@@ -826,7 +1839,7 @@ export type Database = {
           posicion?: number | null
           precio?: number | null
           propietario?: string | null
-          publicar_en_web?: boolean
+          publicar_en_web?: boolean | null
           puerta?: string | null
           telefono?: string | null
           tipo_operacion?: string | null
@@ -834,9 +1847,9 @@ export type Database = {
           updated_at?: string | null
           visibility?: string
           web_descripcion?: string | null
-          web_destacada?: boolean
+          web_destacada?: boolean | null
           web_error_sync?: string | null
-          web_precio_visible?: boolean
+          web_precio_visible?: boolean | null
           web_titulo?: string | null
           web_ultima_sincronizacion?: string | null
         }
@@ -1148,6 +2161,48 @@ export type Database = {
           },
         ]
       }
+      user_preferences: {
+        Row: {
+          created_at: string
+          empresa_id: number | null
+          id: number
+          theme: string
+          updated_at: string
+          user_id: number
+        }
+        Insert: {
+          created_at?: string
+          empresa_id?: number | null
+          id?: number
+          theme?: string
+          updated_at?: string
+          user_id: number
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: number | null
+          id?: number
+          theme?: string
+          updated_at?: string
+          user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_preferences_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usuario_orden: {
         Row: {
           id: number
@@ -1358,6 +2413,67 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      can_access_colaboracion: {
+        Args: {
+          row_colaborador_id: number
+          row_empresa_id: number
+          row_owner_id: number
+        }
+        Returns: boolean
+      }
+      can_access_contacto_timeline_event:
+        | {
+            Args: {
+              row_agente_id: number
+              row_contacto_id: number
+              row_empresa_id: number
+              row_pedido_id: number
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              row_agente_id: number
+              row_contacto_id: number
+              row_empresa_id: number
+              row_pedido_id: number
+              row_propiedad_id?: number
+            }
+            Returns: boolean
+          }
+      can_access_documento_generado: {
+        Args: { row_empresa_id: number; row_generado_por: number }
+        Returns: boolean
+      }
+      can_access_pedido: {
+        Args: {
+          row_empresa_id: number
+          row_equipo_id: number
+          row_owner_user_id: number
+          row_visibility: string
+          row_visibility_agente_ids: number[]
+        }
+        Returns: boolean
+      }
+      can_access_pipeline_suggestion: {
+        Args: { row_agente_id: number; row_empresa_id: number }
+        Returns: boolean
+      }
+      can_access_propiedad: {
+        Args: {
+          row_agente_asignado: number
+          row_empresa_id: number
+          row_equipo_id: number
+          row_id: number
+          row_owner_user_id: number
+          row_visibility: string
+        }
+        Returns: boolean
+      }
+      can_access_propiedad_by_id: {
+        Args: { row_propiedad_id: number }
+        Returns: boolean
+      }
       can_access_scoped_row: {
         Args: {
           row_empresa_id: number
@@ -1369,6 +2485,14 @@ export type Database = {
       }
       can_manage_agent_objectives: {
         Args: { target_agente_id: number }
+        Returns: boolean
+      }
+      can_manage_colaboracion: {
+        Args: { row_empresa_id: number; row_owner_id: number }
+        Returns: boolean
+      }
+      can_manage_contacto_timeline_event: {
+        Args: { row_agente_id: number; row_empresa_id: number }
         Returns: boolean
       }
       can_manage_scoped_row: {
@@ -1517,6 +2641,7 @@ export type Database = {
         Args: { target_usuario_id: number }
         Returns: boolean
       }
+      current_user_id: { Args: never; Returns: number }
       current_user_role: { Args: never; Returns: string }
       current_usuario_id: { Args: never; Returns: number }
       delete_finca_cascade: {
@@ -1543,6 +2668,7 @@ export type Database = {
           deleted_zonas: number
         }[]
       }
+      expire_old_pipeline_suggestions: { Args: never; Returns: undefined }
       get_supervised_user_ids: { Args: never; Returns: number[] }
       insert_desarrollo_activity: {
         Args: {
@@ -1840,6 +2966,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { validatePropertyForWeb } from "@/lib/propiedades/validate-property-for-web";
+import { canUseFeature } from "@/lib/access-control/can-access";
 
 // ─── Helpers internos ─────────────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ export async function updateWebPublicationAction(data: {
   const yo = await getAuthContext();
 
   if (!isManager(yo.role)) throw new Error("Sin permisos para gestionar publicacion web");
+  if (!(await canUseFeature(yo, "properties.web_publish"))) throw new Error("Accion deshabilitada por control de acceso");
 
   const { error } = await supabase
     .from("propiedades")
@@ -93,6 +95,7 @@ export async function prepareForWebAction(
   const yo = await getAuthContext();
 
   if (!isManager(yo.role)) throw new Error("Sin permisos");
+  if (!(await canUseFeature(yo, "properties.web_publish"))) throw new Error("Accion deshabilitada por control de acceso");
 
   const { data: prop, error: fetchError } = await supabase
     .from("propiedades")

@@ -3,12 +3,14 @@
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
-import { Calendar, Clock, Plus, X } from "lucide-react";
+import { Calendar, Clock, Plus, X, Trash2 } from "lucide-react";
 import KanbanColumn from "./KanbanColumn";
 import KanbanAddCard from "./KanbanAddCard";
 import KanbanEditCard from "./KanbanEditCard";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import type { KanbanData, KanbanColumnData, KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import type { UserRole } from "@/lib/roles";
+import type { ActivityType } from "@/lib/activity-options";
 import {
   addKanbanColumnAction,
   completeAgendaAction,
@@ -53,6 +55,7 @@ export default function KanbanBoard({
   });
   const [addingCardCol, setAddingCardCol] = useState<string | null>(null);
   const [editingCard, setEditingCard] = useState<{ columnId: string; card: KanbanCardData } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: "column" | "card"; columnId: string; cardId?: string; isAgenda?: boolean } | null>(null);
   const [resultadoModal, setResultadoModal] = useState<{ columnId: string; cardId: string; titulo: string } | null>(null);
   const [resultadoText, setResultadoText] = useState("");
   const [convertModal, setConvertModal] = useState<{
@@ -135,6 +138,10 @@ export default function KanbanBoard({
     }).then(() => router.refresh()).catch(() => router.refresh());
   }
 
+  function requestDeleteColumn(columnId: string) {
+    setDeleteTarget({ type: "column", columnId });
+  }
+
   function handleDeleteColumn(columnId: string) {
     setColumns((prev) => prev.filter((c) => c.id !== columnId));
     deleteKanbanColumnAction(columnId).catch(() => {});
@@ -198,14 +205,29 @@ export default function KanbanBoard({
     }
   }, [router]);
 
-  function handleDeleteCard(columnId: string, cardId: string) {
+  function requestDeleteCard(columnId: string, cardId: string) {
+    const card = findCard(columnId, cardId);
+    setDeleteTarget({ type: "card", columnId, cardId, isAgenda: card?.source === "agenda" });
+  }
+
+  function handleDeleteCard(columnId: string, cardId: string, isAgenda: boolean) {
     const card = findCard(columnId, cardId);
     setColumns((prev) =>
       prev.map((col) => col.id === columnId ? { ...col, cards: col.cards.filter((c) => c.id !== cardId) } : col),
     );
-    if (card?.source === "tarea") {
+    if (!isAgenda && card?.source === "tarea") {
       deleteTareaAction(card.dbId).then(() => router.refresh()).catch(() => router.refresh());
     }
+  }
+
+  function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === "column") {
+      handleDeleteColumn(deleteTarget.columnId);
+    } else if (deleteTarget.type === "card" && deleteTarget.cardId) {
+      handleDeleteCard(deleteTarget.columnId, deleteTarget.cardId, !!deleteTarget.isAgenda);
+    }
+    setDeleteTarget(null);
   }
 
   const handleOpenEdit = useCallback((columnId: string, card: KanbanCardData) => {
@@ -216,7 +238,7 @@ export default function KanbanBoard({
     title: string;
     priority: KanbanPriority;
     dueDate?: string;
-    tipo?: string;
+    tipo?: ActivityType;
     assignedUserIds?: number[];
   }) => {
     if (!editingCard) return;
@@ -300,9 +322,9 @@ export default function KanbanBoard({
               column={column}
               role={role}
               currentUserId={_currentUserId}
-              onDeleteColumn={handleDeleteColumn}
+              onDeleteColumn={requestDeleteColumn}
               onAddCard={(colId) => setAddingCardCol(colId)}
-              onDeleteCard={handleDeleteCard}
+              onDeleteCard={requestDeleteCard}
               onEditCard={handleOpenEdit}
               onCompleteCard={handleCompleteCard}
             />
@@ -476,6 +498,23 @@ export default function KanbanBoard({
             </div>
           </div>
         </div>
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          open={!!deleteTarget}
+          title={deleteTarget.type === "column" ? "Eliminar columna" : "Eliminar tarea"}
+          description={
+            deleteTarget.type === "column"
+              ? "Esta columna desaparecerá de tu tablero. Las tareas dentro NO se eliminarán de la base de datos y quedarán sin columna asignada. ¿Seguro?"
+              : deleteTarget.isAgenda
+                ? "Esta tarea proviene de la agenda. Solo las 'Tareas' creadas explícitamente se pueden eliminar. ¿Quieres continuar?"
+                : "¿Estás seguro de que quieres eliminar esta tarea? Esta acción no se puede deshacer."
+          }
+          confirmLabel="Eliminar"
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+        />
       )}
     </>
   );
