@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { FileText, History, Users, X, Phone } from "lucide-react";
+import Drawer from "@/components/ui/drawer";
 import DocumentGeneratorModal from "@/components/documents/DocumentGeneratorModal";
 import ColaboracionesPanel from "@/components/colaboraciones/ColaboracionesPanel";
 import { createClient } from "@/lib/supabase-browser";
@@ -408,292 +409,260 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
         </div>
       )}
 
-      {/* ── Modal formulario ── */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]">
-          <div className="flex w-full max-w-lg flex-col rounded-2xl bg-surface shadow-xl" style={{ maxHeight: "calc(100vh - 2rem)" }}>
+      {/* ── Drawer formulario ── */}
+      <Drawer
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editId !== null ? (() => {
+          const pedido = pedidos.find((p) => p.id === editId);
+          return pedido?.nombre_cliente ?? "Editar solicitud";
+        })() : "Nueva solicitud"}
+        subtitle={editId !== null ? `Solicitud #${editId}` : undefined}
+        width="lg"
+        headerActions={editId !== null ? (() => {
+          const pedido = pedidos.find((p) => p.id === editId);
+          if (!pedido) return null;
+          return (
+            <>
+              <button
+                type="button"
+                onClick={() => setColabPedido(pedido)}
+                className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-primary"
+                title="Colaboraciones"
+              >
+                <Users className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setDocPedido(pedido)}
+                className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-primary"
+                title="Generar documento"
+              >
+                <FileText className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimelinePedido(pedido)}
+                className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-primary"
+                title="Timeline"
+              >
+                <History className="h-4 w-4" />
+              </button>
+              <div className="mx-1 h-4 w-px bg-border" />
+            </>
+          );
+        })() : undefined}
+        footer={
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background">Cancelar</button>
+            <button onClick={handleSave} disabled={saving || !form.nombre_cliente.trim()}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60">
+              {saving ? "Guardando..." : editId !== null ? "Guardar cambios" : "Crear solicitud"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 px-5 py-5">
+          {editId !== null && (() => {
+            const pedido = pedidos.find((p) => p.id === editId);
+            return pedido?.telefono ? (
+              <p className="flex items-center gap-1.5 text-sm text-text-secondary">
+                <Phone className="h-3.5 w-3.5" />
+                {pedido.telefono}
+              </p>
+            ) : null;
+          })()}
 
-            {/* Header — modo edición con hero, modo creación con header simple */}
-            {editId !== null ? (() => {
-              const pedido = pedidos.find((p) => p.id === editId);
-              const initials = pedido ? pedido.nombre_cliente.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase() : "?";
-              return (
-                <div className="flex shrink-0 flex-col gap-3 border-b border-border px-5 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    {/* Hero del pedido */}
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 text-sm font-bold text-purple-600 dark:text-purple-400">
-                        {initials}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="mb-1 flex items-center gap-1.5">
-                          <span className="rounded-full bg-purple-500/10 px-2 py-0.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
-                            Solicitud #{editId}
-                          </span>
-                        </div>
-                        <h2 className="truncate text-base font-semibold text-text-primary leading-tight">
-                          {pedido?.nombre_cliente ?? "Editando solicitud"}
-                        </h2>
-                        {pedido?.telefono && (
-                          <p className="mt-0.5 flex items-center gap-1 text-sm text-text-secondary">
-                            <Phone className="h-3 w-3" />
-                            {pedido.telefono}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+          {/* Cliente + teléfono */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 sm:col-span-1">
+              <label className="text-xs font-medium text-text-secondary">Nombre del cliente *</label>
+              <input type="text" value={form.nombre_cliente} onChange={(e) => setForm({ ...form, nombre_cliente: e.target.value })}
+                placeholder="Nombre completo" className="input mt-1.5" autoFocus />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-text-secondary">Telefono</label>
+              <input type="tel" value={form.telefono ?? ""} onChange={(e) => setForm({ ...form, telefono: e.target.value || null })}
+                placeholder="600 000 000" className="input mt-1.5" />
+            </div>
+          </div>
 
-                    {/* Acciones */}
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => { if (pedido) setColabPedido(pedido); }}
-                        className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-primary"
-                        title="Colaboraciones"
-                      >
-                        <Users className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { if (pedido) setDocPedido(pedido); }}
-                        className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-primary"
-                        title="Generar documento"
-                      >
-                        <FileText className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { if (pedido) setTimelinePedido(pedido); }}
-                        className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-primary"
-                        title="Timeline"
-                      >
-                        <History className="h-4 w-4" />
-                      </button>
-                      <div className="mx-1 h-4 w-px bg-border" />
-                      <button
-                        onClick={() => setModalOpen(false)}
-                        className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })() : (
-              <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
-                <h2 className="text-base font-semibold text-text-primary">Nueva solicitud</h2>
-                <button
-                  onClick={() => setModalOpen(false)}
-                  className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+          {/* Tipo de propiedad — chips multi-selección */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary">Tipo de propiedad</label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {TIPOS_PROPIEDAD.map((tipo) => {
+                const active = getTipos().includes(tipo);
+                return (
+                  <button key={tipo} type="button" onClick={() => toggleTipo(tipo)}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      active ? "border-primary bg-primary text-white" : "border-border text-text-secondary hover:border-primary hover:text-primary"
+                    }`}>
+                    {tipo}
+                  </button>
+                );
+              })}
+            </div>
+            {getTipos().length > 0 && (
+              <p className="mt-1.5 text-xs text-text-secondary">Seleccionado: {form.tipo_propiedad}</p>
             )}
+          </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          {/* Modalidad — 3 pestañas */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary">Modalidad</label>
+            <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
+              {MODALIDADES.map((m) => (
+                <TabBtn key={m.value} active={form.modalidad === m.value}
+                  onClick={() => setForm({ ...form, modalidad: form.modalidad === m.value ? null : m.value })}
+                  title={m.title}>
+                  {m.label}
+                </TabBtn>
+              ))}
+            </div>
+            {form.modalidad && (
+              <p className="mt-1 text-xs text-text-secondary">{MODALIDADES.find((m) => m.value === form.modalidad)?.title}</p>
+            )}
+          </div>
 
-              {/* Cliente + teléfono */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="text-xs font-medium text-text-secondary">Nombre del cliente *</label>
-                  <input type="text" value={form.nombre_cliente} onChange={(e) => setForm({ ...form, nombre_cliente: e.target.value })}
-                    placeholder="Nombre completo" className="input mt-1.5" autoFocus />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-text-secondary">Telefono</label>
-                  <input type="tel" value={form.telefono ?? ""} onChange={(e) => setForm({ ...form, telefono: e.target.value || null })}
-                    placeholder="600 000 000" className="input mt-1.5" />
-                </div>
+          {/* Zona búsqueda */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary">Zona de busqueda</label>
+            <input type="text" value={form.zona_busqueda ?? ""}
+              onChange={(e) => setForm({ ...form, zona_busqueda: e.target.value || null })}
+              placeholder="Ej: Cornella, Hospitalet centro, Sant Feliu y Sant Joan Despi"
+              className="input mt-1.5" />
+          </div>
+
+          {/* Presupuesto + Habitaciones + Baños */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-medium text-text-secondary">Presupuesto (€)</label>
+              <input type="number" value={form.presupuesto ?? ""}
+                onChange={(e) => setForm({ ...form, presupuesto: e.target.value ? Number(e.target.value) : null })}
+                placeholder="150000" min={0} className="input mt-1.5" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-text-secondary">Habitaciones</label>
+              <input type="number" value={form.habitaciones ?? ""}
+                onChange={(e) => setForm({ ...form, habitaciones: e.target.value ? Number(e.target.value) : null })}
+                placeholder="3" min={0} className="input mt-1.5" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-text-secondary">Banos</label>
+              <input type="number" value={form.banos ?? ""}
+                onChange={(e) => setForm({ ...form, banos: e.target.value ? Number(e.target.value) : null })}
+                placeholder="1" min={0} className="input mt-1.5" />
+            </div>
+          </div>
+
+          {/* Altura + Garaje */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-text-secondary">Altura deseada</label>
+              <input type="text" value={form.altura_deseada ?? ""}
+                onChange={(e) => setForm({ ...form, altura_deseada: e.target.value || null })}
+                placeholder="Ej: 3 o superior, bajo no" className="input mt-1.5" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-text-secondary">Garaje</label>
+              <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
+                <TabBtn active={form.garaje === true} onClick={() => setForm({ ...form, garaje: form.garaje === true ? null : true })}>Si</TabBtn>
+                <TabBtn active={form.garaje === false} onClick={() => setForm({ ...form, garaje: form.garaje === false ? null : false })}>No</TabBtn>
               </div>
+            </div>
+          </div>
 
-              {/* Tipo de propiedad — chips multi-selección */}
-              <div>
-                <label className="text-xs font-medium text-text-secondary">Tipo de propiedad</label>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {TIPOS_PROPIEDAD.map((tipo) => {
-                    const active = getTipos().includes(tipo);
+          {/* Origen */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary">Origen</label>
+            <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
+              <TabBtn active={form.origen === "oficina"} onClick={() => setForm({ ...form, origen: form.origen === "oficina" ? null : "oficina" })}>Oficina</TabBtn>
+              <TabBtn active={form.origen === "online"} onClick={() => setForm({ ...form, origen: form.origen === "online" ? null : "online" })}>Online</TabBtn>
+            </div>
+          </div>
+
+          {/* Alcance */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary">Alcance del contenido</label>
+            <div className="mt-1.5 grid grid-cols-5 gap-1.5">
+              {ALCANCE_ORDEN.map((scope) => (
+                <button key={scope} type="button"
+                  onClick={() => setForm({ ...form, visibility: scope, visibility_agente_ids: null })}
+                  className={`rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
+                    normalizeAccessScope(form.visibility) === scope
+                      ? "border-primary bg-primary text-white"
+                      : "border-border bg-background text-text-secondary hover:text-text-primary"
+                  }`}>
+                  {ACCESS_SCOPE_LABELS[scope]}
+                </button>
+              ))}
+            </div>
+
+            {needsAgentSelect && agentesParaAlcance.length > 0 && (
+              <div className="mt-2 rounded-lg border border-border bg-background p-3">
+                <p className="mb-2 text-xs font-medium text-text-secondary">
+                  {form.visibility === "responsable"
+                    ? "Selecciona responsables (todos si no eliges ninguno)"
+                    : "Selecciona agentes (todos si no eliges ninguno)"}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {agentesParaAlcance.map((a) => {
+                    const active = selectedAgentIds.includes(a.id);
                     return (
-                      <button key={tipo} type="button" onClick={() => toggleTipo(tipo)}
-                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      <button key={a.id} type="button" onClick={() => toggleAgente(a.id)}
+                        className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
                           active ? "border-primary bg-primary text-white" : "border-border text-text-secondary hover:border-primary hover:text-primary"
                         }`}>
-                        {tipo}
+                        {a.nombre} {a.apellidos}
                       </button>
                     );
                   })}
                 </div>
-                {getTipos().length > 0 && (
-                  <p className="mt-1.5 text-xs text-text-secondary">Seleccionado: {form.tipo_propiedad}</p>
-                )}
               </div>
+            )}
 
-              {/* Modalidad — 3 pestañas */}
-              <div>
-                <label className="text-xs font-medium text-text-secondary">Modalidad</label>
-                <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
-                  {MODALIDADES.map((m) => (
-                    <TabBtn key={m.value} active={form.modalidad === m.value}
-                      onClick={() => setForm({ ...form, modalidad: form.modalidad === m.value ? null : m.value })}
-                      title={m.title}>
-                      {m.label}
-                    </TabBtn>
-                  ))}
-                </div>
-                {form.modalidad && (
-                  <p className="mt-1 text-xs text-text-secondary">{MODALIDADES.find((m) => m.value === form.modalidad)?.title}</p>
-                )}
-              </div>
-
-              {/* Zona búsqueda — texto libre */}
-              <div>
-                <label className="text-xs font-medium text-text-secondary">Zona de busqueda</label>
-                <input type="text" value={form.zona_busqueda ?? ""}
-                  onChange={(e) => setForm({ ...form, zona_busqueda: e.target.value || null })}
-                  placeholder="Ej: Cornella, Hospitalet centro, Sant Feliu y Sant Joan Despi"
-                  className="input mt-1.5" />
-              </div>
-
-              {/* Presupuesto + Habitaciones + Baños */}
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-text-secondary">Presupuesto (€)</label>
-                  <input type="number" value={form.presupuesto ?? ""}
-                    onChange={(e) => setForm({ ...form, presupuesto: e.target.value ? Number(e.target.value) : null })}
-                    placeholder="150000" min={0} className="input mt-1.5" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-text-secondary">Habitaciones</label>
-                  <input type="number" value={form.habitaciones ?? ""}
-                    onChange={(e) => setForm({ ...form, habitaciones: e.target.value ? Number(e.target.value) : null })}
-                    placeholder="3" min={0} className="input mt-1.5" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-text-secondary">Banos</label>
-                  <input type="number" value={form.banos ?? ""}
-                    onChange={(e) => setForm({ ...form, banos: e.target.value ? Number(e.target.value) : null })}
-                    placeholder="1" min={0} className="input mt-1.5" />
-                </div>
-              </div>
-
-              {/* Altura + Garaje */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-text-secondary">Altura deseada</label>
-                  <input type="text" value={form.altura_deseada ?? ""}
-                    onChange={(e) => setForm({ ...form, altura_deseada: e.target.value || null })}
-                    placeholder="Ej: 3 o superior, bajo no" className="input mt-1.5" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-text-secondary">Garaje</label>
-                  <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
-                    <TabBtn active={form.garaje === true} onClick={() => setForm({ ...form, garaje: form.garaje === true ? null : true })}>Si</TabBtn>
-                    <TabBtn active={form.garaje === false} onClick={() => setForm({ ...form, garaje: form.garaje === false ? null : false })}>No</TabBtn>
-                  </div>
-                </div>
-              </div>
-
-              {/* Origen */}
-              <div>
-                <label className="text-xs font-medium text-text-secondary">Origen</label>
-                <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
-                  <TabBtn active={form.origen === "oficina"} onClick={() => setForm({ ...form, origen: form.origen === "oficina" ? null : "oficina" })}>Oficina</TabBtn>
-                  <TabBtn active={form.origen === "online"} onClick={() => setForm({ ...form, origen: form.origen === "online" ? null : "online" })}>Online</TabBtn>
-                </div>
-              </div>
-
-              {/* Alcance */}
-              <div>
-                <label className="text-xs font-medium text-text-secondary">Alcance del contenido</label>
-                <div className="mt-1.5 grid grid-cols-5 gap-1.5">
-                  {ALCANCE_ORDEN.map((scope) => (
-                    <button key={scope} type="button"
-                      onClick={() => setForm({ ...form, visibility: scope, visibility_agente_ids: null })}
-                      className={`rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
-                        normalizeAccessScope(form.visibility) === scope
-                          ? "border-primary bg-primary text-white"
-                          : "border-border bg-background text-text-secondary hover:text-text-primary"
-                      }`}>
-                      {ACCESS_SCOPE_LABELS[scope]}
-                    </button>
-                  ))}
-                </div>
-
-                {needsAgentSelect && agentesParaAlcance.length > 0 && (
-                  <div className="mt-2 rounded-lg border border-border bg-background p-3">
-                    <p className="mb-2 text-xs font-medium text-text-secondary">
-                      {form.visibility === "responsable"
-                        ? "Selecciona responsables (todos si no eliges ninguno)"
-                        : "Selecciona agentes (todos si no eliges ninguno)"}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {agentesParaAlcance.map((a) => {
-                        const active = selectedAgentIds.includes(a.id);
-                        return (
-                          <button key={a.id} type="button" onClick={() => toggleAgente(a.id)}
-                            className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                              active ? "border-primary bg-primary text-white" : "border-border text-text-secondary hover:border-primary hover:text-primary"
-                            }`}>
-                            {a.nombre} {a.apellidos}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <p className="mt-1.5 text-xs text-text-secondary">
-                  {form.visibility === "private" && "Solo visible para ti."}
-                  {form.visibility === "company" && "Visible para toda la empresa."}
-                  {form.visibility === "team" && "Visible para tu equipo."}
-                  {form.visibility === "agents" && "Visible para los agentes que selecciones."}
-                  {form.visibility === "responsable" && "Visible para los responsables que selecciones."}
-                </p>
-              </div>
-
-              {/* Referencia */}
-              <div>
-                <label className="text-xs font-medium text-text-secondary">Referencia de inmueble</label>
-                <input type="text" value={form.referencia ?? ""}
-                  onChange={(e) => setForm({ ...form, referencia: e.target.value || null })}
-                  placeholder="Ref. o descripcion del inmueble" className="input mt-1.5" />
-              </div>
-
-              {/* Notas — ampliada con resize */}
-              <div>
-                <label className="text-xs font-medium text-text-secondary">Notas</label>
-                <textarea value={form.notas ?? ""}
-                  onChange={(e) => setForm({ ...form, notas: e.target.value || null })}
-                  placeholder="Observaciones del cliente, preferencias detalladas, condiciones especiales..."
-                  rows={6} className="input mt-1.5 resize-y" />
-              </div>
-
-              {editId !== null && (() => {
-                const pedido = pedidos.find((p) => p.id === editId);
-                return pedido ? (
-                  <PropertyMatchesPanel pedido={pedido} currentUserId={currentUserId} />
-                ) : null;
-              })()}
-
-              {saveError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{saveError}</p>}
-            </div>
-
-            <div className="flex shrink-0 justify-end gap-3 border-t border-border px-6 py-4">
-              <button onClick={() => setModalOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background">Cancelar</button>
-              <button onClick={handleSave} disabled={saving || !form.nombre_cliente.trim()}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60">
-                {saving ? "Guardando..." : editId !== null ? "Guardar cambios" : "Crear solicitud"}
-              </button>
-            </div>
+            <p className="mt-1.5 text-xs text-text-secondary">
+              {form.visibility === "private" && "Solo visible para ti."}
+              {form.visibility === "company" && "Visible para toda la empresa."}
+              {form.visibility === "team" && "Visible para tu equipo."}
+              {form.visibility === "agents" && "Visible para los agentes que selecciones."}
+              {form.visibility === "responsable" && "Visible para los responsables que selecciones."}
+            </p>
           </div>
+
+          {/* Referencia */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary">Referencia de inmueble</label>
+            <input type="text" value={form.referencia ?? ""}
+              onChange={(e) => setForm({ ...form, referencia: e.target.value || null })}
+              placeholder="Ref. o descripcion del inmueble" className="input mt-1.5" />
+          </div>
+
+          {/* Notas */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary">Notas</label>
+            <textarea value={form.notas ?? ""}
+              onChange={(e) => setForm({ ...form, notas: e.target.value || null })}
+              placeholder="Observaciones del cliente, preferencias detalladas, condiciones especiales..."
+              rows={6} className="input mt-1.5 resize-y" />
+          </div>
+
+          {editId !== null && (() => {
+            const pedido = pedidos.find((p) => p.id === editId);
+            return pedido ? (
+              <PropertyMatchesPanel pedido={pedido} currentUserId={currentUserId} />
+            ) : null;
+          })()}
+
+          {saveError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{saveError}</p>}
         </div>
-      )}
+      </Drawer>
 
       {/* Confirmar borrado */}
       {deleteId !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
+        <div className="fixed inset-0 z-[30] flex items-center justify-center bg-black/8 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl border border-border">
             <h2 className="text-base font-semibold text-text-primary">Eliminar solicitud</h2>
             <p className="mt-2 text-sm text-text-secondary">Esta accion no se puede deshacer.</p>
             <div className="mt-5 flex justify-end gap-3">
@@ -706,35 +675,30 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
         </div>
       )}
 
-      {timelinePedido && (
-        <div
-          className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm"
-          onClick={(e) => { if (e.target === e.currentTarget) setTimelinePedido(null); }}
-        >
-          <div className="h-full w-full max-w-2xl bg-surface shadow-xl">
-            <div className="flex h-full flex-col">
-              <div className="flex justify-end border-b border-border px-4 py-3">
-                <button
-                  onClick={() => setTimelinePedido(null)}
-                  className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <ContactoTimeline
-                subject={{ type: "pedido", id: timelinePedido.id, title: timelinePedido.nombre_cliente }}
-                currentUserId={currentUserId}
-                initialEvents={pedidoTimelineEvents(timelinePedido)}
-              />
-              <RelatedEmailsPanel
-                entityType="pedido"
-                entityId={timelinePedido.id}
-                replyTo={null}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Timeline en Drawer */}
+      <Drawer
+        open={!!timelinePedido}
+        onClose={() => setTimelinePedido(null)}
+        title={timelinePedido?.nombre_cliente ?? ""}
+        subtitle="Timeline de la solicitud"
+        width="xl"
+        zIndex="z-[50]"
+      >
+        {timelinePedido && (
+          <>
+            <ContactoTimeline
+              subject={{ type: "pedido", id: timelinePedido.id, title: timelinePedido.nombre_cliente }}
+              currentUserId={currentUserId}
+              initialEvents={pedidoTimelineEvents(timelinePedido)}
+            />
+            <RelatedEmailsPanel
+              entityType="pedido"
+              entityId={timelinePedido.id}
+              replyTo={null}
+            />
+          </>
+        )}
+      </Drawer>
 
       {colabPedido && (
         <ColaboracionesPanel

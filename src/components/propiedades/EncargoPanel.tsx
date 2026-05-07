@@ -470,7 +470,7 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
   return (
     <>
       <div
-        className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[1px]"
+        className="fixed inset-0 z-[60] bg-black/8"
         onClick={onClose}
         aria-hidden="true"
       />

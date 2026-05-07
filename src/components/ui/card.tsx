@@ -19,6 +19,9 @@
 //   </SectionCard>
 // ─────────────────────────────────────────────────────────────────────────────
 
+"use client";
+
+import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
@@ -30,6 +33,7 @@ interface CardProps {
   padding?: Padding;
   className?: string;
   children: ReactNode;
+  hover?: boolean;
 }
 
 const PADDING_CLASSES: Record<Padding, string> = {
@@ -39,17 +43,23 @@ const PADDING_CLASSES: Record<Padding, string> = {
   lg:   "p-6",
 };
 
-export function Card({ padding = "md", className = "", children }: CardProps) {
+export function Card({ padding = "md", className = "", children, hover }: CardProps) {
   return (
-    <div
+    <motion.div
       className={[
-        "rounded-2xl border border-border bg-surface shadow-sm transition-shadow duration-200",
+        "rounded-2xl border border-border bg-surface shadow-sm",
         PADDING_CLASSES[padding],
         className,
       ].join(" ")}
+      {...(hover
+        ? {
+            whileHover: { y: -2, boxShadow: "0 8px 25px rgba(0,0,0,0.08)" },
+            transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] },
+          }
+        : {})}
     >
       {children}
-    </div>
+    </motion.div>
   );
 }
 

@@ -1030,8 +1030,8 @@ export default function SoporteClient({
 
       {/* Modal: detalle de ticket (admin) */}
       {detailTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-surface shadow-xl">
+        <div className="fixed inset-0 z-[40] flex items-center justify-center bg-black/8 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-surface shadow-xl border border-border">
             <div className="flex items-start justify-between border-b border-border px-6 py-4">
               <div>
                 <h2 className="text-base font-semibold text-text-primary">
@@ -1158,8 +1158,8 @@ export default function SoporteClient({
 
       {/* Modal: crear/editar contacto (admin) */}
       {contactoModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl">
+        <div className="fixed inset-0 z-[40] flex items-center justify-center bg-black/8 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl border border-border">
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <h2 className="text-base font-semibold text-text-primary">
                 {editContactoId !== null ? "Editar contacto" : "Nuevo contacto"}
@@ -1294,8 +1294,8 @@ export default function SoporteClient({
 
       {/* Confirmación eliminar contacto */}
       {deleteContactoId !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
+        <div className="fixed inset-0 z-[40] flex items-center justify-center bg-black/8 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl border border-border">
             <h2 className="text-base font-semibold text-text-primary">
               Eliminar contacto
             </h2>

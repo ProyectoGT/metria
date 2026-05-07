@@ -14,6 +14,7 @@ import type { UserRole } from "@/lib/roles";
 import { DEFAULT_ACTIVITY_TIME, normalizeTime } from "@/lib/local-date-time";
 import { isActivityPriority, isActivityType, normalizeActivityPriority, normalizeActivityType } from "@/lib/activity-options";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
+import Drawer from "@/components/ui/drawer";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1190,168 +1191,159 @@ export default function CalendarioClient({
         </div>
       )}
 
-      {/* ── Create / Edit Modal ── */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-surface shadow-xl">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">
-                {editId !== null ? "Editar actividad" : "Nueva actividad"}
-              </h2>
-              <button onClick={() => setModalOpen(false)} className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
-              <div className="space-y-4">
-                {/* Tipo selector */}
-                <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                    Tipo de actividad
-                  </label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {TIPOS.map((t) => {
-                      const Icon = t.icon;
-                      const active = form.tipo === t.value;
-                      return (
-                        <button
-                          key={t.value}
-                          type="button"
-                          onClick={() => setForm({ ...form, tipo: t.value })}
-                          className={[
-                            "flex flex-col items-center gap-1 rounded-xl border py-2.5 px-1 text-center transition-all",
-                            active ? `${t.bg} ${t.border} ${t.text} border-2` : "border-border text-text-secondary hover:bg-background",
-                          ].join(" ")}
-                        >
-                          <Icon className="h-4 w-4" />
-                          <span className="text-[10px] font-medium">{t.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="text-xs font-medium text-text-secondary">Descripcion *</label>
-                  <input
-                    type="text"
-                    value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    onKeyDown={(e) => e.key === "Enter" && handleSave()}
-                    placeholder="Describe la actividad..."
-                    className="input mt-1.5"
-                    autoFocus
-                  />
-                </div>
-
-                {/* Date + Time */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-text-secondary">Fecha</label>
-                    <input type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} className="input mt-1.5" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-text-secondary">Hora</label>
-                    <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="input mt-1.5" />
-                  </div>
-                </div>
-
-                {/* Priority */}
-                <div>
-                  <label className="text-xs font-medium text-text-secondary">Prioridad</label>
-                  <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
-                    {PRIORITIES.map((p, i) => (
-                      <button
-                        key={p.value}
-                        type="button"
-                        onClick={() => setForm({ ...form, priority: p.value })}
-                        className={[
-                          "flex-1 py-2 text-sm font-medium transition-colors",
-                          i > 0 ? "border-l border-border" : "",
-                          form.priority === p.value ? "bg-primary text-white" : "bg-surface text-text-secondary hover:bg-background",
-                        ].join(" ")}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Assigned users */}
-                <div>
-                  <label className="text-xs font-medium text-text-secondary">Usuarios asignados *</label>
-                  <div className="mt-1.5 max-h-32 space-y-1 overflow-y-auto rounded-xl border border-border bg-background p-2">
-                    {[
-                      { id: currentUserId, name: usersMap[currentUserId] ?? "Yo" },
-                      ...filterableUsers.filter((u) => u.id !== currentUserId),
-                    ].map((user) => (
-                      <label key={user.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-secondary hover:bg-surface">
-                        <input
-                          type="checkbox"
-                          checked={form.assignedUserIds.includes(user.id)}
-                          onChange={() => toggleAssignedUser(user.id)}
-                          className="h-4 w-4 accent-primary"
-                        />
-                        {user.name}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Completed (edit only) */}
-                {editId !== null && (
-                  <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background p-3">
-                    <input type="checkbox" checked={form.completed} onChange={(e) => setForm({ ...form, completed: e.target.checked })} className="h-4 w-4 accent-primary" />
-                    <span className="text-sm text-text-secondary">Marcar como completada</span>
-                  </label>
-                )}
-
-                {/* Notes / result */}
-                <div>
-                  <label className="text-xs font-medium text-text-secondary">Notas / resultado</label>
-                  <textarea
-                    value={form.result}
-                    onChange={(e) => setForm({ ...form, result: e.target.value })}
-                    placeholder="Observaciones, resultado de la actividad..."
-                    rows={3}
-                    className="input mt-1.5 resize-none"
-                  />
-                </div>
-
-                {/* GCal sync */}
-                {editId === null && isConnected && (
-                  <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background p-3">
-                    <input type="checkbox" checked={form.syncToGcal} onChange={(e) => setForm({ ...form, syncToGcal: e.target.checked })} className="h-4 w-4 accent-primary" />
-                    <div>
-                      <p className="text-sm font-medium text-text-primary">Sincronizar con Google Calendar</p>
-                      <p className="text-xs text-text-secondary">Se creara un evento en tu calendario de Google</p>
-                    </div>
-                  </label>
-                )}
-
-                {saveError && (
-                  <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{saveError}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
-              <button onClick={() => setModalOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !form.description.trim() || form.assignedUserIds.length === 0}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
-              >
-                {saving ? "Guardando..." : editId !== null ? "Guardar cambios" : "Crear actividad"}
-              </button>
+      {/* ── Create / Edit Drawer ── */}
+      <Drawer
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editId !== null ? "Editar actividad" : "Nueva actividad"}
+        width="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !form.description.trim() || form.assignedUserIds.length === 0}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
+            >
+              {saving ? "Guardando..." : editId !== null ? "Guardar cambios" : "Crear actividad"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 px-5 py-5">
+          {/* Tipo selector */}
+          <div>
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              Tipo de actividad
+            </label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {TIPOS.map((t) => {
+                const Icon = t.icon;
+                const active = form.tipo === t.value;
+                return (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => setForm({ ...form, tipo: t.value })}
+                    className={[
+                      "flex flex-col items-center gap-1 rounded-xl border py-2.5 px-1 text-center transition-all",
+                      active ? `${t.bg} ${t.border} ${t.text} border-2` : "border-border text-text-secondary hover:bg-background",
+                    ].join(" ")}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="text-[10px] font-medium">{t.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
+
+          {/* Description */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary">Descripcion *</label>
+            <input
+              type="text"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              onKeyDown={(e) => e.key === "Enter" && handleSave()}
+              placeholder="Describe la actividad..."
+              className="input mt-1.5"
+              autoFocus
+            />
+          </div>
+
+          {/* Date + Time */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-text-secondary">Fecha</label>
+              <input type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} className="input mt-1.5" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-text-secondary">Hora</label>
+              <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="input mt-1.5" />
+            </div>
+          </div>
+
+          {/* Priority */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary">Prioridad</label>
+            <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
+              {PRIORITIES.map((p, i) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => setForm({ ...form, priority: p.value })}
+                  className={[
+                    "flex-1 py-2 text-sm font-medium transition-colors",
+                    i > 0 ? "border-l border-border" : "",
+                    form.priority === p.value ? "bg-primary text-white" : "bg-surface text-text-secondary hover:bg-background",
+                  ].join(" ")}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Assigned users */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary">Usuarios asignados *</label>
+            <div className="mt-1.5 max-h-32 space-y-1 overflow-y-auto rounded-xl border border-border bg-background p-2">
+              {[
+                { id: currentUserId, name: usersMap[currentUserId] ?? "Yo" },
+                ...filterableUsers.filter((u) => u.id !== currentUserId),
+              ].map((user) => (
+                <label key={user.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-secondary hover:bg-surface">
+                  <input
+                    type="checkbox"
+                    checked={form.assignedUserIds.includes(user.id)}
+                    onChange={() => toggleAssignedUser(user.id)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  {user.name}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Completed (edit only) */}
+          {editId !== null && (
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background p-3">
+              <input type="checkbox" checked={form.completed} onChange={(e) => setForm({ ...form, completed: e.target.checked })} className="h-4 w-4 accent-primary" />
+              <span className="text-sm text-text-secondary">Marcar como completada</span>
+            </label>
+          )}
+
+          {/* Notes / result */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary">Notas / resultado</label>
+            <textarea
+              value={form.result}
+              onChange={(e) => setForm({ ...form, result: e.target.value })}
+              placeholder="Observaciones, resultado de la actividad..."
+              rows={3}
+              className="input mt-1.5 resize-none"
+            />
+          </div>
+
+          {/* GCal sync */}
+          {editId === null && isConnected && (
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background p-3">
+              <input type="checkbox" checked={form.syncToGcal} onChange={(e) => setForm({ ...form, syncToGcal: e.target.checked })} className="h-4 w-4 accent-primary" />
+              <div>
+                <p className="text-sm font-medium text-text-primary">Sincronizar con Google Calendar</p>
+                <p className="text-xs text-text-secondary">Se creara un evento en tu calendario de Google</p>
+              </div>
+            </label>
+          )}
+
+          {saveError && (
+            <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{saveError}</p>
+          )}
         </div>
-      )}
+      </Drawer>
 
       {/* ── Delete Confirmation ── */}
       {deleteId !== null && (

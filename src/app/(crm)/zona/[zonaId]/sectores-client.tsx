@@ -1,14 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deleteSectorAction } from "@/app/actions/security";
 import { updateSectoresPosicionesAction, resetSectoresPosicionesAction } from "@/app/(crm)/zona/actions";
 import Breadcrumb from "@/components/ui/breadcrumb";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
+import Drawer from "@/components/ui/drawer";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase-browser";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 
 type PropiedadResumen = {
   id: number;
@@ -204,7 +207,10 @@ export default function SectoresClient({
           <DragDropContext onDragEnd={handleDragEnd}>
             <Droppable droppableId="sectores-mobile" direction="vertical">
               {(provided) => (
-                <div
+                <motion.div
+                  variants={staggerContainer}
+                  initial="initial"
+                  animate="animate"
                   className="divide-y divide-border md:hidden"
                   ref={provided.innerRef}
                   {...provided.droppableProps}
@@ -222,7 +228,8 @@ export default function SectoresClient({
                     return (
                       <Draggable key={sector.id} draggableId={`m-${sector.id}`} index={index}>
                         {(drag, snapshot) => (
-                          <div
+                          <motion.div
+                            variants={staggerItem}
                             ref={drag.innerRef}
                             {...drag.draggableProps}
                             className={`flex items-center gap-2 px-4 py-4 transition-colors hover:bg-background ${snapshot.isDragging ? "opacity-90 shadow-lg" : ""}`}
@@ -265,13 +272,13 @@ export default function SectoresClient({
                                 </svg>
                               </button>
                             )}
-                          </div>
+                          </motion.div>
                         )}
                       </Draggable>
                     );
                   })}
                   {provided.placeholder}
-                </div>
+                </motion.div>
               )}
             </Droppable>
           </DragDropContext>
@@ -376,35 +383,34 @@ export default function SectoresClient({
         </div>
       )}
 
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-surface shadow-xl">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">Nuevo sector</h2>
-              <button onClick={() => setModalOpen(false)} className="text-text-secondary transition-colors hover:text-text-primary">×</button>
-            </div>
-            <div className="px-6 py-5">
-              <label className="text-xs font-medium text-text-secondary">Numero de sector</label>
-              <input
-                type="number"
-                value={numero}
-                onChange={(e) => setNumero(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                placeholder="Ej: 12"
-                min={1}
-                className="input mt-1.5"
-                autoFocus
-              />
-            </div>
-            <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
-              <button onClick={() => setModalOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">Cancelar</button>
-              <button onClick={handleCreate} disabled={saving || !numero.trim()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60">
-                {saving ? "Creando..." : "Crear sector"}
-              </button>
-            </div>
+      <Drawer
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Nuevo sector"
+        width="sm"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">Cancelar</button>
+            <button onClick={handleCreate} disabled={saving || !numero.trim()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60">
+              {saving ? "Creando..." : "Crear sector"}
+            </button>
           </div>
+        }
+      >
+        <div className="px-5 py-5">
+          <label className="text-xs font-medium text-text-secondary">Numero de sector</label>
+          <input
+            type="number"
+            value={numero}
+            onChange={(e) => setNumero(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            placeholder="Ej: 12"
+            min={1}
+            className="input mt-1.5"
+            autoFocus
+          />
         </div>
-      )}
+      </Drawer>
 
       {deleteId !== null && (
         <DeleteConfirmationDialog

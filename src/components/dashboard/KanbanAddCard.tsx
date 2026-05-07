@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, BookOpen, Clock, Home, Phone, Star, Users, X } from "lucide-react";
+import { Activity, BookOpen, Clock, Home, Phone, Star, Users } from "lucide-react";
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import type { UserRole } from "@/lib/roles";
 import { DEFAULT_ACTIVITY_TIME, localDateKey } from "@/lib/local-date-time";
 import { type ActivityType } from "@/lib/activity-options";
+import Drawer from "@/components/ui/drawer";
 
 type NewCard = Omit<KanbanCardData, "id" | "source" | "dbId">;
 
@@ -81,161 +82,152 @@ export default function KanbanAddCard({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="w-full max-w-md rounded-xl bg-surface shadow-xl">
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="font-semibold text-text-primary">{isActivity ? "Nueva actividad" : "Nueva tarea"}</h2>
+    <Drawer
+      open
+      onClose={onClose}
+      title={isActivity ? "Nueva actividad" : "Nueva tarea"}
+      width="md"
+      footer={
+        <div className="flex gap-3">
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
-            aria-label="Cerrar"
+            className="flex-1 rounded-lg border border-border py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
           >
-            <X className="h-5 w-5" />
+            Cancelar
+          </button>
+          <button
+            form="kanban-add-form"
+            type="submit"
+            disabled={!title.trim() || assignedUserIds.length === 0 || isSubmitting}
+            className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isActivity ? "Crear actividad" : "Anadir tarea"}
           </button>
         </div>
-
-        <form onSubmit={handleSubmit} className="max-h-[75vh] space-y-4 overflow-y-auto px-6 py-5">
-          {isActivity && (
-            <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                Tipo de actividad
-              </label>
-              <div className="grid grid-cols-4 gap-1.5">
-                {ACTIVITY_TYPES.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.value}
-                      type="button"
-                      onClick={() => setTipo(item.value)}
-                      className={[
-                        "flex flex-col items-center gap-1 rounded-xl border px-1 py-2.5 text-center transition-all",
-                        tipo === item.value ? item.active : "border-border text-text-secondary hover:bg-background",
-                      ].join(" ")}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span className="text-[10px] font-medium">{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
+      }
+    >
+      <form id="kanban-add-form" onSubmit={handleSubmit} className="space-y-4 px-5 py-5">
+        {isActivity && (
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-text-primary">
-              {isActivity ? "Descripcion" : "Titulo"} <span className="text-danger">*</span>
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              Tipo de actividad
             </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={isActivity ? "Describe la actividad..." : "Titulo de la tarea"}
-              className="input"
-              required
-              autoFocus
+            <div className="grid grid-cols-4 gap-1.5">
+              {ACTIVITY_TYPES.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setTipo(item.value)}
+                    className={[
+                      "flex flex-col items-center gap-1 rounded-xl border px-1 py-2.5 text-center transition-all",
+                      tipo === item.value ? item.active : "border-border text-text-secondary hover:bg-background",
+                    ].join(" ")}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="text-[10px] font-medium">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-text-primary">
+            {isActivity ? "Descripcion" : "Titulo"} <span className="text-danger">*</span>
+          </label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={isActivity ? "Describe la actividad..." : "Titulo de la tarea"}
+            className="input"
+            required
+            autoFocus
+          />
+        </div>
+
+        {!isActivity && (
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-text-primary">Descripcion</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Descripcion opcional..."
+              rows={2}
+              className="input resize-none"
             />
           </div>
+        )}
 
-          {!isActivity && (
+        {isActivity && (
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-text-primary">Descripcion</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Descripcion opcional..."
-                rows={2}
-                className="input resize-none"
-              />
+              <label className="mb-1.5 block text-sm font-medium text-text-primary">Fecha</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" required />
             </div>
-          )}
-
-          {isActivity && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-text-primary">Fecha</label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" required />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-text-primary">Hora</label>
-                <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="input" required />
-              </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-text-primary">Hora</label>
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="input" required />
             </div>
-          )}
+          </div>
+        )}
 
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-text-primary">Prioridad</label>
+          <div className="flex gap-2">
+            {PRIORITIES.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => setPriority(p.value)}
+                className={[
+                  "flex-1 rounded-lg border py-2 text-sm font-medium transition-colors",
+                  priority === p.value ? p.activeCls : `border-border ${p.cls}`,
+                ].join(" ")}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {canAssign && availableAgents.length > 0 && (
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-text-primary">Prioridad</label>
-            <div className="flex gap-2">
-              {PRIORITIES.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setPriority(p.value)}
-                  className={[
-                    "flex-1 rounded-lg border py-2 text-sm font-medium transition-colors",
-                    priority === p.value ? p.activeCls : `border-border ${p.cls}`,
-                  ].join(" ")}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
+            <label className="mb-1.5 block text-sm font-medium text-text-primary">
+              {isActivity ? "Usuarios asignados" : "Asignar a"}
+            </label>
+            {isActivity ? (
+              <div className="max-h-32 space-y-1 overflow-y-auto rounded-xl border border-border bg-background p-2">
+                {availableAgents.map((agent) => (
+                  <label key={agent.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-secondary hover:bg-surface">
+                    <input
+                      type="checkbox"
+                      checked={assignedUserIds.includes(agent.id)}
+                      onChange={() => toggleAssigned(agent.id)}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    {agent.nombre}
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <select
+                value={assignedUserIds[0] ?? currentUserId}
+                onChange={(e) => setAssignedUserIds([e.target.value])}
+                className="input"
+              >
+                {availableAgents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>{agent.nombre}</option>
+                ))}
+              </select>
+            )}
           </div>
-
-          {canAssign && availableAgents.length > 0 && (
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-text-primary">
-                {isActivity ? "Usuarios asignados" : "Asignar a"}
-              </label>
-              {isActivity ? (
-                <div className="max-h-32 space-y-1 overflow-y-auto rounded-xl border border-border bg-background p-2">
-                  {availableAgents.map((agent) => (
-                    <label key={agent.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-secondary hover:bg-surface">
-                      <input
-                        type="checkbox"
-                        checked={assignedUserIds.includes(agent.id)}
-                        onChange={() => toggleAssigned(agent.id)}
-                        className="h-4 w-4 accent-primary"
-                      />
-                      {agent.nombre}
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <select
-                  value={assignedUserIds[0] ?? currentUserId}
-                  onChange={(e) => setAssignedUserIds([e.target.value])}
-                  className="input"
-                >
-                  {availableAgents.map((agent) => (
-                    <option key={agent.id} value={agent.id}>{agent.nombre}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-lg border border-border py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={!title.trim() || assignedUserIds.length === 0 || isSubmitting}
-              className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isActivity ? "Crear actividad" : "Anadir tarea"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        )}
+      </form>
+    </Drawer>
   );
 }

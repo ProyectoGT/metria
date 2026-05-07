@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
+import { motion } from "framer-motion";
 import { Calendar, User, Trash2, CheckCircle2, Circle, ExternalLink, AlertCircle, Pencil, GripVertical } from "lucide-react";
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 
@@ -91,14 +92,18 @@ function KanbanCard({
 
   // CRÍTICO: dragHandleProps debe ir en el elemento raíz para @hello-pangea/dnd
   return (
-    <div
-      {...dragHandleProps}
+    <motion.div
+      {...(dragHandleProps as Record<string, unknown>)}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={{ y: -2, boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}
       className={[
         "group relative rounded-2xl border bg-surface p-4 shadow-sm",
-        "select-none transition-all duration-150",
+        "select-none",
         done
           ? "border-border bg-surface-raised opacity-60"
-          : "border-border hover:border-border hover:shadow-md",
+          : "border-border",
         isDragging ? "shadow-xl rotate-[1.5deg] scale-[1.02] border-primary/20 opacity-95" : "",
         completing && !isCompleted ? "scale-95 opacity-40" : "",
       ].join(" ")}
@@ -229,7 +234,7 @@ function KanbanCard({
           )}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 

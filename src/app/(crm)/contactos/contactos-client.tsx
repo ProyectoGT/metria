@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase-browser";
 import { useToast, Toaster } from "@/components/ui/toast";
 import ContactoTimeline, { type TimelineEvent } from "@/components/timeline/ContactoTimeline";
 import RelatedEmailsPanel from "@/components/email/RelatedEmailsPanel";
+import Drawer from "@/components/ui/drawer";
 import type { Contacto, ContactoTipo, ContactoEstado } from "@/types";
 import type { UserRole } from "@/lib/roles";
 
@@ -713,7 +714,7 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
         const t = contactoEditando ? tipoMeta(contactoEditando.tipo) : null;
         const nombre = contactoEditando ? nombreCompleto(contactoEditando) : "";
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+          <div className="fixed inset-0 z-[40] flex items-center justify-center bg-black/8 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
             <div className="flex w-full max-w-2xl flex-col rounded-2xl bg-surface shadow-xl" style={{ maxHeight: "calc(100vh - 2rem)" }}>
 
               {/* Header — modo edición con hero, modo creación simple */}
@@ -878,7 +879,7 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
 
       {/* ── Modal importar CSV ── */}
       {importModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[40] flex items-center justify-center bg-black/8 p-4">
           <div className="w-full max-w-3xl rounded-2xl bg-surface shadow-xl">
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <div>
@@ -941,20 +942,15 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
       )}
 
       {timelineContacto && (
-        <div
-          className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm"
-          onClick={(e) => { if (e.target === e.currentTarget) setTimelineContacto(null); }}
+        <Drawer
+          open={!!timelineContacto}
+          onClose={() => setTimelineContacto(null)}
+          title={nombreCompleto(timelineContacto)}
+          subtitle="Timeline del contacto"
+          width="xl"
+          zIndex="z-[50]"
         >
-          <div className="h-full w-full max-w-2xl bg-surface shadow-xl">
-            <div className="flex h-full flex-col">
-              <div className="flex justify-end border-b border-border px-4 py-3">
-                <button
-                  onClick={() => setTimelineContacto(null)}
-                  className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+          <>
               <ContactoTimeline
                 subject={{ type: "contacto", id: timelineContacto.id, title: nombreCompleto(timelineContacto) }}
                 currentUserId={currentUserId}
@@ -965,9 +961,8 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
                 entityId={timelineContacto.id}
                 replyTo={timelineContacto.email}
               />
-            </div>
-          </div>
-        </div>
+          </>
+        </Drawer>
       )}
     </div>
   );

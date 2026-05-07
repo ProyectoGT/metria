@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ChevronDown, Clock, Loader2, Plus, Trash2, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, Clock, Loader2, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
+import Drawer from "@/components/ui/drawer";
 import type { UserRole } from "@/lib/roles";
 import { DEFAULT_ACTIVITY_TIME, normalizeTime } from "@/lib/local-date-time";
 import { useToast, Toaster } from "@/components/ui/toast";
@@ -348,114 +349,110 @@ export default function OrdenesClient({
         )}
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">
-                {editing ? "Editar actividad" : "Nueva actividad"}
-              </h2>
-              <button onClick={() => setShowModal(false)} className="rounded-lg p-1.5 text-text-secondary hover:bg-background hover:text-text-primary">
-                <X className="h-4 w-4" />
-              </button>
+      <Drawer
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        title={editing ? "Editar actividad" : "Nueva actividad"}
+        width="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => setShowModal(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background">
+              Cancelar
+            </button>
+            <button
+              form="ordenes-form"
+              type="submit"
+              disabled={saving || !form.description.trim() || form.assignedUserIds.length === 0}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50"
+            >
+              {saving ? "Guardando..." : "Guardar"}
+            </button>
+          </div>
+        }
+      >
+        <form id="ordenes-form" onSubmit={saveActividad} className="space-y-4 px-5 py-5">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">Titulo *</label>
+            <input
+              value={form.description}
+              onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+              className="input text-sm"
+              required
+              autoFocus
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-text-secondary">Hora *</label>
+              <input
+                type="time"
+                value={form.time}
+                onChange={(e) => setForm((prev) => ({ ...prev, time: e.target.value }))}
+                className="input text-sm"
+                required
+              />
             </div>
-            <form onSubmit={saveActividad} className="space-y-4 px-6 py-5">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-text-secondary">Titulo *</label>
-                <input
-                  value={form.description}
-                  onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                  className="input text-sm"
-                  required
-                  autoFocus
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-text-secondary">Hora *</label>
-                  <input
-                    type="time"
-                    value={form.time}
-                    onChange={(e) => setForm((prev) => ({ ...prev, time: e.target.value }))}
-                    className="input text-sm"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-text-secondary">Prioridad</label>
-                  <select
-                    value={form.priority}
-                    onChange={(e) => setForm((prev) => ({ ...prev, priority: e.target.value }))}
-                    className="input text-sm"
-                  >
-                    {PRIORIDADES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-text-secondary">Tipo de actividad</label>
-                <select
-                  value={form.tipo}
-                  onChange={(e) => setForm((prev) => ({ ...prev, tipo: e.target.value }))}
-                  className="input text-sm"
-                >
-                  {TIPOS_ACTIVIDAD.map((item) => (
-                    <option key={item.value} value={item.value}>{item.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-text-secondary">Usuarios *</label>
-                <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
-                  {usuarios.map((u) => (
-                    <label key={u.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-background">
-                      <input
-                        type="checkbox"
-                        checked={form.assignedUserIds.includes(u.id)}
-                        onChange={() => toggleAssigned(u.id)}
-                        className="h-4 w-4 accent-primary"
-                      />
-                      {nombreCompleto(u)}
-                    </label>
-                  ))}
-                </div>
-              </div>
-              {editing && (
-                <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background p-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-text-secondary">Prioridad</label>
+              <select
+                value={form.priority}
+                onChange={(e) => setForm((prev) => ({ ...prev, priority: e.target.value }))}
+                className="input text-sm"
+              >
+                {PRIORIDADES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">Tipo de actividad</label>
+            <select
+              value={form.tipo}
+              onChange={(e) => setForm((prev) => ({ ...prev, tipo: e.target.value }))}
+              className="input text-sm"
+            >
+              {TIPOS_ACTIVIDAD.map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">Usuarios *</label>
+            <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+              {usuarios.map((u) => (
+                <label key={u.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-background">
                   <input
                     type="checkbox"
-                    checked={form.completed}
-                    onChange={(e) => setForm((prev) => ({ ...prev, completed: e.target.checked }))}
+                    checked={form.assignedUserIds.includes(u.id)}
+                    onChange={() => toggleAssigned(u.id)}
                     className="h-4 w-4 accent-primary"
                   />
-                  <span className="text-sm text-text-secondary">Marcar como completada</span>
+                  {nombreCompleto(u)}
                 </label>
-              )}
-              <div>
-                <label className="mb-1 block text-xs font-medium text-text-secondary">Resultado / notas</label>
-                <textarea
-                  value={form.result}
-                  onChange={(e) => setForm((prev) => ({ ...prev, result: e.target.value }))}
-                  rows={3}
-                  className="input resize-none text-sm"
-                />
-              </div>
-              <div className="flex justify-end gap-3 border-t border-border pt-3">
-                <button type="button" onClick={() => setShowModal(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background">
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving || !form.description.trim() || form.assignedUserIds.length === 0}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50"
-                >
-                  {saving ? "Guardando..." : "Guardar"}
-                </button>
-              </div>
-            </form>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+          {editing && (
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background p-3">
+              <input
+                type="checkbox"
+                checked={form.completed}
+                onChange={(e) => setForm((prev) => ({ ...prev, completed: e.target.checked }))}
+                className="h-4 w-4 accent-primary"
+              />
+              <span className="text-sm text-text-secondary">Marcar como completada</span>
+            </label>
+          )}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">Resultado / notas</label>
+            <textarea
+              value={form.result}
+              onChange={(e) => setForm((prev) => ({ ...prev, result: e.target.value }))}
+              rows={3}
+              className="input resize-none text-sm"
+            />
+          </div>
+        </form>
+      </Drawer>
     </div>
   );
 }

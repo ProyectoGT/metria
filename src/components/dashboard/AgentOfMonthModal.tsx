@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { X, Trophy, Award } from "lucide-react";
 import type { AgentOfMonthData } from "@/lib/mock/dashboard";
 import {
   saveAgentOfMonthPrizeAction,
   saveAgentOfMonthWinnerAction,
 } from "@/app/(crm)/dashboard/actions";
+import Drawer from "@/components/ui/drawer";
 
 type Mode = "prize" | "winner";
 
@@ -88,107 +88,90 @@ export default function AgentOfMonthModal({
   const canSubmit = isPrizeMode ? premio.trim().length > 0 : agenteId !== "";
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="w-full max-w-md rounded-xl bg-surface shadow-xl">
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            {isPrizeMode ? (
-              <Trophy className="h-5 w-5 text-amber-500" />
-            ) : (
-              <Award className="h-5 w-5 text-amber-500" />
-            )}
-            <h2 className="font-semibold text-text-primary">
-              {isPrizeMode ? "Premio del mes" : "Asignar premiado"}
-            </h2>
-          </div>
+    <Drawer
+      open
+      onClose={onClose}
+      title={isPrizeMode ? "Premio del mes" : "Asignar premiado"}
+      width="sm"
+      footer={
+        <div className="flex gap-3">
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
+            className="flex-1 rounded-lg border border-border py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
           >
-            <X className="h-5 w-5" />
+            Cancelar
+          </button>
+          <button
+            form="agent-month-form"
+            type="submit"
+            disabled={!canSubmit || isPending}
+            className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isPending
+              ? "Guardando..."
+              : isPrizeMode
+                ? "Guardar premio"
+                : "Asignar premiado"}
           </button>
         </div>
+      }
+    >
+      <form id="agent-month-form" onSubmit={handleSubmit} className="space-y-4 px-5 py-5">
+        {isPrizeMode && (
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-text-primary">
+              Premio <span className="text-danger">*</span>
+            </label>
+            <textarea
+              value={premio}
+              onChange={(e) => setPremio(e.target.value)}
+              placeholder="Describe el premio o reconocimiento…"
+              rows={3}
+              className="input resize-none"
+              required
+              autoFocus
+            />
+            <p className="mt-1.5 text-xs text-text-secondary">
+              El premiado se puede asignar mas adelante.
+            </p>
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
-          {isPrizeMode && (
+        {!isPrizeMode && (
+          <>
+            {existingData?.premio && (
+              <div className="rounded-lg bg-accent/10 px-4 py-3">
+                <p className="text-xs font-medium text-accent">Premio del mes</p>
+                <p className="mt-0.5 text-sm text-text-primary">{existingData.premio}</p>
+              </div>
+            )}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-text-primary">
-                Premio <span className="text-danger">*</span>
+                Agente premiado <span className="text-danger">*</span>
               </label>
-              <textarea
-                value={premio}
-                onChange={(e) => setPremio(e.target.value)}
-                placeholder="Describe el premio o reconocimiento…"
-                rows={3}
-                className="input resize-none"
+              <select
+                value={agenteId}
+                onChange={(e) => setAgenteId(e.target.value)}
+                className="input"
                 required
                 autoFocus
-              />
-              <p className="mt-1.5 text-xs text-text-secondary">
-                El premiado se puede asignar más adelante.
-              </p>
+              >
+                <option value="">Selecciona un agente</option>
+                {agents.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nombre}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
+          </>
+        )}
 
-          {!isPrizeMode && (
-            <>
-              {existingData?.premio && (
-                <div className="rounded-lg bg-accent/10 px-4 py-3">
-                  <p className="text-xs font-medium text-accent">Premio del mes</p>
-                  <p className="mt-0.5 text-sm text-text-primary">{existingData.premio}</p>
-                </div>
-              )}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-text-primary">
-                  Agente premiado <span className="text-danger">*</span>
-                </label>
-                <select
-                  value={agenteId}
-                  onChange={(e) => setAgenteId(e.target.value)}
-                  className="input"
-                  required
-                  autoFocus
-                >
-                  <option value="">Selecciona un agente</option>
-                  {agents.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
-
-          {error && (
-            <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-lg border border-border py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={!canSubmit || isPending}
-              className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isPending
-                ? "Guardando..."
-                : isPrizeMode
-                  ? "Guardar premio"
-                  : "Asignar premiado"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        {error && (
+          <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>
+        )}
+      </form>
+    </Drawer>
   );
 }

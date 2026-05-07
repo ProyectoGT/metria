@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { CheckCircle2, Plus, X } from "lucide-react";
 import KanbanCard from "./KanbanCard";
@@ -33,8 +34,11 @@ function KanbanColumn({
   const countLabel = activeCount === totalCount ? String(activeCount) : `${activeCount}/${totalCount}`;
 
   return (
-    <div
-      className="flex w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col rounded-2xl border border-border bg-surface shadow-sm transition-shadow duration-200 hover:shadow-md"
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+      className="flex w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col rounded-2xl border border-border bg-surface shadow-sm"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -125,7 +129,7 @@ function KanbanColumn({
           </button>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 

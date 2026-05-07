@@ -15,6 +15,7 @@
 
 "use client";
 
+import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
 type TabVariant = "underline" | "pill";
@@ -87,27 +88,44 @@ export function Tab({
       disabled={disabled}
       onClick={() => _onChange?.(value)}
       className={[
-        "inline-flex items-center gap-1.5 text-sm font-medium transition-colors",
+        "relative inline-flex items-center gap-1.5 text-sm font-medium transition-colors",
         "outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-1",
         "disabled:cursor-not-allowed disabled:opacity-40",
         _variant === "pill"
-          ? `rounded-lg px-3 py-1.5 ${_active ? pillActive : pillInactive}`
-          : `px-4 py-3 ${_active ? underlineActive : underlineInactive}`,
+          ? `rounded-lg px-3 py-1.5 ${_active ? "text-text-primary" : pillInactive}`
+          : `px-4 py-3 ${_active ? "text-primary" : underlineInactive}`,
       ].join(" ")}
     >
-      {icon && <span className="shrink-0 opacity-70">{icon}</span>}
-      {label}
+      {_variant === "underline" && _active && (
+        <motion.span
+          layoutId="tab-underline"
+          className="absolute inset-x-0 bottom-0 h-0.5 bg-primary"
+          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        />
+      )}
+      {_variant === "pill" && _active && (
+        <motion.span
+          layoutId="tab-pill"
+          className="absolute inset-0 rounded-lg bg-surface shadow-sm"
+          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        />
+      )}
+      {icon && <span className="relative z-10 shrink-0 opacity-70">{icon}</span>}
+      <span className="relative z-10">{label}</span>
       {count != null && (
-        <span
+        <motion.span
+          initial={_active ? { scale: 0 } : false}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 500, damping: 25 }}
           className={[
-            "rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none",
+            "relative z-10 rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none",
             _active
               ? "bg-primary/15 text-primary"
               : "bg-surface-raised text-text-secondary",
           ].join(" ")}
         >
           {count}
-        </span>
+        </motion.span>
       )}
     </button>
   );

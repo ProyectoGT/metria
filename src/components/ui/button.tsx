@@ -10,18 +10,32 @@
 //   <Button variant="ghost" loading>Cargando...</Button>
 // ─────────────────────────────────────────────────────────────────────────────
 
+"use client";
+
+import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "outline";
 type Size = "sm" | "md" | "lg";
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps {
   variant?: Variant;
   size?: Size;
   loading?: boolean;
   icon?: ReactNode;
   children?: ReactNode;
+  className?: string;
+  disabled?: boolean;
+  type?: "button" | "submit" | "reset";
+  onClick?: () => void;
+  form?: string;
+  formAction?: string | ((formData: FormData) => void | Promise<void>);
+  title?: string;
+  "aria-label"?: string;
+  id?: string;
+  name?: string;
+  value?: string;
 }
 
 const VARIANT_CLASSES: Record<Variant, string> = {
@@ -56,8 +70,10 @@ export default function Button({
   const isDisabled = disabled || loading;
 
   return (
-    <button
+    <motion.button
       disabled={isDisabled}
+      whileTap={isDisabled ? undefined : { scale: 0.97 }}
+      transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
       className={[
         "inline-flex items-center justify-center whitespace-nowrap font-medium transition-all duration-200",
         "outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
@@ -74,6 +90,6 @@ export default function Button({
         <span className="shrink-0">{icon}</span>
       ) : null}
       {children}
-    </button>
+    </motion.button>
   );
 }

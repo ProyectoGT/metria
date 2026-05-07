@@ -182,9 +182,9 @@ export default function SummaryPanel({ summary, listings }: SummaryPanelProps) {
 
       {/* ── Detalle fullscreen — abre sobre el content bajo el header ── */}
       {activeKey && activeCard && (
-        <div className="fixed inset-0 z-[30] flex min-w-0 flex-col bg-background/95 backdrop-blur-[2px] pt-16 md:pl-[260px]">
+        <div className="fixed inset-0 z-[30] flex min-w-0 flex-col bg-background pt-16 md:pl-[260px]">
           {/* Cabecera */}
-          <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface/95 px-5 backdrop-blur-sm">
+          <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-5">
             <button
               onClick={handleClose}
               className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"

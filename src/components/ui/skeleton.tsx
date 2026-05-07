@@ -1,6 +1,14 @@
+"use client";
+
+import { motion } from "framer-motion";
+
 function Sk({ className }: { className?: string }) {
   return (
-    <div className={`animate-pulse rounded-md bg-border/55 ${className ?? ""}`} />
+    <motion.div
+      className={`rounded-md bg-border/55 ${className ?? ""}`}
+      animate={{ opacity: [1, 0.45, 1] }}
+      transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+    />
   );
 }
 

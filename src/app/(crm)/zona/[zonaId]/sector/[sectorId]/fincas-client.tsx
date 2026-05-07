@@ -7,6 +7,7 @@ import { deleteFincaAction } from "@/app/actions/security";
 import { updateFincasPosicionesAction, resetFincasPosicionesAction } from "@/app/(crm)/zona/actions";
 import Breadcrumb from "@/components/ui/breadcrumb";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
+import Drawer from "@/components/ui/drawer";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase-browser";
 
@@ -335,34 +336,33 @@ export default function FincasClient({
         </div>
       )}
 
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-surface shadow-xl">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">Nueva finca</h2>
-              <button onClick={() => setModalOpen(false)} className="text-text-secondary transition-colors hover:text-text-primary">×</button>
-            </div>
-            <div className="px-6 py-5">
-              <label className="text-xs font-medium text-text-secondary">Nombre de la finca</label>
-              <input
-                type="text"
-                value={numero}
-                onChange={(e) => setNumero(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                placeholder="Ej: Las Palmeras"
-                className="input mt-1.5"
-                autoFocus
-              />
-            </div>
-            <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
-              <button onClick={() => setModalOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">Cancelar</button>
-              <button onClick={handleCreate} disabled={saving || !numero.trim()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60">
-                {saving ? "Creando..." : "Crear finca"}
-              </button>
-            </div>
+      <Drawer
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Nueva finca"
+        width="sm"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">Cancelar</button>
+            <button onClick={handleCreate} disabled={saving || !numero.trim()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60">
+              {saving ? "Creando..." : "Crear finca"}
+            </button>
           </div>
+        }
+      >
+        <div className="px-5 py-5">
+          <label className="text-xs font-medium text-text-secondary">Nombre de la finca</label>
+          <input
+            type="text"
+            value={numero}
+            onChange={(e) => setNumero(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            placeholder="Ej: Las Palmeras"
+            className="input mt-1.5"
+            autoFocus
+          />
         </div>
-      )}
+      </Drawer>
 
       {deleteId !== null && (
         <DeleteConfirmationDialog

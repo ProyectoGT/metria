@@ -397,8 +397,8 @@ export default function KanbanBoard({
       )}
 
       {resultadoModal && (
-        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl">
+        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/8 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl border border-border">
             <div className="border-b border-border px-6 py-4">
               <h2 className="text-base font-semibold text-text-primary">Como ha ido?</h2>
               <p className="mt-0.5 truncate text-sm text-text-secondary">{resultadoModal.titulo}</p>
@@ -444,8 +444,8 @@ export default function KanbanBoard({
       )}
 
       {convertModal && (
-        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-sm rounded-2xl bg-surface shadow-xl">
+        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/8 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-surface shadow-xl border border-border">
             <div className="border-b border-border px-6 py-4">
               <h2 className="text-base font-semibold text-text-primary">Programar en el Orden del dia</h2>
               <p className="mt-0.5 truncate text-sm text-text-secondary">{convertModal.card.title}</p>

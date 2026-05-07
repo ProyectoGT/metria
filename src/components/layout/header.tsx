@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Search, Bell, ChevronDown, Menu, X, Calendar, AlertCircle, CheckCircle2 } from "lucide-react";
@@ -182,40 +183,53 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
         </div>
 
         {/* Resultados de búsqueda */}
-        {searchOpen && (
-          <div className="absolute left-0 top-full mt-1.5 w-full min-w-0 overflow-hidden rounded-xl border border-border bg-surface shadow-lg sm:min-w-[340px]">
-            {searchLoading ? (
-              <p className="px-4 py-3 text-sm text-text-secondary">Buscando…</p>
-            ) : searchResults.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-text-secondary">
-                Sin resultados para &ldquo;{searchValue}&rdquo;
-              </p>
-            ) : (
-              <ul className="max-h-72 divide-y divide-border overflow-y-auto">
-                {searchResults.map((r) => (
-                  <li key={r.id}>
-                    <button
-                      onClick={() => handleResultClick(r.href)}
-                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-raised"
+        <AnimatePresence>
+          {searchOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -4, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.97 }}
+              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute left-0 top-full mt-1.5 w-full min-w-0 overflow-hidden rounded-xl border border-border bg-surface shadow-lg sm:min-w-[340px]"
+            >
+              {searchLoading ? (
+                <p className="px-4 py-3 text-sm text-text-secondary">Buscando…</p>
+              ) : searchResults.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-text-secondary">
+                  Sin resultados para &ldquo;{searchValue}&rdquo;
+                </p>
+              ) : (
+                <ul className="max-h-72 divide-y divide-border overflow-y-auto">
+                  {searchResults.map((r, i) => (
+                    <motion.li
+                      key={r.id}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.02, duration: 0.15 }}
                     >
-                      <span className={`shrink-0 rounded-lg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLORS[r.type]}`}>
-                        {TYPE_LABELS[r.type]}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-text-primary">
-                          {r.label}
+                      <button
+                        onClick={() => handleResultClick(r.href)}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-raised"
+                      >
+                        <span className={`shrink-0 rounded-lg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLORS[r.type]}`}>
+                          {TYPE_LABELS[r.type]}
                         </span>
-                        {r.sublabel && (
-                          <span className="block truncate text-xs text-text-secondary">{r.sublabel}</span>
-                        )}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-text-primary">
+                            {r.label}
+                          </span>
+                          {r.sublabel && (
+                            <span className="block truncate text-xs text-text-secondary">{r.sublabel}</span>
+                          )}
+                        </span>
+                      </button>
+                    </motion.li>
+                  ))}
+                </ul>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* ── Spacer ────────────────────────────────────────────────── */}
@@ -239,8 +253,15 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
             )}
           </button>
 
-          {bellOpen && (
-            <div className="fixed left-4 right-4 top-16 z-[50] overflow-hidden rounded-xl border border-border bg-surface shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-1.5 sm:w-80">
+          <AnimatePresence>
+            {bellOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -4, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.97 }}
+              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed left-4 right-4 top-16 z-[50] overflow-hidden rounded-xl border border-border bg-surface shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-1.5 sm:w-80"
+            >
               {/* Header del panel */}
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div className="flex items-center gap-2">
@@ -287,8 +308,9 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                   Ver todas las tareas →
                 </Link>
               </div>
-            </div>
+            </motion.div>
           )}
+        </AnimatePresence>
         </div>
 
         {/* Separador */}
@@ -309,8 +331,15 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
             />
           </button>
 
-          {menuOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-52 overflow-hidden rounded-xl border border-border bg-surface py-1 shadow-lg">
+          <AnimatePresence>
+            {menuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -4, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.97 }}
+              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute right-0 top-full mt-1.5 w-52 overflow-hidden rounded-xl border border-border bg-surface py-1 shadow-lg"
+            >
               {/* Info de cuenta */}
               <div className="border-b border-border px-4 py-3">
                 <p className="text-sm font-medium text-text-primary">{userName}</p>
@@ -338,8 +367,9 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                   </button>
                 </form>
               </div>
-            </div>
+            </motion.div>
           )}
+        </AnimatePresence>
         </div>
       </div>
     </header>

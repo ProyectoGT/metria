@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { canManageUsers, canViewOrgChart, normalizeUserRole } from "@/lib/roles";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 import {
   LayoutDashboard,
   MapPin,
@@ -66,26 +68,32 @@ function NavItem({
   active: boolean;
 }) {
   return (
-    <Link
-      href={href}
-      className={[
-        "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150",
-        active
-          ? "bg-primary/10 text-primary"
-          : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary",
-      ].join(" ")}
-    >
-      <Icon
+    <motion.div variants={staggerItem}>
+      <Link
+        href={href}
         className={[
-          "h-[18px] w-[18px] shrink-0 transition-colors",
-          active ? "text-primary" : "text-text-secondary group-hover:text-text-primary",
+          "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150",
+          active
+            ? "bg-primary/10 text-primary"
+            : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary",
         ].join(" ")}
-      />
-      <span className="truncate">{label}</span>
-      {active && (
-        <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-      )}
-    </Link>
+      >
+        <Icon
+          className={[
+            "h-[18px] w-[18px] shrink-0 transition-colors",
+            active ? "text-primary" : "text-text-secondary group-hover:text-text-primary",
+          ].join(" ")}
+        />
+        <span className="truncate">{label}</span>
+        {active && (
+          <motion.span
+            layoutId="sidebar-active"
+            className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          />
+        )}
+      </Link>
+    </motion.div>
   );
 }
 
@@ -198,17 +206,21 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
       {/* ── Navegación ───────────────────────────────────────────── */}
       <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
 
-        <NavGroup>
-          {MAIN_NAV.filter((item) => isNavVisible(item.resourceKey)).map((item) => (
-            <NavItem key={item.href} href={item.href} icon={item.icon} label={item.label} active={isActive(item.href)} />
-          ))}
-        </NavGroup>
+        <motion.div variants={staggerContainer} initial="initial" animate="animate">
+          <NavGroup>
+            {MAIN_NAV.filter((item) => isNavVisible(item.resourceKey)).map((item) => (
+              <NavItem key={item.href} href={item.href} icon={item.icon} label={item.label} active={isActive(item.href)} />
+            ))}
+          </NavGroup>
+        </motion.div>
 
-        <NavGroup label="Herramientas">
-          {TOOLS_NAV.filter((item) => isNavVisible(item.resourceKey)).map((item) => (
-            <NavItem key={item.href} href={item.href} icon={item.icon} label={item.label} active={isActive(item.href)} />
-          ))}
-        </NavGroup>
+        <motion.div variants={staggerContainer} initial="initial" animate="animate">
+          <NavGroup label="Herramientas">
+            {TOOLS_NAV.filter((item) => isNavVisible(item.resourceKey)).map((item) => (
+              <NavItem key={item.href} href={item.href} icon={item.icon} label={item.label} active={isActive(item.href)} />
+            ))}
+          </NavGroup>
+        </motion.div>
 
         {/* Gestión: base permission + configurable layer */}
         {(canSeeUsers || canSeeOrganigrama) && (
@@ -272,7 +284,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
 
       <div
         className={[
-          "fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] transition-opacity duration-300 md:hidden",
+          "fixed inset-0 z-40 bg-black/20 transition-opacity duration-300 md:hidden",
           mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
         ].join(" ")}
         onClick={() => setMobileOpen(false)}

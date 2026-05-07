@@ -17,6 +17,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 
 type ModalSize = "sm" | "md" | "lg" | "xl";
@@ -55,32 +56,42 @@ export function Modal({ open, onClose, size = "md", children, className = "" }: 
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
-  if (!open) return null;
-
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-[30] flex items-center justify-center p-3 sm:p-4"
-    >
-      {/* Overlay con blur sutil */}
-      <div
-        className="absolute inset-0 bg-slate-950/55 backdrop-blur-[3px]"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      {/* Contenedor */}
-      <div
-        className={[
-          "relative z-10 flex w-full flex-col rounded-2xl border border-border bg-surface shadow-xl",
-          "max-h-[calc(100vh-2rem)] overflow-hidden",
-          SIZE_CLASSES[size],
-          className,
-        ].join(" ")}
-      >
-        {children}
-      </div>
-    </div>
+    <AnimatePresence>
+      {open && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[30] flex items-center justify-center p-3 sm:p-4"
+        >
+          {/* Overlay suave: sin blur, opacidad ~8% */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="absolute inset-0 bg-black/8"
+            onClick={onClose}
+            aria-hidden="true"
+          />
+          {/* Contenedor */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className={[
+              "relative z-10 flex w-full flex-col rounded-2xl border border-border bg-surface shadow-xl",
+              "max-h-[calc(100vh-2rem)] overflow-hidden",
+              SIZE_CLASSES[size],
+              className,
+            ].join(" ")}
+          >
+            {children}
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }
 

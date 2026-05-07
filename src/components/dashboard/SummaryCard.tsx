@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import { motion } from "framer-motion";
 import { type LucideIcon } from "lucide-react";
 
 type SummaryCardProps = {
@@ -23,13 +24,16 @@ const SummaryCard = memo(function SummaryCard({
   onClick,
 }: SummaryCardProps) {
   return (
-    <button
+    <motion.button
       onClick={onClick}
+      whileHover={{ y: -2, boxShadow: "0 8px 25px rgba(0,0,0,0.08)" }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
       className={[
-        "group relative w-full overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition-all duration-200 md:p-5",
+        "group relative w-full overflow-hidden rounded-2xl border p-4 text-left shadow-sm md:p-5",
         isActive
           ? `border-primary/30 ${activeBg} shadow-md ring-1 ring-primary/10`
-          : "border-border bg-surface hover:border-secondary/35 hover:shadow-md",
+          : "border-border bg-surface",
       ].join(" ")}
     >
       {/* Icono en la esquina superior derecha — decorativo */}
@@ -54,7 +58,7 @@ const SummaryCard = memo(function SummaryCard({
       {isActive && (
         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary/40" />
       )}
-    </button>
+    </motion.button>
   );
 });
 
