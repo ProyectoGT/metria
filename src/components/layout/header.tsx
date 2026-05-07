@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { Search, Bell, ChevronDown, Menu, X, Calendar, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Search, Bell, ChevronDown, Menu, X, Calendar, AlertCircle, CheckCircle2, LifeBuoy } from "lucide-react";
 import { logout } from "@/app/(auth)/actions";
 import Avatar from "@/components/ui/avatar";
 import type { NotificationItem } from "./app-shell";
@@ -266,7 +266,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div className="flex items-center gap-2">
                   <Bell className="h-4 w-4 text-text-secondary" />
-                  <span className="text-sm font-semibold text-text-primary">Tareas pendientes</span>
+                  <span className="text-sm font-semibold text-text-primary">Notificaciones</span>
                 </div>
                 {unreadCount > 0 && (
                   <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-danger">
@@ -278,34 +278,63 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
               {notifications.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
                   <CheckCircle2 className="h-8 w-8 text-success/60" />
-                  <p className="text-sm font-medium text-text-secondary">Sin tareas pendientes</p>
+                  <p className="text-sm font-medium text-text-secondary">Sin notificaciones pendientes</p>
                 </div>
               ) : (
                 <ul className="max-h-64 divide-y divide-border overflow-y-auto">
-                  {notifications.map((n) => (
-                    <li key={n.id} className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-surface-raised">
-                      <AlertCircle className={`mt-0.5 h-4 w-4 shrink-0 ${prioridadColor(n.prioridad)}`} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-text-primary">{n.titulo}</p>
-                        {n.fecha && (
-                          <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary">
-                            <Calendar className="h-3 w-3" />
-                            {formatFecha(n.fecha)}
-                          </p>
-                        )}
+                  {notifications.map((n) => {
+                    const isSoporte = n.type === "soporte";
+                    const item = isSoporte ? (
+                      <Link
+                        href={n.href ?? "/soporte"}
+                        onClick={() => setBellOpen(false)}
+                        className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-surface-raised"
+                      >
+                        <LifeBuoy className={`mt-0.5 h-4 w-4 shrink-0 text-primary`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-text-primary">{n.titulo}</p>
+                          {n.fecha && (
+                            <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary">
+                              <Calendar className="h-3 w-3" />
+                              {formatFecha(n.fecha)}
+                            </p>
+                          )}
+                        </div>
+                      </Link>
+                    ) : (
+                      <div className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-surface-raised">
+                        <AlertCircle className={`mt-0.5 h-4 w-4 shrink-0 ${prioridadColor(n.prioridad)}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-text-primary">{n.titulo}</p>
+                          {n.fecha && (
+                            <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary">
+                              <Calendar className="h-3 w-3" />
+                              {formatFecha(n.fecha)}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </li>
-                  ))}
+                    );
+                    return <li key={`${n.type}-${n.id}`}>{item}</li>;
+                  })}
                 </ul>
               )}
 
-              <div className="border-t border-border px-4 py-2.5">
+              <div className="flex items-center justify-center gap-4 border-t border-border px-4 py-2.5">
                 <Link
                   href="/ordenes"
                   onClick={() => setBellOpen(false)}
-                  className="block text-center text-xs font-medium text-primary transition-colors hover:underline"
+                  className="text-center text-xs font-medium text-primary transition-colors hover:underline"
                 >
-                  Ver todas las tareas →
+                  Tareas
+                </Link>
+                <span className="text-text-secondary/40">|</span>
+                <Link
+                  href="/soporte"
+                  onClick={() => setBellOpen(false)}
+                  className="text-center text-xs font-medium text-primary transition-colors hover:underline"
+                >
+                  Soporte
                 </Link>
               </div>
             </motion.div>

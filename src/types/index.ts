@@ -12,6 +12,9 @@ export type Usuario = import("./database.types").Tables<"usuarios">;
 export type Pedido = import("./database.types").Tables<"pedidos">;
 export type Tarea = import("./database.types").Tables<"tareas">;
 export type Agenda = import("./database.types").Tables<"agenda">;
+export type SoporteTicket = import("./database.types").Tables<"tickets_soporte">;
+export type SoporteMensaje = import("./database.types").Tables<"soporte_mensajes">;
+export type SoporteNotificacion = import("./database.types").Tables<"soporte_notificaciones">;
 
 // ─── Contactos ────────────────────────────────────────────────────────────────
 

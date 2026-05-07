@@ -10,6 +10,8 @@ export type NotificationItem = {
   titulo: string;
   fecha: string | null;
   prioridad: string | null;
+  type: "tarea" | "soporte";
+  href?: string;
 };
 
 export default async function AppShell({
@@ -71,19 +73,47 @@ export default async function AppShell({
     }
   }
 
-  // Notificaciones: tareas pendientes del usuario actual
+  // Notificaciones: tareas pendientes + notificaciones de soporte
   let notifications: NotificationItem[] = [];
   if (userId) {
-    const { data: tareas } = await supabase
-      .from("tareas")
-      .select("id, titulo, fecha, prioridad")
-      .eq("owner_user_id", userId)
-      .eq("estado", "pendiente")
-      .is("fecha", null)
-      .is("archived_at", null)
-      .order("fecha", { ascending: true, nullsFirst: false })
-      .limit(8);
-    notifications = (tareas ?? []) as NotificationItem[];
+    const [{ data: tareas }, { data: soporteNotifs }] = await Promise.all([
+      supabase
+        .from("tareas")
+        .select("id, titulo, fecha, prioridad")
+        .eq("owner_user_id", userId)
+        .eq("estado", "pendiente")
+        .is("fecha", null)
+        .is("archived_at", null)
+        .order("fecha", { ascending: true, nullsFirst: false })
+        .limit(5),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any)
+        .from("soporte_notificaciones")
+        .select("id, ticket_id, mensaje, created_at, tipo")
+        .eq("usuario_id", userId)
+        .eq("leido", false)
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
+
+    const tareaItems: NotificationItem[] = ((tareas ?? []) as { id: number; titulo: string; fecha: string | null; prioridad: string | null }[]).map((t) => ({
+      id: t.id,
+      titulo: t.titulo,
+      fecha: t.fecha,
+      prioridad: t.prioridad,
+      type: "tarea" as const,
+    }));
+
+    const soporteItems: NotificationItem[] = ((soporteNotifs ?? []) as { id: number; ticket_id: number; mensaje: string; created_at: string; tipo: string }[]).map((n) => ({
+      id: n.id,
+      titulo: n.mensaje,
+      fecha: n.created_at,
+      prioridad: "media",
+      type: "soporte" as const,
+      href: `/soporte?ticket=${n.ticket_id}`,
+    }));
+
+    notifications = [...soporteItems, ...tareaItems].slice(0, 8);
   }
 
   return (

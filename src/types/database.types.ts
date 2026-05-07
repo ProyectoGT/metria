@@ -2169,11 +2169,99 @@ export type Database = {
           },
         ]
       }
+      soporte_mensajes: {
+        Row: {
+          autor_id: number | null
+          autor_nombre: string
+          autor_rol: string
+          contenido: string
+          created_at: string
+          es_sistema: boolean
+          id: number
+          ticket_id: number
+        }
+        Insert: {
+          autor_id?: number | null
+          autor_nombre: string
+          autor_rol?: string
+          contenido: string
+          created_at?: string
+          es_sistema?: boolean
+          id?: number
+          ticket_id: number
+        }
+        Update: {
+          autor_id?: number | null
+          autor_nombre?: string
+          autor_rol?: string
+          contenido?: string
+          created_at?: string
+          es_sistema?: boolean
+          id?: number
+          ticket_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "soporte_mensajes_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets_soporte"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      soporte_notificaciones: {
+        Row: {
+          created_at: string
+          empresa_id: number
+          id: number
+          leido: boolean
+          leido_at: string | null
+          mensaje: string
+          ticket_id: number
+          tipo: string
+          usuario_id: number
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: number
+          id?: number
+          leido?: boolean
+          leido_at?: string | null
+          mensaje: string
+          ticket_id: number
+          tipo: string
+          usuario_id: number
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: number
+          id?: number
+          leido?: boolean
+          leido_at?: string | null
+          mensaje?: string
+          ticket_id?: number
+          tipo?: string
+          usuario_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "soporte_notificaciones_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets_soporte"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tickets_soporte: {
         Row: {
+          archived_at: string | null
+          asignado_a: number | null
           asunto: string
           created_at: string | null
           descripcion: string
+          empresa_id: number | null
           estado: string
           id: number
           nombre_usuario: string | null
@@ -2182,13 +2270,17 @@ export type Database = {
           respondido_por_nombre: string | null
           respuesta: string | null
           tipo: string
+          ultima_respuesta_at: string | null
           updated_at: string | null
           user_id: number | null
         }
         Insert: {
+          archived_at?: string | null
+          asignado_a?: number | null
           asunto: string
           created_at?: string | null
           descripcion: string
+          empresa_id?: number | null
           estado?: string
           id?: number
           nombre_usuario?: string | null
@@ -2197,13 +2289,17 @@ export type Database = {
           respondido_por_nombre?: string | null
           respuesta?: string | null
           tipo: string
+          ultima_respuesta_at?: string | null
           updated_at?: string | null
           user_id?: number | null
         }
         Update: {
+          archived_at?: string | null
+          asignado_a?: number | null
           asunto?: string
           created_at?: string | null
           descripcion?: string
+          empresa_id?: number | null
           estado?: string
           id?: number
           nombre_usuario?: string | null
@@ -2212,6 +2308,7 @@ export type Database = {
           respondido_por_nombre?: string | null
           respuesta?: string | null
           tipo?: string
+          ultima_respuesta_at?: string | null
           updated_at?: string | null
           user_id?: number | null
         }
