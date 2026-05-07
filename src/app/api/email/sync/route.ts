@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { createClient } from "@/lib/supabase";
-import { type EmailAccount } from "@/lib/email/gmail";
+import { type EmailAccount, getGmailHistoryId } from "@/lib/email/gmail";
 import { linkEmailMessageToEntities } from "@/lib/email/linking";
 import { createClientNoReplyAlerts, enrichCommercialEmail } from "@/lib/email/commercial";
 import { getEmailProviderAdapter } from "@/lib/email/providers";
@@ -31,6 +31,9 @@ export async function POST() {
     const token = await adapter.getValidAccessToken(supabase, account as EmailAccount);
     if (!token) return NextResponse.json({ error: "reauth_required" }, { status: 401 });
 
+    const lastHistoryId = account.last_history_id as string | null;
+    const isFullSync = !lastHistoryId;
+
     const synced = await adapter.syncMessages(supabase, account as EmailAccount, token);
     const messages = (synced.messages ?? []) as Array<{
       id: number;
@@ -55,17 +58,32 @@ export async function POST() {
     }
     await createClientNoReplyAlerts(supabase, currentUser.id);
 
-    return NextResponse.json({ synced: synced.synced, linked });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: updatedAccount } = await (supabase as any)
+      .from("email_accounts")
+      .select("last_sync_at, last_history_id")
+      .eq("id", account.id)
+      .single();
+
+    return NextResponse.json({
+      synced: synced.synced,
+      linked,
+      isFullSync,
+      lastSyncAt: updatedAccount?.last_sync_at ?? null,
+      lastHistoryId: updatedAccount?.last_history_id ?? null,
+      syncedMessages: messages.map((m) => ({ id: m.id, subject: m.subject, direction: m.direction })),
+    });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message.slice(0, 240) : "sync_failed";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase as any)
       .from("email_accounts")
       .update({
         status: "sync_error",
-        last_error: error instanceof Error ? error.message.slice(0, 240) : "sync_failed",
+        last_error: errorMessage,
       })
       .eq("id", account.id);
 
-    return NextResponse.json({ error: "sync_failed" }, { status: 500 });
+    return NextResponse.json({ error: "sync_failed", message: errorMessage }, { status: 500 });
   }
 }

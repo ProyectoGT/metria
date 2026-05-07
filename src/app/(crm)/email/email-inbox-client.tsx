@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
-import { Archive, CheckCircle2, ExternalLink, Inbox, Mail, Paperclip, RefreshCw, Search, Send, Tag, Undo2 } from "lucide-react";
+import { AlertCircle, Archive, CheckCircle2, Clock, ExternalLink, Inbox, Mail, Paperclip, RefreshCw, Search, Send, Tag, Undo2 } from "lucide-react";
 import Drawer from "@/components/ui/drawer";
 
 type Account = { id: number; email: string; status: string; last_sync_at: string | null; last_error: string | null };
@@ -88,6 +88,11 @@ export default function EmailInboxClient({
   const [compose, setCompose] = useState({ to: "", subject: "", bodyText: "" });
   const [manualLink, setManualLink] = useState({ entityType: "contacto", entityId: "" });
   const [messageBodies, setMessageBodies] = useState<Record<number, string>>({});
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(accounts[0]?.last_sync_at ?? null);
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const linksByMessage = useMemo(() => {
     const map = new Map<number, LinkRow[]>();
@@ -151,12 +156,39 @@ export default function EmailInboxClient({
     return () => { active = false; };
   }, [messageBodies, selected]);
 
-  function sync() {
-    startTransition(async () => {
-      await fetch("/api/email/sync", { method: "POST" });
-      window.location.reload();
-    });
-  }
+  const sync = useCallback(async () => {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncProgress("Sincronizando...");
+    setSyncError(null);
+
+    const startTime = Date.now();
+    try {
+      const res = await fetch("/api/email/sync", { method: "POST" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSyncError(data.message ?? data.error ?? "sync_failed");
+        setSyncing(false);
+        return;
+      }
+
+      const elapsed = Date.now() - startTime;
+      const label = data.isFullSync ? "Sync completo" : "Sync incremental";
+      setSyncProgress(`${label}: ${data.synced} emails, ${data.linked} vinculados (${(elapsed / 1000).toFixed(1)}s)`);
+      if (data.lastSyncAt) setLastSyncAt(data.lastSyncAt);
+
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+      syncTimeoutRef.current = setTimeout(() => {
+        setSyncing(false);
+        setSyncProgress(null);
+        window.location.reload();
+      }, 2000);
+    } catch {
+      setSyncError("Error de conexion al sincronizar");
+      setSyncing(false);
+    }
+  }, [syncing]);
 
   function messageAction(messageId: number, action: "read" | "unread" | "archive") {
     startTransition(async () => {
@@ -240,18 +272,42 @@ export default function EmailInboxClient({
         <div className="mb-4 flex items-center justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-text-primary">{account.email}</p>
-            <p className="text-xs text-text-secondary">{account.last_sync_at ? `Sync ${formatDate(account.last_sync_at)}` : "Pendiente de sync"}</p>
+            <p className="flex items-center gap-1 text-xs text-text-secondary">
+              <Clock className="h-3 w-3" />
+              {lastSyncAt ? formatDate(lastSyncAt) : "Pendiente de sync"}
+            </p>
           </div>
           <button
             type="button"
             onClick={sync}
-            disabled={isPending}
+            disabled={syncing}
             className="rounded-lg border border-border p-2 text-text-secondary hover:bg-surface hover:text-text-primary disabled:opacity-60"
             title="Sincronizar"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
           </button>
         </div>
+
+        {syncProgress && (
+          <div className="mb-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
+            <div className="mb-1 flex items-center gap-1.5">
+              <RefreshCw className="h-3 w-3 animate-spin" />
+              {syncProgress}
+            </div>
+            <div className="h-1 w-full overflow-hidden rounded-full bg-primary/10">
+              <div className="h-full w-2/3 animate-pulse rounded-full bg-primary" />
+            </div>
+          </div>
+        )}
+
+        {syncError && (
+          <div className="mb-3 rounded-lg border border-danger/20 bg-danger/5 px-3 py-2 text-xs text-danger">
+            <div className="flex items-center gap-1.5">
+              <AlertCircle className="h-3 w-3 shrink-0" />
+              {syncError}
+            </div>
+          </div>
+        )}
 
         <div className="mb-4 grid grid-cols-2 gap-2">
           <div className="rounded-lg border border-border bg-surface px-2.5 py-2">

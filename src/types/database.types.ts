@@ -856,6 +856,7 @@ export type Database = {
           empresa_id: number | null
           id: number
           last_error: string | null
+          last_history_id: string | null
           last_sync_at: string | null
           provider: string
           refresh_token_encrypted: string | null
@@ -871,6 +872,7 @@ export type Database = {
           empresa_id?: number | null
           id?: number
           last_error?: string | null
+          last_history_id?: string | null
           last_sync_at?: string | null
           provider?: string
           refresh_token_encrypted?: string | null
@@ -886,6 +888,7 @@ export type Database = {
           empresa_id?: number | null
           id?: number
           last_error?: string | null
+          last_history_id?: string | null
           last_sync_at?: string | null
           provider?: string
           refresh_token_encrypted?: string | null

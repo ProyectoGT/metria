@@ -39,6 +39,7 @@ const THEMES: { value: Theme; label: string; icon: React.ElementType }[] = [
 // ─── Grupos de navegación ─────────────────────────────────────────────────────
 
 const MAIN_NAV = [
+  { label: "Hoy",            href: "/hoy",           resourceKey: "dashboard",    icon: Sun },
   { label: "Dashboard",      href: "/dashboard",    resourceKey: "dashboard",    icon: LayoutDashboard },
   { label: "Zona",           href: "/zona",          resourceKey: "zona",         icon: MapPin },
   { label: "Propiedades",    href: "/propiedades",   resourceKey: "propiedades",  icon: Building2 },

@@ -294,6 +294,41 @@ export async function toggleArchiveTicketAction(ticketId: number, archive: boole
   return { success: true };
 }
 
+// ─── Crear tarea desde ticket ─────────────────────────────────────────────────
+
+export async function createTaskFromTicketAction(
+  ticketId: number,
+  title: string,
+  asignadoA?: number | null
+) {
+  const yo = await getCurrentUserContext();
+  if (!yo || yo.role !== "Administrador") throw new Error("No autorizado");
+
+  const supabase = createAdminClient();
+
+  const { data: ticket } = await supabase
+    .from("tickets_soporte")
+    .select("asunto, empresa_id")
+    .eq("id", ticketId)
+    .single();
+
+  if (!ticket) throw new Error("Ticket no encontrado");
+
+  const { error } = await supabase
+    .from("tareas")
+    .insert({
+      titulo: title || `Soporte: ${ticket.asunto}`,
+      owner_user_id: yo.id,
+      empresa_id: ticket.empresa_id ?? yo.empresaId ?? undefined,
+      estado: "pendiente",
+      ...(asignadoA ? { agente_asignado: asignadoA } : {}),
+    } as never);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/soporte");
+  return { success: true };
+}
+
 // ─── Marcar notificación como leída ───────────────────────────────────────────
 
 export async function markSoporteNotifReadAction(notifId: number) {

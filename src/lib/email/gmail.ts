@@ -13,6 +13,7 @@ export type EmailAccount = {
   refresh_token_encrypted: string | null;
   token_expires_at: string | null;
   last_sync_at: string | null;
+  last_history_id: string | null;
   last_error?: string | null;
 };
 
@@ -257,27 +258,38 @@ export function mapGmailMessage(message: GmailMessage, account: EmailAccount) {
   };
 }
 
-export async function syncGmailMessages(
+export async function getGmailHistoryId(accessToken: string): Promise<string | null> {
+  try {
+    const profile = await gmailFetch<{ historyId: string }>("/users/me/profile", accessToken);
+    return profile.historyId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchAndUpsertMessages(
   supabase: SupabaseClient,
   account: EmailAccount,
   accessToken: string,
-  folder: "inbox" | "sent" = "inbox",
-  maxResults = 25,
+  messageIds: string[],
+  batchSize = 10,
 ) {
-  const query = folder === "sent" ? "in:sent newer_than:90d" : "in:inbox newer_than:90d";
-  const list = await gmailFetch<{ messages?: Array<{ id: string }> }>(
-    `/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
-    accessToken,
-  );
-
-  const ids = list.messages?.map((m) => m.id) ?? [];
-  if (ids.length === 0) return { synced: 0 };
+  if (messageIds.length === 0) return [];
 
   const rows = [];
-  for (const id of ids) {
-    const message = await gmailFetch<GmailMessage>(`/users/me/messages/${id}?format=full`, accessToken);
-    rows.push(mapGmailMessage(message, account));
+  for (let i = 0; i < messageIds.length; i += batchSize) {
+    const batch = messageIds.slice(i, i + batchSize);
+    const batchResults = await Promise.all(
+      batch.map((id) =>
+        gmailFetch<GmailMessage>(`/users/me/messages/${id}?format=full`, accessToken).catch(() => null),
+      ),
+    );
+    for (const msg of batchResults) {
+      if (msg) rows.push(mapGmailMessage(msg, account));
+    }
   }
+
+  if (rows.length === 0) return [];
 
   const messageRows = rows.map((row) => {
     const { _attachments: attachments, ...messageRow } = row;
@@ -312,13 +324,154 @@ export async function syncGmailMessages(
     await (supabase as any).from("email_attachments").upsert(attachmentRows);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase as any)
-    .from("email_accounts")
-    .update({ status: "connected", last_sync_at: new Date().toISOString(), last_error: null })
-    .eq("id", account.id);
+  return data ?? [];
+}
 
-  return { synced: data?.length ?? 0, messages: data ?? [] };
+export async function syncGmailMessages(
+  supabase: SupabaseClient,
+  account: EmailAccount,
+  accessToken: string,
+  folder: "inbox" | "sent" = "inbox",
+  maxPages = 5,
+) {
+  const now = new Date().toISOString();
+  const isFullSync = !account.last_history_id;
+
+  if (isFullSync) {
+    // ── Full sync: paginated list ──────────────────────────────────────
+    const query = folder === "sent" ? "in:sent newer_than:90d" : "in:inbox newer_than:90d";
+    let nextPageToken: string | undefined;
+    let allIds: string[] = [];
+    let pagesFetched = 0;
+
+    do {
+      let url = `/users/me/messages?q=${encodeURIComponent(query)}&maxResults=100`;
+      if (nextPageToken) url += `&pageToken=${nextPageToken}`;
+
+      const list = await gmailFetch<{ messages?: Array<{ id: string }>; nextPageToken?: string }>(url, accessToken);
+      const ids = list.messages?.map((m) => m.id) ?? [];
+      allIds.push(...ids);
+      nextPageToken = list.nextPageToken;
+      pagesFetched++;
+
+      if (allIds.length >= 500) break;
+    } while (nextPageToken && pagesFetched < maxPages);
+
+    if (allIds.length === 0) {
+      const newHistoryId = await getGmailHistoryId(accessToken);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("email_accounts").update({
+        status: "connected", last_sync_at: now, last_error: null,
+        last_history_id: newHistoryId,
+      }).eq("id", account.id);
+      return { synced: 0 };
+    }
+
+    const data = await fetchAndUpsertMessages(supabase, account, accessToken, allIds);
+
+    const newHistoryId = await getGmailHistoryId(accessToken);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from("email_accounts").update({
+      status: "connected", last_sync_at: now, last_error: null,
+      last_history_id: newHistoryId,
+    }).eq("id", account.id);
+
+    return { synced: data?.length ?? 0, messages: data ?? [] };
+  }
+
+  // ── Incremental sync via History API ─────────────────────────────────
+  try {
+    const historyUrl = `/users/me/history?startHistoryId=${account.last_history_id}&historyTypes=messageAdded&maxResults=100`;
+    let nextPageToken: string | undefined;
+    let allIds: string[] = [];
+    let pagesFetched = 0;
+
+    do {
+      let url = historyUrl;
+      if (nextPageToken) url += `&pageToken=${nextPageToken}`;
+
+      const history = await gmailFetch<{
+        history?: Array<{ messagesAdded?: Array<{ message: { id: string } }> }>;
+        nextPageToken?: string;
+      }>(url, accessToken);
+
+      if (history.history) {
+        for (const entry of history.history) {
+          if (entry.messagesAdded) {
+            for (const ma of entry.messagesAdded) {
+              allIds.push(ma.message.id);
+            }
+          }
+        }
+      }
+
+      nextPageToken = history.nextPageToken;
+      pagesFetched++;
+      if (allIds.length >= 500) break;
+    } while (nextPageToken && pagesFetched < maxPages);
+
+    if (allIds.length > 0) {
+      const data = await fetchAndUpsertMessages(supabase, account, accessToken, allIds);
+      const newHistoryId = await getGmailHistoryId(accessToken);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("email_accounts").update({
+        status: "connected", last_sync_at: now, last_error: null,
+        last_history_id: newHistoryId,
+      }).eq("id", account.id);
+      return { synced: data?.length ?? 0, messages: data ?? [] };
+    }
+
+    // No new messages, just update timestamps
+    const newHistoryId = await getGmailHistoryId(accessToken);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from("email_accounts").update({
+      status: "connected", last_sync_at: now, last_error: null,
+      last_history_id: newHistoryId,
+    }).eq("id", account.id);
+    return { synced: 0 };
+  } catch {
+    // History API fallback: use date-based query
+    const since = account.last_sync_at
+      ? new Date(new Date(account.last_sync_at).getTime() - 86400000).toISOString().split("T")[0]
+      : new Date(Date.now() - 86400000 * 7).toISOString().split("T")[0];
+    const query = `${folder === "sent" ? "in:sent" : "in:inbox"} after:${since}`;
+
+    let nextPageToken: string | undefined;
+    let allIds: string[] = [];
+    let pagesFetched = 0;
+
+    do {
+      let url = `/users/me/messages?q=${encodeURIComponent(query)}&maxResults=100`;
+      if (nextPageToken) url += `&pageToken=${nextPageToken}`;
+
+      const list = await gmailFetch<{ messages?: Array<{ id: string }>; nextPageToken?: string }>(url, accessToken);
+      const ids = list.messages?.map((m) => m.id) ?? [];
+      allIds.push(...ids);
+      nextPageToken = list.nextPageToken;
+      pagesFetched++;
+      if (allIds.length >= 500) break;
+    } while (nextPageToken && pagesFetched < maxPages);
+
+    if (allIds.length === 0) {
+      const newHistoryId = await getGmailHistoryId(accessToken);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("email_accounts").update({
+        status: "connected", last_sync_at: now, last_error: null,
+        last_history_id: newHistoryId,
+      }).eq("id", account.id);
+      return { synced: 0 };
+    }
+
+    const data = await fetchAndUpsertMessages(supabase, account, accessToken, allIds);
+    const newHistoryId = await getGmailHistoryId(accessToken);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from("email_accounts").update({
+      status: "connected", last_sync_at: now, last_error: null,
+      last_history_id: newHistoryId,
+    }).eq("id", account.id);
+
+    return { synced: data?.length ?? 0, messages: data ?? [] };
+  }
 }
 
 export async function modifyGmailMessage(

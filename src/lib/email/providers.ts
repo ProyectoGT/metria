@@ -21,8 +21,10 @@ const gmailAdapter: EmailProviderAdapter = {
   provider: "gmail",
   getValidAccessToken,
   async syncMessages(supabase, account, token) {
-    const inbox = await syncGmailMessages(supabase, account, token, "inbox", 30);
-    const sent = await syncGmailMessages(supabase, account, token, "sent", 20);
+    const [inbox, sent] = await Promise.all([
+      syncGmailMessages(supabase, account, token, "inbox"),
+      syncGmailMessages(supabase, account, token, "sent"),
+    ]);
     return { synced: inbox.synced + sent.synced, messages: [...(inbox.messages ?? []), ...(sent.messages ?? [])] };
   },
   modifyMessage: modifyGmailMessage,
