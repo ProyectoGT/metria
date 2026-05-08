@@ -19,6 +19,7 @@ export type CurrentUserContext = {
   nombre: string;
   apellidos: string;
   role: UserRole;
+  avatarUrl: string | null;
   empresaId: number | null;
   equipoId: number | null;
   canDeletePropiedades: boolean;
@@ -38,9 +39,17 @@ export const getCurrentUserContext = cache(async (): Promise<CurrentUserContext 
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return null;
+  let currentUser = user;
 
-  const profileSelect = "id, nombre, apellidos, rol, correo, auth_id, empresa_id, equipo_id";
+  // Si getUser falla (transitorio), intentar con getSession (local, sin HTTP)
+  if (!currentUser) {
+    const { data: { session } } = await supabase.auth.getSession();
+    currentUser = session?.user ?? null;
+  }
+
+  if (!currentUser) return null;
+
+  const profileSelect = "id, nombre, apellidos, rol, correo, auth_id, avatar_url, empresa_id, equipo_id";
 
   let profile:
     | {
@@ -49,6 +58,7 @@ export const getCurrentUserContext = cache(async (): Promise<CurrentUserContext 
         apellidos: string;
         correo: string;
         auth_id: string | null;
+        avatar_url: string | null;
         rol?: string | null;
         empresa_id?: number | null;
         equipo_id?: number | null;
@@ -59,16 +69,16 @@ export const getCurrentUserContext = cache(async (): Promise<CurrentUserContext 
   const { data: byAuthId } = await supabase
     .from("usuarios")
     .select(profileSelect)
-    .eq("auth_id", user.id)
+    .eq("auth_id", currentUser.id)
     .maybeSingle();
 
   profile = byAuthId;
 
-  if (!profile && user.email) {
+  if (!profile && currentUser.email) {
     const { data: byEmail } = await supabase
       .from("usuarios")
       .select(profileSelect)
-      .eq("correo", user.email)
+      .ilike("correo", currentUser.email)
       .maybeSingle();
 
     profile = byEmail;
@@ -90,10 +100,11 @@ export const getCurrentUserContext = cache(async (): Promise<CurrentUserContext 
   return {
     id: profile.id,
     authId: profile.auth_id,
-    email: user.email ?? profile.correo ?? null,
+    email: currentUser.email ?? profile.correo ?? null,
     nombre: profile.nombre,
     apellidos: profile.apellidos,
     role,
+    avatarUrl: profile.avatar_url,
     empresaId: profile.empresa_id ?? null,
     equipoId: profile.equipo_id ?? null,
     canDeletePropiedades: canDeletePropiedades(role),
