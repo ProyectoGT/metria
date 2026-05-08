@@ -185,7 +185,7 @@ export default function OrdenesClient({
 
     const { data, error } = editing
       ? await supabase.rpc("update_agenda_activity", { p_agenda_id: editing.id, ...args })
-      : await supabase.rpc("create_agenda_activity", { ...args, p_visibility: "private" });
+      : await supabase.rpc("create_agenda_activity_v2", { ...args, p_visibility: "private" });
 
     setSaving(false);
     if (error || !data) {

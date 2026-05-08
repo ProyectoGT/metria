@@ -266,7 +266,7 @@ export default async function DashboardPage() {
     applyPropFilters(
       supabase.from("propiedades")
         .select("id, propietario, planta, puerta, latitud, longitud, finca_id, fincas(id, numero, sector_id, sectores(id, numero, zona_id))")
-        .ilike("estado", "encargo")
+        .ilike("estado", "encarg%")
         .not("latitud", "is", null)
         .not("longitud", "is", null)
     ),
