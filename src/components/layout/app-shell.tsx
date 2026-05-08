@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase";
-import { normalizeUserRole } from "@/lib/roles";
+import { getCurrentUserContext } from "@/lib/current-user";
 import { redirect } from "next/navigation";
 import Sidebar from "./sidebar";
 import Header from "./header";
@@ -22,68 +22,43 @@ export default async function AppShell({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  let currentUser = user;
 
-  let userName = "Usuario";
-  let userEmail: string | null = null;
-  let userRole: ReturnType<typeof normalizeUserRole> | null = null;
-  let userId: number | null = null;
-  let userAvatarUrl: string | null = null;
+  if (!currentUser) {
+    const { data: { session } } = await supabase.auth.getSession();
+    currentUser = session?.user ?? null;
+  }
 
-  if (user) {
-    userEmail = user.email ?? null;
+  if (!currentUser) redirect("/login");
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let { data: profile } = await (supabase as any)
-      .from("usuarios")
-      .select("id, nombre, apellidos, rol, avatar_url")
-      .eq("auth_id", user.id)
-      .maybeSingle() as { data: { id: number; nombre: string; apellidos: string; rol: string; avatar_url: string | null } | null };
+  const ctx = await getCurrentUserContext();
 
-    if (!profile && user.email) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: byEmail } = await (supabase as any)
-        .from("usuarios")
-        .select("id, nombre, apellidos, rol, avatar_url")
-        .eq("correo", user.email)
-        .maybeSingle() as { data: { id: number; nombre: string; apellidos: string; rol: string; avatar_url: string | null } | null };
-      profile = byEmail;
-    }
-
-    if (!profile) {
-      redirect("/sin-acceso");
-    }
-
-    userName = `${profile.nombre} ${profile.apellidos}`.trim() || "Usuario";
-    userRole = normalizeUserRole(profile.rol);
-    userId = profile.id ?? null;
-    userAvatarUrl = profile.avatar_url
-      ?? (user.user_metadata?.avatar_url as string | undefined)
-      ?? null;
+  if (!ctx) {
+    redirect("/sin-acceso");
   }
 
   // Notificaciones: tareas pendientes del usuario actual
   let notifications: NotificationItem[] = [];
-  if (userId) {
-    const { data: tareas } = await supabase
-      .from("tareas")
-      .select("id, titulo, fecha, prioridad")
-      .eq("owner_user_id", userId)
-      .eq("estado", "pendiente")
-      .is("fecha", null)
-      .is("archived_at", null)
-      .order("fecha", { ascending: true, nullsFirst: false })
-      .limit(8);
-    notifications = (tareas ?? []) as NotificationItem[];
-  }
+  const { data: tareas } = await supabase
+    .from("tareas")
+    .select("id, titulo, fecha, prioridad")
+    .eq("owner_user_id", ctx.id)
+    .eq("estado", "pendiente")
+    .is("fecha", null)
+    .is("archived_at", null)
+    .order("fecha", { ascending: true, nullsFirst: false })
+    .limit(8);
+  notifications = (tareas ?? []) as NotificationItem[];
+
+  const userName = `${ctx.nombre} ${ctx.apellidos}`.trim() || "Usuario";
 
   return (
     <>
       <ThemeScript />
       <div className="min-h-screen bg-background md:grid md:grid-cols-[220px_minmax(0,1fr)]">
-        <Sidebar userRole={userRole} />
+        <Sidebar userRole={ctx.role} />
         <div className="flex h-screen min-w-0 flex-col">
-          <Header userName={userName} userEmail={userEmail} avatarUrl={userAvatarUrl} notifications={notifications} />
+          <Header userName={userName} userEmail={ctx.email} avatarUrl={ctx.avatarUrl} notifications={notifications} />
           <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
             {children}
           </main>
