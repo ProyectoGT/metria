@@ -51,7 +51,7 @@ export async function createAgendaAction(data: {
   if (!yo) throw new Error("No autenticado");
 
   const assignedUserIds = data.assignedUserIds?.length ? data.assignedUserIds : [yo.id];
-  const { data: row, error } = await supabase.rpc("create_agenda_activity", {
+  const { data: row, error } = await supabase.rpc("create_agenda_activity_v2", {
     p_description: data.description,
     p_event_date: normalizeDateKey(data.eventDate),
     p_time: normalizeTime(data.time, DEFAULT_ACTIVITY_TIME),
