@@ -63,6 +63,6 @@ export async function getAdminUserIds(empresaId: number): Promise<number[]> {
     .select("id")
     .eq("empresa_id", empresaId)
     .eq("rol", "Administrador")
-    .eq("activo", true);
+    .eq("estado", "active");
   return (data ?? []).map((u: { id: number }) => u.id);
 }

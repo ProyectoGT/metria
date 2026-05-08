@@ -66,7 +66,7 @@ export async function createAgendaAction(data: {
     throw new Error("Se requiere hora de inicio para configurar un recordatorio");
   }
 
-  const { data: row, error } = await supabase.rpc("create_agenda_activity", {
+  const { data: row, error } = await supabase.rpc("create_agenda_activity_v2", {
     p_description: data.description,
     p_event_date: normalizeDateKey(data.eventDate),
     p_time: normalizedStart,
@@ -80,7 +80,11 @@ export async function createAgendaAction(data: {
     p_reminder_minutes: data.reminderMinutes ?? undefined,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error("[createAgendaAction]", error.message);
+    throw new Error("No se pudo crear la actividad. Revisa fecha, hora y usuarios asignados.");
+  }
+
   revalidatePath("/dashboard");
   revalidatePath("/ordenes");
   revalidatePath("/calendario");
@@ -478,7 +482,7 @@ export async function convertTareaToAgendaFullAction(
     throw new Error("La hora de fin debe ser posterior a la hora de inicio");
   }
 
-  const { data: agendaRow, error: createError } = await supabase.rpc("create_agenda_activity", {
+  const { data: agendaRow, error: createError } = await supabase.rpc("create_agenda_activity_v2", {
     p_description: data.description,
     p_event_date: normalizeDateKey(data.eventDate),
     p_time: normalizedStart,
@@ -492,7 +496,10 @@ export async function convertTareaToAgendaFullAction(
     p_reminder_minutes: data.reminderMinutes ?? undefined,
   });
 
-  if (createError) throw new Error(createError.message);
+  if (createError) {
+    console.error("[convertTareaToAgendaFullAction]", createError.message);
+    throw new Error("No se pudo crear la actividad. Revisa fecha, hora y usuarios asignados.");
+  }
 
   const agendaId = (agendaRow as unknown as { id: number }).id;
 

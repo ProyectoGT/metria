@@ -517,7 +517,7 @@ export default function CalendarioClient({
           p_reminder_minutes: p.reminderMinutes ?? -1,
         });
       }
-      return supabase.rpc("create_agenda_activity", {
+      return supabase.rpc("create_agenda_activity_v2", {
         p_description: p.description,
         p_event_date: p.event_date,
         p_time: p.time,

@@ -68,7 +68,7 @@ function KanbanColumn({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={[
-              "flex min-h-[72px] flex-1 flex-col gap-2.5 overflow-y-auto px-3 py-2 transition-colors duration-150",
+              "flex min-h-[72px] flex-1 flex-col gap-2 overflow-y-auto px-3 py-3 transition-colors duration-150",
               "scrollbar-thin max-h-[420px]",
               snapshot.isDraggingOver ? "bg-primary/5" : "",
             ].join(" ")}

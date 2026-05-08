@@ -47,9 +47,17 @@ export async function login(formData: FormData) {
     if (!byAuthId && data.user.email) {
       const { data: byEmail } = await supabase
         .from("usuarios")
-        .select("id")
+        .select("id, auth_id")
         .eq("correo", data.user.email)
         .maybeSingle();
+
+      if (byEmail && !byEmail.auth_id) {
+        await supabase
+          .from("usuarios")
+          .update({ auth_id: data.user.id })
+          .eq("id", byEmail.id);
+      }
+
       profile = byEmail;
     } else {
       profile = byAuthId;

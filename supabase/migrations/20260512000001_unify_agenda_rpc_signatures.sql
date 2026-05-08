@@ -1,0 +1,143 @@
+-- ─── Eliminar ambiguedad de RPC create_agenda_activity ────────────────────────
+--
+-- Problema:
+--   Existian dos overloads de create_agenda_activity con firmas distintas:
+--     1. (text, date, time, text, text, text, boolean, bigint[], text) -> agenda
+--     2. (text, date, text, text, text, text, boolean, text, integer[], text, integer) -> json
+--   PostgREST no podia elegir la candidata correcta.
+--
+-- Solucion:
+--   - Eliminar ambos overloads antiguos (DROP FUNCTION IF EXISTS)
+--   - Crear funcion con nombre unico create_agenda_activity_v2
+--   - Sin ambiguedad: solo una funcion con ese nombre en todo el schema
+--   - Actualizar todas las llamadas en el frontend a la v2
+
+-- ── 1. Eliminar overloads antiguos de create_agenda_activity ──────────────────
+
+drop function if exists public.create_agenda_activity(
+  text, date, time, text, text, text, boolean, bigint[], text
+);
+
+drop function if exists public.create_agenda_activity(
+  text, date, text, text, text, text, boolean, text, integer[], text, integer
+);
+
+-- ── 2. Eliminar overload antiguo de update_agenda_activity ────────────────────
+-- (solo el que tenia p_time time without time zone y bigint[] sin time_end/reminder)
+-- El overload nuevo (con text, integer[], time_end, reminder) se conserva
+
+drop function if exists public.update_agenda_activity(
+  bigint, text, date, time, text, text, text, boolean, bigint[]
+);
+
+-- ── 3. Funcion unica: create_agenda_activity_v2 ────────────────────────────────
+-- Nombre unico → sin ambiguedad posible en PostgREST.
+-- p_time: time without time zone (coincide con agenda.time)
+-- p_time_end: text (coincide con agenda.time_end)
+-- p_assigned_user_ids: bigint[] (coincide con usuarios.id bigserial)
+
+create or replace function public.create_agenda_activity_v2(
+  p_description       text,
+  p_event_date        date,
+  p_time              time without time zone,
+  p_time_end          text            default null,
+  p_priority          text            default 'media',
+  p_tipo              text            default 'actividad',
+  p_completed         boolean         default false,
+  p_result            text            default null,
+  p_assigned_user_ids bigint[]        default null,
+  p_visibility        text            default 'private',
+  p_reminder_minutes  integer         default null
+)
+returns public.agenda
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id     bigint;
+  v_empresa_id  bigint;
+  v_equipo_id   bigint;
+  v_assigned    bigint[];
+  v_result      public.agenda;
+begin
+  -- Contexto del usuario actual
+  select id, empresa_id, equipo_id
+  into v_user_id, v_empresa_id, v_equipo_id
+  from usuarios
+  where auth_id = auth.uid()
+    and estado = 'active'
+  limit 1;
+
+  if v_user_id is null then
+    raise exception 'Usuario no encontrado o inactivo';
+  end if;
+
+  -- Validar descripcion
+  if p_description is null or trim(p_description) = '' then
+    raise exception 'La descripcion es obligatoria';
+  end if;
+
+  -- Validar fecha
+  if p_event_date is null then
+    raise exception 'La fecha es obligatoria';
+  end if;
+
+  -- Al menos un usuario asignado
+  v_assigned := coalesce(p_assigned_user_ids, array[v_user_id]);
+  if array_length(v_assigned, 1) is null or array_length(v_assigned, 1) = 0 then
+    raise exception 'Debe asignarse al menos un usuario';
+  end if;
+
+  -- Insertar actividad
+  insert into agenda (
+    description, event_date, time, time_end,
+    priority, tipo, completed, result,
+    user_id, owner_user_id, empresa_id, equipo_id,
+    visibility, reminder_minutes_before
+  )
+  values (
+    trim(p_description),
+    p_event_date,
+    p_time,
+    nullif(trim(coalesce(p_time_end, '')), ''),
+    coalesce(nullif(p_priority, ''), 'media'),
+    coalesce(nullif(p_tipo, ''), 'actividad'),
+    coalesce(p_completed, false),
+    nullif(trim(coalesce(p_result, '')), ''),
+    v_assigned[1],
+    v_user_id,
+    v_empresa_id,
+    v_equipo_id,
+    coalesce(nullif(p_visibility, ''), 'private'),
+    p_reminder_minutes
+  )
+  returning * into v_result;
+
+  -- Insertar asignaciones
+  insert into agenda_usuarios (agenda_id, usuario_id)
+  select v_result.id, uid
+  from unnest(v_assigned) as uid
+  on conflict (agenda_id, usuario_id) do nothing;
+
+  -- Registrar recordatorio si aplica
+  if p_reminder_minutes is not null then
+    perform upsert_agenda_reminders(
+      v_result.id,
+      p_event_date,
+      p_time::text,
+      p_reminder_minutes,
+      v_empresa_id
+    );
+  end if;
+
+  return v_result;
+end;
+$$;
+
+comment on function public.create_agenda_activity_v2 is
+  'Crea actividad en agenda (v2, nombre unico). Parametros: descripcion, fecha, hora time, hora fin text, prioridad, tipo, completado, resultado, usuarios bigint[], visibilidad, recordatorio.';
+
+-- ── 4. Recargar schema en PostgREST ────────────────────────────────────────────
+
+notify pgrst, 'reload schema';

@@ -53,6 +53,18 @@ export function canDeleteZonas(role: UserRole) {
   return canDeleteSectores(role);
 }
 
+export function canDrawZones(role: UserRole) {
+  return role === "Administrador" || role === "Director";
+}
+
+export function canEditZoneGeometry(role: UserRole) {
+  return role === "Administrador" || role === "Director";
+}
+
+export function canDeleteZonasGeograficas(role: UserRole) {
+  return role === "Administrador" || role === "Director";
+}
+
 export function canManageConfirmationPassword(role: UserRole) {
   return role === "Administrador";
 }

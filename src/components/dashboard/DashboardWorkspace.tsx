@@ -43,6 +43,7 @@ import AgentPerformanceTable from "@/components/dashboard/AgentPerformanceTable"
 import MyActivity from "@/components/dashboard/MyActivity";
 import AgentOfMonth from "@/components/dashboard/AgentOfMonth";
 import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
+import type { ZonaGeografica } from "@/types";
 
 type MetricKey = "noticias" | "investigaciones" | "encargos" | "pedidosActivos";
 
@@ -92,6 +93,7 @@ type Props = {
     anadido_por: string;
   } | null;
   assignableAgents: Array<{ id: string; nombre: string }>;
+  zonasGeograficas: ZonaGeografica[];
 };
 
 const METRIC_ACCENT: Record<MetricKey, string> = {
@@ -317,12 +319,18 @@ export default function DashboardWorkspace(props: Props) {
     currentDateLabel,
     agenteMesData,
     assignableAgents,
+    zonasGeograficas,
   } = props;
 
   const metricCards = useMemo(() => buildMetricCards(summary), [summary]);
   const [activeFilter, setActiveFilter] = useState<MetricKey | null>(null);
   const [openInsight, setOpenInsight] = useState<IntelligenceKey | null>(null);
   const [openDevelopment, setOpenDevelopment] = useState(false);
+  const [layerVisibility, setLayerVisibility] = useState({
+    zonas: true,
+    noticias: true,
+    encargos: true,
+  });
 
   function handleMetricClick(key: MetricKey) {
     setActiveFilter((prev) => (prev === key ? null : key));
@@ -488,35 +496,87 @@ export default function DashboardWorkspace(props: Props) {
           <div className="flex flex-col gap-3 border-b border-border bg-surface px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <h2 className="text-sm font-semibold text-text-primary">Mapa</h2>
-              <p className="mt-0.5 text-xs text-text-secondary">Noticias y encargos con contexto geografico.</p>
+              <p className="mt-0.5 text-xs text-text-secondary">Noticias, encargos y zonas con contexto geografico.</p>
             </div>
             <div className="shrink-0 flex flex-wrap items-center gap-3 text-xs text-text-secondary">
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-3 w-3 rounded-sm bg-gray-900 dark:bg-gray-100" />
                 Oficina
               </span>
-              <span className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setLayerVisibility((prev) => ({ ...prev, zonas: !prev.zonas }))}
+                className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 transition-colors ${
+                  layerVisibility.zonas
+                    ? "border-primary/40 bg-primary/8 text-primary"
+                    : "border-border text-text-secondary hover:bg-surface-raised"
+                }`}
+              >
+                <span className="inline-block h-3 w-3 rounded-sm bg-purple-500" />
+                Zonas
+                {zonasGeograficas.length > 0 && (
+                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                    layerVisibility.zonas
+                      ? "bg-primary/12 text-primary"
+                      : "bg-muted text-text-secondary"
+                  }`}>
+                    {zonasGeograficas.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setLayerVisibility((prev) => ({ ...prev, noticias: !prev.noticias }))}
+                className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 transition-colors ${
+                  layerVisibility.noticias
+                    ? "border-primary/40 bg-primary/8 text-primary"
+                    : "border-border text-text-secondary hover:bg-surface-raised"
+                }`}
+              >
                 <span className="inline-block h-3 w-3 rounded-full bg-blue-500" />
-                Noticia
+                Noticias
                 {noticiasMap.length > 0 && (
-                  <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                    layerVisibility.noticias
+                      ? "bg-primary/12 text-primary"
+                      : "bg-muted text-text-secondary"
+                  }`}>
                     {noticiasMap.length}
                   </span>
                 )}
-              </span>
-              <span className="flex items-center gap-1.5">
+              </button>
+              <button
+                type="button"
+                onClick={() => setLayerVisibility((prev) => ({ ...prev, encargos: !prev.encargos }))}
+                className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 transition-colors ${
+                  layerVisibility.encargos
+                    ? "border-primary/40 bg-primary/8 text-primary"
+                    : "border-border text-text-secondary hover:bg-surface-raised"
+                }`}
+              >
                 <span className="inline-block h-3 w-3 rounded-full bg-green-500" />
-                Encargo
+                Encargos
                 {encargosMap.length > 0 && (
-                  <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                    layerVisibility.encargos
+                      ? "bg-primary/12 text-primary"
+                      : "bg-muted text-text-secondary"
+                  }`}>
                     {encargosMap.length}
                   </span>
                 )}
-              </span>
+              </button>
             </div>
           </div>
           <div className="flex-1">
-            <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
+            <MapaDashboardLazy
+              noticias={noticiasMap}
+              encargos={encargosMap}
+              zonasGeograficas={zonasGeograficas}
+              showZonas={layerVisibility.zonas}
+              showNoticias={layerVisibility.noticias}
+              showEncargos={layerVisibility.encargos}
+            />
           </div>
         </div>
       </div>

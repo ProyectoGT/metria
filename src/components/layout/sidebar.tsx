@@ -42,6 +42,7 @@ const MAIN_NAV = [
   { label: "Hoy",            href: "/hoy",           resourceKey: "dashboard",    icon: Sun },
   { label: "Dashboard",      href: "/dashboard",    resourceKey: "dashboard",    icon: LayoutDashboard },
   { label: "Zona",           href: "/zona",          resourceKey: "zona",         icon: MapPin },
+  { label: "Zonas en Mapa",  href: "/zonas-geograficas", resourceKey: "zonas-geograficas", icon: MapPin },
   { label: "Propiedades",    href: "/propiedades",   resourceKey: "propiedades",  icon: Building2 },
   { label: "Solicitudes",    href: "/solicitudes",   resourceKey: "solicitudes",  icon: ClipboardList },
   { label: "Contactos",      href: "/contactos",     resourceKey: "contactos",    icon: BookUser },
@@ -180,6 +181,9 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
 
   function isActive(href: string) {
     if (href === "/dashboard") return pathname === "/dashboard";
+    if (href === "/zona") {
+      return pathname === "/zona" || pathname.startsWith("/zona/");
+    }
     return pathname.startsWith(href);
   }
 

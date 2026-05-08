@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo } from "react";
 import { motion } from "framer-motion";
 import { Bell, Calendar, User, CheckCircle2, Circle, ExternalLink, AlertCircle, GripVertical } from "lucide-react";
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
@@ -75,18 +75,15 @@ function KanbanCard({
   isDragging,
 }: KanbanCardProps) {
   const badge = priorityBadge[card.priority];
-  const [completing, setCompleting] = useState(false);
-  const done = isCompleted || completing;
 
   function handleComplete(e: React.MouseEvent) {
     e.stopPropagation();
-    if (completing || !onComplete) return;
-    setCompleting(true);
-    setTimeout(() => { onComplete(card.id); }, 700);
+    if (!onComplete) return;
+    onComplete(card.id);
   }
 
   function handleClick() {
-    if (!completing && !isCompleted && onClick) {
+    if (!isCompleted && onClick) {
       onClick(card.id);
     }
   }
@@ -97,38 +94,30 @@ function KanbanCard({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      whileHover={{ y: -2, boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}
+      whileHover={{ boxShadow: "0 6px 20px rgba(0,0,0,0.08)" }}
       onClick={handleClick}
       className={[
-        "group relative rounded-2xl border bg-surface p-4 shadow-sm",
+        "group relative rounded-2xl border bg-surface p-4 pb-3 shadow-sm",
         "select-none transition-shadow duration-150",
-        onClick && !done ? "cursor-pointer" : "",
-        done
+        onClick && !isCompleted ? "cursor-pointer" : "",
+        isCompleted
           ? "border-border bg-surface-raised opacity-60"
           : "border-border hover:border-primary/20",
         isDragging ? "z-50 shadow-2xl rotate-[2deg] scale-[1.03] border-primary/25 bg-surface" : "",
-        completing && !isCompleted ? "scale-95 opacity-40" : "",
       ].join(" ")}
       style={isDragging ? { pointerEvents: "none" } : undefined}
       layout
       layoutId={card.id}
     >
-      {/* Drag handle decorativo */}
-      {!done && (
-        <div className="absolute right-3 top-3.5 opacity-0 transition-opacity group-hover:opacity-25 pointer-events-none">
-          <GripVertical className="h-3.5 w-3.5 text-text-secondary" />
-        </div>
-      )}
-
       {/* ── Cabecera: badges + acciones ────────────────────────────── */}
       <div className="mb-2.5 flex items-center justify-between gap-2">
         {/* Badges de estado */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.cls} ${done ? "opacity-40" : ""}`}>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.cls} ${isCompleted ? "opacity-40" : ""}`}>
             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${badge.dot}`} />
             {badge.label}
           </span>
-          {card.fromOrdenDia && !done && (
+          {card.fromOrdenDia && !isCompleted && (
             <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
               Hoy
             </span>
@@ -136,35 +125,31 @@ function KanbanCard({
         </div>
 
         {/* Acciones */}
-        <div className="flex shrink-0 items-center gap-0.5">
-          {isCompleted && (
-            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />
-          )}
-          {onComplete && !isCompleted && !completing && (
+        <div className="flex shrink-0 items-center gap-1">
+          {isCompleted ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+          ) : onComplete ? (
             <button
               onClick={handleComplete}
               className="rounded-lg p-1 text-text-secondary transition-colors hover:bg-success/10 hover:text-success"
               aria-label="Marcar como realizada"
             >
-              <Circle className="h-3.5 w-3.5" />
+              <Circle className="h-4 w-4" />
             </button>
-          )}
-          {completing && (
-            <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-          )}
+          ) : null}
         </div>
       </div>
 
       {/* ── Título ────────────────────────────────────────────────── */}
       <p className={[
         "text-sm font-medium leading-snug transition-all duration-300",
-        done ? "line-through text-text-secondary" : "text-text-primary",
+        isCompleted ? "line-through text-text-secondary" : "text-text-primary",
       ].join(" ")}>
         {card.title}
       </p>
 
       {/* ── Descripción ──────────────────────────────────────────── */}
-      {card.description && !done && (
+      {card.description && !isCompleted && (
         <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-text-secondary">
           {card.description}
         </p>
@@ -178,7 +163,7 @@ function KanbanCard({
       )}
 
       {/* ── Footer: fecha + duración + recordatorio + asignados ─────── */}
-      {!done && (card.dueDate || card.assignedUsers?.length || card.assignedBy || card.reminderMinutesBefore != null) && (
+      {!isCompleted && (card.dueDate || card.assignedUsers?.length || card.assignedBy || card.reminderMinutesBefore != null) && (
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-2.5">
           {card.dueDate && (() => {
             const status = getDateStatus(card.dueDate);
@@ -223,6 +208,13 @@ function KanbanCard({
               }
             </span>
           )}
+        </div>
+      )}
+
+      {/* Drag handle — solo visible en hover */}
+      {!isCompleted && (
+        <div className="mt-2 flex justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-20 pointer-events-none">
+          <GripVertical className="h-3.5 w-3.5 text-text-secondary" />
         </div>
       )}
     </motion.div>

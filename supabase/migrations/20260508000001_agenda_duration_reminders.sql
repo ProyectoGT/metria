@@ -193,7 +193,7 @@ BEGIN
   INTO v_user_id, v_empresa_id, v_equipo_id
   FROM usuarios
   WHERE auth_id = auth.uid()
-    AND activo = TRUE
+    AND estado = 'active'
   LIMIT 1;
 
   IF v_user_id IS NULL THEN

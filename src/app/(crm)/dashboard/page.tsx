@@ -5,6 +5,7 @@ import { getPeriodRange, mergeRendimientoRows } from "@/lib/desarrollo-metrics";
 import { getNextBestActions } from "@/lib/next-actions";
 import { generateAndFetchSuggestions } from "@/lib/pipeline-suggestions";
 import { detectLostOpportunities } from "@/lib/opportunities";
+import { listZonasGeograficas } from "@/lib/zonas-geograficas/actions";
 import {
   emptyRendimiento,
   type SummaryData,
@@ -143,6 +144,7 @@ export default async function DashboardPage() {
     nextBestActions,
     pipelineSuggestions,
     lostOpportunities,
+    zonasGeograficas,
   ] = await Promise.all([
     applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "noticia")),
     applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "investig%")),
@@ -222,6 +224,7 @@ export default async function DashboardPage() {
     nextBestActionsPromise,
     pipelineSuggestionsPromise,
     lostOpportunitiesPromise,
+    listZonasGeograficas(),
   ]);
 
   // ─── 2. Summary data ─────────────────────────────────────────────────────
@@ -583,6 +586,7 @@ export default async function DashboardPage() {
       currentDateLabel={currentDateLabel}
       agenteMesData={agenteMesData}
       assignableAgents={assignableAgents}
+      zonasGeograficas={zonasGeograficas}
     />
   );
 }

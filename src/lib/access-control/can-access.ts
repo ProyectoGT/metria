@@ -25,6 +25,10 @@ const BASE_PERMISSION: Record<string, (role: UserRole) => boolean> = {
   "zones.delete_sector": (r) => r === "Administrador" || r === "Director",
   "zones.delete_zona":   (r) => r === "Administrador" || r === "Director",
 
+  "zones.draw_new":      (r) => r === "Administrador" || r === "Director",
+  "zones.edit_geometry": (r) => r === "Administrador" || r === "Director",
+  "zones.archive":       (r) => r === "Administrador" || r === "Director",
+
   "users.create":        (r) => r === "Administrador" || r === "Director",
   "users.edit":          (r) => r === "Administrador" || r === "Director",
   "users.delete":        (r) => r === "Administrador" || r === "Director",
@@ -92,6 +96,7 @@ export async function canUseFeature(
 export const PAGE_HREF: Record<string, string> = {
   dashboard:  "/dashboard",
   zona:       "/zona",
+  "zonas-geograficas": "/zonas-geograficas",
   propiedades: "/propiedades",
   solicitudes: "/solicitudes",
   contactos:  "/contactos",
