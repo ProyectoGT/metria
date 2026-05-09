@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useUIStore } from "@/stores/ui.store";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
@@ -114,7 +115,9 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
   const pathname = usePathname();
   const { t } = useI18n();
 
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const sidebarOpen   = useUIStore((s) => s.sidebarOpen);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const closeSidebar  = useUIStore((s) => s.closeSidebar);
 
   const userRole = _userRole ? normalizeUserRole(_userRole) : null;
   const role = userRole ?? "Agente";
@@ -127,16 +130,17 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
     return !deniedSet.has(key);
   }
 
+  // Mantener compatibilidad con el evento legacy del Header (sidebar:toggle)
   useEffect(() => {
-    function handleToggle() { setMobileOpen((prev) => !prev); }
-    window.addEventListener("sidebar:toggle", handleToggle);
-    return () => window.removeEventListener("sidebar:toggle", handleToggle);
-  }, []);
+    window.addEventListener("sidebar:toggle", toggleSidebar);
+    return () => window.removeEventListener("sidebar:toggle", toggleSidebar);
+  }, [toggleSidebar]);
 
+  // Cerrar al navegar
   useEffect(() => {
-    const id = window.requestAnimationFrame(() => setMobileOpen(false));
+    const id = window.requestAnimationFrame(closeSidebar);
     return () => window.cancelAnimationFrame(id);
-  }, [pathname]);
+  }, [pathname, closeSidebar]);
 
   function isActive(href: string) {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -159,7 +163,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
           priority
         />
         <button
-          onClick={() => setMobileOpen(false)}
+          onClick={() => closeSidebar()}
           className="absolute right-3 rounded-lg p-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white md:hidden"
           aria-label={t("navigation.closeMenu")}
         >
@@ -224,15 +228,15 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
       <div
         className={[
           "fixed inset-0 z-40 bg-black/20 transition-opacity duration-300 md:hidden",
-          mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
+          sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
         ].join(" ")}
-        onClick={() => setMobileOpen(false)}
+        onClick={() => closeSidebar()}
         aria-hidden="true"
       />
       <aside
         className={[
           `${sidebarClass} ${borderClass} transition-transform duration-300 ease-out md:hidden`,
-          mobileOpen ? "translate-x-0 shadow-xl" : "-translate-x-full",
+          sidebarOpen ? "translate-x-0 shadow-xl" : "-translate-x-full",
         ].join(" ")}
       >
         {navContent}
