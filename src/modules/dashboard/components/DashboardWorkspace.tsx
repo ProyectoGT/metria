@@ -582,14 +582,14 @@ export default function DashboardWorkspace(props: Props) {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <SectionCard
-          title="Orden del dia"
-          description="Actividad operativa y proximas acciones del dia."
-          padding="none"
-        >
-          {showOrdenDia ? (
-            <OrdenDiaPanel agentes={ordenDiaAgentes} />
-          ) : (
+        {showOrdenDia ? (
+          <OrdenDiaPanel agentes={ordenDiaAgentes} />
+        ) : (
+          <div className="rounded-2xl border border-border bg-surface shadow-sm">
+            <div className="border-b border-border bg-surface-elevated px-5 py-4">
+              <h2 className="text-sm font-semibold text-text-primary">Orden del dia</h2>
+              <p className="mt-0.5 text-xs text-text-secondary">Actividad operativa y proximas acciones del dia.</p>
+            </div>
             <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-3">
               <Card padding="sm" className="border-border bg-surface-raised/45">
                 <p className="text-xs font-medium text-text-secondary">Pendientes</p>
@@ -610,8 +610,8 @@ export default function DashboardWorkspace(props: Props) {
                 </p>
               </Card>
             </div>
-          )}
-        </SectionCard>
+          </div>
+        )}
 
         <SectionCard
           title="Desarrollo"

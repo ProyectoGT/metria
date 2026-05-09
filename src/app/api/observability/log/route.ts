@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { apiSuccess, handleApiError } from "@/lib/api";
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,9 +31,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true });
+    return apiSuccess({ ok: true });
   } catch (error) {
     console.error("[observability] Error processing log batch:", error);
-    return NextResponse.json({ ok: false }, { status: 500 });
+    return handleApiError(error);
   }
 }

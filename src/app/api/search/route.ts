@@ -269,5 +269,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ results: results.slice(0, 40) });
+  const finalResults = results.slice(0, 40);
+  // Respuesta estándar (nuevo formato) + compatibilidad legacy
+  return NextResponse.json({
+    data: { results: finalResults },
+    results: finalResults, // ← legacy: mantener hasta migrar clientes
+  });
 }
