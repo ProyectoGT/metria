@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  const start = Date.now();
   const { pathname } = request.nextUrl;
 
   const isPublicPage =
@@ -65,6 +66,14 @@ export async function middleware(request: NextRequest) {
   // Con sesión y en página pública → dashboard
   if (isAuthenticated && isPublicPage) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  const duration = Date.now() - start;
+  response.headers.set("X-Response-Time", `${duration}ms`);
+
+  // Log slow requests in production
+  if (duration > 2000) {
+    console.warn(`[SLOW] ${request.method} ${pathname} — ${duration}ms`);
   }
 
   return response;

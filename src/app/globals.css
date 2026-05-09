@@ -173,7 +173,7 @@
   --color-state-hover:    rgba(15, 23, 42, 0.045);
   --color-state-active:   rgba(37, 99, 235, 0.10);
   --color-state-disabled: rgba(100, 116, 139, 0.42);
-  --color-overlay:        rgba(15, 23, 42, 0.18);
+  --color-overlay:        rgba(15, 23, 42, 0.05);
   --color-map-surface:    #ffffff;
   --color-map-muted:      #f8fafc;
 
@@ -225,7 +225,7 @@ html[data-theme="dark"] {
   --color-state-hover:   rgba(148, 163, 184, 0.10);
   --color-state-active:  rgba(96, 165, 250, 0.16);
   --color-state-disabled:rgba(148, 163, 184, 0.32);
-  --color-overlay:       rgba(2, 6, 23, 0.52);
+  --color-overlay:       rgba(2, 6, 23, 0.05);
   --color-map-surface:   #172033;
   --color-map-muted:     #202d44;
   --shadow-layer-1: 0 1px 2px rgba(0, 0, 0, 0.28);
@@ -271,7 +271,7 @@ html[data-theme="dark-black"] {
   --color-state-hover:    rgba(229, 229, 229, 0.07);
   --color-state-active:   rgba(96, 165, 250, 0.17);
   --color-state-disabled: rgba(118, 118, 118, 0.35);
-  --color-overlay:        rgba(0, 0, 0, 0.68);
+  --color-overlay:        rgba(0, 0, 0, 0.05);
   --color-map-surface:    #101010;
   --color-map-muted:      #171717;
   --shadow-layer-1: 0 1px 3px rgba(0, 0, 0, 0.55);
