@@ -63,6 +63,18 @@
     @apply border-l border-border bg-surface shadow-layer-3;
   }
 
+  .theme-panel {
+    @apply border border-border bg-surface shadow-layer-1;
+  }
+
+  .theme-panel-elevated {
+    @apply border border-border bg-surface-elevated shadow-layer-2;
+  }
+
+  .map-surface {
+    @apply border border-border bg-map-surface shadow-layer-1;
+  }
+
   html.dark .input {
     background-color: var(--color-surface);
     color: var(--color-text-primary);
@@ -94,6 +106,7 @@
   --color-accent:        #f59e0b;
   --color-success:       #16a34a;
   --color-danger:        #dc2626;
+  --color-danger-dark:   #b91c1c;
   --color-warning:       #f59e0b;
   --color-muted:         #f1f5f9;
 
@@ -105,6 +118,7 @@
   --color-sidebar:       #ffffff;
   --color-sidebar-hover: #f1f5f9;
   --color-sidebar-logo:  #0f1729;
+  --color-sidebar-active:#eff6ff;
 
   /* ── Texto ────────────────────────────────────────────────────────────── */
   --color-text-primary:   #0f172a;
@@ -119,6 +133,9 @@
   --color-state-hover:    rgba(15, 23, 42, 0.045);
   --color-state-active:   rgba(37, 99, 235, 0.10);
   --color-state-disabled: rgba(100, 116, 139, 0.42);
+  --color-overlay:        rgba(15, 23, 42, 0.18);
+  --color-map-surface:    #ffffff;
+  --color-map-muted:      #f8fafc;
 
   /* Escalas reutilizables */
   --spacing-ds-xs: 0.25rem;
@@ -139,7 +156,8 @@
 }
 
 /* ── Dark mode — deep slate, calm contrast ─────────────────────────────── */
-html.dark {
+html.dark,
+html[data-theme="dark"] {
   color-scheme: dark;
   --color-primary:       #60a5fa;
   --color-primary-light: #93c5fd;
@@ -148,14 +166,16 @@ html.dark {
   --color-accent:        #fbbf24;
   --color-success:       #4ade80;
   --color-danger:        #f87171;
+  --color-danger-dark:   #ef4444;
   --color-warning:       #fbbf24;
   --color-background:    #0f172a;
   --color-surface:       #182235;
   --color-surface-elevated:#1c2940;
   --color-surface-raised:#22304a;
-  --color-sidebar:       #111827;
-  --color-sidebar-hover: #1f2a3d;
+  --color-sidebar:       #101827;
+  --color-sidebar-hover: #1d2a3f;
   --color-sidebar-logo:  #0b1220;
+  --color-sidebar-active:#17345d;
   --color-text-primary:  #f8fafc;
   --color-text-secondary:#aebbd0;
   --color-border:        #334155;
@@ -165,19 +185,25 @@ html.dark {
   --color-state-hover:   rgba(148, 163, 184, 0.10);
   --color-state-active:  rgba(96, 165, 250, 0.16);
   --color-state-disabled:rgba(148, 163, 184, 0.32);
+  --color-overlay:       rgba(2, 6, 23, 0.52);
+  --color-map-surface:   #172033;
+  --color-map-muted:     #202d44;
   --shadow-layer-1: 0 1px 2px rgba(0, 0, 0, 0.28);
   --shadow-layer-2: 0 14px 34px rgba(0, 0, 0, 0.30);
   --shadow-layer-3: 0 26px 68px rgba(0, 0, 0, 0.46);
 }
 
-html.dark body {
+html.dark body,
+html[data-theme="dark"] body {
   background:
-    radial-gradient(circle at 20% -10%, rgba(96, 165, 250, 0.07), transparent 32rem),
+    radial-gradient(circle at 14% -10%, rgba(96, 165, 250, 0.10), transparent 30rem),
+    radial-gradient(circle at 90% 0%, rgba(20, 184, 166, 0.055), transparent 26rem),
     linear-gradient(180deg, #111c31 0%, var(--color-background) 24rem);
 }
 
 /* ── Dark-black — true black, fondo puro ──────────────────────────────── */
-html.dark.dark-black {
+html.dark.dark-black,
+html[data-theme="dark-black"] {
   color-scheme: dark;
   --color-primary:        #60a5fa;
   --color-primary-light:  #93c5fd;
@@ -186,6 +212,7 @@ html.dark.dark-black {
   --color-accent:         #fbbf24;
   --color-success:        #4ade80;
   --color-danger:         #f87171;
+  --color-danger-dark:    #ef4444;
   --color-warning:        #fbbf24;
   --color-background:     #000000;
   --color-surface:        #0c0c0c;
@@ -194,6 +221,7 @@ html.dark.dark-black {
   --color-sidebar:        #050505;
   --color-sidebar-hover:  #121212;
   --color-sidebar-logo:   #000000;
+  --color-sidebar-active: #111827;
   --color-text-primary:   #e5e5e5;
   --color-text-secondary: #767676;
   --color-border:         #1e1e1e;
@@ -203,12 +231,16 @@ html.dark.dark-black {
   --color-state-hover:    rgba(229, 229, 229, 0.07);
   --color-state-active:   rgba(96, 165, 250, 0.17);
   --color-state-disabled: rgba(118, 118, 118, 0.35);
+  --color-overlay:        rgba(0, 0, 0, 0.68);
+  --color-map-surface:    #101010;
+  --color-map-muted:      #171717;
   --shadow-layer-1: 0 1px 3px rgba(0, 0, 0, 0.55);
   --shadow-layer-2: 0 8px 24px rgba(0, 0, 0, 0.65);
   --shadow-layer-3: 0 20px 56px rgba(0, 0, 0, 0.75);
 }
 
-html.dark.dark-black body {
+html.dark.dark-black body,
+html[data-theme="dark-black"] body {
   /* Sin gradiente azul, fondo negro puro */
   background: #000000;
 }
@@ -230,6 +262,20 @@ body {
     linear-gradient(180deg, #fbfdff 0%, var(--color-background) 26rem);
   color: var(--color-text-primary);
   text-rendering: optimizeLegibility;
+}
+
+.shadow-sm {
+  box-shadow: var(--shadow-layer-1);
+}
+
+.shadow-md,
+.shadow-lg {
+  box-shadow: var(--shadow-layer-2);
+}
+
+.shadow-xl,
+.shadow-2xl {
+  box-shadow: var(--shadow-layer-3);
 }
 
 ::selection {

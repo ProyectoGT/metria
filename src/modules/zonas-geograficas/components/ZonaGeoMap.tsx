@@ -7,6 +7,11 @@ import type { ZonaGeografica } from "@/modules/zonas-geograficas/services/types"
 const MAP_ID = "metria-zonageo-map";
 const DEFAULT_CENTER = { lat: 41.365795, lng: 2.053508 };
 
+function themeColor(name: string, fallback: string) {
+  if (typeof window === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
 export function zonaToPaths(z: ZonaGeografica): { lat: number; lng: number }[] {
   if (z.geojson.type === "Polygon") {
     return z.geojson.coordinates[0].map((c) => ({ lat: c[1], lng: c[0] }));
@@ -57,9 +62,9 @@ function DrawingHandler({
         drawingModes: [drawingLib.OverlayType.POLYGON],
       },
       polygonOptions: {
-        fillColor: "#2563eb",
+        fillColor: themeColor("--color-primary", "#2563eb"),
         fillOpacity: 0.15,
-        strokeColor: "#2563eb",
+        strokeColor: themeColor("--color-primary", "#2563eb"),
         strokeWeight: 2,
         editable: true,
         draggable: true,
@@ -122,39 +127,43 @@ export default function ZonaGeoMap({
   onDrawingComplete,
   onMapReady,
 }: ZonaGeoMapProps) {
-  return (
-    <APIProvider
-      apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""}
-      libraries={["drawing"]}
-    >
-      <Map
-        defaultCenter={DEFAULT_CENTER}
-        defaultZoom={14}
-        gestureHandling="greedy"
-        mapId={MAP_ID}
-        style={{ width: "100%", height: "100%", minHeight: "400px" }}
-        disableDefaultUI={false}
-        onTilesLoaded={onMapReady}
-      >
-        {zonas.map((z) => (
-          <Polygon
-            key={z.id}
-            paths={zonaToPaths(z)}
-            strokeColor={z.id === selectedZonaId ? "#f59e0b" : z.color}
-            strokeOpacity={0.85}
-            strokeWeight={z.id === selectedZonaId ? 3 : 2}
-            fillColor={z.color}
-            fillOpacity={z.id === selectedZonaId ? 0.25 : 0.12}
-            editable={z.id === editableZonaId}
-            draggable={z.id === editableZonaId}
-            clickable={true}
-            onClick={() => onZonaClick(z)}
-            zIndex={z.id === selectedZonaId ? 10 : 1}
-          />
-        ))}
+  const selectedStroke = themeColor("--color-warning", "#f59e0b");
 
-        <DrawingHandler active={drawingMode} onPolygonComplete={onDrawingComplete} />
-      </Map>
-    </APIProvider>
+  return (
+    <div className="map-surface h-full w-full overflow-hidden rounded-ds-lg">
+      <APIProvider
+        apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""}
+        libraries={["drawing"]}
+      >
+        <Map
+          defaultCenter={DEFAULT_CENTER}
+          defaultZoom={14}
+          gestureHandling="greedy"
+          mapId={MAP_ID}
+          style={{ width: "100%", height: "100%", minHeight: "400px" }}
+          disableDefaultUI={false}
+          onTilesLoaded={onMapReady}
+        >
+          {zonas.map((z) => (
+            <Polygon
+              key={z.id}
+              paths={zonaToPaths(z)}
+              strokeColor={z.id === selectedZonaId ? selectedStroke : z.color}
+              strokeOpacity={0.85}
+              strokeWeight={z.id === selectedZonaId ? 3 : 2}
+              fillColor={z.color}
+              fillOpacity={z.id === selectedZonaId ? 0.25 : 0.12}
+              editable={z.id === editableZonaId}
+              draggable={z.id === editableZonaId}
+              clickable={true}
+              onClick={() => onZonaClick(z)}
+              zIndex={z.id === selectedZonaId ? 10 : 1}
+            />
+          ))}
+
+          <DrawingHandler active={drawingMode} onPolygonComplete={onDrawingComplete} />
+        </Map>
+      </APIProvider>
+    </div>
   );
 }

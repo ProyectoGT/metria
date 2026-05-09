@@ -68,7 +68,7 @@ function NavItem({
         className={[
           "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150",
           active
-            ? "bg-primary/10 text-primary"
+            ? "bg-sidebar-active text-primary"
             : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary",
         ].join(" ")}
       >
@@ -153,7 +153,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
   const navContent = (
     <div className="flex h-full min-h-0 flex-col">
       {/* ── Logo ─────────────────────────────────────────────────── */}
-      <div className="relative flex h-16 shrink-0 items-center justify-center border-b border-border/60 bg-sidebar-logo px-4">
+      <div className="relative flex h-16 shrink-0 items-center justify-center border-b border-border bg-sidebar-logo px-4">
         <Image
           src="/logo-bg-master-iberica.png"
           alt="Master Ibérica"
@@ -164,7 +164,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
         />
         <button
           onClick={() => closeSidebar()}
-          className="absolute right-3 rounded-lg p-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white md:hidden"
+          className="absolute right-3 rounded-lg p-1.5 text-white/70 transition-colors hover:bg-white/10 hover:text-white md:hidden"
           aria-label={t("navigation.closeMenu")}
         >
           <X className="h-4 w-4" />
@@ -203,7 +203,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
         )}
 
         {/* Soporte + Configuración */}
-        <div className="mt-3 border-t border-border/60 pt-3">
+        <div className="mt-3 border-t border-border pt-3">
           {isNavVisible("soporte") && (
             <NavItem href="/soporte" icon={LifeBuoy} label={t("navigation.support")} active={isActive("/soporte")} />
           )}
@@ -227,7 +227,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
 
       <div
         className={[
-          "fixed inset-0 z-40 bg-black/20 transition-opacity duration-300 md:hidden",
+          "fixed inset-0 z-40 bg-overlay transition-opacity duration-300 md:hidden",
           sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
         ].join(" ")}
         onClick={() => closeSidebar()}

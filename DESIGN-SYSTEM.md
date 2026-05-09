@@ -8,7 +8,7 @@ Cards amplias, mucho aire, jerarquía clara, dark mode excelente.
 ## Tokens de color
 
 Definidos en `src/app/globals.css` dentro del bloque `@theme {}`.
-Los dark mode overrides están en `html.dark {}`.
+Los overrides de tema están en `html[data-theme="light"]` implícito, `html[data-theme="dark"]` y `html[data-theme="dark-black"]`, manteniendo compatibilidad con las clases `dark` y `dark-black`.
 
 | Token | Light | Dark | Uso |
 |-------|-------|------|-----|
@@ -21,12 +21,19 @@ Los dark mode overrides están en `html.dark {}`.
 | `text-text-secondary` | #64748b | #a1a1aa | Texto secundario |
 | `border-border` | #e2e8f0 | #27272a | Bordes |
 | `border-border-strong` | #cbd5e1 | #475569 | Bordes en hover/foco suave |
+| `bg-sidebar` | #ffffff | #101827 | Sidebar |
+| `bg-sidebar-hover` | #f1f5f9 | #1d2a3f | Hover del sidebar |
+| `bg-sidebar-active` | #eff6ff | #17345d | Navegación activa |
+| `bg-overlay` | rgba(...) | rgba(...) | Overlays de modales/drawers |
+| `bg-map-surface` | #ffffff | #172033 | Contenedores de mapa |
 | `text-primary` | #2563eb | = | Acción primaria |
 | `text-success` | #16a34a | = | Éxito |
 | `text-danger` | #dc2626 | = | Error / Destructivo |
 | `text-warning` | #f59e0b | = | Advertencia / Amber |
 
 Los tokens canónicos están en `src/app/globals.css`; las clases semánticas y mapas de estado están en `src/lib/design-system.ts`.
+
+La preferencia de tema se guarda en `localStorage`, cookie `metria-theme` y `user_preferences.theme`, y se aplica antes de la hidratación desde `ThemeScript`.
 
 ---
 

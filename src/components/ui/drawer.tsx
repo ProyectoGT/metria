@@ -81,7 +81,7 @@ export default function Drawer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="absolute inset-0 bg-black/8"
+            className="absolute inset-0 bg-overlay"
             onClick={onClose}
             aria-hidden="true"
           />

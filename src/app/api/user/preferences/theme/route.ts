@@ -37,5 +37,12 @@ export async function POST(request: NextRequest) {
     }, { onConflict: "user_id" });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ ok: true });
+
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set("metria-theme", theme, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+  });
+  return response;
 }

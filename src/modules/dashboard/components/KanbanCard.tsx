@@ -7,11 +7,12 @@ import {
 } from "lucide-react";
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import { calcDurationMinutes, formatDuration, formatReminderLabel } from "@/lib/local-date-time";
+import { PRIORITY_LABEL, PRIORITY_TONE } from "@/lib/design-system";
 
 const priorityBadge: Record<KanbanPriority, { cls: string; label: string; dot: string }> = {
-  alta:  { cls: "bg-danger/10  text-danger",                            label: "Alta",  dot: "bg-danger" },
-  media: { cls: "bg-accent/15  text-amber-700 dark:text-amber-300",     label: "Media", dot: "bg-accent" },
-  baja:  { cls: "bg-muted      text-text-secondary",                    label: "Baja",  dot: "bg-border" },
+  alta:  { cls: PRIORITY_TONE.alta.badge,  label: PRIORITY_LABEL.alta,  dot: PRIORITY_TONE.alta.dot },
+  media: { cls: PRIORITY_TONE.media.badge, label: PRIORITY_LABEL.media, dot: PRIORITY_TONE.media.dot },
+  baja:  { cls: PRIORITY_TONE.baja.badge,  label: PRIORITY_LABEL.baja,  dot: PRIORITY_TONE.baja.dot },
 };
 
 function formatDate(iso: string) {
@@ -96,16 +97,16 @@ function KanbanCard({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      whileHover={{ boxShadow: "0 6px 20px rgba(0,0,0,0.08)" }}
+      whileHover={{ boxShadow: "var(--shadow-layer-2)" }}
       onClick={handleClick}
       className={[
-        "group relative rounded-2xl border bg-surface p-4 pb-3 shadow-sm",
+        "group relative rounded-ds-lg border bg-surface p-4 pb-3 shadow-layer-1",
         "select-none transition-shadow duration-150",
         onClick && !isCompleted ? "cursor-pointer" : "",
         isCompleted
-          ? "border-border bg-surface-raised opacity-60"
+          ? "border-border bg-muted opacity-60"
           : "border-border hover:border-primary/20",
-        isDragging ? "z-50 shadow-2xl rotate-[2deg] scale-[1.03] border-primary/25 bg-surface" : "",
+        isDragging ? "z-50 rotate-[2deg] scale-[1.03] border-primary/25 bg-surface-elevated shadow-layer-3" : "",
       ].join(" ")}
       style={isDragging ? { pointerEvents: "none" } : undefined}
       layout

@@ -43,16 +43,16 @@ function KanbanColumn({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-      className="flex w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col rounded-2xl border border-border bg-surface shadow-sm"
+      className="flex w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col rounded-ds-lg border border-border bg-surface shadow-layer-1"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       {/* ── Cabecera (sticky) ─────────────────────────────────────── */}
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3.5 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.08)]">
+      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-surface-elevated px-4 py-3.5 shadow-layer-1">
         <div className="flex min-w-0 items-center gap-2.5">
           <h3 className="truncate text-sm font-semibold text-text-primary">{column.title}</h3>
           <div className="flex items-center gap-1">
-            <span className="rounded-full bg-surface-raised px-2 py-0.5 text-[11px] font-semibold text-text-secondary">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-text-secondary">
               {countLabel}
             </span>
             {activeCount === 0 && totalCount > 0 && (
@@ -85,7 +85,7 @@ function KanbanColumn({
           >
             {column.cards.length === 0 && !snapshot.isDraggingOver && (
               <div className="flex flex-col items-center justify-center py-8 text-center">
-                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-surface-raised text-text-secondary/40">
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-text-secondary/40">
                   <Plus className="h-5 w-5" />
                 </div>
                 <p className="text-xs text-text-secondary/50">Sin tareas</p>
@@ -114,7 +114,7 @@ function KanbanColumn({
         <div className="border-t border-border px-3 py-2.5">
           <button
             onClick={handleAddCard}
-            className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium text-text-secondary transition-all hover:bg-surface-raised hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium text-text-secondary transition-all hover:bg-state-hover hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-state-focus"
           >
             <Plus className="h-3.5 w-3.5" />
             Añadir

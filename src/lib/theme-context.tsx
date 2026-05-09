@@ -25,9 +25,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const applyTheme = useCallback((t: Theme, persist = true) => {
     const el = document.documentElement;
     el.classList.remove("dark", "dark-black");
+    el.dataset.theme = t;
     if (t === "dark")       el.classList.add("dark");
     if (t === "dark-black") el.classList.add("dark", "dark-black");
     localStorage.setItem("metria-theme", t);
+    document.cookie = `metria-theme=${t}; path=/; max-age=31536000; samesite=lax`;
     setThemeState(t);
     if (persist) {
       fetch("/api/user/preferences/theme", {
@@ -43,8 +45,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [applyTheme]);
 
   useEffect(() => {
+    const activeTheme = document.documentElement.dataset.theme as Theme | undefined;
+    if (activeTheme === "light" || activeTheme === "dark" || activeTheme === "dark-black") {
+      setThemeState(activeTheme);
+    }
+
     const saved = localStorage.getItem("metria-theme") as Theme | null;
-    if (saved) {
+    if (saved === "light" || saved === "dark" || saved === "dark-black") {
       window.setTimeout(() => applyTheme(saved, false), 0);
       return;
     }

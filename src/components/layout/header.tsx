@@ -8,6 +8,7 @@ import { Search, Bell, ChevronDown, Menu, X, Calendar, AlertCircle, CheckCircle2
 import { logout } from "@/app/(auth)/actions";
 import Avatar from "@/components/ui/avatar";
 import { useTheme, THEMES } from "@/lib/theme-context";
+import { PRIORITY_TONE, normalizePriority } from "@/lib/design-system";
 import { localeLabels, useI18n, type Locale } from "@/lib/i18n";
 import type { NotificationItem } from "./app-shell";
 import type { SearchResult } from "@/app/api/search/route";
@@ -15,9 +16,7 @@ import type { SearchResult } from "@/app/api/search/route";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function prioridadColor(p: string | null) {
-  if (p === "alta") return "text-danger";
-  if (p === "media") return "text-accent";
-  return "text-primary";
+  return PRIORITY_TONE[normalizePriority(p)].text;
 }
 
 function formatFecha(fecha: string | null, locale = "es-ES"): string {
@@ -36,12 +35,12 @@ const TYPE_COLORS: Record<SearchResult["type"], string> = {
   sector:    "bg-primary/15    text-primary",
   finca:     "bg-accent/10     text-accent",
   propiedad: "bg-success/10    text-success",
-  solicitud: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
-  usuario:   "bg-blue-500/10   text-blue-600   dark:text-blue-400",
+  solicitud: "bg-primary/10 text-primary",
+  usuario:   "bg-primary/10 text-primary",
   ticket:    "bg-danger/10     text-danger",
   tarea:     "bg-secondary/10  text-secondary",
-  contacto:  "bg-teal-500/10   text-teal-600   dark:text-teal-400",
-  email:     "bg-sky-500/10    text-sky-600    dark:text-sky-400",
+  contacto:  "bg-success/10 text-success",
+  email:     "bg-primary/10 text-primary",
 };
 
 const LANGUAGE_OPTIONS: Array<{ label: string; value: Locale; flag: string }> = [
@@ -160,12 +159,12 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
   const unreadCount = notifications.length;
 
   return (
-    <header className="sticky top-0 z-[20] flex h-16 shrink-0 items-center gap-3 border-b border-border/60 bg-surface px-4 md:px-5">
+    <header className="sticky top-0 z-[20] flex h-16 shrink-0 items-center gap-3 border-b border-border bg-surface-elevated px-4 shadow-layer-1 md:px-5">
 
       {/* ── Hamburger (solo móvil) ─────────────────────────────────── */}
       <button
         onClick={() => window.dispatchEvent(new Event("sidebar:toggle"))}
-        className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary md:hidden"
+        className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-state-hover hover:text-text-primary md:hidden"
         aria-label={t("navigation.openMenu")}
       >
         <Menu className="h-5 w-5" />
@@ -182,7 +181,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
             onKeyDown={(e) => { if (e.key === "Escape") clearSearch(); }}
             onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
             placeholder={placeholder}
-            className="h-9 w-full rounded-xl border-0 bg-surface-raised pl-9 pr-8 text-sm text-text-primary placeholder:text-text-secondary/60 outline-none ring-0 transition-all focus:bg-background focus:ring-2 focus:ring-primary/20"
+            className="h-9 w-full rounded-xl border border-border bg-surface pl-9 pr-8 text-sm text-text-primary placeholder:text-text-secondary/60 outline-none transition-all hover:border-border-strong focus:bg-surface-elevated focus:ring-2 focus:ring-state-focus"
           />
           {searchValue && (
             <button
@@ -202,7 +201,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -4, scale: 0.97 }}
               transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute left-0 top-full mt-1.5 w-full min-w-0 overflow-hidden rounded-xl border border-border bg-surface shadow-lg sm:min-w-[340px]"
+              className="absolute left-0 top-full mt-1.5 w-full min-w-0 overflow-hidden rounded-xl border border-border bg-surface-elevated shadow-layer-2 sm:min-w-[340px]"
             >
               {searchLoading ? (
                 <p className="px-4 py-3 text-sm text-text-secondary">{t("common.searching")}</p>
@@ -221,7 +220,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                     >
                       <button
                         onClick={() => handleResultClick(r.href)}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-raised"
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-state-hover"
                       >
                         <span className={`shrink-0 rounded-lg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLORS[r.type]}`}>
                           {t(TYPE_LABEL_KEYS[r.type])}
@@ -254,7 +253,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
         <div ref={bellRef} className="relative">
           <button
             onClick={() => setBellOpen((p) => !p)}
-            className="relative rounded-xl p-2 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+            className="relative rounded-xl p-2 text-text-secondary transition-colors hover:bg-state-hover hover:text-text-primary"
             aria-label={t("common.notifications")}
           >
             <Bell className="h-5 w-5" />
@@ -272,7 +271,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -4, scale: 0.97 }}
               transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-              className="fixed left-4 right-4 top-16 z-[50] overflow-hidden rounded-xl border border-border bg-surface shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-1.5 sm:w-80"
+              className="fixed left-4 right-4 top-16 z-[50] overflow-hidden rounded-xl border border-border bg-surface-elevated shadow-layer-3 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-1.5 sm:w-80"
             >
               {/* Header del panel */}
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -300,7 +299,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                       <Link
                         href={n.href ?? "/soporte"}
                         onClick={() => setBellOpen(false)}
-                        className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-surface-raised"
+                        className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-state-hover"
                       >
                         <LifeBuoy className={`mt-0.5 h-4 w-4 shrink-0 text-primary`} />
                         <div className="min-w-0 flex-1">
@@ -314,7 +313,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                         </div>
                       </Link>
                     ) : (
-                      <div className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-surface-raised">
+                      <div className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-state-hover">
                         <AlertCircle className={`mt-0.5 h-4 w-4 shrink-0 ${prioridadColor(n.prioridad)}`} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium text-text-primary">{n.titulo}</p>
@@ -361,7 +360,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
         <div ref={menuRef} className="relative">
           <button
             onClick={() => setMenuOpen((p) => !p)}
-            className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 transition-colors hover:bg-surface-raised"
+            className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 transition-colors hover:bg-state-hover"
           >
             <Avatar name={userName} src={avatarUrl ?? undefined} size="sm" />
             <span className="hidden max-w-[120px] truncate text-sm font-medium text-text-primary sm:block">
@@ -379,7 +378,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -4, scale: 0.97 }}
               transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute right-0 top-full mt-1.5 w-52 overflow-hidden rounded-xl border border-border bg-surface py-1 shadow-lg"
+              className="absolute right-0 top-full mt-1.5 w-52 overflow-hidden rounded-xl border border-border bg-surface-elevated py-1 shadow-layer-2"
             >
               {/* Info de cuenta */}
               <div className="border-b border-border px-4 py-3">
@@ -403,7 +402,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                       className={[
                         "flex flex-1 items-center justify-center gap-1 rounded-md py-1.5 text-xs font-medium transition-all duration-150",
                         theme === value
-                          ? "bg-surface text-primary shadow-sm"
+                          ? "bg-surface text-primary shadow-layer-1"
                           : "text-text-secondary hover:text-text-primary",
                       ].join(" ")}
                     >
@@ -428,7 +427,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                         "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors",
                         locale === option.value
                           ? "bg-primary/10 text-primary"
-                          : "text-text-secondary hover:bg-surface-raised hover:text-text-primary",
+                          : "text-text-secondary hover:bg-state-hover hover:text-text-primary",
                       ].join(" ")}
                       aria-label={`${t("common.language")}: ${option.label}`}
                     >
@@ -443,14 +442,14 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                 <Link
                   href="/cuenta"
                   onClick={() => setMenuOpen(false)}
-                  className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-text-primary transition-colors hover:bg-surface-raised"
+                  className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-text-primary transition-colors hover:bg-state-hover"
                 >
                   {t("common.profile")}
                 </Link>
                 <form action={logout}>
                   <button
                     type="submit"
-                    className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-danger transition-colors hover:bg-surface-raised"
+                    className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-danger transition-colors hover:bg-state-hover"
                   >
                     {t("common.signOut")}
                   </button>

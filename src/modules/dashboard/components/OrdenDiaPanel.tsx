@@ -7,15 +7,16 @@ import type { OrdenDiaAgente, OrdenDiaTarea, KanbanPriority } from "@/lib/mock/d
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { completeTareaAction, deleteTareaAction } from "@/app/(crm)/dashboard/actions";
+import { PRIORITY_LABEL, PRIORITY_TONE } from "@/lib/design-system";
 
 type OrdenDiaPanelProps = {
   agentes: OrdenDiaAgente[];
 };
 
 const PRIORITY_BADGE: Record<KanbanPriority, { cls: string; label: string }> = {
-  alta:  { cls: "bg-red-500/15 text-red-700 dark:bg-red-500/20 dark:text-red-400",       label: "Alta"  },
-  media: { cls: "bg-yellow-500/15 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400", label: "Media" },
-  baja:  { cls: "bg-gray-500/15 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400",   label: "Baja"  },
+  alta:  { cls: PRIORITY_TONE.alta.badge,  label: PRIORITY_LABEL.alta },
+  media: { cls: PRIORITY_TONE.media.badge, label: PRIORITY_LABEL.media },
+  baja:  { cls: PRIORITY_TONE.baja.badge,  label: PRIORITY_LABEL.baja },
 };
 
 function initials(name: string) {
@@ -98,7 +99,7 @@ export default function OrdenDiaPanel({ agentes: initialAgentes }: OrdenDiaPanel
   }
 
   return (
-    <div className="flex h-full w-full flex-col rounded-xl bg-surface shadow-sm">
+    <div className="flex h-full w-full flex-col rounded-xl border border-border bg-surface shadow-layer-1">
       <Toaster toasts={toasts} />
       {/* Header fijo */}
       <div className="shrink-0 border-b border-border px-6 py-4">
@@ -113,7 +114,7 @@ export default function OrdenDiaPanel({ agentes: initialAgentes }: OrdenDiaPanel
                 {totalCompletadas}/{totalTareas}
               </span>
             )}
-            <span className="rounded-full bg-background px-3 py-1 text-xs font-medium text-text-secondary">
+              <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-text-secondary">
               {totalTareas} {totalTareas === 1 ? "tarea" : "tareas"}
             </span>
           </div>
@@ -147,7 +148,7 @@ export default function OrdenDiaPanel({ agentes: initialAgentes }: OrdenDiaPanel
                 <li key={agent.id}>
                   <button
                     onClick={() => toggle(agent.id)}
-                    className="flex w-full items-center justify-between px-6 py-3 text-left transition-colors hover:bg-background"
+                    className="flex w-full items-center justify-between px-6 py-3 text-left transition-colors hover:bg-state-hover"
                   >
                     <div className="flex items-center gap-3">
                       <div className="relative shrink-0">
@@ -206,7 +207,7 @@ export default function OrdenDiaPanel({ agentes: initialAgentes }: OrdenDiaPanel
                                   "group rounded-lg border px-3 py-2",
                                   completada
                                     ? "border-success/20 bg-success/5"
-                                    : "border-border bg-background",
+                                    : "border-border bg-surface-elevated",
                                 ].join(" ")}
                               >
                                 <div className="flex items-start gap-2">

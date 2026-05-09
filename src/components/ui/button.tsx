@@ -47,7 +47,7 @@ const VARIANT_CLASSES: Record<Variant, string> = {
   ghost:
     "text-text-secondary hover:bg-state-hover hover:text-text-primary disabled:opacity-40",
   danger:
-    "bg-danger text-white shadow-layer-1 hover:bg-red-700 hover:shadow-layer-2 disabled:bg-danger/50 disabled:shadow-none",
+    "bg-danger text-white shadow-layer-1 hover:bg-danger-dark hover:shadow-layer-2 disabled:bg-danger/50 disabled:shadow-none",
   outline:
     "border border-primary/60 bg-surface text-primary shadow-layer-1 hover:border-primary hover:bg-state-active disabled:opacity-50 disabled:shadow-none",
 };

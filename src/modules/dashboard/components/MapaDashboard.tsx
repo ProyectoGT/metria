@@ -61,7 +61,7 @@ function CirclePin({ bg, border }: { bg: string; border: string }) {
         borderRadius: "50%",
         background: bg,
         border: `2.5px solid ${border}`,
-        boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+        boxShadow: "var(--shadow-layer-1)",
       }}
     />
   );
@@ -75,9 +75,9 @@ function SquarePin() {
         width: 16,
         height: 16,
         borderRadius: 3,
-        background: "#111827",
-        border: "2px solid #ffffff",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+        background: "var(--color-sidebar-logo)",
+        border: "2px solid var(--color-surface)",
+        boxShadow: "var(--shadow-layer-1)",
       }}
     />
   );
@@ -161,7 +161,7 @@ function MapaDashboard({
   }, []);
 
   return (
-    <div className="h-full w-full" style={{ minHeight: 380 }}>
+    <div className="map-surface h-full w-full overflow-hidden rounded-ds-lg" style={{ minHeight: 380 }}>
       <APIProvider apiKey={apiKey}>
         <Map
           defaultCenter={OFICINA}
@@ -242,9 +242,9 @@ function MapaDashboard({
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 5,
-                      background: selected.tipo === "noticia" ? "#eff6ff" : "#f0fdf4",
-                      color: selected.tipo === "noticia" ? "#1d4ed8" : "#15803d",
-                      border: `1px solid ${selected.tipo === "noticia" ? "#bfdbfe" : "#bbf7d0"}`,
+                      background: selected.tipo === "noticia" ? "color-mix(in oklab, var(--color-primary) 12%, transparent)" : "color-mix(in oklab, var(--color-success) 12%, transparent)",
+                      color: selected.tipo === "noticia" ? "var(--color-primary)" : "var(--color-success)",
+                      border: `1px solid ${selected.tipo === "noticia" ? "color-mix(in oklab, var(--color-primary) 28%, transparent)" : "color-mix(in oklab, var(--color-success) 28%, transparent)"}`,
                       borderRadius: 999,
                       fontSize: 10,
                       fontWeight: 700,
@@ -254,31 +254,31 @@ function MapaDashboard({
                     }}>
                       <span style={{
                         width: 7, height: 7, borderRadius: "50%",
-                        background: selected.tipo === "noticia" ? "#3b82f6" : "#22c55e",
+                        background: selected.tipo === "noticia" ? "var(--color-primary)" : "var(--color-success)",
                         flexShrink: 0,
                       }} />
                       {selected.tipo === "noticia" ? "Noticia" : "Encargo"}
                     </span>
                   </div>
 
-                  <p style={{ fontSize: 16, fontWeight: 700, color: "#111827", margin: "0 0 4px", lineHeight: 1.3 }}>
+                  <p style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text-primary)", margin: "0 0 4px", lineHeight: 1.3 }}>
                     {selected.propietario?.trim() || `Propiedad #${selected.id}`}
                   </p>
 
                   {selected.propietario?.trim() && (selected.planta || selected.puerta) && (
-                    <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 4px" }}>
+                    <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: "0 0 4px" }}>
                       Planta {selected.planta ?? "-"} · Puerta {selected.puerta ?? "-"}
                     </p>
                   )}
 
-                  <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 2px" }}>
+                  <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: "0 0 2px" }}>
                     {selected.sector}
                   </p>
-                  <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px" }}>
+                  <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: "0 0 12px" }}>
                     Finca {selected.finca}
                   </p>
 
-                  <p style={{ fontSize: 11, color: "#9ca3af", margin: "0 0 12px", fontVariantNumeric: "tabular-nums" }}>
+                  <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: "0 0 12px", fontVariantNumeric: "tabular-nums" }}>
                     {selected.latitud.toFixed(5)}, {selected.longitud.toFixed(5)}
                   </p>
 
@@ -289,7 +289,7 @@ function MapaDashboard({
                       rel="noopener noreferrer"
                       style={{
                         display: "flex", alignItems: "center", gap: 6,
-                        background: "#2563eb", color: "#fff",
+                        background: "var(--color-primary)", color: "#fff",
                         padding: "7px 12px", borderRadius: 7,
                         fontSize: 12, fontWeight: 600, textDecoration: "none",
                       }}
@@ -302,9 +302,9 @@ function MapaDashboard({
                         href={`/propiedades/${selected.id}`}
                         style={{
                           display: "flex", alignItems: "center", gap: 6,
-                          background: selected.tipo === "noticia" ? "#eff6ff" : "#f0fdf4",
-                          color: selected.tipo === "noticia" ? "#1d4ed8" : "#15803d",
-                          border: `1px solid ${selected.tipo === "noticia" ? "#bfdbfe" : "#bbf7d0"}`,
+                          background: selected.tipo === "noticia" ? "color-mix(in oklab, var(--color-primary) 12%, transparent)" : "color-mix(in oklab, var(--color-success) 12%, transparent)",
+                          color: selected.tipo === "noticia" ? "var(--color-primary)" : "var(--color-success)",
+                          border: `1px solid ${selected.tipo === "noticia" ? "color-mix(in oklab, var(--color-primary) 28%, transparent)" : "color-mix(in oklab, var(--color-success) 28%, transparent)"}`,
                           padding: "7px 12px", borderRadius: 7,
                           fontSize: 12, fontWeight: 600, textDecoration: "none",
                         }}
@@ -339,9 +339,9 @@ function MapaDashboard({
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 5,
-                      background: "#f5f3ff",
-                      color: "#6d28d9",
-                      border: "1px solid #ddd6fe",
+                      background: "color-mix(in oklab, var(--color-primary) 12%, transparent)",
+                      color: "var(--color-primary)",
+                      border: "1px solid color-mix(in oklab, var(--color-primary) 28%, transparent)",
                       borderRadius: 999,
                       fontSize: 10,
                       fontWeight: 700,
@@ -354,17 +354,17 @@ function MapaDashboard({
                     </span>
                   </div>
 
-                  <p style={{ fontSize: 16, fontWeight: 700, color: "#111827", margin: "0 0 4px", lineHeight: 1.3 }}>
+                  <p style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text-primary)", margin: "0 0 4px", lineHeight: 1.3 }}>
                     {selectedZone.zona.nombre}
                   </p>
 
                   {selectedZone.zona.descripcion && (
-                    <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 8px" }}>
+                    <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: "0 0 8px" }}>
                       {selectedZone.zona.descripcion}
                     </p>
                   )}
 
-                  <p style={{ fontSize: 11, color: "#9ca3af", margin: "0 0 12px" }}>
+                  <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: "0 0 12px" }}>
                     {selectedZone.zona.tipo}
                   </p>
 
@@ -372,7 +372,7 @@ function MapaDashboard({
                     href="/zonas-geograficas"
                     style={{
                       display: "flex", alignItems: "center", gap: 6,
-                      background: "#2563eb", color: "#fff",
+                      background: "var(--color-primary)", color: "#fff",
                       padding: "7px 12px", borderRadius: 7,
                       fontSize: 12, fontWeight: 600, textDecoration: "none",
                     }}

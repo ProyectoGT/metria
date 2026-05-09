@@ -36,7 +36,7 @@ const ALIGN: Record<Align, string> = {
 
 export function TableContainer({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={["overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm", className].join(" ")}>
+    <div className={["overflow-x-auto rounded-ds-lg border border-border bg-surface shadow-layer-1", className].join(" ")}>
       {children}
     </div>
   );
@@ -107,7 +107,7 @@ export function Tr({ children, onClick, className = "", muted = false }: TrProps
       onClick={onClick}
       className={[
         "transition-colors",
-        onClick ? "cursor-pointer hover:bg-surface-raised" : "hover:bg-surface-raised/55",
+        onClick ? "cursor-pointer hover:bg-state-hover" : "hover:bg-state-hover",
         muted ? "opacity-50" : "",
         className,
       ].join(" ")}
