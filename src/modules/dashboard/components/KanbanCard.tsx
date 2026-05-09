@@ -91,6 +91,15 @@ function KanbanCard({
     }
   }
 
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleClick();
+    }
+  }
+
+  const isInteractive = !!onClick && !isCompleted;
+
   return (
     <motion.div
       {...(dragHandleProps as Record<string, unknown>)}
@@ -99,10 +108,14 @@ function KanbanCard({
       transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
       whileHover={{ boxShadow: "var(--shadow-layer-2)" }}
       onClick={handleClick}
+      onKeyDown={isInteractive ? handleKeyDown : undefined}
+      role={isInteractive ? "button" : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      aria-label={isInteractive ? card.title : undefined}
       className={[
         "group relative rounded-ds-lg border bg-surface p-4 pb-3 shadow-layer-1",
         "select-none transition-shadow duration-150",
-        onClick && !isCompleted ? "cursor-pointer" : "",
+        isInteractive ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background" : "",
         isCompleted
           ? "border-border bg-muted opacity-60"
           : "border-border hover:border-primary/20",

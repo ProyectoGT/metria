@@ -115,8 +115,19 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
       if (bellRef.current   && !bellRef.current.contains(e.target as Node))   setBellOpen(false);
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false);
     }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        setBellOpen(false);
+        setSearchOpen(false);
+      }
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
   }, []);
 
   // ── Search ─────────────────────────────────────────────────────────────────
@@ -181,12 +192,14 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
             onKeyDown={(e) => { if (e.key === "Escape") clearSearch(); }}
             onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
             placeholder={placeholder}
+            aria-label={t("search.global") || "Buscar..."}
             className="h-9 w-full rounded-xl border border-border bg-surface pl-9 pr-8 text-sm text-text-primary placeholder:text-text-secondary/60 outline-none transition-all hover:border-border-strong focus:bg-surface-elevated focus:ring-2 focus:ring-state-focus"
           />
           {searchValue && (
             <button
               onClick={clearSearch}
               className="absolute right-2.5 rounded-md p-0.5 text-text-secondary hover:text-text-primary"
+              aria-label={t("common.clear") || "Limpiar búsqueda"}
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -255,6 +268,8 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
             onClick={() => setBellOpen((p) => !p)}
             className="relative rounded-xl p-2 text-text-secondary transition-colors hover:bg-state-hover hover:text-text-primary"
             aria-label={t("common.notifications")}
+            aria-expanded={bellOpen}
+            aria-haspopup="true"
           >
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
@@ -361,6 +376,9 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
           <button
             onClick={() => setMenuOpen((p) => !p)}
             className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 transition-colors hover:bg-state-hover"
+            aria-expanded={menuOpen}
+            aria-haspopup="true"
+            aria-label={t("common.userMenu") || `Menú de ${userName}`}
           >
             <Avatar name={userName} src={avatarUrl ?? undefined} size="sm" />
             <span className="hidden max-w-[120px] truncate text-sm font-medium text-text-primary sm:block">

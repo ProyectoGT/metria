@@ -172,7 +172,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
       </div>
 
       {/* ── Navegación ───────────────────────────────────────────── */}
-      <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
+      <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4" aria-label={t("navigation.mainNavigation") || "Navegación principal"}>
 
         <motion.div variants={staggerContainer} initial="initial" animate="animate">
           <NavGroup>
@@ -221,7 +221,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
 
   return (
     <>
-      <aside className={`${sidebarClass} ${borderClass} hidden md:flex`}>
+      <aside className={`${sidebarClass} ${borderClass} hidden md:flex`} aria-label={t("navigation.sidebar") || "Menú lateral"}>
         {navContent}
       </aside>
 
@@ -238,6 +238,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
           `${sidebarClass} ${borderClass} transition-transform duration-300 ease-out md:hidden`,
           sidebarOpen ? "translate-x-0 shadow-xl" : "-translate-x-full",
         ].join(" ")}
+        aria-label={t("navigation.sidebar") || "Menú lateral"}
       >
         {navContent}
       </aside>

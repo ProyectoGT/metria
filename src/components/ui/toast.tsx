@@ -24,7 +24,12 @@ export function useToast() {
 
 export function Toaster({ toasts }: { toasts: ToastItem[] }) {
   return (
-    <div className="fixed bottom-5 right-5 z-[200] flex flex-col gap-2 pointer-events-none">
+    <div
+      className="fixed bottom-5 right-5 z-[200] flex flex-col gap-2 pointer-events-none"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
       <AnimatePresence>
         {toasts.map((t) => (
           <ToastCard key={t.id} toast={t} />

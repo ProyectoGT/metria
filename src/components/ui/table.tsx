@@ -102,12 +102,23 @@ interface TrProps {
 }
 
 export function Tr({ children, onClick, className = "", muted = false }: TrProps) {
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if ((e.key === "Enter" || e.key === " ") && onClick) {
+      e.preventDefault();
+      onClick();
+    }
+  }
+
   return (
     <tr
       onClick={onClick}
+      onKeyDown={onClick ? handleKeyDown : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      role={onClick ? "button" : undefined}
+      aria-label={onClick ? "Fila clicable" : undefined}
       className={[
         "transition-colors",
-        onClick ? "cursor-pointer hover:bg-state-hover" : "hover:bg-state-hover",
+        onClick ? "cursor-pointer hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset" : "hover:bg-state-hover",
         muted ? "opacity-50" : "",
         className,
       ].join(" ")}

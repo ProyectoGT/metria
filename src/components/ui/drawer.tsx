@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn, UI } from "@/lib/design-system";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 type DrawerWidth = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -55,6 +56,8 @@ export default function Drawer({
 }: DrawerProps) {
   const { t } = useI18n();
 
+  const panelRef = useFocusTrap(open);
+
   // Cerrar con Escape
   useEffect(() => {
     if (!open) return;
@@ -70,6 +73,8 @@ export default function Drawer({
     if (open) document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, [open]);
+
+  const labelledById = open && title ? "drawer-title" : undefined;
 
   return (
     <AnimatePresence>
@@ -88,8 +93,10 @@ export default function Drawer({
 
           {/* Panel */}
           <motion.div
+            ref={panelRef}
             role="dialog"
             aria-modal="true"
+            aria-labelledby={labelledById}
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -105,7 +112,7 @@ export default function Drawer({
               <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4">
                 <div className="min-w-0">
                   {title && (
-                    <h2 className="text-base font-semibold text-text-primary">{title}</h2>
+                    <h2 id="drawer-title" className="text-base font-semibold text-text-primary">{title}</h2>
                   )}
                   {subtitle && (
                     <p className="mt-0.5 text-xs text-text-secondary">{subtitle}</p>

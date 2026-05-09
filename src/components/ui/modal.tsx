@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn, UI } from "@/lib/design-system";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 type ModalSize = "sm" | "md" | "lg" | "xl";
 
@@ -43,6 +44,8 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, size = "md", children, className = "" }: ModalProps) {
+  const panelRef = useFocusTrap(open);
+
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -56,6 +59,8 @@ export function Modal({ open, onClose, size = "md", children, className = "" }: 
     if (open) document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, [open]);
+
+  const labelledById = open ? "modal-title" : undefined;
 
   return (
     <AnimatePresence>
@@ -71,8 +76,10 @@ export function Modal({ open, onClose, size = "md", children, className = "" }: 
             aria-hidden="true"
           />
           <motion.div
+            ref={panelRef}
             role="dialog"
             aria-modal="true"
+            aria-labelledby={labelledById}
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -107,7 +114,7 @@ export function ModalHeader({ title, subtitle, onClose, children }: ModalHeaderP
   return (
     <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4">
       <div className="min-w-0">
-        <h2 className="text-base font-semibold text-text-primary">{title}</h2>
+        <h2 id="modal-title" className="text-base font-semibold text-text-primary">{title}</h2>
         {subtitle && <p className="mt-0.5 text-xs text-text-secondary">{subtitle}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-1">

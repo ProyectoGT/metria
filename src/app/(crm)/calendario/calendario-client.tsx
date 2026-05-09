@@ -961,7 +961,7 @@ export default function CalendarioClient({
 
           {/* User filter (managers only) */}
           {canSeeOthers(role) && filterableUsers.length > 1 && (
-            <div className="relative">
+            <div className="relative" onKeyDown={(e) => { if (e.key === "Escape") setFilterOpen(false); }}>
               <button
                 onClick={() => setFilterOpen((v) => !v)}
                 className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
@@ -969,23 +969,29 @@ export default function CalendarioClient({
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border text-text-secondary hover:bg-background"
                 }`}
+                aria-label="Filtrar por usuario"
+                aria-expanded={filterOpen}
+                aria-haspopup="listbox"
               >
                 <Filter className="h-4 w-4" />
                 {filterUserId === "all" ? "Todos" : (usersMap[filterUserId as number] ?? "Usuario")}
                 {filterUserId !== "all" && (
-                  <span
+                  <button
                     onClick={(e) => { e.stopPropagation(); setFilterUserId("all"); }}
                     className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary/20 text-primary hover:bg-primary/30"
+                    aria-label="Quitar filtro"
                   >
                     <X className="h-2.5 w-2.5" />
-                  </span>
+                  </button>
                 )}
               </button>
               {filterOpen && (
-                <div className="absolute left-0 top-full z-20 mt-1 w-52 rounded-xl border border-border bg-surface shadow-lg">
+                <div className="absolute left-0 top-full z-20 mt-1 w-52 rounded-xl border border-border bg-surface shadow-lg" role="listbox" aria-label="Filtrar por usuario">
                   <div className="py-1">
                     <button
                       onClick={() => { setFilterUserId("all"); setFilterOpen(false); }}
+                      role="option"
+                      aria-selected={filterUserId === "all"}
                       className={`flex w-full items-center px-4 py-2.5 text-sm transition-colors hover:bg-background ${filterUserId === "all" ? "font-semibold text-primary" : "text-text-primary"}`}
                     >
                       Todos los usuarios
@@ -994,6 +1000,8 @@ export default function CalendarioClient({
                       <button
                         key={u.id}
                         onClick={() => { setFilterUserId(u.id); setFilterOpen(false); }}
+                        role="option"
+                        aria-selected={filterUserId === u.id}
                         className={`flex w-full items-center px-4 py-2.5 text-sm transition-colors hover:bg-background ${filterUserId === u.id ? "font-semibold text-primary" : "text-text-primary"}`}
                       >
                         {u.name}
@@ -1042,13 +1050,13 @@ export default function CalendarioClient({
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <h2 className="text-lg font-semibold text-text-primary">{periodLabel}</h2>
               <div className="flex items-center gap-1.5">
-                <button onClick={prevPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary">
+                <button onClick={prevPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary" aria-label="Mes anterior">
                   <ChevronLeft className="h-4 w-4" />
                 </button>
                 <button onClick={goToday} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-background">
                   Hoy
                 </button>
-                <button onClick={nextPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary">
+                <button onClick={nextPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary" aria-label="Mes siguiente">
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
@@ -1122,6 +1130,7 @@ export default function CalendarioClient({
               <button
                 onClick={() => openCreate(selectedDate)}
                 className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-dark"
+                aria-label="Nueva actividad"
               >
                 + Nueva
               </button>
@@ -1140,13 +1149,13 @@ export default function CalendarioClient({
           <div className="flex items-center justify-between border-b border-border px-6 py-4">
             <h2 className="text-base font-semibold text-text-primary">{periodLabel}</h2>
             <div className="flex items-center gap-1.5">
-              <button onClick={prevPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary">
+              <button onClick={prevPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary" aria-label="Semana anterior">
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button onClick={goToday} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-background">
                 Hoy
               </button>
-              <button onClick={nextPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary">
+              <button onClick={nextPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary" aria-label="Semana siguiente">
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>

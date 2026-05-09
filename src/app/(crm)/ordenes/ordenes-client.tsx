@@ -324,6 +324,7 @@ export default function OrdenesClient({
           <button
             onClick={openCreate}
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+            aria-label="Nueva actividad"
           >
             <Plus className="h-4 w-4" />
             Nueva
@@ -336,7 +337,7 @@ export default function OrdenesClient({
           <div className="flex flex-col items-center py-12 text-center">
             <Clock className="mb-3 h-10 w-10 text-text-secondary/40" />
             <p className="text-sm font-medium text-text-primary">Sin actividades para hoy</p>
-            <button onClick={openCreate} className="mt-3 text-xs font-medium text-primary hover:underline">
+            <button onClick={openCreate} className="mt-3 text-xs font-medium text-primary hover:underline" aria-label="Añadir actividad">
               + Anadir actividad
             </button>
           </div>

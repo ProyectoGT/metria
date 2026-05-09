@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/lib/theme-context";
 import Sidebar from "./sidebar";
 import Header from "./header";
 import RoutePreloader from "./route-preloader";
+import KeyboardShortcuts from "./keyboard-shortcuts";
 
 export type NotificationItem = {
   id: number;
@@ -120,12 +121,13 @@ export default async function AppShell({
 
   return (
     <ThemeProvider>
+      <KeyboardShortcuts />
       <RoutePreloader />
       <div className="h-dvh overflow-hidden bg-background">
         <Sidebar userRole={userRole} deniedResourceKeys={deniedKeys} />
         <div className="flex h-full min-w-0 flex-col md:pl-[260px]">
           <Header userName={userName} userEmail={userEmail} avatarUrl={userAvatarUrl} notifications={notifications} />
-          <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background px-4 py-5 md:px-6 md:py-6 lg:px-7 lg:py-7">
+          <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background px-4 py-5 md:px-6 md:py-6 lg:px-7 lg:py-7" aria-label="Contenido principal">
             <div className="w-full min-w-0">
               {children}
             </div>
