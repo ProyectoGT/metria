@@ -10,6 +10,7 @@ import type { UserRole } from "@/lib/roles";
 import { DEFAULT_ACTIVITY_TIME, normalizeTime, calcDurationMinutes, formatDuration, formatReminderLabel, REMINDER_OPTIONS } from "@/lib/local-date-time";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { isActivityPriority, isActivityType, normalizeActivityPriority, normalizeActivityType, type ActivityType } from "@/lib/activity-options";
+import { AuditTimelineCard } from "@/components/audit/audit-timeline";
 
 type Usuario = { id: number; nombre: string; apellidos: string };
 
@@ -644,6 +645,12 @@ export default function OrdenesClient({
                 <p className="mt-1 text-sm text-text-primary">{detailActividad.result}</p>
               </div>
             )}
+
+            <AuditTimelineCard
+              entityType="agenda"
+              entityId={detailActividad.id}
+              compact
+            />
 
             <div className="rounded-xl bg-surface-raised px-4 py-3 text-xs text-text-secondary">
               <p>Actividad de calendario · ID: {detailActividad.id}</p>

@@ -7,6 +7,7 @@ import { normalizeTime, calcDurationMinutes, formatDuration, formatReminderLabel
 import { ACTIVITY_TYPES } from "@/lib/activity-options";
 import Drawer from "@/components/ui/drawer";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
+import { AuditTimelineCard } from "@/components/audit/audit-timeline";
 
 const priorityMeta: Record<KanbanPriority, { label: string; cls: string }> = {
   alta:  { label: "Alta",  cls: "bg-danger/10 text-danger" },
@@ -192,6 +193,13 @@ export default function KanbanDetailDrawer({
               <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">Sincronizado con Google Calendar</p>
             </div>
           )}
+
+          {/* Historial */}
+          <AuditTimelineCard
+            entityType={isAgenda ? "agenda" : "tarea"}
+            entityId={card.dbId}
+            compact
+          />
 
           {/* Metadata */}
           <div className="rounded-xl bg-surface-raised px-4 py-3 text-xs text-text-secondary">

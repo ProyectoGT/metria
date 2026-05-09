@@ -15,6 +15,7 @@ export type Agenda = import("./database.types").Tables<"agenda">;
 export type Job = import("./database.types").Tables<"jobs">;
 export type JobLog = import("./database.types").Tables<"job_logs">;
 export type JobSchedule = import("./database.types").Tables<"job_schedules">;
+export type AuditLog = import("./database.types").Tables<"audit_log">;
 
 // ─── Zonas Geográficas (dibujadas en mapa) ────────────────────────────────────
 

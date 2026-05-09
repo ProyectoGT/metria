@@ -15,6 +15,7 @@ import { DEFAULT_ACTIVITY_TIME, normalizeTime, calcDurationMinutes, formatDurati
 import { isActivityPriority, isActivityType, normalizeActivityPriority, normalizeActivityType } from "@/lib/activity-options";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import Drawer from "@/components/ui/drawer";
+import { AuditTimelineCard } from "@/components/audit/audit-timeline";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1649,6 +1650,12 @@ export default function CalendarioClient({
                 <p className="mt-1 text-sm text-text-primary">{detailEvent.result}</p>
               </div>
             )}
+
+            <AuditTimelineCard
+              entityType="agenda"
+              entityId={detailEvent.id}
+              compact
+            />
 
             <div className="rounded-xl bg-surface-raised px-4 py-3 text-xs text-text-secondary">
               <p>Actividad de calendario · ID: {detailEvent.id}</p>

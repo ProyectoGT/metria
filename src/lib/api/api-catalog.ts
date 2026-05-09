@@ -137,6 +137,22 @@
  */
 
 /**
+ * ─── Auditoría (audit log) ──────────────────────────────────────────────────
+ *
+ * GET    /api/audit                     → Listar eventos de auditoría (paginado)
+ *   ?entity_type=tarea                  → Filtrar por tipo de entidad
+ *   &entity_id=123                      → Filtrar por ID de entidad
+ *   &action=tarea.editada               → Filtrar por acción
+ *   &actor_id=1                         → Filtrar por usuario que ejecutó
+ *   &from=2024-01-01&to=2024-12-31      → Rango de fechas
+ *   &page=1&page_size=50                → Paginación
+ *
+ * Formato respuesta: { data: AuditEntry[], meta: PaginationMeta }
+ * Autorización: usuarios autenticados, solo ven logs de su misma empresa
+ * Estado:  ✅ Implementado
+ */
+
+/**
  * ─── Endpoints existentes (no refactorizados aún) ───────────────────────────
  *
  * GET    /api/search?q=&ctx=            → Búsqueda global (formato legacy)
