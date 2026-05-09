@@ -1,0 +1,20 @@
+{
+  "today": "Hoy",
+  "dashboard": "Dashboard",
+  "zone": "Zona",
+  "mapZones": "Zonas en Mapa",
+  "properties": "Propiedades",
+  "requests": "Solicitudes",
+  "contacts": "Contactos",
+  "email": "Email",
+  "development": "Desarrollo",
+  "calendar": "Calendario",
+  "dayOrders": "Órdenes del día",
+  "calculator": "Calculadora",
+  "tools": "Herramientas",
+  "management": "Gestión",
+  "users": "Usuarios",
+  "orgChart": "Organigrama",
+  "support": "Soporte",
+  "accessControl": "Control de Acceso"
+}

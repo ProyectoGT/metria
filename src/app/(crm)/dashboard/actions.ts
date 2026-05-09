@@ -33,6 +33,7 @@ export async function createTareaAction(data: {
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
   revalidatePath("/ordenes");
+  revalidatePath("/calendario");
   return { id: row.id };
 }
 
@@ -276,6 +277,7 @@ export async function updateTareaEstadoAction(
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
   revalidatePath("/ordenes");
+  revalidatePath("/calendario");
 }
 
 // ─── Completar tarea con resultado ───────────────────────────────────────────
@@ -290,6 +292,42 @@ export async function completeTareaAction(id: number, resultado?: string): Promi
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
   revalidatePath("/ordenes");
+  revalidatePath("/calendario");
+}
+
+// ─── Accion unificada para completar tarea o agenda ─────────────────────────
+
+export async function completeTaskAction(input: {
+  type: "tarea" | "agenda";
+  id: number;
+  completed: boolean;
+  resultado?: string;
+}): Promise<{ success: boolean }> {
+  const yo = await getCurrentUserContext();
+  if (!yo) throw new Error("No autenticado");
+
+  if (input.type === "tarea") {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("set_tarea_completed", {
+      p_tarea_id: input.id,
+      p_completed: input.completed,
+      p_resultado: input.resultado?.trim() || undefined,
+    });
+    if (error) throw new Error(error.message);
+  } else {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("set_agenda_completed", {
+      p_agenda_id: input.id,
+      p_completed: input.completed,
+      p_result: input.resultado?.trim() || undefined,
+    });
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/ordenes");
+  revalidatePath("/calendario");
+  return { success: true };
 }
 
 // ─── Eliminar tarea ───────────────────────────────────────────────────────────
@@ -303,6 +341,7 @@ export async function deleteTareaAction(id: number): Promise<void> {
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
   revalidatePath("/ordenes");
+  revalidatePath("/calendario");
 }
 
 export async function completeAgendaAction(id: number, completed: boolean, result?: string | null): Promise<void> {

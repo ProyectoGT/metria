@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import ThemeScript from "@/components/layout/theme-script";
+import { I18nProvider } from "@/lib/i18n";
+import DomLocalizer from "@/lib/i18n/dom-localizer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -47,8 +49,10 @@ export default function RootLayout({
         <ThemeScript />
       </head>
       <body className="h-full bg-background text-text-primary font-sans">
-
-        {children}
+        <I18nProvider>
+          <DomLocalizer />
+          {children}
+        </I18nProvider>
         <Script id="service-worker-registration" strategy="afterInteractive">
           {`
             if ('serviceWorker' in navigator) {

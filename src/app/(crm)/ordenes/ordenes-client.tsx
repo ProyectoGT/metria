@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Calendar, CheckCircle2, ChevronDown, Clock, Loader2, Pencil, Plus, Trash2, User } from "lucide-react";
+import { Bell, Calendar, CheckCircle2, ChevronDown, Circle, Clock, Loader2, Pencil, Plus, Trash2, User } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 import Drawer from "@/components/ui/drawer";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
@@ -250,6 +250,7 @@ export default function OrdenesClient({
       return;
     }
     router.refresh();
+    toast(completed ? "Actividad completada" : "Actividad pendiente");
   }
 
   async function archiveActividad(id: number) {
@@ -329,11 +330,17 @@ export default function OrdenesClient({
                         setCompleted(actividad, !actividad.completed);
                       }}
                       disabled={completingId === actividad.id}
-                      className={`mt-0.5 shrink-0 transition-opacity disabled:opacity-50 ${actividad.completed ? "text-success" : "text-text-secondary hover:text-success"}`}
+                      className={`mt-0.5 shrink-0 transition-opacity disabled:opacity-50 ${
+                        actividad.completed
+                          ? "text-success"
+                          : "text-text-secondary opacity-0 group-hover:opacity-100 hover:text-success"
+                      }`}
                     >
                       {completingId === actividad.id
                         ? <Loader2 className="h-4 w-4 animate-spin" />
-                        : <CheckCircle2 className="h-4 w-4" />}
+                        : actividad.completed
+                          ? <CheckCircle2 className="h-4 w-4" />
+                          : <Circle className="h-4 w-4" />}
                     </button>
                     <div className="min-w-0 flex-1">
                       <p className={`break-words text-sm font-medium leading-snug ${actividad.completed ? "line-through text-text-secondary" : "text-text-primary"}`}>

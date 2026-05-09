@@ -694,6 +694,24 @@ export default function CalendarioClient({
     } catch { toast("Error al completar la tarea", "error"); }
   }
 
+  // ── Complete agenda ────────────────────────────────────────────────────────
+
+  async function handleCompleteAgenda(id: number, completed: boolean) {
+    setEvents((prev) => prev.map((e) => e.id === id ? { ...e, completed } : e));
+    const { error } = await supabase.rpc("set_agenda_completed", {
+      p_agenda_id: id,
+      p_completed: completed,
+      p_result: undefined,
+    });
+    if (error) {
+      setEvents((prev) => prev.map((e) => e.id === id ? { ...e, completed: !completed } : e));
+      toast("Error al completar la actividad", "error");
+      return;
+    }
+    router.refresh();
+    toast(completed ? "Actividad completada" : "Actividad pendiente");
+  }
+
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const todayStr        = toDateStr(today);
@@ -726,9 +744,15 @@ export default function CalendarioClient({
         {localEvs.slice(0, 2).map((ev) => {
           const t = tipoMeta(ev.tipo);
           return (
-            <div key={ev.id} className={`flex items-center gap-1 rounded px-1 py-0.5 ${t.bg}`}>
-              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${t.dot}`} />
-              <span className={`truncate text-[10px] font-medium leading-none ${t.text}`}>{ev.description}</span>
+            <div key={ev.id} className={`group flex items-center gap-1 rounded px-1 py-0.5 ${ev.completed ? "opacity-50" : t.bg}`}>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleCompleteAgenda(ev.id, !ev.completed); }}
+                className={`shrink-0 ${ev.completed ? "text-green-500" : "text-text-secondary opacity-0 group-hover:opacity-100 hover:text-green-500"}`}
+              >
+                {ev.completed ? <Check className="h-2.5 w-2.5" /> : <Circle className="h-2.5 w-2.5" />}
+              </button>
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${ev.completed ? "opacity-0" : t.dot}`} />
+              <span className={`truncate text-[10px] font-medium leading-none ${ev.completed ? "line-through text-text-secondary" : t.text}`}>{ev.description}</span>
             </div>
           );
         })}
@@ -808,6 +832,13 @@ export default function CalendarioClient({
               className={`group relative cursor-pointer rounded-xl border p-3 transition-colors hover:brightness-95 ${t.bg} ${t.border}`}
             >
               <div className="flex items-start gap-2">
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleCompleteAgenda(ev.id, !ev.completed); }}
+                  title={ev.completed ? "Completada" : "Marcar como completada"}
+                  className={`mt-0.5 shrink-0 transition-colors ${ev.completed ? "text-green-500 cursor-default" : "text-text-secondary opacity-0 group-hover:opacity-100 hover:text-green-500"}`}
+                >
+                  {ev.completed ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                </button>
                 <div className={`mt-0.5 shrink-0 rounded-md p-1 ${t.bg}`}>
                   <Icon className={`h-3.5 w-3.5 ${t.text}`} />
                 </div>
@@ -1177,9 +1208,15 @@ export default function CalendarioClient({
                         <div
                           key={ev.id}
                           onClick={(e) => { e.stopPropagation(); setDetailEvent(ev); }}
-                          className={`flex cursor-pointer items-start gap-1 rounded-lg border px-1.5 py-1 transition-colors hover:brightness-95 ${t.bg} ${t.border}`}
+                          className={`group flex cursor-pointer items-start gap-1 rounded-lg border px-1.5 py-1 transition-colors hover:brightness-95 ${t.bg} ${t.border}`}
                         >
-                          <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${t.dot}`} />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleCompleteAgenda(ev.id, !ev.completed); }}
+                            className={`mt-0.5 shrink-0 ${ev.completed ? "text-green-500" : "text-text-secondary opacity-0 group-hover:opacity-100 hover:text-green-500"}`}
+                          >
+                            {ev.completed ? <Check className="h-2.5 w-2.5" /> : <Circle className="h-2.5 w-2.5" />}
+                          </button>
+                          <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${t.dot} ${ev.completed ? "opacity-0" : ""}`} />
                           <div className="min-w-0">
                             {ev.time && <p className={`text-[9px] font-medium ${t.text}`}>{ev.time}</p>}
                             <p className={`truncate text-[10px] font-medium leading-tight ${ev.completed ? "line-through text-text-secondary" : "text-text-primary"}`}>
@@ -1440,6 +1477,22 @@ export default function CalendarioClient({
         width="md"
         headerActions={
           <div className="flex items-center gap-1">
+            {detailEvent && !detailEvent.completed && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  if (!detailEvent) return;
+                  e.stopPropagation();
+                  handleCompleteAgenda(detailEvent.id, true);
+                  setDetailEvent(null);
+                }}
+                className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-success/10 hover:text-success"
+                aria-label="Marcar como completada"
+                title="Marcar como completada"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {

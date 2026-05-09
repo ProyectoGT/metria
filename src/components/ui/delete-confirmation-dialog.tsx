@@ -7,6 +7,8 @@
 
 import { Modal, ModalHeader, ModalBody, ModalFooter } from "@/components/ui/modal";
 import Button from "@/components/ui/button";
+import { useI18n } from "@/lib/i18n";
+import { translateVisibleText } from "@/lib/i18n/translate-text";
 
 type DeleteConfirmationDialogProps = {
   title: string;
@@ -31,21 +33,23 @@ export default function DeleteConfirmationDialog({
   onCancel,
   onConfirm,
 }: DeleteConfirmationDialogProps) {
+  const { t } = useI18n();
+
   return (
     <Modal open size="sm" onClose={onCancel}>
-      <ModalHeader title={title} onClose={onCancel} />
+      <ModalHeader title={translateVisibleText(title)} onClose={onCancel} />
       <ModalBody>
-        <p className="text-sm text-text-secondary">{description}</p>
+        <p className="text-sm text-text-secondary">{translateVisibleText(description)}</p>
 
         <div className="mt-4">
           <label className="block text-xs font-medium text-text-secondary">
-            Contraseña de confirmación
+            {t("auth:password")}
           </label>
           <input
             type="password"
             value={password}
             onChange={(e) => onPasswordChange(e.target.value)}
-            placeholder="Introduce la contraseña"
+            placeholder={t("auth:password")}
             className="input mt-1.5"
             autoFocus
           />
@@ -53,16 +57,16 @@ export default function DeleteConfirmationDialog({
 
         {error && (
           <p className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
-            {error}
+            {translateVisibleText(error)}
           </p>
         )}
       </ModalBody>
       <ModalFooter>
         <Button variant="secondary" size="sm" onClick={onCancel} disabled={pending}>
-          Cancelar
+          {t("common:cancel")}
         </Button>
         <Button variant="danger" size="sm" onClick={onConfirm} loading={pending}>
-          {pending ? "Eliminando..." : confirmLabel}
+          {pending ? translateVisibleText("Eliminando...") : translateVisibleText(confirmLabel)}
         </Button>
       </ModalFooter>
     </Modal>

@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import type { ReactNode } from "react";
+import { translateVisibleText } from "@/lib/i18n/translate-text";
 
 type AuthShellProps = {
   title: string;
@@ -14,6 +17,8 @@ export default function AuthShell({
   children,
   eyebrow = "Acceso privado",
 }: AuthShellProps) {
+  const renderedDescription = typeof description === "string" ? translateVisibleText(description) : description;
+
   return (
     <main className="min-h-screen bg-[#f4f2ee] transition-colors dark:bg-background lg:grid lg:grid-cols-[1.05fr_1fr]">
       <section className="relative hidden overflow-hidden bg-[#050505] dark:bg-sidebar-logo lg:flex lg:min-h-screen lg:items-center lg:justify-center">
@@ -45,13 +50,13 @@ export default function AuthShell({
             </div>
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#8d867c] dark:text-text-secondary">
-                {eyebrow}
+                {translateVisibleText(eyebrow)}
               </p>
               <h1 className="text-3xl font-semibold tracking-tight text-[#171717] dark:text-text-primary">
-                {title}
+                {translateVisibleText(title)}
               </h1>
               <div className="max-w-sm text-sm leading-6 text-[#6f6a63] dark:text-text-secondary">
-                {description}
+                {renderedDescription}
               </div>
             </div>
           </div>

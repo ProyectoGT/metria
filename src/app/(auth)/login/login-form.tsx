@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { login, loginWithGoogle } from "./actions";
+import { useI18n } from "@/lib/i18n";
+import { translateVisibleText } from "@/lib/i18n/translate-text";
 
 const fieldClassName =
   "w-full border-0 border-b border-[#d8d3cb] bg-transparent px-0 py-3 text-sm text-[#171717] outline-none transition placeholder:text-[#b1aba3] focus:border-[#7ba4e0] focus:ring-0";
@@ -21,6 +23,7 @@ const URL_SUCCESS: Record<string, string> = {
 };
 
 export default function LoginForm() {
+  const { t } = useI18n();
   const searchParams = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search)
     : null;
@@ -55,12 +58,12 @@ export default function LoginForm() {
     <div className="space-y-6">
       {success && (
         <div className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-3 text-sm text-[#15803d]">
-          {success}
+          {translateVisibleText(success)}
         </div>
       )}
       {error && (
         <div className="rounded-2xl border border-[#f2c7c7] bg-[#fff3f3] px-4 py-3 text-sm text-[#b42318]">
-          {error}
+          {translateVisibleText(error)}
         </div>
       )}
 
@@ -93,13 +96,13 @@ export default function LoginForm() {
             />
           </svg>
         )}
-        {isGooglePending ? "Redirigiendo..." : "Continuar con Google"}
+        {isGooglePending ? t("auth:redirecting") : t("auth:continueWithGoogle")}
       </button>
 
       {/* Separador */}
       <div className="flex items-center gap-3">
         <div className="h-px flex-1 bg-[#e5e0d9]" />
-        <span className="text-xs text-[#b1aba3]">o con email</span>
+        <span className="text-xs text-[#b1aba3]">{t("auth:orWithEmail")}</span>
         <div className="h-px flex-1 bg-[#e5e0d9]" />
       </div>
 
@@ -110,7 +113,7 @@ export default function LoginForm() {
               htmlFor="email"
               className="mb-2 block text-sm font-medium text-[#2f2f2f]"
             >
-              Usuario o Email
+              {t("auth:userOrEmail")}
             </label>
             <input
               id="email"
@@ -129,13 +132,13 @@ export default function LoginForm() {
                 htmlFor="password"
                 className="block text-sm font-medium text-[#2f2f2f]"
               >
-                Contraseña
+                {t("auth:password")}
               </label>
               <Link
                 href="/recuperar"
                 className="text-xs font-medium text-[#7ba4e0] transition hover:text-[#5f8fd4]"
               >
-                ¿Has olvidado tu contraseña?
+                {t("auth:forgotPassword")}
               </Link>
             </div>
             <input
@@ -144,7 +147,7 @@ export default function LoginForm() {
               type="password"
               required
               autoComplete="current-password"
-              placeholder="Introduce tu contraseña"
+              placeholder={t("auth:password")}
               className={fieldClassName}
             />
           </div>
@@ -155,7 +158,7 @@ export default function LoginForm() {
           disabled={isPending || isGooglePending}
           className="w-full rounded-full border border-[#9fc0ee] px-4 py-2.5 text-sm font-medium text-[#6f96cf] transition hover:border-[#7ba4e0] hover:text-[#5f8fd4] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isPending ? "Iniciando sesión..." : "Acceder"}
+          {isPending ? t("auth:signingIn") : t("auth:login")}
         </button>
       </form>
     </div>

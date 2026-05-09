@@ -1,0 +1,8 @@
+{
+  "required": "Este campo es obligatorio",
+  "invalidEmail": "Correo no válido",
+  "passwordRequired": "La contraseña es obligatoria",
+  "invalidDateFormat": "Formato de fecha inválido",
+  "invalidTimeFormat": "Formato de hora inválido",
+  "invalidEndTimeFormat": "Formato de hora fin inválido"
+}

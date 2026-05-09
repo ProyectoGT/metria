@@ -1,8 +1,11 @@
-// Server Component — se renderiza como <script> inline para aplicar el tema
-// de forma SÍNCRONA antes de que el navegador pinte, evitando cualquier flash.
+import Script from "next/script";
+
+// Runs before hydration so the saved theme is applied without a visual flash.
 export default function ThemeScript() {
   return (
-    <script
+    <Script
+      id="metria-theme-script"
+      strategy="afterInteractive"
       dangerouslySetInnerHTML={{
         __html: `(function(){
   try {
@@ -14,7 +17,6 @@ export default function ThemeScript() {
     } else if (t === 'dark-black') {
       el.classList.add('dark', 'dark-black');
     }
-    // 'light': sin clases adicionales
   } catch(e) {}
 })();`,
       }}

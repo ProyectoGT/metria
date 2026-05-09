@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { ChevronDown, CheckCircle2, Trash2 } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { ChevronDown, CheckCircle2, Circle, Loader2, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { OrdenDiaAgente, KanbanPriority } from "@/lib/mock/dashboard";
+import type { OrdenDiaAgente, OrdenDiaTarea, KanbanPriority } from "@/lib/mock/dashboard";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
-import { deleteTareaAction } from "@/app/(crm)/dashboard/actions";
+import { useToast, Toaster } from "@/components/ui/toast";
+import { completeTareaAction, deleteTareaAction } from "@/app/(crm)/dashboard/actions";
 
 type OrdenDiaPanelProps = {
   agentes: OrdenDiaAgente[];
@@ -17,12 +18,6 @@ const PRIORITY_BADGE: Record<KanbanPriority, { cls: string; label: string }> = {
   baja:  { cls: "bg-gray-500/15 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400",   label: "Baja"  },
 };
 
-const ESTADO_DOT: Record<string, string> = {
-  pendiente:   "bg-gray-400",
-  en_progreso: "bg-amber-400",
-  completado:  "bg-success",
-};
-
 function initials(name: string) {
   return name
     .split(" ")
@@ -31,19 +26,52 @@ function initials(name: string) {
     .join("");
 }
 
-export default function OrdenDiaPanel({ agentes }: OrdenDiaPanelProps) {
+export default function OrdenDiaPanel({ agentes: initialAgentes }: OrdenDiaPanelProps) {
   const [openIds, setOpenIds] = useState<Set<number>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<{ id: string | number; isAgenda: boolean } | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
+  const [localAgentes, setLocalAgentes] = useState<OrdenDiaAgente[]>(initialAgentes);
   const router = useRouter();
+  const { toast, toasts } = useToast();
+
+  useEffect(() => {
+    setLocalAgentes(initialAgentes);
+  }, [initialAgentes]);
+
+  async function handleCompleteTarea(tareaId: number, currentEstado: string) {
+    const nuevoEstado = currentEstado === "completado" ? "pendiente" : "completado";
+    setCompletingTaskId(tareaId);
+    setLocalAgentes((prev) =>
+      prev.map((ag) => ({
+        ...ag,
+        tareas: ag.tareas.map((t) => t.id === tareaId ? { ...t, estado: nuevoEstado as OrdenDiaTarea["estado"] } : t),
+      })),
+    );
+    try {
+      await completeTareaAction(tareaId);
+      router.refresh();
+      toast(nuevoEstado === "completado" ? "Tarea completada" : "Tarea pendiente");
+    } catch {
+      setLocalAgentes((prev) =>
+        prev.map((ag) => ({
+          ...ag,
+          tareas: ag.tareas.map((t) => t.id === tareaId ? { ...t, estado: currentEstado as OrdenDiaTarea["estado"] } : t),
+        })),
+      );
+      toast("Error al completar la tarea", "error");
+    } finally {
+      setCompletingTaskId(null);
+    }
+  }
 
   const { totalTareas, totalCompletadas } = useMemo(() => {
     let total = 0, completadas = 0;
-    for (const a of agentes) {
+    for (const a of localAgentes) {
       total += a.tareas.length;
       completadas += a.tareas.filter((t) => t.estado === "completado").length;
     }
     return { totalTareas: total, totalCompletadas: completadas };
-  }, [agentes]);
+  }, [localAgentes]);
 
   function toggle(id: number) {
     setOpenIds((prev) => {
@@ -71,6 +99,7 @@ export default function OrdenDiaPanel({ agentes }: OrdenDiaPanelProps) {
 
   return (
     <div className="flex h-full w-full flex-col rounded-xl bg-surface shadow-sm">
+      <Toaster toasts={toasts} />
       {/* Header fijo */}
       <div className="shrink-0 border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
@@ -102,13 +131,13 @@ export default function OrdenDiaPanel({ agentes }: OrdenDiaPanelProps) {
 
       {/* Lista con scroll */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {agentes.length === 0 ? (
+        {localAgentes.length === 0 ? (
           <p className="py-10 text-center text-sm text-text-secondary">
             No hay agentes que mostrar.
           </p>
         ) : (
           <ul className="divide-y divide-border">
-            {agentes.map((agent) => {
+            {localAgentes.map((agent) => {
               const isOpen = openIds.has(agent.id);
               const pendientes = agent.tareas.filter((t) => t.estado !== "completado").length;
               const completadas = agent.tareas.filter((t) => t.estado === "completado").length;
@@ -169,7 +198,6 @@ export default function OrdenDiaPanel({ agentes }: OrdenDiaPanelProps) {
                           ].map((t) => {
                             const badge = t.prioridad ? PRIORITY_BADGE[t.prioridad] : null;
                             const completada = t.estado === "completado";
-                            const dot = ESTADO_DOT[t.estado] ?? "bg-gray-400";
 
                             return (
                               <li
@@ -182,7 +210,19 @@ export default function OrdenDiaPanel({ agentes }: OrdenDiaPanelProps) {
                                 ].join(" ")}
                               >
                                 <div className="flex items-start gap-2">
-                                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot}`} />
+                                  <button
+                                    onClick={() => handleCompleteTarea(t.id, t.estado)}
+                                    disabled={completingTaskId === t.id}
+                                    className={`mt-0.5 shrink-0 transition-colors disabled:opacity-50 ${completada ? "text-success" : "text-text-secondary hover:text-success"}`}
+                                    title={completada ? "Desmarcar" : "Marcar como completada"}
+                                  >
+                                    {completingTaskId === t.id
+                                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                                      : completada
+                                        ? <CheckCircle2 className="h-4 w-4" />
+                                        : <Circle className="h-4 w-4" />
+                                    }
+                                  </button>
                                   <div className="min-w-0 flex-1">
                                     <p className={`text-sm leading-snug ${completada ? "line-through text-text-secondary" : "text-text-primary"}`}>
                                       {t.titulo}

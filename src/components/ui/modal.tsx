@@ -20,6 +20,7 @@
 import { useEffect, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 type ModalSize = "sm" | "md" | "lg" | "xl";
 
@@ -100,6 +101,8 @@ interface ModalHeaderProps {
 }
 
 export function ModalHeader({ title, subtitle, onClose, children }: ModalHeaderProps) {
+  const { t } = useI18n();
+
   return (
     <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4">
       <div className="min-w-0">
@@ -113,7 +116,7 @@ export function ModalHeader({ title, subtitle, onClose, children }: ModalHeaderP
             type="button"
             onClick={onClose}
             className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-            aria-label="Cerrar"
+            aria-label={t("common:close")}
           >
             <X className="h-4 w-4" />
           </button>

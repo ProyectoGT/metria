@@ -2,7 +2,9 @@
 
 import { memo } from "react";
 import { motion } from "framer-motion";
-import { Bell, Calendar, User, CheckCircle2, Circle, ExternalLink, AlertCircle, GripVertical } from "lucide-react";
+import {
+  Bell, Calendar, User, CheckCircle2, Circle, ExternalLink, AlertCircle, GripVertical,
+} from "lucide-react";
 import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import { calcDurationMinutes, formatDuration, formatReminderLabel } from "@/lib/local-date-time";
 

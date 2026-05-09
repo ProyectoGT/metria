@@ -16,6 +16,7 @@
 import { useEffect, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 type DrawerWidth = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -51,6 +52,8 @@ export default function Drawer({
   footer,
   zIndex = "z-[40]",
 }: DrawerProps) {
+  const { t } = useI18n();
+
   // Cerrar con Escape
   useEffect(() => {
     if (!open) return;
@@ -114,7 +117,7 @@ export default function Drawer({
                       type="button"
                       onClick={onClose}
                       className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                      aria-label="Cerrar"
+                      aria-label={t("common:close")}
                     >
                       <X className="h-4 w-4" />
                     </button>

@@ -4,9 +4,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { Search, Bell, ChevronDown, Menu, X, Calendar, AlertCircle, CheckCircle2, LifeBuoy } from "lucide-react";
+import { Search, Bell, ChevronDown, Menu, X, Calendar, AlertCircle, CheckCircle2, LifeBuoy, Languages, Check } from "lucide-react";
 import { logout } from "@/app/(auth)/actions";
 import Avatar from "@/components/ui/avatar";
+import { useTheme, THEMES } from "@/lib/theme-context";
+import { localeLabels, locales, useI18n, type Locale } from "@/lib/i18n";
 import type { NotificationItem } from "./app-shell";
 import type { SearchResult } from "@/app/api/search/route";
 
@@ -18,15 +20,15 @@ function prioridadColor(p: string | null) {
   return "text-primary";
 }
 
-function formatFecha(fecha: string | null): string {
+function formatFecha(fecha: string | null, locale = "es-ES"): string {
   if (!fecha) return "";
-  return new Date(fecha).toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+  return new Date(fecha).toLocaleDateString(locale, { day: "numeric", month: "short" });
 }
 
-const TYPE_LABELS: Record<SearchResult["type"], string> = {
-  zona: "Zona", sector: "Sector", finca: "Finca",
-  propiedad: "Propiedad", solicitud: "Solicitud",
-  usuario: "Usuario", ticket: "Soporte", tarea: "Tarea", contacto: "Contacto", email: "Email",
+const TYPE_LABEL_KEYS: Record<SearchResult["type"], string> = {
+  zona: "search.typeZona", sector: "search.typeSector", finca: "search.typeFinca",
+  propiedad: "search.typePropiedad", solicitud: "search.typeSolicitud",
+  usuario: "search.typeUsuario", ticket: "search.typeTicket", tarea: "search.typeTarea", contacto: "search.typeContacto", email: "search.typeEmail",
 };
 
 const TYPE_COLORS: Record<SearchResult["type"], string> = {
@@ -42,13 +44,13 @@ const TYPE_COLORS: Record<SearchResult["type"], string> = {
   email:     "bg-sky-500/10    text-sky-600    dark:text-sky-400",
 };
 
-function getPlaceholder(pathname: string): string {
-  if (pathname.startsWith("/zona"))        return "Buscar zonas, sectores, fincas…";
-  if (pathname.startsWith("/solicitudes")) return "Buscar solicitudes…";
-  if (pathname.startsWith("/usuarios"))    return "Buscar usuarios…";
-  if (pathname.startsWith("/soporte"))     return "Buscar tickets…";
-  if (pathname.startsWith("/contactos"))   return "Buscar contactos…";
-  return "Buscar en todo el programa…";
+function getPlaceholderKey(pathname: string): string {
+  if (pathname.startsWith("/zona"))        return "search.zones";
+  if (pathname.startsWith("/solicitudes")) return "search.requests";
+  if (pathname.startsWith("/usuarios"))    return "search.users";
+  if (pathname.startsWith("/soporte"))     return "search.tickets";
+  if (pathname.startsWith("/contactos"))   return "search.contacts";
+  return "search.global";
 }
 
 function getCtx(pathname: string): string {
@@ -73,9 +75,13 @@ interface HeaderProps {
 export default function Header({ userName, userEmail, avatarUrl, notifications = [] }: HeaderProps) {
   const router   = useRouter();
   const pathname = usePathname();
+  const { locale, setLocale, t } = useI18n();
 
-  const placeholder = getPlaceholder(pathname);
+  const placeholder = t(getPlaceholderKey(pathname));
   const ctx         = getCtx(pathname);
+
+  // ── Theme ──────────────────────────────────────────────────────────────────
+  const { theme, applyTheme } = useTheme();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [menuOpen,       setMenuOpen]       = useState(false);
@@ -154,7 +160,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
       <button
         onClick={() => window.dispatchEvent(new Event("sidebar:toggle"))}
         className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary md:hidden"
-        aria-label="Abrir menú"
+        aria-label={t("navigation.openMenu")}
       >
         <Menu className="h-5 w-5" />
       </button>
@@ -193,10 +199,10 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
               className="absolute left-0 top-full mt-1.5 w-full min-w-0 overflow-hidden rounded-xl border border-border bg-surface shadow-lg sm:min-w-[340px]"
             >
               {searchLoading ? (
-                <p className="px-4 py-3 text-sm text-text-secondary">Buscando…</p>
+                <p className="px-4 py-3 text-sm text-text-secondary">{t("common.searching")}</p>
               ) : searchResults.length === 0 ? (
                 <p className="px-4 py-3 text-sm text-text-secondary">
-                  Sin resultados para &ldquo;{searchValue}&rdquo;
+                  {t("common.noResultsFor", { query: searchValue })}
                 </p>
               ) : (
                 <ul className="max-h-72 divide-y divide-border overflow-y-auto">
@@ -212,7 +218,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-raised"
                       >
                         <span className={`shrink-0 rounded-lg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLORS[r.type]}`}>
-                          {TYPE_LABELS[r.type]}
+                          {t(TYPE_LABEL_KEYS[r.type])}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium text-text-primary">
@@ -243,7 +249,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
           <button
             onClick={() => setBellOpen((p) => !p)}
             className="relative rounded-xl p-2 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
-            aria-label="Notificaciones"
+            aria-label={t("common.notifications")}
           >
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
@@ -266,7 +272,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div className="flex items-center gap-2">
                   <Bell className="h-4 w-4 text-text-secondary" />
-                  <span className="text-sm font-semibold text-text-primary">Notificaciones</span>
+                  <span className="text-sm font-semibold text-text-primary">{t("common.notifications")}</span>
                 </div>
                 {unreadCount > 0 && (
                   <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-danger">
@@ -278,7 +284,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
               {notifications.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
                   <CheckCircle2 className="h-8 w-8 text-success/60" />
-                  <p className="text-sm font-medium text-text-secondary">Sin notificaciones pendientes</p>
+                  <p className="text-sm font-medium text-text-secondary">{t("common.noPendingNotifications")}</p>
                 </div>
               ) : (
                 <ul className="max-h-64 divide-y divide-border overflow-y-auto">
@@ -296,7 +302,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                           {n.fecha && (
                             <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary">
                               <Calendar className="h-3 w-3" />
-                              {formatFecha(n.fecha)}
+                              {formatFecha(n.fecha, localeLabels[locale].region)}
                             </p>
                           )}
                         </div>
@@ -309,7 +315,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                           {n.fecha && (
                             <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary">
                               <Calendar className="h-3 w-3" />
-                              {formatFecha(n.fecha)}
+                              {formatFecha(n.fecha, localeLabels[locale].region)}
                             </p>
                           )}
                         </div>
@@ -326,7 +332,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                   onClick={() => setBellOpen(false)}
                   className="text-center text-xs font-medium text-primary transition-colors hover:underline"
                 >
-                  Tareas
+                  {t("common.tasks")}
                 </Link>
                 <span className="text-text-secondary/40">|</span>
                 <Link
@@ -334,7 +340,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                   onClick={() => setBellOpen(false)}
                   className="text-center text-xs font-medium text-primary transition-colors hover:underline"
                 >
-                  Soporte
+                  {t("common.support")}
                 </Link>
               </div>
             </motion.div>
@@ -378,6 +384,54 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                   </p>
                 )}
               </div>
+              {/* Selector de tema */}
+              <div className="border-b border-border px-4 py-2">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-secondary/50">
+                  {t("common.appearance")}
+                </p>
+                <div className="flex gap-1 rounded-lg bg-muted p-0.5">
+                  {THEMES.map(({ value, label, icon: Icon }) => (
+                    <button
+                      key={value}
+                      onClick={() => applyTheme(value)}
+                      className={[
+                        "flex flex-1 items-center justify-center gap-1 rounded-md py-1.5 text-xs font-medium transition-all duration-150",
+                        theme === value
+                          ? "bg-surface text-primary shadow-sm"
+                          : "text-text-secondary hover:text-text-primary",
+                      ].join(" ")}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {t(value === "light" ? "theme.light" : value === "dark" ? "theme.dark" : "theme.black") || label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="border-b border-border px-4 py-2">
+                <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-secondary/50">
+                  <Languages className="h-3 w-3" />
+                  {t("common.language")}
+                </p>
+                <div className="space-y-0.5">
+                  {locales.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setLocale(option as Locale)}
+                      className={[
+                        "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors",
+                        locale === option
+                          ? "bg-primary/10 text-primary"
+                          : "text-text-secondary hover:bg-surface-raised hover:text-text-primary",
+                      ].join(" ")}
+                      aria-label={`${t("common.language")}: ${localeLabels[option].nativeName}`}
+                    >
+                      <span>{localeLabels[option].nativeName}</span>
+                      {locale === option && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {/* Acciones */}
               <div className="py-1">
                 <Link
@@ -385,14 +439,14 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                   onClick={() => setMenuOpen(false)}
                   className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-text-primary transition-colors hover:bg-surface-raised"
                 >
-                  Mi perfil
+                  {t("common.profile")}
                 </Link>
                 <form action={logout}>
                   <button
                     type="submit"
                     className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-danger transition-colors hover:bg-surface-raised"
                   >
-                    Cerrar sesión
+                    {t("common.signOut")}
                   </button>
                 </form>
               </div>

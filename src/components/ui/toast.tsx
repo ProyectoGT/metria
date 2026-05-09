@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { translateVisibleText } from "@/lib/i18n/translate-text";
 
 type ToastType = "success" | "error" | "info";
 
@@ -12,7 +13,7 @@ export function useToast() {
 
   function toast(message: string, type: ToastType = "success") {
     const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((prev) => [...prev, { id, message: translateVisibleText(message), type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3500);
