@@ -1,18 +1,18 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Droppable, Draggable } from "@hello-pangea/dnd";
+import { Droppable } from "@hello-pangea/dnd";
 import { CheckCircle2, Plus, X } from "lucide-react";
-import KanbanCard from "./KanbanCard";
+import KanbanDraggableCard from "./KanbanDraggableCard";
 import type { KanbanColumnData, KanbanCardData } from "@/lib/mock/dashboard";
 
 type KanbanColumnProps = {
-  column: KanbanColumnData;
-  onDeleteColumn: (columnId: string) => void;
-  onAddCard?: (columnId: string) => void;
+  column:          KanbanColumnData;
+  onDeleteColumn:  (columnId: string) => void;
+  onAddCard?:      (columnId: string) => void;
   onCompleteCard?: (columnId: string, cardId: string, card: KanbanCardData) => void;
-  onDetailCard: (columnId: string, card: KanbanCardData) => void;
+  onDetailCard:    (columnId: string, card: KanbanCardData) => void;
 };
 
 function KanbanColumn({
@@ -25,8 +25,18 @@ function KanbanColumn({
   const [hovered, setHovered] = useState(false);
 
   const activeCount = useMemo(() => column.cards.filter((c) => !c.isCompleted).length, [column.cards]);
-  const totalCount = column.cards.length;
-  const countLabel = activeCount === totalCount ? String(activeCount) : `${activeCount}/${totalCount}`;
+  const totalCount  = column.cards.length;
+  const countLabel  = activeCount === totalCount ? String(activeCount) : `${activeCount}/${totalCount}`;
+
+  // Stable callbacks — created once per column mount so KanbanDraggableCard's
+  // useCallback dependencies remain stable across parent re-renders.
+  const handleDelete = useCallback(() => {
+    onDeleteColumn(column.id);
+  }, [column.id, onDeleteColumn]);
+
+  const handleAddCard = useCallback(() => {
+    onAddCard?.(column.id);
+  }, [column.id, onAddCard]);
 
   return (
     <motion.div
@@ -37,7 +47,7 @@ function KanbanColumn({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* ── Cabecera de columna (sticky) ──────────────────────────── */}
+      {/* ── Cabecera (sticky) ─────────────────────────────────────── */}
       <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3.5 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.08)]">
         <div className="flex min-w-0 items-center gap-2.5">
           <h3 className="truncate text-sm font-semibold text-text-primary">{column.title}</h3>
@@ -52,7 +62,7 @@ function KanbanColumn({
         </div>
         {!column.fixed && (
           <button
-            onClick={() => onDeleteColumn(column.id)}
+            onClick={handleDelete}
             className={`rounded-lg p-1 text-text-secondary transition-all hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/30 ${hovered ? "opacity-100" : "opacity-0 focus-visible:opacity-100"}`}
             aria-label="Eliminar columna"
           >
@@ -61,7 +71,7 @@ function KanbanColumn({
         )}
       </div>
 
-      {/* ── Área droppable — NO cambiar la estructura ─────────────── */}
+      {/* ── Área droppable ───────────────────────────────────────── */}
       <Droppable droppableId={column.id}>
         {(provided, snapshot) => (
           <div
@@ -73,38 +83,26 @@ function KanbanColumn({
               snapshot.isDraggingOver ? "bg-primary/5" : "",
             ].join(" ")}
           >
-            {/* Empty state */}
             {column.cards.length === 0 && !snapshot.isDraggingOver && (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-surface-raised text-text-secondary/40">
                   <Plus className="h-5 w-5" />
                 </div>
-                <p className="text-xs text-text-secondary/50">
-                  Sin tareas
-                </p>
+                <p className="text-xs text-text-secondary/50">Sin tareas</p>
               </div>
             )}
 
             {column.cards.map((card: KanbanCardData, index: number) => (
-              <Draggable key={card.id} draggableId={card.id} index={index}>
-                {(dragProvided, dragSnapshot) => (
-                  // div wrapper requerido por @hello-pangea/dnd — NO añadir clases aquí
-                  <div
-                    ref={dragProvided.innerRef}
-                    {...dragProvided.draggableProps}
-                    style={dragProvided.draggableProps.style}
-                  >
-                    <KanbanCard
-                      card={card}
-                      isCompleted={card.isCompleted ?? false}
-                      onClick={(id) => { const c = column.cards.find((x) => x.id === id); if (c) onDetailCard(column.id, c); }}
-                      onComplete={onCompleteCard ? (id) => onCompleteCard(column.id, id, card) : undefined}
-                      dragHandleProps={dragProvided.dragHandleProps ?? undefined}
-                      isDragging={dragSnapshot.isDragging}
-                    />
-                  </div>
-                )}
-              </Draggable>
+              // KanbanDraggableCard is memoized and creates stable callbacks internally,
+              // so KanbanCard only re-renders when its own `card` data changes.
+              <KanbanDraggableCard
+                key={card.id}
+                card={card}
+                index={index}
+                columnId={column.id}
+                onDetail={onDetailCard}
+                onComplete={onCompleteCard}
+              />
             ))}
             {provided.placeholder}
           </div>
@@ -115,7 +113,7 @@ function KanbanColumn({
       {onAddCard && (
         <div className="border-t border-border px-3 py-2.5">
           <button
-            onClick={() => onAddCard(column.id)}
+            onClick={handleAddCard}
             className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium text-text-secondary transition-all hover:bg-surface-raised hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           >
             <Plus className="h-3.5 w-3.5" />

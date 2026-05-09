@@ -1,8 +1,9 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase-browser";
 import { queryKeys } from "@/lib/query-keys";
+import { eventBus } from "@/lib/event-bus";
 import type { OrdenDiaTarea } from "@/lib/mock/dashboard";
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
@@ -14,8 +15,7 @@ async function fetchOrdenesDay(date: string, userId: number): Promise<OrdenDiaTa
     .from("tareas")
     .select(`
       id, titulo, prioridad, fecha, estado, resultado,
-      tarea_usuarios!inner(usuario_id, usuarios(nombre, apellidos)),
-      agenda(id, time)
+      tarea_usuarios!inner(usuario_id)
     `)
     .in("tarea_usuarios.usuario_id", [userId])
     .eq("fecha", date)
@@ -25,11 +25,11 @@ async function fetchOrdenesDay(date: string, userId: number): Promise<OrdenDiaTa
   if (error) throw error;
 
   return (data ?? []).map((t) => ({
-    id:       t.id,
-    titulo:   t.titulo,
+    id:        t.id,
+    titulo:    t.titulo,
     prioridad: (t.prioridad as OrdenDiaTarea["prioridad"]) ?? null,
-    fecha:    t.fecha,
-    estado:   (t.estado as OrdenDiaTarea["estado"]) ?? "pendiente",
+    fecha:     t.fecha,
+    estado:    (t.estado as OrdenDiaTarea["estado"]) ?? "pendiente",
     resultado: t.resultado as string | null,
   }));
 }
@@ -44,30 +44,40 @@ interface UseOrdenesOptions {
 
 export function useOrdenes({ date, userId, initialData }: UseOrdenesOptions) {
   return useQuery({
-    queryKey:    queryKeys.ordenes.day(date, userId),
-    queryFn:     () => fetchOrdenesDay(date, userId),
+    queryKey:  queryKeys.ordenes.day(date, userId),
+    queryFn:   () => fetchOrdenesDay(date, userId),
     initialData,
-    staleTime:   1000 * 60, // 1 min — ordenes cambian con frecuencia
+    staleTime: 1000 * 60,
   });
 }
 
-// ─── Mutations ────────────────────────────────────────────────────────────────
+// ─── Mutation ─────────────────────────────────────────────────────────────────
 
 type UpdateTareaEstadoAction = (args: {
-  tareaId: number;
-  estado: "pendiente" | "en_progreso" | "completado";
+  tareaId:    number;
+  estado:     "pendiente" | "en_progreso" | "completado";
   resultado?: string | null;
 }) => Promise<void>;
 
-export function useUpdateOrdenEstado(serverAction: UpdateTareaEstadoAction) {
-  const queryClient = useQueryClient();
-
+export function useUpdateOrdenEstado(
+  serverAction: UpdateTareaEstadoAction,
+  date:         string,
+  userId:       number
+) {
   return useMutation({
     mutationFn: serverAction,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.ordenes.all() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.kanban.all() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.tareas.all() });
+    onSuccess: (_data, { tareaId, estado }) => {
+      if (estado === "completado") {
+        eventBus.emit({
+          type:    "task.completed",
+          payload: { tareaId, source: "ordenes" },
+        });
+      } else {
+        eventBus.emit({
+          type:    "order.updated",
+          payload: { date, userId },
+        });
+      }
     },
   });
 }

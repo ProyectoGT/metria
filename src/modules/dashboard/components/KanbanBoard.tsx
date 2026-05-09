@@ -1,16 +1,20 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { X, Plus } from "lucide-react";
+import dynamic from "next/dynamic";
 import KanbanColumn from "./KanbanColumn";
-import KanbanAddCard from "./KanbanAddCard";
-import KanbanEditCard from "./KanbanEditCard";
-import KanbanDetailDrawer from "./KanbanDetailDrawer";
-import KanbanConvertCard from "./KanbanConvertCard";
 import Drawer from "@/components/ui/drawer";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
+
+// Lazy-load heavy drawers/modals — they're only needed after user interaction,
+// not on initial board render. This reduces the initial JS bundle size.
+const KanbanAddCard     = dynamic(() => import("./KanbanAddCard"),     { ssr: false });
+const KanbanEditCard    = dynamic(() => import("./KanbanEditCard"),    { ssr: false });
+const KanbanDetailDrawer = dynamic(() => import("./KanbanDetailDrawer"), { ssr: false });
+const KanbanConvertCard = dynamic(() => import("./KanbanConvertCard"), { ssr: false });
 import type { KanbanData, KanbanColumnData, KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import type { UserRole } from "@/lib/roles";
 import type { ActivityType } from "@/lib/activity-options";
@@ -40,7 +44,7 @@ type KanbanBoardProps = {
   agents?: Array<{ id: string; nombre: string }>;
 };
 
-export default function KanbanBoard({
+function KanbanBoard({
   initialData,
   customColumns = [],
   role,
@@ -79,7 +83,7 @@ export default function KanbanBoard({
     return columns.find((c) => c.id === columnId)?.cards.find((c) => c.id === cardId) ?? null;
   }
 
-  function handleDragEnd(result: DropResult) {
+  const handleDragEnd = useCallback(function handleDragEnd(result: DropResult) {
     const { source, destination, draggableId } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
@@ -116,9 +120,9 @@ export default function KanbanBoard({
         .then(() => router.refresh())
         .catch(() => router.refresh());
     }
-  }
+  }, [router]); // end handleDragEnd
 
-  async function handleConfirmConvert(data: {
+  const handleConfirmConvert = useCallback(async function handleConfirmConvert(data: {
     description: string;
     tipo: ActivityType;
     date: string;
@@ -151,20 +155,20 @@ export default function KanbanBoard({
 
     setConvertingCard(null);
     router.refresh();
-  }
+  }, [convertingCard, router]); // end handleConfirmConvert
 
-  function handleCancelConvert() {
+  const handleCancelConvert = useCallback(() => {
     setConvertingCard(null);
-  }
+  }, []);
 
-  function requestDeleteColumn(columnId: string) {
+  const requestDeleteColumn = useCallback((columnId: string) => {
     setDeleteTarget({ type: "column", columnId });
-  }
+  }, []);
 
-  function handleDeleteColumn(columnId: string) {
+  const handleDeleteColumn = useCallback((columnId: string) => {
     setColumns((prev) => prev.filter((c) => c.id !== columnId));
     deleteKanbanColumnAction(columnId).catch(() => {});
-  }
+  }, []);
 
   function handleStartAddColumn() {
     setNewColTitle("");
@@ -224,22 +228,22 @@ export default function KanbanBoard({
     }
   }, [router]);
 
-  function handleOpenDetail(columnId: string, card: KanbanCardData) {
+  const handleOpenDetail = useCallback((columnId: string, card: KanbanCardData) => {
     setDetailCard({ columnId, card });
-  }
+  }, []);
 
-  function handleEditFromDetail() {
-    if (!detailCard) return;
-    const { columnId, card } = detailCard;
-    setDetailCard(null);
-    // Pequeño retraso para permitir que el drawer de detalle se cierre antes de abrir el de edicion
-    setTimeout(() => setEditingCard({ columnId, card }), 150);
-  }
+  const handleEditFromDetail = useCallback(() => {
+    setDetailCard((prev) => {
+      if (!prev) return prev;
+      const { columnId, card } = prev;
+      setTimeout(() => setEditingCard({ columnId, card }), 150);
+      return null;
+    });
+  }, []);
 
-  function handleRequestDeleteFromDetail() {
-    if (!detailCard) return;
-    setConfirmDeleteCard(detailCard);
-  }
+  const handleRequestDeleteFromDetail = useCallback(() => {
+    setDetailCard((prev) => { if (prev) setConfirmDeleteCard(prev); return prev; });
+  }, []);
 
   async function handleConfirmDeleteCard() {
     if (!confirmDeleteCard) return;
@@ -366,13 +370,15 @@ export default function KanbanBoard({
   }
 
   const isManager = role === "Administrador" || role === "Director";
-  const isOwnerOrAssigned = (card: KanbanCardData) => {
-    const uid = Number(_currentUserId);
-    return card.assignedUserIds?.includes(uid) || false;
-  };
-  const canDeleteAgenda = (card: KanbanCardData) => {
+  const currentUserIdNum = useMemo(() => Number(_currentUserId), [_currentUserId]);
+
+  const isOwnerOrAssigned = useCallback((card: KanbanCardData) => {
+    return card.assignedUserIds?.includes(currentUserIdNum) ?? false;
+  }, [currentUserIdNum]);
+
+  const canDeleteAgenda = useCallback((card: KanbanCardData) => {
     return isManager || isOwnerOrAssigned(card);
-  };
+  }, [isManager, isOwnerOrAssigned]);
 
   return (
     <>
@@ -573,3 +579,5 @@ export default function KanbanBoard({
     </>
   );
 }
+
+export default memo(KanbanBoard);

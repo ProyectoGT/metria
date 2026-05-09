@@ -10,6 +10,7 @@ import { useToast, Toaster } from "@/components/ui/toast";
 import ContactoTimeline, { type TimelineEvent } from "@/modules/contactos/components/ContactoTimeline";
 import RelatedEmailsPanel from "@/modules/email/components/RelatedEmailsPanel";
 import Drawer from "@/components/ui/drawer";
+import { ContactosTable } from "./contactos-table";
 import type { Contacto, ContactoTipo, ContactoEstado } from "@/types";
 import type { UserRole } from "@/lib/roles";
 
@@ -31,7 +32,7 @@ export const TIPOS: { value: ContactoTipo; label: string; badge: string }[] = [
   { value: "otro",                 label: "Otro",             badge: "bg-gray-500/15 text-gray-600 dark:text-gray-400" },
 ];
 
-const ESTADOS: { value: ContactoEstado; label: string; badge: string }[] = [
+export const ESTADOS: { value: ContactoEstado; label: string; badge: string }[] = [
   { value: "activo",   label: "Activo",   badge: "bg-success/15 text-success" },
   { value: "inactivo", label: "Inactivo", badge: "bg-gray-500/15 text-gray-600 dark:text-gray-400" },
 ];
@@ -269,10 +270,11 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
 
   // ─── Modal create/edit ───────────────────────────────────────────────────────
 
-  function openCreate() {
+  const openCreate = useCallback(() => {
     setEditId(null); setForm(emptyForm()); setSaveError(null); setModalOpen(true);
-  }
-  function openEdit(c: Contacto) {
+  }, []);
+
+  const openEdit = useCallback((c: Contacto) => {
     setEditId(c.id);
     setForm({
       nombre: c.nombre, apellidos: c.apellidos ?? "", empresa: c.empresa ?? "",
@@ -284,8 +286,9 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
       visibility: c.visibility ?? "company",
     });
     setSaveError(null); setModalOpen(true);
-  }
-  function closeModal() { setModalOpen(false); setEditId(null); setSaveError(null); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const closeModal = useCallback(() => { setModalOpen(false); setEditId(null); setSaveError(null); }, []);
   function setField<K extends keyof ContactoForm>(key: K, value: ContactoForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -343,7 +346,7 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
     }];
   }
 
-  async function handleArchive(id: number) {
+  const handleArchive = useCallback(async (id: number) => {
     if (archivingId === id) return;
     setArchivingId(id);
     const { error } = await db.from("contactos").update({ archived_at: new Date().toISOString() }).eq("id", id);
@@ -351,7 +354,11 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
     if (error) { toast(error.message, "error"); return; }
     setContactos((prev) => prev.filter((c) => c.id !== id));
     toast("Contacto archivado");
-  }
+  }, [archivingId, db, toast]);
+
+  const handleTimeline = useCallback((c: Contacto) => {
+    setTimelineContacto(c);
+  }, []);
 
   const fetchArchived = useCallback(async () => {
     setLoadingArchived(true);
@@ -574,80 +581,15 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-background text-left text-xs font-medium text-text-secondary">
-                    <th className="px-4 py-3">Contacto</th>
-                    <th className="px-4 py-3">Tipo</th>
-                    <th className="hidden px-4 py-3 md:table-cell">Empresa</th>
-                    <th className="hidden px-4 py-3 lg:table-cell">Telefono</th>
-                    <th className="hidden px-4 py-3 lg:table-cell">Email</th>
-                    <th className="hidden px-4 py-3 xl:table-cell">Ciudad</th>
-                    <th className="px-4 py-3">Estado</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filtered.map((c) => {
-                    const t = tipoMeta(c.tipo);
-                    const e = estadoMeta(c.estado);
-                    const nombre = nombreCompleto(c);
-                    return (
-                      <tr key={c.id} onClick={() => openEdit(c)} className="cursor-pointer hover:bg-background">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${avatarColor(nombre)}`}>
-                              {initials(c)}
-                            </span>
-                            <span className="font-medium text-text-primary">{nombre}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${t.badge}`}>{t.label}</span>
-                        </td>
-                        <td className="hidden px-4 py-3 text-text-secondary md:table-cell">{c.empresa ?? "—"}</td>
-                        <td className="hidden px-4 py-3 lg:table-cell">
-                          {c.telefono ? (
-                            <a href={`tel:${c.telefono}`} onClick={(ev) => ev.stopPropagation()} className="flex items-center gap-1 text-text-secondary hover:text-primary">
-                              <Phone className="h-3.5 w-3.5" />{c.telefono}
-                            </a>
-                          ) : <span className="text-text-secondary">—</span>}
-                        </td>
-                        <td className="hidden px-4 py-3 lg:table-cell">
-                          {c.email ? (
-                            <a href={`mailto:${c.email}`} onClick={(ev) => ev.stopPropagation()} className="flex max-w-[180px] items-center gap-1 truncate text-text-secondary hover:text-primary">
-                              <Mail className="h-3.5 w-3.5 shrink-0" />{c.email}
-                            </a>
-                          ) : <span className="text-text-secondary">—</span>}
-                        </td>
-                        <td className="hidden px-4 py-3 text-text-secondary xl:table-cell">
-                          {[c.ciudad, c.provincia].filter(Boolean).join(", ") || "—"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${e.badge}`}>{e.label}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1">
-                            <button onClick={(ev) => { ev.stopPropagation(); openEdit(c); }} className="rounded p-1.5 text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary" title="Editar">
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                            <button onClick={(ev) => { ev.stopPropagation(); setTimelineContacto(c); }} className="rounded p-1.5 text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary" title="Timeline">
-                              <History className="h-3.5 w-3.5" />
-                            </button>
-                            {(canManageAll || c.owner_user_id === currentUserId) && (
-                              <button onClick={(ev) => { ev.stopPropagation(); handleArchive(c.id); }} disabled={archivingId === c.id} className="rounded p-1.5 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50" title="Archivar">
-                                <Archive className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <ContactosTable
+              contacts={filtered}
+              currentUserId={currentUserId}
+              canManageAll={canManageAll}
+              archivingId={archivingId}
+              onEdit={openEdit}
+              onArchive={handleArchive}
+              onTimeline={handleTimeline}
+            />
             <div className="flex items-center justify-between border-t border-border px-4 py-2">
               <span className="text-xs text-text-secondary">
                 {filtered.length} {filtered.length === 1 ? "contacto" : "contactos"}{filtered.length !== contactos.length && ` de ${contactos.length}`}

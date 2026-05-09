@@ -40,7 +40,27 @@
 @layer components {
   /* ── Input global ────────────────────────────────────────────────────── */
   .input {
-    @apply w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary shadow-sm outline-none transition-colors placeholder:text-text-secondary hover:border-secondary/45 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply w-full rounded-ds-sm border border-border bg-surface px-ds-md py-ds-sm text-sm text-text-primary shadow-layer-1 outline-none transition-colors placeholder:text-text-secondary hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-state-focus disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .dropdown {
+    @apply rounded-ds-md border border-border bg-surface-elevated p-ds-xs shadow-layer-2;
+  }
+
+  .card {
+    @apply rounded-ds-lg border border-border bg-surface shadow-layer-1;
+  }
+
+  .card-elevated {
+    @apply rounded-ds-lg border border-border bg-surface-elevated shadow-layer-2;
+  }
+
+  .badge-base {
+    @apply inline-flex items-center rounded-full px-ds-sm py-0.5 text-[11px] font-semibold leading-none;
+  }
+
+  .modal-panel {
+    @apply border-l border-border bg-surface shadow-layer-3;
   }
 
   html.dark .input {
@@ -75,10 +95,12 @@
   --color-success:       #16a34a;
   --color-danger:        #dc2626;
   --color-warning:       #f59e0b;
+  --color-muted:         #f1f5f9;
 
   /* ── Superficies light mode ──────────────────────────────────────────── */
   --color-background:    #f8fafc;
   --color-surface:       #ffffff;
+  --color-surface-elevated:#ffffff;
   --color-surface-raised:#f1f5f9;
   --color-sidebar:       #ffffff;
   --color-sidebar-hover: #f1f5f9;
@@ -89,8 +111,27 @@
   --color-text-secondary: #64748b;
 
   /* ── Bordes y fondos sutiles ──────────────────────────────────────────── */
-  --color-border:  #e2e8f0;
-  --color-muted:   #f1f5f9;
+  --color-border:        #e2e8f0;
+  --color-border-strong: #cbd5e1;
+
+  /* Estados semanticos */
+  --color-state-focus:    rgba(37, 99, 235, 0.20);
+  --color-state-hover:    rgba(15, 23, 42, 0.045);
+  --color-state-active:   rgba(37, 99, 235, 0.10);
+  --color-state-disabled: rgba(100, 116, 139, 0.42);
+
+  /* Escalas reutilizables */
+  --spacing-ds-xs: 0.25rem;
+  --spacing-ds-sm: 0.5rem;
+  --spacing-ds-md: 1rem;
+  --spacing-ds-lg: 1.5rem;
+  --spacing-ds-xl: 2rem;
+  --radius-ds-sm: 0.5rem;
+  --radius-ds-md: 0.75rem;
+  --radius-ds-lg: 1rem;
+  --shadow-layer-1: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --shadow-layer-2: 0 10px 28px rgba(15, 23, 42, 0.10);
+  --shadow-layer-3: 0 24px 72px rgba(15, 23, 42, 0.18);
 
   /* ── Tipografía ───────────────────────────────────────────────────────── */
   --font-sans: "Aptos", "Segoe UI", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
@@ -110,6 +151,7 @@ html.dark {
   --color-warning:       #fbbf24;
   --color-background:    #0f172a;
   --color-surface:       #182235;
+  --color-surface-elevated:#1c2940;
   --color-surface-raised:#22304a;
   --color-sidebar:       #111827;
   --color-sidebar-hover: #1f2a3d;
@@ -117,7 +159,15 @@ html.dark {
   --color-text-primary:  #f8fafc;
   --color-text-secondary:#aebbd0;
   --color-border:        #334155;
+  --color-border-strong: #475569;
   --color-muted:         #1f2a3d;
+  --color-state-focus:   rgba(96, 165, 250, 0.26);
+  --color-state-hover:   rgba(148, 163, 184, 0.10);
+  --color-state-active:  rgba(96, 165, 250, 0.16);
+  --color-state-disabled:rgba(148, 163, 184, 0.32);
+  --shadow-layer-1: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --shadow-layer-2: 0 14px 34px rgba(0, 0, 0, 0.30);
+  --shadow-layer-3: 0 26px 68px rgba(0, 0, 0, 0.46);
 }
 
 html.dark body {
@@ -139,6 +189,7 @@ html.dark.dark-black {
   --color-warning:        #fbbf24;
   --color-background:     #000000;
   --color-surface:        #0c0c0c;
+  --color-surface-elevated:#121212;
   --color-surface-raised: #141414;
   --color-sidebar:        #050505;
   --color-sidebar-hover:  #121212;
@@ -146,7 +197,15 @@ html.dark.dark-black {
   --color-text-primary:   #e5e5e5;
   --color-text-secondary: #767676;
   --color-border:         #1e1e1e;
+  --color-border-strong:  #2d2d2d;
   --color-muted:          #0a0a0a;
+  --color-state-focus:    rgba(96, 165, 250, 0.28);
+  --color-state-hover:    rgba(229, 229, 229, 0.07);
+  --color-state-active:   rgba(96, 165, 250, 0.17);
+  --color-state-disabled: rgba(118, 118, 118, 0.35);
+  --shadow-layer-1: 0 1px 3px rgba(0, 0, 0, 0.55);
+  --shadow-layer-2: 0 8px 24px rgba(0, 0, 0, 0.65);
+  --shadow-layer-3: 0 20px 56px rgba(0, 0, 0, 0.75);
 }
 
 html.dark.dark-black body {

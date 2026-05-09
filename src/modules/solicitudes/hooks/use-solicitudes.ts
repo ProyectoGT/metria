@@ -3,14 +3,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase-browser";
 import { queryKeys } from "@/lib/query-keys";
+import { eventBus } from "@/lib/event-bus";
 import type { Pedido } from "@/types";
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 
 interface SolicitudesParams {
-  empresaId:    number;
-  search?:      string;
-  agentId?:     number | null;
+  empresaId:      number;
+  search?:        string;
+  agentId?:       number | null;
   tipoPropiedad?: string | null;
 }
 
@@ -47,8 +48,8 @@ interface UseSolicitudesOptions {
 
 export function useSolicitudes({ params, initialData }: UseSolicitudesOptions) {
   return useQuery({
-    queryKey: queryKeys.solicitudes.list(params as unknown as Record<string, unknown>),
-    queryFn:  () => fetchSolicitudes(params),
+    queryKey:  queryKeys.solicitudes.list(params as unknown as Record<string, unknown>),
+    queryFn:   () => fetchSolicitudes(params),
     initialData,
     staleTime: 1000 * 60 * 5,
   });
@@ -57,17 +58,15 @@ export function useSolicitudes({ params, initialData }: UseSolicitudesOptions) {
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 type UpdateSolicitudAction = (args: {
-  id: number;
+  id:      number;
   changes: Partial<Pedido>;
 }) => Promise<void>;
 
 export function useUpdateSolicitud(serverAction: UpdateSolicitudAction) {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: serverAction,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.solicitudes.all() });
+    onSuccess: (_data, { id }) => {
+      eventBus.emit({ type: "solicitud.updated", payload: { pedidoId: id } });
     },
   });
 }
@@ -75,22 +74,31 @@ export function useUpdateSolicitud(serverAction: UpdateSolicitudAction) {
 type DeleteSolicitudAction = (id: number) => Promise<void>;
 
 export function useDeleteSolicitud(serverAction: DeleteSolicitudAction) {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
 
   return useMutation({
     mutationFn: serverAction,
+
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.solicitudes.all() });
-      queryClient.setQueriesData<Pedido[]>(
+      await qc.cancelQueries({ queryKey: queryKeys.solicitudes.all() });
+      const snapshots = qc.getQueriesData<Pedido[]>({ queryKey: queryKeys.solicitudes.all() });
+      qc.setQueriesData<Pedido[]>(
         { queryKey: queryKeys.solicitudes.all() },
         (old) => old?.filter((p) => p.id !== id) ?? []
       );
+      return { snapshots };
     },
-    onError: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.solicitudes.all() });
+
+    onError: (_err, _id, context) => {
+      context?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data));
     },
+
+    onSuccess: (_data, id) => {
+      eventBus.emit({ type: "solicitud.updated", payload: { pedidoId: id } });
+    },
+
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.solicitudes.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.solicitudes.all() });
     },
   });
 }

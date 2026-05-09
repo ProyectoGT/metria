@@ -15,6 +15,7 @@
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
+import { cn, UI } from "@/lib/design-system";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "outline";
 type Size = "sm" | "md" | "lg";
@@ -40,15 +41,15 @@ interface ButtonProps {
 
 const VARIANT_CLASSES: Record<Variant, string> = {
   primary:
-    "bg-primary text-white shadow-sm hover:bg-primary-dark hover:shadow-md focus-visible:ring-primary/50 disabled:bg-primary/50 disabled:shadow-none",
+    "bg-primary text-white shadow-layer-1 hover:bg-primary-dark hover:shadow-layer-2 disabled:bg-primary/50 disabled:shadow-none",
   secondary:
-    "bg-surface text-text-primary border border-border shadow-sm hover:border-secondary/40 hover:bg-surface-raised hover:shadow-md focus-visible:ring-primary/30 disabled:opacity-50 disabled:shadow-none",
+    "border border-border bg-surface text-text-primary shadow-layer-1 hover:border-border-strong hover:bg-surface-elevated hover:shadow-layer-2 disabled:opacity-50 disabled:shadow-none",
   ghost:
-    "text-text-secondary hover:bg-surface-raised hover:text-text-primary focus-visible:ring-primary/30 disabled:opacity-40",
+    "text-text-secondary hover:bg-state-hover hover:text-text-primary disabled:opacity-40",
   danger:
-    "bg-danger text-white shadow-sm hover:bg-red-700 hover:shadow-md focus-visible:ring-danger/50 disabled:bg-danger/50 disabled:shadow-none",
+    "bg-danger text-white shadow-layer-1 hover:bg-red-700 hover:shadow-layer-2 disabled:bg-danger/50 disabled:shadow-none",
   outline:
-    "border border-primary/60 bg-surface text-primary shadow-sm hover:bg-primary/5 hover:border-primary focus-visible:ring-primary/30 disabled:opacity-50 disabled:shadow-none",
+    "border border-primary/60 bg-surface text-primary shadow-layer-1 hover:border-primary hover:bg-state-active disabled:opacity-50 disabled:shadow-none",
 };
 
 const SIZE_CLASSES: Record<Size, string> = {
@@ -74,14 +75,14 @@ export default function Button({
       disabled={isDisabled}
       whileTap={isDisabled ? undefined : { scale: 0.97 }}
       transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
-      className={[
+      className={cn(
         "inline-flex items-center justify-center whitespace-nowrap font-medium transition-all duration-200",
-        "outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+        UI.focus,
         "disabled:cursor-not-allowed",
         VARIANT_CLASSES[variant],
         SIZE_CLASSES[size],
         className,
-      ].join(" ")}
+      )}
       {...props}
     >
       {loading ? (

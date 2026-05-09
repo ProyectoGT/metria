@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useMemo } from "react";
+import { memo, useCallback, useState, useMemo } from "react";
 import {
   AlertTriangle, Sun, CalendarDays, RefreshCw, ClipboardList, Bell, Activity,
   ChevronDown, Clock, Users, CheckCircle2, ArrowRight, Inbox,
@@ -39,21 +39,19 @@ const KIND_LABEL: Record<string, string> = {
 
 type OpenSections = Record<string, boolean>;
 
-function PriorityDot({ priority }: { priority: HoyPriority }) {
+const PriorityDot = memo(function PriorityDot({ priority }: { priority: HoyPriority }) {
   const cfg = PRIORITY_CONFIG[priority] ?? PRIORITY_CONFIG.media;
   return <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${cfg.dot}`} title={cfg.label} />;
-}
-
-function ItemKindBadge({ kind }: { kind: string }) {
+})
+const ItemKindBadge = memo(function ItemKindBadge({ kind }: { kind: string }) {
   const label = KIND_LABEL[kind] ?? kind;
   return (
     <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-text-secondary">
       {label}
     </span>
   );
-}
-
-function HoyItemRow({ item }: { item: HoyItem }) {
+})
+const HoyItemRow = memo(function HoyItemRow({ item }: { item: HoyItem }) {
   return (
     <div className="group flex items-start gap-3 px-5 py-3 transition-colors hover:bg-background/50">
       <PriorityDot priority={item.priority} />
@@ -100,9 +98,8 @@ function HoyItemRow({ item }: { item: HoyItem }) {
       )}
     </div>
   );
-}
-
-function HoySectionCard({
+})
+const HoySectionCard = memo(function HoySectionCard({
   section,
   isOpen,
   onToggle,
@@ -145,9 +142,9 @@ function HoySectionCard({
       </AnimatedAccordion>
     </div>
   );
-}
+});
 
-function SummaryCard({
+const SummaryCard = memo(function SummaryCard({
   icon: Icon,
   label,
   value,
@@ -171,7 +168,16 @@ function SummaryCard({
       </div>
     </div>
   );
-}
+});
+
+// Wrapper that creates a stable `onToggle` per section id,
+// so HoySectionCard's memo isn't defeated by inline arrow functions.
+const StableSectionCard = memo(function StableSectionCard({
+  section, isOpen, onToggle,
+}: { section: HoySection; isOpen: boolean; onToggle: (id: string) => void }) {
+  const handleToggle = useCallback(() => onToggle(section.id), [section.id, onToggle]);
+  return <HoySectionCard section={section} isOpen={isOpen} onToggle={handleToggle} />;
+});
 
 export default function HoyPanelClient({ hoyData }: { hoyData: HoyData | null }) {
   const [openSections, setOpenSections] = useState<OpenSections>(() => {
@@ -197,9 +203,9 @@ export default function HoyPanelClient({ hoyData }: { hoyData: HoyData | null })
 
   const sections = hoyData?.sections ?? [];
 
-  function toggleSection(id: string) {
+  const toggleSection = useCallback((id: string) => {
     setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
+  }, []);
 
   if (!hoyData) {
     return (
@@ -227,11 +233,11 @@ export default function HoyPanelClient({ hoyData }: { hoyData: HoyData | null })
 
       <div className="space-y-3">
         {sections.map((section) => (
-          <HoySectionCard
+          <StableSectionCard
             key={section.id}
             section={section}
             isOpen={openSections[section.id] ?? false}
-            onToggle={() => toggleSection(section.id)}
+            onToggle={toggleSection}
           />
         ))}
 

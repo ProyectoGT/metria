@@ -14,15 +14,19 @@ Los dark mode overrides están en `html.dark {}`.
 |-------|-------|------|-----|
 | `bg-background` | #f8fafc | #09090b | Fondo de página |
 | `bg-surface` | #ffffff | #111113 | Fondo de cards |
+| `bg-surface-elevated` | #ffffff | #1c2940 | Dropdowns, headers de card, footers de modal |
 | `bg-surface-raised` | #f1f5f9 | #18181b | Fondos dentro de cards |
 | `bg-muted` | #f1f5f9 | #18181b | Fondos sutiles, thead |
 | `text-text-primary` | #0f172a | #fafafa | Texto principal |
 | `text-text-secondary` | #64748b | #a1a1aa | Texto secundario |
 | `border-border` | #e2e8f0 | #27272a | Bordes |
+| `border-border-strong` | #cbd5e1 | #475569 | Bordes en hover/foco suave |
 | `text-primary` | #2563eb | = | Acción primaria |
 | `text-success` | #16a34a | = | Éxito |
 | `text-danger` | #dc2626 | = | Error / Destructivo |
-| `text-accent` | #f59e0b | = | Advertencia / Amber |
+| `text-warning` | #f59e0b | = | Advertencia / Amber |
+
+Los tokens canónicos están en `src/app/globals.css`; las clases semánticas y mapas de estado están en `src/lib/design-system.ts`.
 
 ---
 
@@ -92,7 +96,11 @@ Usar **solo** estos valores. No usar gap-1.5, gap-2.5, gap-3, gap-5.
 | Componente | Archivo | Descripción |
 |------------|---------|-------------|
 | `Button` | `button.tsx` | Botón con variantes: primary, secondary, ghost, danger, outline |
-| `Badge` | `badge.tsx` | Etiqueta de estado: default, primary, success, warning, danger, purple, blue |
+| `Badge` | `badge.tsx` | Etiqueta base: default, primary, success, warning, danger, muted |
+| `PriorityBadge` | `badge.tsx` | Prioridades centralizadas: baja, media, alta |
+| `StatusBadge` | `badge.tsx` | Estados centralizados: pendiente, en curso, completado, cancelado |
+| `Input` / `Textarea` / `Select` | `input.tsx` | Campos conectados a la clase global `.input` |
+| `Dropdown` / `DropdownItem` | `dropdown.tsx` | Superficie flotante y opción de menú con foco consistente |
 | `Card` | `card.tsx` | Contenedor base con border + surface + shadow |
 | `StatCard` | `card.tsx` | Métrica numérica con icono y trend |
 | `SectionCard` | `card.tsx` | Sección con header, título y slot de acción |
@@ -118,25 +126,22 @@ Usar **solo** estos valores. No usar gap-1.5, gap-2.5, gap-3, gap-5.
 
 ---
 
-## Constantes de tema (`src/lib/theme.ts`)
+## Constantes de tema (`src/lib/design-system.ts` y `src/lib/theme.ts`)
 
 Para evitar colores hardcoded en badges y estados:
 
 ```tsx
-import { PRIORITY_BADGE, ESTADO_PROPIEDAD, ROL_BADGE, ESTADO_USUARIO } from "@/lib/theme";
+import { PRIORITY_TONE, STATUS_TONE, PRIORITY_LABEL, STATUS_LABEL } from "@/lib/design-system";
+import { PriorityBadge, StatusBadge } from "@/components/ui/badge";
 
-// Prioridad de tareas
-<span className={PRIORITY_BADGE.alta}>Alta</span>
+<PriorityBadge priority="alta" />
+<StatusBadge status="en_progreso" />
 
-// Estado de propiedad
-<span className={ESTADO_PROPIEDAD.encargo}>Encargo</span>
-
-// Rol de usuario
-<span className={ROL_BADGE.Responsable}>Responsable</span>
-
-// Estado de usuario
-<span className={ESTADO_USUARIO.active}>{ESTADO_USUARIO_LABEL.active}</span>
+<span className={PRIORITY_TONE.media.badge}>{PRIORITY_LABEL.media}</span>
+<span className={STATUS_TONE.completado.badge}>{STATUS_LABEL.completado}</span>
 ```
+
+`src/lib/theme.ts` mantiene exports compatibles (`PRIORITY_BADGE`, `ESTADO_PROPIEDAD`, `ROL_BADGE`, `ESTADO_USUARIO`) para no romper módulos existentes mientras se migra.
 
 ---
 

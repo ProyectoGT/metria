@@ -21,6 +21,7 @@ import { useEffect, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { cn, UI } from "@/lib/design-system";
 
 type ModalSize = "sm" | "md" | "lg" | "xl";
 
@@ -76,12 +77,12 @@ export function Modal({ open, onClose, size = "md", children, className = "" }: 
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
-            className={[
-              "relative z-10 flex flex-col bg-surface shadow-xl",
-              "h-full border-l border-border",
+            className={cn(
+              "relative z-10 flex h-full flex-col",
+              "modal-panel",
               WIDTH_CLASSES[size],
               className,
-            ].join(" ")}
+            )}
           >
             {children}
           </motion.div>
@@ -115,7 +116,7 @@ export function ModalHeader({ title, subtitle, onClose, children }: ModalHeaderP
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className={cn("rounded-ds-sm p-1.5 text-text-secondary transition-colors hover:bg-state-hover hover:text-text-primary", UI.focus)}
             aria-label={t("common:close")}
           >
             <X className="h-4 w-4" />
@@ -159,7 +160,7 @@ export function ModalFooter({ children, className = "" }: ModalFooterProps) {
   return (
     <div
       className={[
-        "flex shrink-0 flex-col-reverse gap-2 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:gap-3",
+        "flex shrink-0 flex-col-reverse gap-2 border-t border-border bg-surface-elevated px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:gap-3",
         className,
       ].join(" ")}
     >

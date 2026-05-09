@@ -1,75 +1,74 @@
-// ─── Design System — constantes de tema centralizadas ───────────────────────
-//
-// Usar estas constantes en lugar de clases Tailwind hardcoded para badges,
-// estados y colores de prioridad. Así un cambio aquí se propaga globalmente.
-//
-// ── USO ──────────────────────────────────────────────────────────────────────
-//
-//   import { PRIORITY_BADGE, ESTADO_PROPIEDAD } from "@/lib/theme";
-//   <span className={PRIORITY_BADGE.alta}>Alta</span>
-//
-// ─────────────────────────────────────────────────────────────────────────────
+import { PRIORITY_TONE, STATUS_TONE } from "@/lib/design-system";
 
-// ── Prioridades de tareas / acciones ─────────────────────────────────────────
+export { cn, normalizePriority, normalizeStatus, PRIORITY_LABEL, PRIORITY_TONE, STATUS_LABEL, STATUS_TONE, UI } from "@/lib/design-system";
+export type { Priority, WorkflowStatus } from "@/lib/design-system";
+
 export const PRIORITY_BADGE = {
-  alta:  "bg-danger/12  text-danger",
-  media: "bg-accent/15  text-amber-700 dark:text-amber-300",
-  baja:  "bg-primary/10 text-primary",
+  alta: PRIORITY_TONE.alta.badge,
+  media: PRIORITY_TONE.media.badge,
+  baja: PRIORITY_TONE.baja.badge,
 } as const;
 
-// ── Estados de propiedades ────────────────────────────────────────────────────
+export const PRIORITY_BORDER = {
+  alta: PRIORITY_TONE.alta.border,
+  media: PRIORITY_TONE.media.border,
+  baja: PRIORITY_TONE.baja.border,
+} as const;
+
+export const ESTADO_TAREA = {
+  pendiente: STATUS_TONE.pendiente.badge,
+  en_curso: STATUS_TONE.en_curso.badge,
+  en_progreso: STATUS_TONE.en_curso.badge,
+  completado: STATUS_TONE.completado.badge,
+  cancelado: STATUS_TONE.cancelado.badge,
+} as const;
+
 export const ESTADO_PROPIEDAD: Record<string, string> = {
-  noticia:       "bg-primary/10      text-primary",
-  investigacion: "bg-blue-500/12     text-blue-700    dark:text-blue-300",
-  seguimiento:   "bg-accent/15       text-amber-700   dark:text-amber-300",
-  encargo:       "bg-success/12      text-success",
-  vendido:       "bg-success/20      text-success",
-  neutral:       "bg-muted           text-text-secondary",
+  noticia: "bg-primary/10 text-primary",
+  investigacion: "bg-primary/10 text-primary",
+  seguimiento: "bg-warning/15 text-amber-700 dark:text-amber-300",
+  encargo: "bg-success/12 text-success",
+  vendido: "bg-success/20 text-success",
+  neutral: "bg-muted text-text-secondary",
 };
 
-// ── Modalidades de pedido ─────────────────────────────────────────────────────
 export const MODALIDAD_BADGE: Record<string, string> = {
-  CV:  "bg-success/12  text-success",
-  CH:  "bg-primary/10  text-primary",
-  ALQ: "bg-purple-500/12 text-purple-700 dark:text-purple-300",
+  CV: "bg-success/12 text-success",
+  CH: "bg-primary/10 text-primary",
+  ALQ: "bg-primary/10 text-primary",
 };
 
-// ── Origen de pedido ──────────────────────────────────────────────────────────
 export const ORIGEN_BADGE: Record<string, string> = {
-  oficina: "bg-accent/15  text-amber-700 dark:text-amber-300",
-  online:  "bg-purple-500/12 text-purple-700 dark:text-purple-300",
+  oficina: "bg-warning/15 text-amber-700 dark:text-amber-300",
+  online: "bg-primary/10 text-primary",
 };
 
-// ── Roles de usuario ──────────────────────────────────────────────────────────
 export const ROL_BADGE: Record<string, string> = {
-  Administrador: "bg-danger/10   text-danger",
-  Director:      "bg-primary/10  text-primary",
-  Responsable:   "bg-purple-500/10 text-purple-700 dark:text-purple-300",
-  Agente:        "bg-success/10  text-success",
+  Administrador: "bg-danger/10 text-danger",
+  Director: "bg-primary/10 text-primary",
+  Responsable: "bg-primary/10 text-primary",
+  Agente: "bg-success/10 text-success",
 };
 
-// ── Estado de usuario ─────────────────────────────────────────────────────────
 export const ESTADO_USUARIO: Record<string, string> = {
-  active:   "bg-success/12 text-success",
-  invited:  "bg-accent/15  text-amber-700 dark:text-amber-300",
-  disabled: "bg-muted      text-text-secondary",
+  active: STATUS_TONE.completado.badge,
+  invited: STATUS_TONE.pendiente.badge,
+  disabled: STATUS_TONE.cancelado.badge,
 };
 
 export const ESTADO_USUARIO_LABEL: Record<string, string> = {
-  active:   "Activo",
-  invited:  "Invitado",
+  active: "Activo",
+  invited: "Invitado",
   disabled: "Inactivo",
 };
 
-// ── Colores del avatar (basados en tokens) ────────────────────────────────────
-// El hash se mantiene igual; solo los colores apuntan a clases semánticas
 export const AVATAR_COLORS = [
-  "bg-primary    text-white",
-  "bg-success    text-white",
-  "bg-danger     text-white",
-  "bg-accent     text-white",
-  "bg-purple-600 text-white",
-  "bg-cyan-600   text-white",
-  "bg-indigo-600 text-white",
-  "bg-teal-600   text-white",
+  "bg-primary text-white",
+  "bg-success text-white",
+  "bg-danger text-white",
+  "bg-warning text-white",
+  "bg-slate-700 text-white",
+  "bg-teal-700 text-white",
+  "bg-indigo-700 text-white",
+  "bg-cyan-700 text-white",
 ] as const;

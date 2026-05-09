@@ -3,15 +3,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase-browser";
 import { queryKeys } from "@/lib/query-keys";
+import { eventBus } from "@/lib/event-bus";
 import type { Agenda } from "@/types";
 
-// ─── Fetch functions ──────────────────────────────────────────────────────────
+// ─── Fetch ────────────────────────────────────────────────────────────────────
 
 interface CalendarParams {
-  start:     string; // ISO date YYYY-MM-DD
-  end:       string; // ISO date YYYY-MM-DD
-  userId:    number;
-  agentIds?: number[];
+  start:  string;
+  end:    string;
+  userId: number;
 }
 
 async function fetchCalendarEvents(params: CalendarParams): Promise<Agenda[]> {
@@ -41,24 +41,19 @@ interface UseCalendarEventsOptions {
   start:        string;
   end:          string;
   userId:       number;
-  agentIds?:    number[];
   initialData?: Agenda[];
   enabled?:     boolean;
 }
 
 export function useCalendarEvents({
-  start,
-  end,
-  userId,
-  initialData,
-  enabled = true,
+  start, end, userId, initialData, enabled = true,
 }: UseCalendarEventsOptions) {
   return useQuery({
-    queryKey:    queryKeys.agenda.range(start, end, userId),
-    queryFn:     () => fetchCalendarEvents({ start, end, userId }),
+    queryKey:  queryKeys.agenda.range(start, end, userId),
+    queryFn:   () => fetchCalendarEvents({ start, end, userId }),
     initialData,
     enabled,
-    staleTime:   1000 * 60 * 2,
+    staleTime: 1000 * 60 * 2,
   });
 }
 
@@ -68,8 +63,8 @@ export function useDayEvents(
   initialData?: Agenda[]
 ) {
   return useQuery({
-    queryKey: queryKeys.agenda.day(date, userId),
-    queryFn:  () => fetchCalendarEvents({ start: date, end: date, userId }),
+    queryKey:  queryKeys.agenda.day(date, userId),
+    queryFn:   () => fetchCalendarEvents({ start: date, end: date, userId }),
     initialData,
     staleTime: 1000 * 60 * 2,
   });
@@ -78,45 +73,54 @@ export function useDayEvents(
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 type CreateEventServerAction = (data: {
-  description: string;
-  eventDate: string;
-  time?: string | null;
-  timeEnd?: string | null;
-  priority?: string;
-  tipo?: string;
-  completed?: boolean;
-  result?: string | null;
+  description:      string;
+  eventDate:        string;
+  time?:            string | null;
+  timeEnd?:         string | null;
+  priority?:        string;
+  tipo?:            string;
+  completed?:       boolean;
+  result?:          string | null;
   assignedUserIds?: number[];
   reminderMinutes?: number | null;
 }) => Promise<{ id: number }>;
 
 export function useCreateCalendarEvent(serverAction: CreateEventServerAction) {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: serverAction,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.agenda.all() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.kanban.all() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.ordenes.all() });
+    onSuccess: (result, vars) => {
+      eventBus.emit({
+        type:    "calendar.event.created",
+        payload: { agendaId: result.id, date: vars.eventDate },
+      });
     },
   });
 }
 
 type UpdateEventServerAction = (args: {
-  id: number;
+  id:      number;
   changes: Partial<Agenda>;
 }) => Promise<void>;
 
 export function useUpdateCalendarEvent(serverAction: UpdateEventServerAction) {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: serverAction,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.agenda.all() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.ordenes.all() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.kanban.all() });
+    onSuccess: (_data, { id, changes }) => {
+      eventBus.emit({
+        type:    "calendar.event.updated",
+        payload: { agendaId: id, date: changes.event_date ?? undefined },
+      });
+    },
+  });
+}
+
+type CompleteEventServerAction = (args: { id: number }) => Promise<void>;
+
+export function useCompleteCalendarEvent(serverAction: CompleteEventServerAction) {
+  return useMutation({
+    mutationFn: serverAction,
+    onSuccess: (_data, { id }) => {
+      eventBus.emit({ type: "calendar.event.completed", payload: { agendaId: id } });
     },
   });
 }
@@ -124,24 +128,33 @@ export function useUpdateCalendarEvent(serverAction: UpdateEventServerAction) {
 type DeleteEventServerAction = (id: number) => Promise<void>;
 
 export function useDeleteCalendarEvent(serverAction: DeleteEventServerAction) {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
 
   return useMutation({
     mutationFn: serverAction,
+
+    // Optimistic removal so the event disappears immediately in the UI
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.agenda.all() });
-      queryClient.setQueriesData<Agenda[]>(
+      await qc.cancelQueries({ queryKey: queryKeys.agenda.all() });
+      const snapshots = qc.getQueriesData<Agenda[]>({ queryKey: queryKeys.agenda.all() });
+      qc.setQueriesData<Agenda[]>(
         { queryKey: queryKeys.agenda.all() },
         (old) => old?.filter((e) => e.id !== id) ?? []
       );
+      return { snapshots };
     },
-    onError: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.agenda.all() });
+
+    onError: (_err, _id, context) => {
+      // Rollback all agenda cache snapshots
+      context?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data));
     },
+
+    onSuccess: (_data, id) => {
+      eventBus.emit({ type: "calendar.event.deleted", payload: { agendaId: id } });
+    },
+
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.agenda.all() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.ordenes.all() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.kanban.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.agenda.all() });
     },
   });
 }

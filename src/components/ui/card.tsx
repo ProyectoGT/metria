@@ -24,6 +24,7 @@
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { cn } from "@/lib/design-system";
 
 // ── Card base ─────────────────────────────────────────────────────────────────
 
@@ -46,11 +47,11 @@ const PADDING_CLASSES: Record<Padding, string> = {
 export function Card({ padding = "md", className = "", children, hover }: CardProps) {
   return (
     <motion.div
-      className={[
-        "rounded-2xl border border-border bg-surface shadow-sm",
+      className={cn(
+        "rounded-ds-lg border border-border bg-surface shadow-layer-1",
         PADDING_CLASSES[padding],
         className,
-      ].join(" ")}
+      )}
       {...(hover
         ? {
             whileHover: { y: -2, boxShadow: "0 8px 25px rgba(0,0,0,0.08)" },
@@ -104,11 +105,11 @@ export function StatCard({
     <div
       onClick={onClick}
       className={[
-        "group rounded-2xl border bg-surface p-5 shadow-sm transition-all duration-200",
+        "group rounded-ds-lg border bg-surface p-5 shadow-layer-1 transition-all duration-200",
         onClick ? "cursor-pointer select-none" : "",
         active
-          ? "border-primary shadow-md ring-1 ring-primary/20"
-          : "border-border hover:border-secondary/35 hover:shadow-md",
+          ? "border-primary shadow-layer-2 ring-1 ring-state-focus"
+          : "border-border hover:border-border-strong hover:shadow-layer-2",
         className,
       ].join(" ")}
     >
@@ -131,8 +132,8 @@ export function StatCard({
         {icon && (
           <div
             className={[
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-raised transition-colors",
-              "group-hover:bg-primary/5",
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-ds-md bg-muted transition-colors",
+              "group-hover:bg-state-active",
               iconColor,
             ].join(" ")}
           >
@@ -168,12 +169,12 @@ export function SectionCard({
   return (
     <div
       className={[
-        "overflow-hidden rounded-2xl border border-border bg-surface shadow-sm",
+        "overflow-hidden rounded-ds-lg border border-border bg-surface shadow-layer-1",
         className,
       ].join(" ")}
     >
       {hasHeader && (
-        <div className="flex flex-col gap-3 border-b border-border bg-surface px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border bg-surface-elevated px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           {title && (
             <div className="min-w-0">
               <h2 className="text-sm font-semibold text-text-primary">{title}</h2>

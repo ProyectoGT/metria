@@ -3,21 +3,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase-browser";
 import { queryKeys } from "@/lib/query-keys";
+import { eventBus } from "@/lib/event-bus";
 import type { Zona } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ZonaWithStats extends Zona {
   sectores?: Array<{
-    id: number;
-    numero: number;
+    id:      number;
+    numero:  number;
     fincas?: Array<{ id: number; propiedades?: Array<{ id: number }> }>;
   }>;
 }
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 
-// Zona table only has id, nombre, posicion — RLS scopes it to the current user's empresa
+// Zona table has id, nombre, posicion only. RLS scopes by empresa.
 async function fetchZonas(): Promise<ZonaWithStats[]> {
   const supabase = createClient();
 
@@ -26,9 +27,7 @@ async function fetchZonas(): Promise<ZonaWithStats[]> {
     .select(`
       id, nombre, posicion,
       sectores(id, numero,
-        fincas(id,
-          propiedades(id)
-        )
+        fincas(id, propiedades(id))
       )
     `)
     .order("posicion", { ascending: true, nullsFirst: false });
@@ -38,17 +37,16 @@ async function fetchZonas(): Promise<ZonaWithStats[]> {
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
-// empresaId is passed for cache key uniqueness only; RLS handles filtering
 
 interface UseZonasOptions {
-  empresaId:    number;
+  empresaId:    number; // Used only for cache key uniqueness
   initialData?: ZonaWithStats[];
 }
 
 export function useZonas({ empresaId, initialData }: UseZonasOptions) {
   return useQuery({
-    queryKey: queryKeys.zonas.list(empresaId),
-    queryFn:  fetchZonas,
+    queryKey:  queryKeys.zonas.list(empresaId),
+    queryFn:   fetchZonas,
     initialData,
     staleTime: 1000 * 60 * 10,
   });
@@ -59,22 +57,31 @@ export function useZonas({ empresaId, initialData }: UseZonasOptions) {
 type DeleteZonaAction = (id: number) => Promise<void>;
 
 export function useDeleteZona(serverAction: DeleteZonaAction) {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
 
   return useMutation({
     mutationFn: serverAction,
+
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.zonas.all() });
-      queryClient.setQueriesData<ZonaWithStats[]>(
+      await qc.cancelQueries({ queryKey: queryKeys.zonas.all() });
+      const snapshots = qc.getQueriesData<ZonaWithStats[]>({ queryKey: queryKeys.zonas.all() });
+      qc.setQueriesData<ZonaWithStats[]>(
         { queryKey: queryKeys.zonas.all() },
         (old) => old?.filter((z) => z.id !== id) ?? []
       );
+      return { snapshots };
     },
-    onError: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.zonas.all() });
+
+    onError: (_err, _id, context) => {
+      context?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data));
     },
+
+    onSuccess: (_data, id) => {
+      eventBus.emit({ type: "zona.updated", payload: { zonaId: id } });
+    },
+
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.zonas.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.zonas.all() });
     },
   });
 }

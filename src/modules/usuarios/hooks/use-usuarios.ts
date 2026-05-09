@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase-browser";
 import { queryKeys } from "@/lib/query-keys";
+import { eventBus } from "@/lib/event-bus";
 import type { Usuario } from "@/types";
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
@@ -31,8 +32,8 @@ interface UseUsuariosOptions {
 
 export function useUsuarios({ empresaId, initialData }: UseUsuariosOptions) {
   return useQuery({
-    queryKey: queryKeys.usuarios.list(empresaId),
-    queryFn:  () => fetchUsuarios(empresaId),
+    queryKey:  queryKeys.usuarios.list(empresaId),
+    queryFn:   () => fetchUsuarios(empresaId),
     initialData,
     staleTime: 1000 * 60 * 10,
   });
@@ -41,20 +42,18 @@ export function useUsuarios({ empresaId, initialData }: UseUsuariosOptions) {
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 type CreateUsuarioAction = (data: {
-  nombre: string;
+  nombre:    string;
   apellidos: string;
-  correo: string;
-  rol: string;
+  correo:    string;
+  rol:       string;
   equipoId?: number;
 }) => Promise<{ id: number }>;
 
 export function useCreateUsuario(serverAction: CreateUsuarioAction) {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: serverAction,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.usuarios.all() });
+    onSuccess: (result) => {
+      eventBus.emit({ type: "user.updated", payload: { usuarioId: result.id } });
     },
   });
 }
@@ -62,22 +61,31 @@ export function useCreateUsuario(serverAction: CreateUsuarioAction) {
 type DeleteUsuarioAction = (id: number) => Promise<void>;
 
 export function useDeleteUsuario(serverAction: DeleteUsuarioAction) {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
 
   return useMutation({
     mutationFn: serverAction,
+
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.usuarios.all() });
-      queryClient.setQueriesData<Usuario[]>(
+      await qc.cancelQueries({ queryKey: queryKeys.usuarios.all() });
+      const snapshots = qc.getQueriesData<Usuario[]>({ queryKey: queryKeys.usuarios.all() });
+      qc.setQueriesData<Usuario[]>(
         { queryKey: queryKeys.usuarios.all() },
         (old) => old?.filter((u) => u.id !== id) ?? []
       );
+      return { snapshots };
     },
-    onError: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.usuarios.all() });
+
+    onError: (_err, _id, context) => {
+      context?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data));
     },
+
+    onSuccess: (_data, id) => {
+      eventBus.emit({ type: "user.updated", payload: { usuarioId: id } });
+    },
+
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.usuarios.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.usuarios.all() });
     },
   });
 }

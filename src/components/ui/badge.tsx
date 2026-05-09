@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { ReactNode } from "react";
+import { cn, PRIORITY_LABEL, PRIORITY_TONE, STATUS_LABEL, STATUS_TONE, normalizePriority, normalizeStatus } from "@/lib/design-system";
 
 type Variant = "default" | "primary" | "success" | "warning" | "danger" | "purple" | "blue" | "muted";
 type Size = "sm" | "md";
@@ -24,14 +25,14 @@ interface BadgeProps {
 }
 
 const VARIANT_CLASSES: Record<Variant, string> = {
-  default: "bg-muted          text-text-secondary",
-  primary: "bg-primary/10     text-primary",
-  success: "bg-success/12     text-success",
-  warning: "bg-accent/15      text-amber-700 dark:text-amber-300",
-  danger:  "bg-danger/12      text-danger",
-  purple:  "bg-purple-500/12  text-purple-700 dark:text-purple-300",
-  blue:    "bg-blue-500/12    text-blue-700   dark:text-blue-300",
-  muted:   "bg-muted          text-text-secondary",
+  default: "bg-muted text-text-secondary",
+  primary: "bg-primary/10 text-primary",
+  success: "bg-success/12 text-success",
+  warning: "bg-warning/15 text-amber-700 dark:text-amber-300",
+  danger: "bg-danger/12 text-danger",
+  purple: "bg-primary/10 text-primary",
+  blue: "bg-primary/10 text-primary",
+  muted: "bg-muted text-text-secondary",
 };
 
 const SIZE_CLASSES: Record<Size, string> = {
@@ -47,14 +48,48 @@ export default function Badge({
 }: BadgeProps) {
   return (
     <span
-      className={[
+      className={cn(
         "inline-flex items-center rounded-full font-semibold leading-none",
         VARIANT_CLASSES[variant],
         SIZE_CLASSES[size],
         className,
-      ].join(" ")}
+      )}
     >
       {children}
     </span>
+  );
+}
+
+export function PriorityBadge({
+  priority,
+  size = "sm",
+  className = "",
+}: {
+  priority: string | null | undefined;
+  size?: Size;
+  className?: string;
+}) {
+  const normalized = normalizePriority(priority);
+  return (
+    <Badge size={size} className={cn(PRIORITY_TONE[normalized].badge, className)}>
+      {PRIORITY_LABEL[normalized]}
+    </Badge>
+  );
+}
+
+export function StatusBadge({
+  status,
+  size = "sm",
+  className = "",
+}: {
+  status: string | null | undefined;
+  size?: Size;
+  className?: string;
+}) {
+  const normalized = normalizeStatus(status);
+  return (
+    <Badge size={size} className={cn(STATUS_TONE[normalized].badge, className)}>
+      {STATUS_LABEL[normalized]}
+    </Badge>
   );
 }
