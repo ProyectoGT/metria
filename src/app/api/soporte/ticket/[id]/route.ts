@@ -1,7 +1,7 @@
-import { createClient } from "@/lib/supabase";
+﻿import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
-import { sendTicketRespuestaEmail } from "@/lib/email";
+import { sendTicketRespuestaEmail } from "@/modules/email/services/email";
 
 export async function PATCH(
   request: Request,

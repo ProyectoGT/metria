@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
@@ -7,8 +7,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 import { useToast, Toaster } from "@/components/ui/toast";
-import ContactoTimeline, { type TimelineEvent } from "@/components/timeline/ContactoTimeline";
-import RelatedEmailsPanel from "@/components/email/RelatedEmailsPanel";
+import ContactoTimeline, { type TimelineEvent } from "@/modules/contactos/components/ContactoTimeline";
+import RelatedEmailsPanel from "@/modules/email/components/RelatedEmailsPanel";
 import Drawer from "@/components/ui/drawer";
 import type { Contacto, ContactoTipo, ContactoEstado } from "@/types";
 import type { UserRole } from "@/lib/roles";

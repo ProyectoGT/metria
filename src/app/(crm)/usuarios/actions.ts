@@ -1,11 +1,11 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { canManageUsers, canCreateUsers, USER_ROLES, type UserRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { validatePassword } from "@/lib/password";
-import { sendInviteEmail, sendVerificacionGoogleEmail } from "@/lib/email";
+import { sendInviteEmail, sendVerificacionGoogleEmail } from "@/modules/email/services/email";
 import { generateVerificationToken } from "@/lib/verification";
 
 type CreateUserInput = {

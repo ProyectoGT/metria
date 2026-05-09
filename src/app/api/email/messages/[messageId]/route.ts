@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { createClient } from "@/lib/supabase";
-import { type EmailAccount } from "@/lib/email/gmail";
-import { getEmailProviderAdapter } from "@/lib/email/providers";
+import { type EmailAccount } from "@/modules/email/services/gmail";
+import { getEmailProviderAdapter } from "@/modules/email/services/providers";
 
 export async function GET(
   _request: NextRequest,

@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { createClient } from "@/lib/supabase";
-import { type EmailAccount, getGmailHistoryId } from "@/lib/email/gmail";
-import { linkEmailMessageToEntities } from "@/lib/email/linking";
-import { createClientNoReplyAlerts, enrichCommercialEmail } from "@/lib/email/commercial";
-import { getEmailProviderAdapter } from "@/lib/email/providers";
+import { type EmailAccount, getGmailHistoryId } from "@/modules/email/services/gmail";
+import { linkEmailMessageToEntities } from "@/modules/email/services/linking";
+import { createClientNoReplyAlerts, enrichCommercialEmail } from "@/modules/email/services/commercial";
+import { getEmailProviderAdapter } from "@/modules/email/services/providers";
 
 export async function POST() {
   const currentUser = await getCurrentUserContext();

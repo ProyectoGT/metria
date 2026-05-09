@@ -1,4 +1,4 @@
-import { loadHoyData } from "@/lib/hoy/queries";
+﻿import { loadHoyData } from "@/modules/hoy/services/queries";
 import HoyPanelClient from "./hoy-client";
 
 export default async function HoyPage() {

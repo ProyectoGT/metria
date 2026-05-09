@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
 import {
@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { AnimatedAccordion, AnimatedList, AnimatedListItem } from "@/components/ui/animated";
 import PageHeader from "@/components/layout/page-header";
-import type { HoyData, HoyItem, HoySection, HoyPriority } from "@/lib/hoy/types";
+import type { HoyData, HoyItem, HoySection, HoyPriority } from "@/modules/hoy/services/types";
 
 const SECTION_ICONS: Record<string, React.ElementType> = {
   vencido: AlertTriangle,

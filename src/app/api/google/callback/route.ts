@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getCallbackOrigin, GOOGLE_REDIRECT_PATH } from "@/lib/google-redirect";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { createClient } from "@/lib/supabase";
-import { encryptSecret } from "@/lib/email/crypto";
-import { exchangeGmailCode, getGmailProfile } from "@/lib/email/gmail";
+import { encryptSecret } from "@/modules/email/services/crypto";
+import { exchangeGmailCode, getGmailProfile } from "@/modules/email/services/gmail";
 
 // ─── Flujo Calendar ───────────────────────────────────────────────────────
 

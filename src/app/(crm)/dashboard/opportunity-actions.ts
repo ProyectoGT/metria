@@ -1,9 +1,9 @@
-"use server";
+﻿"use server";
 
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext, type CurrentUserContext } from "@/lib/current-user";
 import { revalidatePath } from "next/cache";
-import type { LostOpportunity, LostOpportunityEntity } from "@/lib/opportunities";
+import type { LostOpportunity, LostOpportunityEntity } from "@/modules/dashboard/services/opportunities";
 
 export type OpportunityActionResult = { ok: true } | { ok: false; error: string };
 

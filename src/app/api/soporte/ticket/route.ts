@@ -1,8 +1,8 @@
-import { createAdminClient } from "@/lib/supabase-admin";
+﻿import { createAdminClient } from "@/lib/supabase-admin";
 import { createClient } from "@/lib/supabase";
 import { rateLimiter, getIp } from "@/lib/rate-limiter";
 import { CreateTicketSchema } from "@/lib/validations/ticket";
-import { sendTicketAdminEmail } from "@/lib/email";
+import { sendTicketAdminEmail } from "@/modules/email/services/email";
 
 export async function POST(request: Request) {
   try {

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
@@ -23,7 +23,7 @@ import {
   WEB_SYNC_STATUS_COLOR,
   type WebSyncStatus,
 } from "@/lib/web-sync";
-import { getLabelForField } from "@/lib/propiedades/validate-property-for-web";
+import { getLabelForField } from "@/modules/propiedades/services/validate-property-for-web";
 import { prepareForWebAction, updateWebPublicationAction } from "../actions";
 import { useToast } from "@/components/ui/toast";
 

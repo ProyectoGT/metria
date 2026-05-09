@@ -309,6 +309,7 @@ export const dictionaries: Record<Locale, Messages> = {
       saveFailed: "Could not save",
     },
   },
+  it: {},
 };
 
 export function flattenMessages(messages: Messages, prefix = ""): Record<string, string> {

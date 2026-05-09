@@ -1,10 +1,10 @@
-import PageHeader from "@/components/layout/page-header";
+﻿import PageHeader from "@/components/layout/page-header";
 import { getConfirmationPasswordStatus } from "@/lib/delete-confirmation-password";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { createClient } from "@/lib/supabase";
 import SecuritySettingsForm from "./security-settings-form";
-import AccountProfileCard from "@/components/cuenta/AccountProfileCard";
-import EmailConnectionCard from "@/components/email/EmailConnectionCard";
+import AccountProfileCard from "@/modules/cuenta/components/AccountProfileCard";
+import EmailConnectionCard from "@/modules/email/components/EmailConnectionCard";
 
 export default async function CuentaPage() {
   const supabase = await createClient();

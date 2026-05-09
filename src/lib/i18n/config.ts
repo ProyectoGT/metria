@@ -1,4 +1,4 @@
-export const locales = ["es", "en"] as const;
+export const locales = ["es", "en", "it"] as const;
 
 export type Locale = (typeof locales)[number];
 
@@ -9,11 +9,13 @@ export const localeStorageKey = "preferred-lang";
 export const localeLabels: Record<Locale, { nativeName: string; englishName: string; region: string }> = {
   es: { nativeName: "Español", englishName: "Spanish", region: "es-ES" },
   en: { nativeName: "English", englishName: "English", region: "en-US" },
+  it: { nativeName: "Italiano", englishName: "Italian", region: "it-IT" },
 };
 
 export const localeToHtmlLang: Record<Locale, string> = {
   es: "es",
   en: "en",
+  it: "it",
 };
 
 export function normalizeLocale(value: string | null | undefined): Locale {

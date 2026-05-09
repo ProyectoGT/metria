@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { FileText, History, Users, Phone } from "lucide-react";
 import Drawer from "@/components/ui/drawer";
-import DocumentGeneratorModal from "@/components/documents/DocumentGeneratorModal";
-import ColaboracionesPanel from "@/components/colaboraciones/ColaboracionesPanel";
+import DocumentGeneratorModal from "@/modules/documents/components/DocumentGeneratorModal";
+import ColaboracionesPanel from "@/modules/colaboraciones/components/ColaboracionesPanel";
 import { createClient } from "@/lib/supabase-browser";
 import {
   ACCESS_SCOPE_BADGES,
@@ -12,9 +12,9 @@ import {
   normalizeAccessScope,
   type AccessScope,
 } from "@/lib/access-scope";
-import PropertyMatchesPanel from "@/components/matching/PropertyMatchesPanel";
-import ContactoTimeline, { type TimelineEvent } from "@/components/timeline/ContactoTimeline";
-import RelatedEmailsPanel from "@/components/email/RelatedEmailsPanel";
+import PropertyMatchesPanel from "@/modules/matching/components/PropertyMatchesPanel";
+import ContactoTimeline, { type TimelineEvent } from "@/modules/contactos/components/ContactoTimeline";
+import RelatedEmailsPanel from "@/modules/email/components/RelatedEmailsPanel";
 import type { UserRole } from "@/lib/roles";
 import { useToast, Toaster } from "@/components/ui/toast";
 

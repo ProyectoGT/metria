@@ -1,0 +1,17 @@
+{
+  "save": "Salva",
+  "cancel": "Annulla",
+  "edit": "Modifica",
+  "delete": "Elimina",
+  "confirm": "Conferma",
+  "search": "Cerca...",
+  "actions": "Azioni",
+  "loading": "Caricamento in corso...",
+  "yes": "Sì",
+  "no": "No",
+  "close": "Chiudi",
+  "back": "Indietro",
+  "next": "Avanti",
+  "success": "Operazione completata con successo.",
+  "error": "Si è verificato un errore."
+}

@@ -8,7 +8,7 @@ import { Search, Bell, ChevronDown, Menu, X, Calendar, AlertCircle, CheckCircle2
 import { logout } from "@/app/(auth)/actions";
 import Avatar from "@/components/ui/avatar";
 import { useTheme, THEMES } from "@/lib/theme-context";
-import { localeLabels, locales, useI18n, type Locale } from "@/lib/i18n";
+import { localeLabels, useI18n, type Locale } from "@/lib/i18n";
 import type { NotificationItem } from "./app-shell";
 import type { SearchResult } from "@/app/api/search/route";
 
@@ -43,6 +43,12 @@ const TYPE_COLORS: Record<SearchResult["type"], string> = {
   contacto:  "bg-teal-500/10   text-teal-600   dark:text-teal-400",
   email:     "bg-sky-500/10    text-sky-600    dark:text-sky-400",
 };
+
+const LANGUAGE_OPTIONS: Array<{ label: string; value: Locale; flag: string }> = [
+  { label: "Español", value: "es", flag: "🇪🇸" },
+  { label: "English", value: "en", flag: "🇬🇧" },
+  { label: "Italiano", value: "it", flag: "🇮🇹" },
+];
 
 function getPlaceholderKey(pathname: string): string {
   if (pathname.startsWith("/zona"))        return "search.zones";
@@ -413,21 +419,21 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                   {t("common.language")}
                 </p>
                 <div className="space-y-0.5">
-                  {locales.map((option) => (
+                  {LANGUAGE_OPTIONS.map((option) => (
                     <button
-                      key={option}
+                      key={option.value}
                       type="button"
-                      onClick={() => setLocale(option as Locale)}
+                      onClick={() => setLocale(option.value)}
                       className={[
                         "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors",
-                        locale === option
+                        locale === option.value
                           ? "bg-primary/10 text-primary"
                           : "text-text-secondary hover:bg-surface-raised hover:text-text-primary",
                       ].join(" ")}
-                      aria-label={`${t("common.language")}: ${localeLabels[option].nativeName}`}
+                      aria-label={`${t("common.language")}: ${option.label}`}
                     >
-                      <span>{localeLabels[option].nativeName}</span>
-                      {locale === option && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
+                      <span className="flex items-center gap-2"><span aria-hidden="true">{option.flag}</span>{option.label}</span>
+                      {locale === option.value && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
                     </button>
                   ))}
                 </div>

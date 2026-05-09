@@ -1,6 +1,6 @@
-import { createClient } from "@/lib/supabase";
+﻿import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
-import { getPeriodRange, mergeRendimientoRows } from "@/lib/desarrollo-metrics";
+import { getPeriodRange, mergeRendimientoRows } from "@/modules/desarrollo/services/desarrollo-metrics";
 import PageHeader from "@/components/layout/page-header";
 import DesarrolloClient from "./desarrollo-client";
 

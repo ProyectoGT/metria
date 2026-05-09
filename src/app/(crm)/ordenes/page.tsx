@@ -1,9 +1,9 @@
-import { createClient } from "@/lib/supabase";
+﻿import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { canViewAllAgents, canViewSupervisedAgents } from "@/lib/roles";
 import { formatLocalDateEs, localDateKey } from "@/lib/local-date-time";
-import { normalizeAgendaEvent } from "@/lib/agenda/normalize-agenda-event";
+import { normalizeAgendaEvent } from "@/modules/calendario/services/normalize-agenda-event";
 import PageHeader from "@/components/layout/page-header";
 import OrdenesClient from "./ordenes-client";
 

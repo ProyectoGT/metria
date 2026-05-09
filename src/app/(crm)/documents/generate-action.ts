@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
@@ -9,7 +9,7 @@ import {
   type DocumentType,
   type PropiedadDocData,
   type PedidoDocData,
-} from "@/lib/document-templates";
+} from "@/modules/documents/services/document-templates";
 
 export type GenerateDocumentInput =
   | { tipo: "ficha_propiedad" | "encargo_venta" | "encargo_alquiler"; propiedadId: number }

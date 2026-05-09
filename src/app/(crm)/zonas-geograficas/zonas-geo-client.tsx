@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
@@ -12,15 +12,15 @@ import {
   archiveZonaGeografica,
   deleteZonaGeografica,
   listZonasGeograficas,
-} from "@/lib/zonas-geograficas/actions";
-import ZonaGeoDrawer from "@/components/zonas-geograficas/ZonaGeoDrawer";
-import ZonaGeoListPanel from "@/components/zonas-geograficas/ZonaGeoListPanel";
-import type { ZonaGeografica } from "@/lib/zonas-geograficas/types";
-import type { ZonaGeoFormData } from "@/lib/zonas-geograficas/types";
+} from "@/modules/zonas-geograficas/services/actions";
+import ZonaGeoDrawer from "@/modules/zonas-geograficas/components/ZonaGeoDrawer";
+import ZonaGeoListPanel from "@/modules/zonas-geograficas/components/ZonaGeoListPanel";
+import type { ZonaGeografica } from "@/modules/zonas-geograficas/services/types";
+import type { ZonaGeoFormData } from "@/modules/zonas-geograficas/services/types";
 import type { UserRole } from "@/lib/roles";
 
 const ZonaGeoMap = dynamic(
-  () => import("@/components/zonas-geograficas/ZonaGeoMap"),
+  () => import("@/modules/zonas-geograficas/components/ZonaGeoMap"),
   {
     ssr: false,
     loading: () => (

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests para el motor de matching propiedad-pedido.
  * Verifica que los scores y la lógica de filtrado son correctos
  * y no exponen propiedades de otras empresas.
@@ -9,7 +9,7 @@ import {
   calculatePropertyMatches,
   type MatchPedido,
   type MatchPropiedad,
-} from "@/lib/matching";
+} from "@/modules/matching/services";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 

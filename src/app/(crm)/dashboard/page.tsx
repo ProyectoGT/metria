@@ -1,11 +1,11 @@
-import { createClient } from "@/lib/supabase";
+﻿import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
-import { getPeriodRange, mergeRendimientoRows } from "@/lib/desarrollo-metrics";
-import { getNextBestActions } from "@/lib/next-actions";
-import { generateAndFetchSuggestions } from "@/lib/pipeline-suggestions";
-import { detectLostOpportunities } from "@/lib/opportunities";
-import { listZonasGeograficas } from "@/lib/zonas-geograficas/actions";
+import { getPeriodRange, mergeRendimientoRows } from "@/modules/desarrollo/services/desarrollo-metrics";
+import { getNextBestActions } from "@/modules/dashboard/services/next-actions";
+import { generateAndFetchSuggestions } from "@/modules/dashboard/services/pipeline-suggestions";
+import { detectLostOpportunities } from "@/modules/dashboard/services/opportunities";
+import { listZonasGeograficas } from "@/modules/zonas-geograficas/services/actions";
 import {
   emptyRendimiento,
   type SummaryData,
@@ -17,10 +17,10 @@ import {
   type OrdenDiaAgente,
   type KanbanPriority,
 } from "@/lib/mock/dashboard";
-import DashboardWorkspace from "@/components/dashboard/DashboardWorkspace";
-import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
+import DashboardWorkspace from "@/modules/dashboard/components/DashboardWorkspace";
+import type { NoticiaMapPoint } from "@/modules/dashboard/components/MapaDashboard";
 import { combineLocalDateTime, formatLocalDateEs, localDateKey, normalizeTime } from "@/lib/local-date-time";
-import { normalizeAgendaEvent } from "@/lib/agenda/normalize-agenda-event";
+import { normalizeAgendaEvent } from "@/modules/calendario/services/normalize-agenda-event";
 import { normalizeActivityType } from "@/lib/activity-options";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

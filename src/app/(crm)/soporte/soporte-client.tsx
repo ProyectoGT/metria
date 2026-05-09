@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,8 +14,8 @@ import { createClient } from "@/lib/supabase-browser";
 import { useToast, Toaster } from "@/components/ui/toast";
 import Drawer from "@/components/ui/drawer";
 import Avatar from "@/components/ui/avatar";
-import TicketDetailSidePanel from "@/components/soporte/TicketDetailSidePanel";
-import { TipoIcon } from "@/components/soporte/TicketMessage";
+import TicketDetailSidePanel from "@/modules/soporte/components/TicketDetailSidePanel";
+import { TipoIcon } from "@/modules/soporte/components/TicketMessage";
 import type { UserRole } from "@/lib/roles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
-import { getCurrentUserContext } from "@/lib/current-user";
-import { listZonasGeograficas } from "@/lib/zonas-geograficas/actions";
+﻿import { getCurrentUserContext } from "@/lib/current-user";
+import { listZonasGeograficas } from "@/modules/zonas-geograficas/services/actions";
 import ZonasGeoClient from "./zonas-geo-client";
 
 export default async function ZonasGeograficasPage() {

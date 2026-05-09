@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { SlidersHorizontal, X, MapPin, Loader2, Navigation, FileText, Users } from "lucide-react";
-import DocumentGeneratorModal from "@/components/documents/DocumentGeneratorModal";
-import ColaboracionesPanel from "@/components/colaboraciones/ColaboracionesPanel";
+import DocumentGeneratorModal from "@/modules/documents/components/DocumentGeneratorModal";
+import ColaboracionesPanel from "@/modules/colaboraciones/components/ColaboracionesPanel";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deletePropiedadAction } from "@/app/actions/security";
 import { createAgendaAction } from "@/app/(crm)/dashboard/actions";
@@ -13,8 +13,8 @@ import { canSetVendido, type UserRole } from "@/lib/roles";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { AnimatedAccordion } from "@/components/ui/animated";
-import EncargoPanel from "@/components/propiedades/EncargoPanel";
-import RelatedEmailsPanel from "@/components/email/RelatedEmailsPanel";
+import EncargoPanel from "@/modules/propiedades/components/EncargoPanel";
+import RelatedEmailsPanel from "@/modules/email/components/RelatedEmailsPanel";
 import Drawer from "@/components/ui/drawer";
 
 type Agente = {

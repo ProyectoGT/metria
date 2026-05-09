@@ -1,16 +1,16 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { Network, Table2 } from "lucide-react";
-import OrgFilters from "@/components/organigrama/OrgFilters";
-import OrgChart from "@/components/organigrama/OrgChart";
-import OrgTable from "@/components/organigrama/OrgTable";
+import OrgFilters from "@/modules/empresa/components/OrgFilters";
+import OrgChart from "@/modules/empresa/components/OrgChart";
+import OrgTable from "@/modules/empresa/components/OrgTable";
 import {
   buildOrgTree,
   applyOrgFilters,
   type OrgUser,
   type OrgFilters as Filters,
-} from "@/lib/org-chart";
+} from "@/modules/empresa/services/org-chart";
 
 type Props = {
   users: OrgUser[];

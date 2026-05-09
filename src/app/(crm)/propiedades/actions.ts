@@ -1,9 +1,9 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
-import { validatePropertyForWeb } from "@/lib/propiedades/validate-property-for-web";
+import { validatePropertyForWeb } from "@/modules/propiedades/services/validate-property-for-web";
 import { canUseFeature } from "@/lib/access-control/can-access";
 
 // ─── Helpers internos ─────────────────────────────────────────────────────────

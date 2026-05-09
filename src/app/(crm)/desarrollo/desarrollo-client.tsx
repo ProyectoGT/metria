@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
@@ -13,7 +13,7 @@ import {
   mergeRendimientoRowsAnual,
   type ObjectiveKey,
   type RendimientoPeriodo,
-} from "@/lib/desarrollo-metrics";
+} from "@/modules/desarrollo/services/desarrollo-metrics";
 import { updateObjetivosRendimientoAction } from "./actions";
 
 type Agente = {
