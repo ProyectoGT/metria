@@ -208,12 +208,39 @@ export default function OrdenesClient({
       p_reminder_minutes: form.reminderMinutes ?? undefined,
     };
 
+    const previousActividades = actividades;
+    const optimisticId = editing?.id ?? -Date.now();
+    const optimisticActividad: Actividad = {
+      id: optimisticId,
+      description: args.p_description,
+      event_date: today,
+      time: args.p_time,
+      time_end: args.p_time_end ?? null,
+      priority,
+      tipo,
+      completed: form.completed,
+      result: form.result.trim() || null,
+      reminder_minutes_before: form.reminderMinutes,
+      owner_user_id: editing?.owner_user_id ?? currentUserId,
+      user_id: editing?.user_id ?? currentUserId,
+      agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({
+        usuario_id,
+        usuarios: null,
+      })),
+    };
+
+    setActividades((prev) => editing
+      ? prev.map((a) => a.id === editing.id ? { ...a, ...optimisticActividad, id: editing.id } : a)
+      : [...prev, optimisticActividad].sort((a, b) => normalizeTime(a.time).localeCompare(normalizeTime(b.time))));
+    setShowModal(false);
+
     const { data, error } = editing
       ? await supabase.rpc("update_agenda_activity", { p_agenda_id: editing.id, ...args, p_reminder_minutes: form.reminderMinutes ?? -1 })
       : await supabase.rpc("create_agenda_activity_v2", { ...args, p_visibility: "private" });
 
     setSaving(false);
     if (error || !data) {
+      setActividades(previousActividades);
       toast(error?.message ?? "Error al guardar", "error");
       return;
     }
@@ -228,9 +255,9 @@ export default function OrdenesClient({
     };
     setActividades((prev) => editing
       ? prev.map((a) => a.id === editing.id ? withUsers : a)
-      : [...prev, withUsers].sort((a, b) => normalizeTime(a.time).localeCompare(normalizeTime(b.time))));
+      : prev.map((a) => a.id === optimisticId ? withUsers : a)
+          .sort((a, b) => normalizeTime(a.time).localeCompare(normalizeTime(b.time))));
     router.refresh();
-    setShowModal(false);
     toast(editing ? "Actividad actualizada" : "Actividad creada");
   }
 

@@ -34,13 +34,13 @@ export default function EmptyState({
   return (
     <div
       className={[
-        "flex flex-col items-center justify-center rounded-2xl text-center",
+        "flex flex-col items-center justify-center rounded-ds-lg border border-dashed border-border bg-surface-elevated text-center shadow-layer-1",
         variant === "compact" ? "py-10 px-4" : "py-16 px-6",
         className,
       ].join(" ")}
     >
       {icon && (
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-surface-raised text-text-secondary shadow-sm">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-ds-lg border border-border bg-muted text-text-secondary shadow-layer-1">
           {icon}
         </div>
       )}

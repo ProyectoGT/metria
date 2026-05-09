@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase-browser";
 import { queryKeys } from "@/lib/query-keys";
 import { eventBus } from "@/lib/event-bus";
@@ -52,6 +52,7 @@ export function useCalendarEvents({
     queryKey:  queryKeys.agenda.range(start, end, userId),
     queryFn:   () => fetchCalendarEvents({ start, end, userId }),
     initialData,
+    placeholderData: keepPreviousData,
     enabled,
     staleTime: 1000 * 60 * 2,
   });
@@ -66,6 +67,7 @@ export function useDayEvents(
     queryKey:  queryKeys.agenda.day(date, userId),
     queryFn:   () => fetchCalendarEvents({ start: date, end: date, userId }),
     initialData,
+    placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 2,
   });
 }

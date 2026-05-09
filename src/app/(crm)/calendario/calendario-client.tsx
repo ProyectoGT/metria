@@ -499,6 +499,33 @@ export default function CalendarioClient({
       result: form.result || null,
       reminderMinutes: form.reminderMinutes,
     };
+    const previousEvents = events;
+    const optimisticId = editId ?? -Date.now();
+    const optimisticEvent = normalizeCalendarEvent({
+      id: optimisticId,
+      description: payload.description,
+      event_date: payload.event_date,
+      time: payload.time,
+      time_end: payload.time_end,
+      priority: payload.priority,
+      tipo: payload.tipo,
+      completed: payload.completed,
+      result: payload.result,
+      reminder_minutes_before: payload.reminderMinutes,
+      gcal_event_id: editId !== null ? events.find((event) => event.id === editId)?.gcal_event_id ?? null : null,
+      owner_user_id: currentUserId,
+      user_id: currentUserId,
+      empresa_id: empresaId,
+      created_at: new Date().toISOString(),
+      agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
+    });
+
+    setEvents((prev) =>
+      editId !== null
+        ? prev.map((event) => event.id === editId ? { ...event, ...optimisticEvent, id: editId } : event)
+        : [...prev, optimisticEvent].sort((a, b) => a.event_date.localeCompare(b.event_date)),
+    );
+    setModalOpen(false);
 
     async function insertOrUpdate(p: typeof payload) {
       const assignedUserIds = form.assignedUserIds.length ? form.assignedUserIds : [currentUserId];
@@ -535,7 +562,11 @@ export default function CalendarioClient({
     if (editId !== null) {
       const previousEvent = events.find((event) => event.id === editId);
       const { data, error } = await insertOrUpdate(payload);
-      if (error) setSaveError(error.message);
+      if (error) {
+        setEvents(previousEvents);
+        setSaveError(error.message);
+        toast(error.message, "error");
+      }
       else if (data) {
         const updated: AgendaEvent = {
           ...(data as unknown as AgendaEvent),
@@ -583,11 +614,15 @@ export default function CalendarioClient({
 
         setEvents((prev) => prev.map((e) => e.id === editId ? normalizedUpdated : e));
         router.refresh();
-        toast("Actividad actualizada"); setModalOpen(false);
+        toast("Actividad actualizada");
       }
     } else {
       const { data, error } = await insertOrUpdate(payload);
-      if (error) setSaveError(error.message);
+      if (error) {
+        setEvents(previousEvents);
+        setSaveError(error.message);
+        toast(error.message, "error");
+      }
       else if (data) {
         let saved: AgendaEvent = {
           ...(data as unknown as AgendaEvent),
@@ -596,7 +631,7 @@ export default function CalendarioClient({
         saved = normalizeCalendarEvent(saved);
 
         setEvents((prev) =>
-          [...prev.filter((event) => event.id !== saved.id), saved]
+          [...prev.filter((event) => event.id !== optimisticId && event.id !== saved.id), saved]
             .sort((a, b) => a.event_date.localeCompare(b.event_date))
         );
 
@@ -655,7 +690,7 @@ export default function CalendarioClient({
           }
         }
         router.refresh();
-        toast("Actividad creada"); setModalOpen(false);
+        toast("Actividad creada");
       }
     }
     setSaving(false);

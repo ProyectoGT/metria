@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase-browser";
 import { queryKeys } from "@/lib/query-keys";
 import { eventBus } from "@/lib/event-bus";
@@ -79,6 +79,7 @@ export function useKanban({ params, initialData }: UseKanbanOptions) {
     queryKey:  queryKeys.kanban.board(params as unknown as Record<string, unknown>),
     queryFn:   () => fetchKanbanBoard(params),
     initialData,
+    placeholderData: keepPreviousData,
     staleTime: 1000 * 30,
   });
 }

@@ -192,10 +192,23 @@ function KanbanBoard({
   }
 
   const handleAddCard = useCallback(async (columnId: string, newCard: NewKanbanCard) => {
+    const isAgendaColumn = columnId === "en_progreso";
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimisticCard: KanbanCardData = {
+      ...newCard,
+      id: optimisticId,
+      source: isAgendaColumn ? "agenda" : "tarea",
+      dbId: -Date.now(),
+      isCompleted: false,
+      fromOrdenDia: isAgendaColumn,
+    };
+    setColumns((prev) =>
+      prev.map((col) => col.id === columnId ? { ...col, cards: [...col.cards, optimisticCard] } : col),
+    );
+
     try {
       const assignedUserIds = newCard.assignedUserIds?.length ? newCard.assignedUserIds : undefined;
       const { date, time } = splitLocalDateTime(newCard.dueDate);
-      const isAgendaColumn = columnId === "en_progreso";
       const created = isAgendaColumn
         ? await createAgendaAction({
             description: newCard.title,
@@ -220,10 +233,19 @@ function KanbanBoard({
         fromOrdenDia: isAgendaColumn,
       };
       setColumns((prev) =>
-        prev.map((col) => col.id === columnId ? { ...col, cards: [...col.cards, finalCard] } : col),
+        prev.map((col) =>
+          col.id === columnId
+            ? { ...col, cards: col.cards.map((card) => card.id === optimisticId ? finalCard : card) }
+            : col,
+        ),
       );
       router.refresh();
     } catch {
+      setColumns((prev) =>
+        prev.map((col) =>
+          col.id === columnId ? { ...col, cards: col.cards.filter((card) => card.id !== optimisticId) } : col,
+        ),
+      );
       router.refresh();
     }
   }, [router]);

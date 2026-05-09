@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { ThemeProvider } from "@/lib/theme-context";
 import Sidebar from "./sidebar";
 import Header from "./header";
+import RoutePreloader from "./route-preloader";
 
 export type NotificationItem = {
   id: number;
@@ -119,6 +120,7 @@ export default async function AppShell({
 
   return (
     <ThemeProvider>
+      <RoutePreloader />
       <div className="h-dvh overflow-hidden bg-background">
         <Sidebar userRole={userRole} deniedResourceKeys={deniedKeys} />
         <div className="flex h-full min-w-0 flex-col md:pl-[260px]">

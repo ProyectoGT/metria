@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase-browser";
 import { queryKeys } from "@/lib/query-keys";
 import { eventBus } from "@/lib/event-bus";
@@ -35,6 +35,7 @@ export function useUsuarios({ empresaId, initialData }: UseUsuariosOptions) {
     queryKey:  queryKeys.usuarios.list(empresaId),
     queryFn:   () => fetchUsuarios(empresaId),
     initialData,
+    placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 10,
   });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase-browser";
 import { queryKeys } from "@/lib/query-keys";
 import { eventBus } from "@/lib/event-bus";
@@ -47,6 +47,7 @@ export function useOrdenes({ date, userId, initialData }: UseOrdenesOptions) {
     queryKey:  queryKeys.ordenes.day(date, userId),
     queryFn:   () => fetchOrdenesDay(date, userId),
     initialData,
+    placeholderData: keepPreviousData,
     staleTime: 1000 * 60,
   });
 }

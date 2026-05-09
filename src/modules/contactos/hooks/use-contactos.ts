@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase-browser";
 import { queryKeys } from "@/lib/query-keys";
 import type { Contacto } from "@/types";
@@ -51,6 +51,7 @@ export function useContactos({ params, initialData }: UseContactosOptions) {
     queryKey: queryKeys.contactos.list(params as unknown as Record<string, unknown>),
     queryFn:  () => fetchContactos(params),
     initialData,
+    placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 5,
   });
 }

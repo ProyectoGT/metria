@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 function Sk({ className }: { className?: string }) {
   return (
     <motion.div
-      className={`rounded-md bg-border/55 ${className ?? ""}`}
+      className={`rounded-md bg-muted ${className ?? ""}`}
       animate={{ opacity: [1, 0.45, 1] }}
       transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
     />
@@ -46,9 +46,9 @@ export function TableSkeleton({ rows = 8 }: { rows?: number }) {
         <PageHeader />
         <Sk className="h-9 w-32 rounded-xl" />
       </div>
-      <div className="rounded-2xl border border-border bg-surface shadow-sm overflow-hidden">
-        <div className="flex gap-4 border-b border-border px-5 py-3">
-          {["w-40", "w-60", "w-30", "w-50"].map((widthClass, i) => (
+      <div className="rounded-ds-lg border border-border bg-surface shadow-layer-1 overflow-hidden">
+        <div className="flex gap-4 border-b border-border bg-surface-elevated px-5 py-3">
+          {["w-40", "w-60", "w-32", "w-48"].map((widthClass, i) => (
             <Sk key={i} className={`h-4 ${widthClass}`} />
           ))}
         </div>
@@ -81,7 +81,7 @@ export function KanbanSkeleton() {
             <Sk className="h-5 w-28" />
           </div>
           {Array.from({ length: cards }).map((_, j) => (
-            <div key={j} className="rounded-2xl border border-border bg-surface p-4 flex flex-col gap-3">
+            <div key={j} className="rounded-ds-lg border border-border bg-surface p-4 shadow-layer-1 flex flex-col gap-3">
               <Sk className="h-4 w-3/4" />
               <Sk className="h-3 w-1/2" />
               <div className="flex gap-2">
@@ -103,7 +103,7 @@ export function DashboardSkeleton() {
       {/* stat cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="rounded-2xl border border-border bg-surface p-5 flex flex-col gap-3">
+          <div key={i} className="rounded-ds-lg border border-border bg-surface p-5 shadow-layer-1 flex flex-col gap-3">
             <Sk className="h-4 w-24" />
             <Sk className="h-8 w-16" />
             <Sk className="h-3 w-32" />
@@ -125,7 +125,7 @@ export function ZonaSkeleton() {
       </div>
       <div className="flex flex-col gap-3">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="rounded-2xl border border-border bg-surface shadow-sm px-5 py-4 flex items-center justify-between">
+          <div key={i} className="rounded-ds-lg border border-border bg-surface shadow-layer-1 px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Sk className="h-5 w-5 rounded" />
               <Sk className="h-5 w-32" />
@@ -153,7 +153,7 @@ export function SolicitudesSkeleton() {
         <Sk className="h-9 w-36 rounded-xl" />
       </div>
       {/* filter bar */}
-      <div className="rounded-xl border border-border bg-surface px-4 py-3 flex gap-4">
+      <div className="rounded-ds-md border border-border bg-surface-elevated px-4 py-3 flex gap-4 shadow-layer-1">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="flex flex-col gap-1 flex-1">
             <Sk className="h-3 w-12" />
@@ -162,7 +162,7 @@ export function SolicitudesSkeleton() {
         ))}
       </div>
       {/* table */}
-      <div className="rounded-2xl border border-border bg-surface shadow-sm overflow-hidden">
+      <div className="rounded-ds-lg border border-border bg-surface shadow-layer-1 overflow-hidden">
         <div className="divide-y divide-border">
           {Array.from({ length: 7 }).map((_, i) => (
             <div key={i} className="flex items-center gap-4 px-5 py-4">
@@ -189,7 +189,7 @@ export function CalendarioSkeleton() {
         <PageHeader />
         <Sk className="h-9 w-36 rounded-xl" />
       </div>
-      <div className="rounded-2xl border border-border bg-surface shadow-sm p-5 flex flex-col gap-4">
+      <div className="rounded-ds-lg border border-border bg-surface shadow-layer-1 p-5 flex flex-col gap-4">
         {/* month nav */}
         <div className="flex items-center justify-between">
           <Sk className="h-7 w-32" />
@@ -239,7 +239,7 @@ export function OrdenesSkeleton() {
             <Sk className="h-9 w-40 rounded-xl" />
           </div>
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="rounded-2xl border border-border bg-surface shadow-sm px-4 py-3 flex items-center gap-3">
+            <div key={i} className="rounded-ds-lg border border-border bg-surface shadow-layer-1 px-4 py-3 flex items-center gap-3">
               <Sk className="h-3 w-3 rounded-full shrink-0" />
               <div className="flex flex-1 flex-col gap-2">
                 <Sk className="h-4 w-3/4" />
@@ -250,7 +250,7 @@ export function OrdenesSkeleton() {
           ))}
         </div>
         {/* detail panel */}
-        <div className="w-72 shrink-0 rounded-2xl border border-border bg-surface shadow-sm p-5 flex flex-col gap-4">
+        <div className="w-72 shrink-0 rounded-ds-lg border border-border bg-surface shadow-layer-1 p-5 flex flex-col gap-4">
           <Sk className="h-5 w-32" />
           <Sk className="h-24 rounded-xl" />
           <div className="flex flex-col gap-3">
@@ -296,6 +296,48 @@ export function DesarrolloSkeleton() {
   );
 }
 
+export function PropiedadesSkeleton() {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <PageHeader />
+        <div className="flex gap-2">
+          <Sk className="h-9 w-28 rounded-xl" />
+          <Sk className="h-9 w-36 rounded-xl" />
+        </div>
+      </div>
+      <div className="rounded-ds-md border border-border bg-surface-elevated px-4 py-3 shadow-layer-1">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Sk key={i} className="h-9 rounded-lg" />
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="rounded-ds-lg border border-border bg-surface p-4 shadow-layer-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1 space-y-2">
+                <Sk className="h-5 w-3/4" />
+                <Sk className="h-3.5 w-1/2" />
+                <Sk className="h-3.5 w-2/3" />
+              </div>
+              <Sk className="h-8 w-8 shrink-0 rounded-full" />
+            </div>
+            <div className="mt-4 flex gap-2">
+              <Sk className="h-5 w-16 rounded-full" />
+              <Sk className="h-5 w-20 rounded-full" />
+            </div>
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
+              <Sk className="h-full w-2/3 rounded-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ── Usuarios ─────────────────────────────────────────────────────────── */
 export function UsuariosSkeleton() {
   return (
@@ -304,8 +346,8 @@ export function UsuariosSkeleton() {
         <PageHeader />
         <Sk className="h-9 w-36 rounded-xl" />
       </div>
-      <div className="rounded-2xl border border-border bg-surface shadow-sm overflow-hidden">
-        <div className="flex gap-4 border-b border-border px-5 py-3 bg-background">
+      <div className="rounded-ds-lg border border-border bg-surface shadow-layer-1 overflow-hidden">
+        <div className="flex gap-4 border-b border-border px-5 py-3 bg-surface-elevated">
           {["Nombre", "Email", "Rol", "Estado", ""].map((_, i) => (
             <Sk key={i} className="h-4 w-24" />
           ))}
