@@ -42,13 +42,13 @@ export function Toaster({ toasts }: { toasts: ToastItem[] }) {
 
 function ToastCard({ toast }: { toast: ToastItem }) {
   const base =
-    "flex items-center gap-2.5 rounded-lg px-4 py-3 text-sm font-medium shadow-lg";
+    "flex items-center gap-2.5 rounded-ds-md border px-4 py-3 text-sm font-medium shadow-layer-3";
   const colors =
     toast.type === "success"
-      ? "bg-success text-white"
+      ? "border-success/20 bg-success text-white"
       : toast.type === "error"
-      ? "bg-danger text-white"
-      : "bg-text-primary text-background";
+      ? "border-danger/20 bg-danger text-white"
+      : "border-border bg-surface-elevated text-text-primary";
 
   return (
     <motion.div

@@ -86,7 +86,7 @@ export function Modal({ open, onClose, size = "md", children, className = "" }: 
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
-              transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
+            transition={{ type: "spring", stiffness: 380, damping: 34, mass: 0.65 }}
               className={cn(
                 "relative z-10 flex w-full flex-col rounded-t-2xl bg-surface shadow-layer-3 sm:max-w-[360px] sm:rounded-2xl sm:mx-4",
                 "max-h-[85vh]",

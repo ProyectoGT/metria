@@ -75,6 +75,26 @@
     @apply border border-border bg-map-surface shadow-layer-1;
   }
 
+  .interactive {
+    @apply transition-all duration-150 ease-out;
+  }
+
+  .interactive-surface {
+    @apply transition-all duration-150 ease-out hover:border-border-strong hover:bg-surface-elevated hover:shadow-layer-2;
+  }
+
+  .pressable {
+    @apply transition-all duration-150 ease-out active:scale-[0.98];
+  }
+
+  .drag-feedback {
+    @apply rotate-[2deg] scale-[1.02] border-primary/35 bg-surface-elevated shadow-layer-3;
+  }
+
+  .complete-pop {
+    animation: complete-pop 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
   html.dark .input {
     background-color: var(--color-surface);
     color: var(--color-text-primary);
@@ -510,6 +530,21 @@ textarea {
 /* ── Transición suave entre temas ────────────────────────────────────────── */
 html {
   transition: background-color 200ms ease, color 200ms ease;
+}
+
+@keyframes complete-pop {
+  0% {
+    transform: scale(0.88);
+    opacity: 0.5;
+  }
+  70% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* ── Scrollbar sutil ─────────────────────────────────────────────────────── */

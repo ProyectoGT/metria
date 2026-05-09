@@ -43,7 +43,7 @@ function KanbanColumn({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-      className="group flex w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col overflow-hidden rounded-ds-lg border border-border bg-surface shadow-layer-1"
+      className="group flex w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col overflow-hidden rounded-ds-lg border border-border bg-surface shadow-layer-1 interactive-surface"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -80,7 +80,7 @@ function KanbanColumn({
             className={[
               "flex min-h-[72px] flex-1 flex-col gap-2 overflow-y-auto px-3 py-3 transition-colors duration-150",
               "scrollbar-thin max-h-[420px]",
-              snapshot.isDraggingOver ? "bg-primary/5" : "",
+              snapshot.isDraggingOver ? "bg-state-active ring-1 ring-primary/20" : "",
             ].join(" ")}
           >
             {column.cards.length === 0 && !snapshot.isDraggingOver && (
@@ -114,7 +114,7 @@ function KanbanColumn({
         <div className="border-t border-border px-3 py-2.5">
           <button
             onClick={handleAddCard}
-            className="touch-target flex w-full items-center justify-center gap-1.5 rounded-xl px-4 py-3 text-sm font-medium text-text-secondary transition-all hover:bg-state-hover hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-state-focus"
+            className="pressable touch-target flex w-full items-center justify-center gap-1.5 rounded-xl px-4 py-3 text-sm font-medium text-text-secondary hover:bg-state-hover hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-state-focus"
           >
             <Plus className="h-4 w-4" />
             Añadir

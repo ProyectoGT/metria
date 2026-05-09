@@ -14,8 +14,9 @@ import { NotFoundError, UnauthorizedError } from "@/lib/api/errors";
 import { revalidatePath } from "next/cache";
 
 type RouteContext = { params: Promise<{ id: string }> };
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
-async function getTask(supabase: ReturnType<typeof createClient>, id: number) {
+async function getTask(supabase: SupabaseServerClient, id: number) {
   const { data, error } = await supabase
     .from("tareas")
     .select("*")
@@ -57,10 +58,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const supabase = await createClient();
     await getTask(supabase, Number(id)); // verifica que existe
+    const taskUpdate = {
+      ...(input.titulo !== undefined ? { titulo: input.titulo } : {}),
+      ...(input.prioridad !== undefined ? { prioridad: input.prioridad } : {}),
+      ...(input.estado !== undefined ? { estado: input.estado } : {}),
+      ...(input.resultado !== undefined ? { resultado: input.resultado } : {}),
+    };
 
     const { data, error } = await supabase
       .from("tareas")
-      .update(input)
+      .update(taskUpdate)
       .eq("id", Number(id))
       .select()
       .single();

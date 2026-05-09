@@ -113,13 +113,13 @@ function KanbanCard({
       tabIndex={isInteractive ? 0 : undefined}
       aria-label={isInteractive ? card.title : undefined}
       className={[
-        "group relative rounded-ds-lg border bg-surface p-4 pb-3 shadow-layer-1",
-        "select-none transition-shadow duration-150",
+        "pressable group relative rounded-ds-lg border bg-surface p-4 pb-3 shadow-layer-1",
+        "select-none",
         isInteractive ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background" : "",
         isCompleted
           ? "border-border bg-muted opacity-60"
           : "border-border hover:border-primary/20",
-        isDragging ? "z-50 rotate-[2deg] scale-[1.03] border-primary/25 bg-surface-elevated shadow-layer-3" : "",
+        isDragging ? "z-50 drag-feedback" : "",
       ].join(" ")}
       style={isDragging ? { pointerEvents: "none" } : undefined}
       layout
@@ -143,11 +143,11 @@ function KanbanCard({
         {/* Acciones */}
         <div className="flex shrink-0 items-center gap-1">
           {isCompleted ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+            <CheckCircle2 className="complete-pop h-4 w-4 shrink-0 text-success" />
           ) : onComplete ? (
             <button
               onClick={handleComplete}
-              className="rounded-lg p-1 text-text-secondary transition-colors hover:bg-success/10 hover:text-success"
+              className="pressable rounded-lg p-1 text-text-secondary hover:bg-success/10 hover:text-success"
               aria-label="Marcar como realizada"
             >
               <Circle className="h-4 w-4" />

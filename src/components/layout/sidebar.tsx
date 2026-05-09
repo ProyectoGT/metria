@@ -66,7 +66,7 @@ function NavItem({
       <Link
         href={href}
         className={[
-          "group flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all duration-150 md:py-2.5",
+          "pressable group flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium md:py-2.5",
           active
             ? "bg-sidebar-active text-primary"
             : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary",
@@ -82,7 +82,7 @@ function NavItem({
         {active && (
           <motion.span
             layoutId="sidebar-active"
-            className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+            className="complete-pop ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
           />
         )}

@@ -48,7 +48,7 @@ export function Card({ padding = "md", className = "", children, hover }: CardPr
   return (
     <motion.div
       className={cn(
-        "rounded-ds-lg border border-border bg-surface shadow-layer-1",
+        "rounded-ds-lg border border-border bg-surface shadow-layer-1 interactive-surface",
         PADDING_CLASSES[padding],
         className,
       )}
@@ -105,7 +105,7 @@ export function StatCard({
     <div
       onClick={onClick}
       className={[
-        "group rounded-ds-lg border bg-surface p-5 shadow-layer-1 transition-all duration-200",
+        "group rounded-ds-lg border bg-surface p-5 shadow-layer-1 interactive-surface",
         onClick ? "cursor-pointer select-none" : "",
         active
           ? "border-primary shadow-layer-2 ring-1 ring-state-focus"

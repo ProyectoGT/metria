@@ -368,7 +368,7 @@ export default function OrdenesClient({
                       {completingId === actividad.id
                         ? <Loader2 className="h-4 w-4 animate-spin" />
                         : actividad.completed
-                          ? <CheckCircle2 className="h-4 w-4" />
+                          ? <CheckCircle2 className="complete-pop h-4 w-4" />
                           : <Circle className="h-4 w-4" />}
                     </button>
                     <div className="min-w-0 flex-1">
@@ -419,8 +419,9 @@ export default function OrdenesClient({
               form="ordenes-form"
               type="submit"
               disabled={saving || !form.description.trim() || form.assignedUserIds.length === 0}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50"
+              className="pressable inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50"
             >
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               {saving ? "Guardando..." : "Guardar"}
             </button>
           </div>
@@ -586,7 +587,7 @@ export default function OrdenesClient({
               </span>
               {detailActividad.completed && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <CheckCircle2 className="complete-pop h-3.5 w-3.5" />
                   Completada
                 </span>
               )}

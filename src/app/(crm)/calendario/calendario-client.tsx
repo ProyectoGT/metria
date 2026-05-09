@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   Phone, Users, Home, Clock, BookOpen, Star, Activity, Calendar,
-  ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter, Pencil, CheckCircle2, User, Bell,
+  ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter, Pencil, CheckCircle2, User, Bell, Loader2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
@@ -242,6 +242,8 @@ export default function CalendarioClient({
   const [deleteId, setDeleteId]     = useState<number | null>(null);
   const [deleting, setDeleting]     = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [completingAgendaIds, setCompletingAgendaIds] = useState<Set<number>>(new Set());
+  const [completingTaskIds, setCompletingTaskIds] = useState<Set<number>>(new Set());
 
   // Sync events and tareas when server re-renders with fresh data
   useEffect(() => {
@@ -723,16 +725,27 @@ export default function CalendarioClient({
   // ── Complete tarea ─────────────────────────────────────────────────────────
 
   async function handleCompleteTarea(id: number) {
+    setCompletingTaskIds((prev) => new Set(prev).add(id));
+    setTareas((prev) => prev.map((t) => (t.id === id ? { ...t, estado: "completado" } : t)));
     try {
       await updateTareaEstadoAction(id, "completado");
-      setTareas((prev) => prev.map((t) => (t.id === id ? { ...t, estado: "completado" } : t)));
       toast("Tarea completada");
-    } catch { toast("Error al completar la tarea", "error"); }
+    } catch {
+      setTareas((prev) => prev.map((t) => (t.id === id ? { ...t, estado: "pendiente" } : t)));
+      toast("Error al completar la tarea", "error");
+    } finally {
+      setCompletingTaskIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   }
 
   // ── Complete agenda ────────────────────────────────────────────────────────
 
   async function handleCompleteAgenda(id: number, completed: boolean) {
+    setCompletingAgendaIds((prev) => new Set(prev).add(id));
     setEvents((prev) => prev.map((e) => e.id === id ? { ...e, completed } : e));
     const { error } = await supabase.rpc("set_agenda_completed", {
       p_agenda_id: id,
@@ -742,10 +755,20 @@ export default function CalendarioClient({
     if (error) {
       setEvents((prev) => prev.map((e) => e.id === id ? { ...e, completed: !completed } : e));
       toast("Error al completar la actividad", "error");
+      setCompletingAgendaIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       return;
     }
     router.refresh();
     toast(completed ? "Actividad completada" : "Actividad pendiente");
+    setCompletingAgendaIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   }
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -785,7 +808,11 @@ export default function CalendarioClient({
                 onClick={(e) => { e.stopPropagation(); handleCompleteAgenda(ev.id, !ev.completed); }}
                 className={`shrink-0 ${ev.completed ? "text-green-500" : "text-text-secondary opacity-0 group-hover:opacity-100 hover:text-green-500"}`}
               >
-                {ev.completed ? <Check className="h-2.5 w-2.5" /> : <Circle className="h-2.5 w-2.5" />}
+                {completingAgendaIds.has(ev.id)
+                  ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                  : ev.completed
+                    ? <Check className="complete-pop h-2.5 w-2.5" />
+                    : <Circle className="h-2.5 w-2.5" />}
               </button>
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${ev.completed ? "opacity-0" : t.dot}`} />
               <span className={`truncate text-[10px] font-medium leading-none ${ev.completed ? "line-through text-text-secondary" : t.text}`}>{ev.description}</span>
@@ -839,7 +866,11 @@ export default function CalendarioClient({
                   title={completada ? "Completada" : "Marcar como completada"}
                   className={`mt-0.5 shrink-0 transition-colors ${completada ? "text-green-500 cursor-default" : "text-violet-400 hover:text-green-500"}`}
                 >
-                  {completada ? <Check className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                  {completingTaskIds.has(t.id)
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : completada
+                      ? <Check className="complete-pop h-4 w-4" />
+                      : <Circle className="h-4 w-4" />}
                 </button>
                 <div className="min-w-0 flex-1">
                   <p className={`text-sm font-medium leading-snug ${completada ? "line-through text-text-secondary" : "text-text-primary"}`}>
@@ -873,7 +904,11 @@ export default function CalendarioClient({
                   title={ev.completed ? "Completada" : "Marcar como completada"}
                   className={`mt-0.5 shrink-0 transition-colors ${ev.completed ? "text-green-500 cursor-default" : "text-text-secondary opacity-0 group-hover:opacity-100 hover:text-green-500"}`}
                 >
-                  {ev.completed ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                  {completingAgendaIds.has(ev.id)
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : ev.completed
+                      ? <CheckCircle2 className="complete-pop h-4 w-4" />
+                      : <Circle className="h-4 w-4" />}
                 </button>
                 <div className={`mt-0.5 shrink-0 rounded-md p-1 ${t.bg}`}>
                   <Icon className={`h-3.5 w-3.5 ${t.text}`} />
@@ -1236,7 +1271,11 @@ export default function CalendarioClient({
                             onClick={() => !completada && handleCompleteTarea(t.id)}
                             className={`mt-0.5 shrink-0 ${completada ? "text-green-500 cursor-default" : "text-violet-400 hover:text-green-500"}`}
                           >
-                            {completada ? <Check className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                            {completingTaskIds.has(t.id)
+                              ? <Loader2 className="h-3 w-3 animate-spin" />
+                              : completada
+                                ? <Check className="complete-pop h-3 w-3" />
+                                : <Circle className="h-3 w-3" />}
                           </button>
                           <div className="min-w-0">
                             {hora && <p className="text-[9px] font-medium text-violet-600 dark:text-violet-400">{hora}</p>}
@@ -1259,7 +1298,11 @@ export default function CalendarioClient({
                             onClick={(e) => { e.stopPropagation(); handleCompleteAgenda(ev.id, !ev.completed); }}
                             className={`mt-0.5 shrink-0 ${ev.completed ? "text-green-500" : "text-text-secondary opacity-0 group-hover:opacity-100 hover:text-green-500"}`}
                           >
-                            {ev.completed ? <Check className="h-2.5 w-2.5" /> : <Circle className="h-2.5 w-2.5" />}
+                            {completingAgendaIds.has(ev.id)
+                              ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                              : ev.completed
+                                ? <Check className="complete-pop h-2.5 w-2.5" />
+                                : <Circle className="h-2.5 w-2.5" />}
                           </button>
                           <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${t.dot} ${ev.completed ? "opacity-0" : ""}`} />
                           <div className="min-w-0">
@@ -1335,8 +1378,9 @@ export default function CalendarioClient({
             <button
               onClick={handleSave}
               disabled={saving || !form.description.trim() || form.assignedUserIds.length === 0}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
+              className="pressable inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60"
             >
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               {saving ? "Guardando..." : editId !== null ? "Guardar cambios" : "Crear actividad"}
             </button>
           </div>

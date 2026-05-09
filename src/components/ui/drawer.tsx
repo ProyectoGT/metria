@@ -100,7 +100,7 @@ export default function Drawer({
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
+            transition={{ type: "spring", stiffness: 380, damping: 34, mass: 0.65 }}
             className={cn(
               "relative z-10 flex h-full flex-col",
               "modal-panel",

@@ -465,7 +465,7 @@ function KanbanBoard({
                 <button
                   type="button"
                   onClick={handleConfirmAddColumn}
-                  className="flex-1 rounded-xl bg-primary px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-primary-dark"
+                  className="pressable flex-1 rounded-xl bg-primary px-3 py-2 text-xs font-medium text-white hover:bg-primary-dark"
                 >
                   Añadir
                 </button>
@@ -482,7 +482,7 @@ function KanbanBoard({
             <button
               type="button"
               onClick={handleStartAddColumn}
-              className="mt-0 hidden h-fit w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface/50 px-4 py-6 text-sm font-medium text-text-secondary transition-all hover:border-primary/40 hover:bg-surface hover:text-primary md:flex"
+              className="pressable mt-0 hidden h-fit w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface/50 px-4 py-6 text-sm font-medium text-text-secondary hover:border-primary/40 hover:bg-surface hover:text-primary md:flex"
             >
               <Plus className="h-4 w-4" />
               Nueva columna
@@ -593,7 +593,7 @@ function KanbanBoard({
               <button
                 type="button"
                 onClick={handleConfirmResultado}
-                className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+                className="pressable rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark"
               >
                 Marcar como realizada
               </button>

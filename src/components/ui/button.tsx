@@ -76,7 +76,7 @@ export default function Button({
       whileTap={isDisabled ? undefined : { scale: 0.97 }}
       transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap font-medium transition-all duration-200",
+        "pressable inline-flex items-center justify-center whitespace-nowrap font-medium",
         UI.focus,
         "disabled:cursor-not-allowed",
         VARIANT_CLASSES[variant],
