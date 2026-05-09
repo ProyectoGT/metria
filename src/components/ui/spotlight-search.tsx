@@ -204,7 +204,7 @@ export default function SpotlightSearch({ open, onOpenChange }: SpotlightSearchP
   const totalGroups = Object.keys(grouped).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-[10vh] backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/5 pt-[10vh]">
       {/* Overlay click to close */}
       <div className="absolute inset-0" onClick={close} />
 

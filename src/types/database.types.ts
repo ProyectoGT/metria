@@ -179,13 +179,18 @@ export type Database = {
           equipo_id: number | null
           event_date: string
           gcal_event_id: string | null
+          google_calendar_id: string | null
           id: number
+          last_synced_at: string | null
           owner_user_id: number | null
           priority: string
           reminder_minutes_before: number | null
           result: string | null
+          sync_error: string | null
+          sync_status: string
           time: string | null
           time_end: string | null
+          timezone: string
           tipo: string
           user_id: number | null
           visibility: string
@@ -201,13 +206,18 @@ export type Database = {
           equipo_id?: number | null
           event_date: string
           gcal_event_id?: string | null
+          google_calendar_id?: string | null
           id?: number
+          last_synced_at?: string | null
           owner_user_id?: number | null
           priority?: string
           reminder_minutes_before?: number | null
           result?: string | null
+          sync_error?: string | null
+          sync_status?: string
           time?: string | null
           time_end?: string | null
+          timezone?: string
           tipo?: string
           user_id?: number | null
           visibility?: string
@@ -223,13 +233,18 @@ export type Database = {
           equipo_id?: number | null
           event_date?: string
           gcal_event_id?: string | null
+          google_calendar_id?: string | null
           id?: number
+          last_synced_at?: string | null
           owner_user_id?: number | null
           priority?: string
           reminder_minutes_before?: number | null
           result?: string | null
+          sync_error?: string | null
+          sync_status?: string
           time?: string | null
           time_end?: string | null
+          timezone?: string
           tipo?: string
           user_id?: number | null
           visibility?: string
@@ -1440,6 +1455,51 @@ export type Database = {
           },
         ]
       }
+      global_search_index: {
+        Row: {
+          created_at: string | null
+          empresa_id: number | null
+          entity_id: string
+          entity_type: string
+          href: string
+          id: string
+          metadata: Json | null
+          owner_user_id: number | null
+          search_text: string
+          subtitle: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          empresa_id?: number | null
+          entity_id: string
+          entity_type: string
+          href: string
+          id?: string
+          metadata?: Json | null
+          owner_user_id?: number | null
+          search_text: string
+          subtitle?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          empresa_id?: number | null
+          entity_id?: string
+          entity_type?: string
+          href?: string
+          id?: string
+          metadata?: Json | null
+          owner_user_id?: number | null
+          search_text?: string
+          subtitle?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       idealista_leads: {
         Row: {
           asunto: string | null
@@ -2046,6 +2106,112 @@ export type Database = {
           },
         ]
       }
+      soporte_mensajes: {
+        Row: {
+          autor_id: number | null
+          autor_nombre: string
+          autor_rol: string
+          contenido: string
+          created_at: string
+          es_sistema: boolean
+          id: number
+          ticket_id: number
+        }
+        Insert: {
+          autor_id?: number | null
+          autor_nombre: string
+          autor_rol?: string
+          contenido: string
+          created_at?: string
+          es_sistema?: boolean
+          id?: number
+          ticket_id: number
+        }
+        Update: {
+          autor_id?: number | null
+          autor_nombre?: string
+          autor_rol?: string
+          contenido?: string
+          created_at?: string
+          es_sistema?: boolean
+          id?: number
+          ticket_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "soporte_mensajes_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "soporte_mensajes_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets_soporte"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      soporte_notificaciones: {
+        Row: {
+          created_at: string
+          empresa_id: number
+          id: number
+          leido: boolean
+          leido_at: string | null
+          mensaje: string
+          ticket_id: number
+          tipo: string
+          usuario_id: number
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: number
+          id?: number
+          leido?: boolean
+          leido_at?: string | null
+          mensaje: string
+          ticket_id: number
+          tipo: string
+          usuario_id: number
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: number
+          id?: number
+          leido?: boolean
+          leido_at?: string | null
+          mensaje?: string
+          ticket_id?: number
+          tipo?: string
+          usuario_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "soporte_notificaciones_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "soporte_notificaciones_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets_soporte"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "soporte_notificaciones_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tarea_usuarios: {
         Row: {
           created_at: string
@@ -2172,91 +2338,6 @@ export type Database = {
           },
         ]
       }
-      soporte_mensajes: {
-        Row: {
-          autor_id: number | null
-          autor_nombre: string
-          autor_rol: string
-          contenido: string
-          created_at: string
-          es_sistema: boolean
-          id: number
-          ticket_id: number
-        }
-        Insert: {
-          autor_id?: number | null
-          autor_nombre: string
-          autor_rol?: string
-          contenido: string
-          created_at?: string
-          es_sistema?: boolean
-          id?: number
-          ticket_id: number
-        }
-        Update: {
-          autor_id?: number | null
-          autor_nombre?: string
-          autor_rol?: string
-          contenido?: string
-          created_at?: string
-          es_sistema?: boolean
-          id?: number
-          ticket_id?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "soporte_mensajes_ticket_id_fkey"
-            columns: ["ticket_id"]
-            isOneToOne: false
-            referencedRelation: "tickets_soporte"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      soporte_notificaciones: {
-        Row: {
-          created_at: string
-          empresa_id: number
-          id: number
-          leido: boolean
-          leido_at: string | null
-          mensaje: string
-          ticket_id: number
-          tipo: string
-          usuario_id: number
-        }
-        Insert: {
-          created_at?: string
-          empresa_id: number
-          id?: number
-          leido?: boolean
-          leido_at?: string | null
-          mensaje: string
-          ticket_id: number
-          tipo: string
-          usuario_id: number
-        }
-        Update: {
-          created_at?: string
-          empresa_id?: number
-          id?: number
-          leido?: boolean
-          leido_at?: string | null
-          mensaje?: string
-          ticket_id?: number
-          tipo?: string
-          usuario_id?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "soporte_notificaciones_ticket_id_fkey"
-            columns: ["ticket_id"]
-            isOneToOne: false
-            referencedRelation: "tickets_soporte"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       tickets_soporte: {
         Row: {
           archived_at: string | null
@@ -2316,6 +2397,20 @@ export type Database = {
           user_id?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tickets_soporte_asignado_a_fkey"
+            columns: ["asignado_a"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_soporte_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tickets_soporte_user_id_fkey"
             columns: ["user_id"]
@@ -2517,6 +2612,237 @@ export type Database = {
           },
         ]
       }
+      zonas_geograficas: {
+        Row: {
+          archived_at: string | null
+          area_sqm: number | null
+          color: string
+          created_at: string
+          created_by: number
+          descripcion: string | null
+          empresa_id: number
+          estado: string
+          geojson: Json
+          id: number
+          nombre: string
+          tipo: string
+          updated_at: string
+          updated_by: number | null
+        }
+        Insert: {
+          archived_at?: string | null
+          area_sqm?: number | null
+          color?: string
+          created_at?: string
+          created_by: number
+          descripcion?: string | null
+          empresa_id: number
+          estado?: string
+          geojson: Json
+          id?: number
+          nombre: string
+          tipo?: string
+          updated_at?: string
+          updated_by?: number | null
+        }
+        Update: {
+          archived_at?: string | null
+          area_sqm?: number | null
+          color?: string
+          created_at?: string
+          created_by?: number
+          descripcion?: string | null
+          empresa_id?: number
+          estado?: string
+          geojson?: Json
+          id?: number
+          nombre?: string
+          tipo?: string
+          updated_at?: string
+          updated_by?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zonas_geograficas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zonas_geograficas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zonas_geograficas_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          attempts: number
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: number | null
+          empresa_id: number | null
+          error_message: string | null
+          error_stack: string | null
+          failed_at: string | null
+          id: string
+          max_attempts: number
+          payload: Json
+          priority: number
+          result: Json | null
+          scheduled_for: string | null
+          started_at: string | null
+          status: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: number | null
+          empresa_id?: number | null
+          error_message?: string | null
+          error_stack?: string | null
+          failed_at?: string | null
+          id?: string
+          max_attempts?: number
+          payload?: Json
+          priority?: number
+          result?: Json | null
+          scheduled_for?: string | null
+          started_at?: string | null
+          status?: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: number | null
+          empresa_id?: number | null
+          error_message?: string | null
+          error_stack?: string | null
+          failed_at?: string | null
+          id?: string
+          max_attempts?: number
+          payload?: Json
+          priority?: number
+          result?: Json | null
+          scheduled_for?: string | null
+          started_at?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_logs: {
+        Row: {
+          attempt: number
+          created_at: string
+          duration_ms: number | null
+          id: string
+          job_id: string
+          level: string
+          message: string
+          metadata: Json | null
+        }
+        Insert: {
+          attempt?: number
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          job_id: string
+          level?: string
+          message: string
+          metadata?: Json | null
+        }
+        Update: {
+          attempt?: number
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          job_id?: string
+          level?: string
+          message?: string
+          metadata?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_logs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_schedules: {
+        Row: {
+          created_at: string
+          cron_expression: string
+          description: string | null
+          enabled: boolean
+          id: string
+          job_type: string
+          last_enqueued_at: string | null
+          payload: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cron_expression: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          job_type: string
+          last_enqueued_at?: string | null
+          payload?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cron_expression?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          job_type?: string
+          last_enqueued_at?: string | null
+          payload?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -2535,11 +2861,18 @@ export type Database = {
           equipo_id: number | null
           event_date: string
           gcal_event_id: string | null
+          google_calendar_id: string | null
           id: number
+          last_synced_at: string | null
           owner_user_id: number | null
           priority: string
+          reminder_minutes_before: number | null
           result: string | null
+          sync_error: string | null
+          sync_status: string
           time: string | null
+          time_end: string | null
+          timezone: string
           tipo: string
           user_id: number | null
           visibility: string
@@ -2577,6 +2910,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      calc_reminder_scheduled_at: {
+        Args: { p_event_date: string; p_minutes: number; p_time: string }
+        Returns: string
+      }
       can_access_colaboracion: {
         Args: {
           row_colaborador_id: number
@@ -2605,6 +2942,30 @@ export type Database = {
             }
             Returns: boolean
           }
+      claim_next_job: {
+        Args: { p_worker_id?: string }
+        Returns: {
+          attempts: number
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: number | null
+          empresa_id: number | null
+          error_message: string | null
+          error_stack: string | null
+          failed_at: string | null
+          id: string
+          max_attempts: number
+          payload: Json
+          priority: number
+          result: Json | null
+          scheduled_for: string | null
+          started_at: string | null
+          status: string
+          type: string
+          updated_at: string
+        }
+      }
       can_access_documento_generado: {
         Args: { row_empresa_id: number; row_generado_por: number }
         Returns: boolean
@@ -2711,54 +3072,18 @@ export type Database = {
           equipo_id: number | null
           event_date: string
           gcal_event_id: string | null
+          google_calendar_id: string | null
           id: number
-          owner_user_id: number | null
-          priority: string
-          result: string | null
-          time: string | null
-          tipo: string
-          user_id: number | null
-          visibility: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "agenda"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      create_agenda_activity: {
-        Args: {
-          p_assigned_user_ids?: number[]
-          p_completed?: boolean
-          p_description: string
-          p_event_date: string
-          p_priority?: string
-          p_reminder_minutes?: number | null
-          p_result?: string
-          p_time?: string | null
-          p_time_end?: string | null
-          p_tipo?: string
-          p_visibility?: string
-        }
-        Returns: {
-          archived_at: string | null
-          archived_reason: string | null
-          completed: boolean
-          converted_to_tarea_id: number | null
-          created_at: string
-          description: string
-          empresa_id: number | null
-          equipo_id: number | null
-          event_date: string
-          gcal_event_id: string | null
-          id: number
+          last_synced_at: string | null
           owner_user_id: number | null
           priority: string
           reminder_minutes_before: number | null
           result: string | null
+          sync_error: string | null
+          sync_status: string
           time: string | null
           time_end: string | null
+          timezone: string
           tipo: string
           user_id: number | null
           visibility: string
@@ -2777,10 +3102,10 @@ export type Database = {
           p_description: string
           p_event_date: string
           p_priority?: string
-          p_reminder_minutes?: number | null
-          p_result?: string | null
+          p_reminder_minutes?: number
+          p_result?: string
           p_time: string
-          p_time_end?: string | null
+          p_time_end?: string
           p_tipo?: string
           p_visibility?: string
         }
@@ -2795,13 +3120,18 @@ export type Database = {
           equipo_id: number | null
           event_date: string
           gcal_event_id: string | null
+          google_calendar_id: string | null
           id: number
+          last_synced_at: string | null
           owner_user_id: number | null
           priority: string
           reminder_minutes_before: number | null
           result: string | null
+          sync_error: string | null
+          sync_status: string
           time: string | null
           time_end: string | null
+          timezone: string
           tipo: string
           user_id: number | null
           visibility: string
@@ -2926,11 +3256,18 @@ export type Database = {
           equipo_id: number | null
           event_date: string
           gcal_event_id: string | null
+          google_calendar_id: string | null
           id: number
+          last_synced_at: string | null
           owner_user_id: number | null
           priority: string
+          reminder_minutes_before: number | null
           result: string | null
+          sync_error: string | null
+          sync_status: string
           time: string | null
+          time_end: string | null
+          timezone: string
           tipo: string
           user_id: number | null
           visibility: string
@@ -2968,6 +3305,9 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      unaccent_lower: { Args: { t: string }; Returns: string }
       update_agenda_activity: {
         Args: {
           p_agenda_id: number
@@ -2978,38 +3318,11 @@ export type Database = {
           p_priority?: string
           p_reminder_minutes?: number
           p_result?: string
-          p_time?: string | null
-          p_time_end?: string | null
+          p_time?: string
+          p_time_end?: string
           p_tipo?: string
         }
-        Returns: {
-          archived_at: string | null
-          archived_reason: string | null
-          completed: boolean
-          converted_to_tarea_id: number | null
-          created_at: string
-          description: string
-          empresa_id: number | null
-          equipo_id: number | null
-          event_date: string
-          gcal_event_id: string | null
-          id: number
-          owner_user_id: number | null
-          priority: string
-          reminder_minutes_before: number | null
-          result: string | null
-          time: string | null
-          time_end: string | null
-          tipo: string
-          user_id: number | null
-          visibility: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "agenda"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+        Returns: undefined
       }
       update_pending_tarea: {
         Args: {
@@ -3047,10 +3360,10 @@ export type Database = {
       upsert_agenda_reminders: {
         Args: {
           p_agenda_id: number
-          p_event_date: string
-          p_time: string
-          p_minutes: number | null
           p_empresa_id: number
+          p_event_date: string
+          p_minutes: number
+          p_time: string
         }
         Returns: undefined
       }
@@ -3065,7 +3378,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      job_status: "pending" | "processing" | "completed" | "failed" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3195,6 +3508,8 @@ export const Constants = {
     Enums: {},
   },
   public: {
-    Enums: {},
+    Enums: {
+      job_status: ["pending", "processing", "completed", "failed", "cancelled"],
+    },
   },
 } as const

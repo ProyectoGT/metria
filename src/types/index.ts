@@ -12,6 +12,9 @@ export type Usuario = import("./database.types").Tables<"usuarios">;
 export type Pedido = import("./database.types").Tables<"pedidos">;
 export type Tarea = import("./database.types").Tables<"tareas">;
 export type Agenda = import("./database.types").Tables<"agenda">;
+export type Job = import("./database.types").Tables<"jobs">;
+export type JobLog = import("./database.types").Tables<"job_logs">;
+export type JobSchedule = import("./database.types").Tables<"job_schedules">;
 
 // ─── Zonas Geográficas (dibujadas en mapa) ────────────────────────────────────
 

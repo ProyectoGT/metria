@@ -118,6 +118,25 @@
  */
 
 /**
+ * ─── Background Jobs ─────────────────────────────────────────────────────────
+ *
+ * POST   /api/jobs/enqueue              → Encolar un job
+ * POST   /api/jobs/process              → Procesar jobs pendientes (worker)
+ * GET    /api/jobs/process              → Procesar jobs (vía cron GET)
+ *
+ * Base de datos: jobs, job_logs, job_schedules
+ * Estados: pending → processing → completed | failed (con retry)
+ * Worker usa service_role + claim_next_job() (FOR UPDATE SKIP LOCKED)
+ * Scheduler incorporado en /api/jobs/process (runScheduler=true por defecto)
+ *
+ * Ejemplo de uso desde server action:
+ *   import { enqueueJob } from "@/jobs";
+ *   await enqueueJob({ type: "email:send", payload: { to, subject } });
+ *
+ * Estado:  ✅ Implementado
+ */
+
+/**
  * ─── Endpoints existentes (no refactorizados aún) ───────────────────────────
  *
  * GET    /api/search?q=&ctx=            → Búsqueda global (formato legacy)
