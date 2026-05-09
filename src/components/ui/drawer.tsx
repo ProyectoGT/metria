@@ -86,7 +86,7 @@ export default function Drawer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="absolute inset-0 bg-overlay"
+            className="absolute inset-0 bg-black/30 sm:bg-overlay"
             onClick={onClose}
             aria-hidden="true"
           />
@@ -124,7 +124,7 @@ export default function Drawer({
                     <button
                       type="button"
                       onClick={onClose}
-                      className={cn("rounded-ds-sm p-1.5 text-text-secondary transition-colors hover:bg-state-hover hover:text-text-primary", UI.focus)}
+                      className={cn("rounded-ds-sm p-2.5 text-text-secondary transition-colors hover:bg-state-hover hover:text-text-primary md:p-1.5", UI.focus)}
                       aria-label={t("common:close")}
                     >
                       <X className="h-4 w-4" />
@@ -139,7 +139,7 @@ export default function Drawer({
 
             {/* Footer opcional */}
             {footer && (
-              <div className="shrink-0 border-t border-border bg-surface-elevated px-5 py-4">{footer}</div>
+              <div className="shrink-0 border-t border-border bg-surface-elevated px-5 py-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }}>{footer}</div>
             )}
           </motion.div>
         </div>

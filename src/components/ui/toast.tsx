@@ -25,10 +25,11 @@ export function useToast() {
 export function Toaster({ toasts }: { toasts: ToastItem[] }) {
   return (
     <div
-      className="fixed bottom-5 right-5 z-[200] flex flex-col gap-2 pointer-events-none"
+      className="fixed bottom-5 left-5 right-5 z-[200] flex flex-col gap-2 pointer-events-none sm:left-auto sm:right-5 sm:w-auto"
       role="status"
       aria-live="polite"
       aria-atomic="true"
+      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
       <AnimatePresence>
         {toasts.map((t) => (
@@ -55,7 +56,7 @@ function ToastCard({ toast }: { toast: ToastItem }) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -8, scale: 0.95 }}
       transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      className={`${base} ${colors}`}
+      className={`${base} ${colors} max-w-full sm:max-w-sm`}
     >
       {toast.type === "success" && (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

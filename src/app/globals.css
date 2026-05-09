@@ -517,3 +517,83 @@ html {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-secondary); }
+
+/* ── Mobile touch utilities ──────────────────────────────────────────────── */
+/* Minimum touch target for interactive elements */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Horizontal scroll container for mobile */
+.mobile-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.mobile-scroll-x::-webkit-scrollbar { display: none; }
+
+.mobile-scroll-x > * {
+  scroll-snap-align: start;
+}
+
+/* Bottom nav safe area spacing */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  }
+}
+
+/* Week view: allow proper horizontal scroll on mobile without breaking */
+@media (max-width: 768px) {
+  .cal-week-grid {
+    min-width: 100% !important;
+  }
+  .cal-week-grid > * {
+    min-width: calc(100% / 7) !important;
+  }
+}
+
+/* Prevent text size adjustment on orientation change */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Improved tap highlight */
+a, button, [role="button"], input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Calendar mobile day cell - prevent iOS zoom on double-tap */
+.cal-day-cell {
+  touch-action: manipulation;
+}
+
+/* Disable hover effects on touch devices to prevent sticky hover */
+@media (hover: none) and (pointer: coarse) {
+  .hover-only {
+    opacity: 1 !important;
+  }
+  
+  .group:hover .group-hover-only {
+    opacity: 1 !important;
+  }
+
+  /* Force all group-hover:opacity-* patterns to be visible on touch */
+  .group *[class*="group-hover:opacity"] {
+    opacity: 1 !important;
+  }
+  
+  /* Force all group-hover:flex patterns to be visible on touch */
+  .group *[class*="group-hover:flex"] {
+    display: flex !important;
+  }
+
+  /* Prevent hover background changes on touch */
+  .group *[class*="group-hover:bg-"],
+  *[class*="hover:bg-"] {
+    transition: none;
+  }
+}

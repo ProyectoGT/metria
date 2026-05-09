@@ -62,37 +62,59 @@ export function Modal({ open, onClose, size = "md", children, className = "" }: 
 
   const labelledById = open ? "modal-title" : undefined;
 
+  const isSmall = size === "sm";
+
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[40] flex justify-end">
+        <div className="fixed inset-0 z-[40] flex items-end justify-center sm:items-center sm:justify-end">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="absolute inset-0 bg-overlay"
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 bg-black/40"
             onClick={onClose}
             aria-hidden="true"
           />
-          <motion.div
-            ref={panelRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={labelledById}
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
-            className={cn(
-              "relative z-10 flex h-full flex-col",
-              "modal-panel",
-              WIDTH_CLASSES[size],
-              className,
-            )}
-          >
-            {children}
-          </motion.div>
+          {isSmall ? (
+            <motion.div
+              ref={panelRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={labelledById}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
+              className={cn(
+                "relative z-10 flex w-full flex-col rounded-t-2xl bg-surface shadow-layer-3 sm:max-w-[360px] sm:rounded-2xl sm:mx-4",
+                "max-h-[85vh]",
+                className,
+              )}
+            >
+              {children}
+            </motion.div>
+          ) : (
+            <motion.div
+              ref={panelRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={labelledById}
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
+              className={cn(
+                "relative z-10 flex h-full flex-col",
+                "modal-panel",
+                WIDTH_CLASSES[size],
+                className,
+              )}
+            >
+              {children}
+            </motion.div>
+          )}
         </div>
       )}
     </AnimatePresence>

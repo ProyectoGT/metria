@@ -391,6 +391,8 @@ function KanbanBoard({
     setDeleteTarget(null);
   }
 
+  const [mobileColIndex, setMobileColIndex] = useState(0);
+
   const isManager = role === "Administrador" || role === "Director";
   const currentUserIdNum = useMemo(() => Number(_currentUserId), [_currentUserId]);
 
@@ -404,8 +406,35 @@ function KanbanBoard({
 
   return (
     <>
+      {/* ── Mobile column selector (tabs) ──────────────────────────── */}
+      <div className="flex gap-1 overflow-x-auto px-1 pb-1 md:hidden" aria-label="Selector de columna">
+        {columns.map((col, i) => {
+          const activeCount = col.cards.filter((c) => !c.isCompleted).length;
+          const totalCount = col.cards.length;
+          const countLabel = activeCount === totalCount ? String(activeCount) : `${activeCount}/${totalCount}`;
+          return (
+            <button
+              key={col.id}
+              onClick={() => setMobileColIndex(i)}
+              className={`touch-target shrink-0 rounded-xl px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
+                mobileColIndex === i
+                  ? "bg-primary text-white shadow-sm"
+                  : "bg-surface text-text-secondary border border-border hover:bg-surface-raised"
+              }`}
+            >
+              {col.title}
+              <span className={`ml-1.5 rounded-full px-1.5 py-px text-[10px] ${
+                mobileColIndex === i ? "bg-white/20 text-white" : "bg-muted text-text-secondary"
+              }`}>
+                {countLabel}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="@container flex min-w-0 flex-row gap-3 overflow-x-auto overscroll-x-contain pb-2">
+        <div className="@container hidden flex-row gap-3 overflow-x-auto overscroll-x-contain pb-2 md:flex">
           {columns.map((column) => (
             <KanbanColumn
               key={column.id}
@@ -417,9 +446,9 @@ function KanbanBoard({
             />
           ))}
 
-          {/* Añadir columna */}
+          {/* Añadir columna (solo desktop) */}
           {addingColumn ? (
-            <div className="mt-0 flex h-fit w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col gap-2 rounded-2xl border border-dashed border-border bg-surface p-3">
+            <div className="mt-0 hidden h-fit w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col gap-2 rounded-2xl border border-dashed border-border bg-surface p-3 md:flex">
               <input
                 ref={newColInputRef}
                 type="text"
@@ -453,7 +482,7 @@ function KanbanBoard({
             <button
               type="button"
               onClick={handleStartAddColumn}
-              className="mt-0 flex h-fit w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface/50 px-4 py-6 text-sm font-medium text-text-secondary transition-all hover:border-primary/40 hover:bg-surface hover:text-primary"
+              className="mt-0 hidden h-fit w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface/50 px-4 py-6 text-sm font-medium text-text-secondary transition-all hover:border-primary/40 hover:bg-surface hover:text-primary md:flex"
             >
               <Plus className="h-4 w-4" />
               Nueva columna
@@ -461,6 +490,19 @@ function KanbanBoard({
           )}
         </div>
       </DragDropContext>
+
+      {/* ── Mobile: only show selected column ─────────────────────── */}
+      <div className="md:hidden">
+        {columns[mobileColIndex] && (
+          <KanbanColumn
+            column={columns[mobileColIndex]}
+            onDeleteColumn={requestDeleteColumn}
+            onAddCard={(colId) => setAddingCardCol(colId)}
+            onCompleteCard={handleCompleteCard}
+            onDetailCard={handleOpenDetail}
+          />
+        )}
+      </div>
 
       {/* Drawer detalle de tarjeta */}
       {detailCard && (

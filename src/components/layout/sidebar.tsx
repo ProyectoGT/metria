@@ -66,7 +66,7 @@ function NavItem({
       <Link
         href={href}
         className={[
-          "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150",
+          "group flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all duration-150 md:py-2.5",
           active
             ? "bg-sidebar-active text-primary"
             : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary",
@@ -164,7 +164,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
         />
         <button
           onClick={() => closeSidebar()}
-          className="absolute right-3 rounded-lg p-1.5 text-white/70 transition-colors hover:bg-white/10 hover:text-white md:hidden"
+          className="touch-target absolute right-2 rounded-lg p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white md:hidden"
           aria-label={t("navigation.closeMenu")}
         >
           <X className="h-4 w-4" />
@@ -172,7 +172,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
       </div>
 
       {/* ── Navegación ───────────────────────────────────────────── */}
-      <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4" aria-label={t("navigation.mainNavigation") || "Navegación principal"}>
+      <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4" aria-label={t("navigation.mainNavigation") || "Navegación principal"} style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}>
 
         <motion.div variants={staggerContainer} initial="initial" animate="animate">
           <NavGroup>

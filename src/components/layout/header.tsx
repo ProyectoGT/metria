@@ -89,7 +89,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
       {/* ── Hamburger (solo móvil) ─────────────────────────────────── */}
       <button
         onClick={() => window.dispatchEvent(new Event("sidebar:toggle"))}
-        className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-state-hover hover:text-text-primary md:hidden"
+        className="touch-target rounded-lg p-2.5 text-text-secondary transition-colors hover:bg-state-hover hover:text-text-primary md:hidden md:p-2"
         aria-label={t("navigation.openMenu")}
       >
         <Menu className="h-5 w-5" />
@@ -120,7 +120,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
         <div ref={bellRef} className="relative">
           <button
             onClick={() => setBellOpen((p) => !p)}
-            className="relative rounded-xl p-2 text-text-secondary transition-colors hover:bg-state-hover hover:text-text-primary"
+            className="touch-target relative rounded-xl p-2.5 text-text-secondary transition-colors hover:bg-state-hover hover:text-text-primary md:p-2"
             aria-label={t("common.notifications")}
             aria-expanded={bellOpen}
             aria-haspopup="true"
@@ -229,7 +229,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
         <div ref={menuRef} className="relative">
           <button
             onClick={() => setMenuOpen((p) => !p)}
-            className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 transition-colors hover:bg-state-hover"
+            className="touch-target flex items-center gap-2 rounded-xl px-2.5 py-2 transition-colors hover:bg-state-hover md:py-1.5"
             aria-expanded={menuOpen}
             aria-haspopup="true"
             aria-label={t("common.userMenu") || `Menú de ${userName}`}
