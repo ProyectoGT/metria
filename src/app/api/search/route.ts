@@ -5,10 +5,16 @@ import { SearchSchema } from "@/lib/validations/search";
 
 export type SearchResult = {
   id: string;
-  type: "propiedad" | "finca" | "sector" | "zona" | "solicitud" | "usuario" | "ticket" | "tarea" | "contacto" | "email";
+  type: "propiedad" | "finca" | "sector" | "zona" | "solicitud" | "usuario" | "ticket" | "tarea" | "contacto" | "email" | "actividad";
   label: string;
   sublabel?: string;
   href: string;
+  meta?: {
+    completed?: boolean;
+    priority?: string | null;
+    estado?: string | null;
+    dbId?: number;
+  };
 };
 
 export async function GET(request: NextRequest) {
@@ -195,23 +201,50 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── Tareas / Órdenes del día ────────────────────────────────────
+  // ── Tareas ───────────────────────────────────────────────────────
   if (ctx === "general") {
     const { data: tareas } = await supabase
       .from("tareas")
-      .select("id, titulo, fecha, prioridad")
+      .select("id, titulo, fecha, prioridad, estado")
       .ilike("titulo", `%${q}%`)
-      .is("fecha", null)
       .is("archived_at", null)
-      .limit(4);
+      .limit(6);
 
     for (const t of tareas ?? []) {
       results.push({
         id: `tarea-${t.id}`,
         type: "tarea",
         label: t.titulo,
-        sublabel: t.fecha ? new Date(t.fecha).toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : undefined,
+        sublabel: t.fecha
+          ? `${new Date(t.fecha).toLocaleDateString("es-ES", { day: "numeric", month: "short" })} · ${t.estado ?? "pendiente"}`
+          : t.estado ?? "pendiente",
         href: "/ordenes",
+        meta: { dbId: t.id, priority: t.prioridad, estado: t.estado, completed: t.estado === "completado" },
+      });
+    }
+  }
+
+  // ── Agenda (actividades / orden del dia) ─────────────────────────
+  if (ctx === "general") {
+    const { data: actividades } = await supabase
+      .from("agenda")
+      .select("id, description, event_date, time, priority, tipo, completed, owner_user_id")
+      .is("archived_at", null)
+      .or(`description.ilike.%${q}%,tipo.ilike.%${q}%`)
+      .order("event_date", { ascending: false, nullsFirst: false })
+      .limit(6);
+
+    for (const a of actividades ?? []) {
+      const dateStr = a.event_date
+        ? new Date(a.event_date + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" })
+        : "";
+      results.push({
+        id: `actividad-${a.id}`,
+        type: "actividad",
+        label: a.description,
+        sublabel: `${dateStr}${a.time ? ` ${a.time.slice(0, 5)}` : ""} · ${a.tipo ?? "actividad"}${a.completed ? " · Completada" : ""}`,
+        href: "/ordenes",
+        meta: { dbId: a.id, priority: a.priority, completed: a.completed },
       });
     }
   }
@@ -236,5 +269,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ results: results.slice(0, 20) });
+  return NextResponse.json({ results: results.slice(0, 40) });
 }

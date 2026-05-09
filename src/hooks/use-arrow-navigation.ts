@@ -79,9 +79,10 @@ export function useArrowNavigation<T extends HTMLElement>(
       }
     }
 
-    if (!containerRef.current) return;
-    containerRef.current.addEventListener("keydown", handleKeyDown);
-    return () => containerRef.current?.removeEventListener("keydown", handleKeyDown);
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener("keydown", handleKeyDown);
+    return () => el.removeEventListener("keydown", handleKeyDown);
   }, [enabled, itemCount, orientation, loop, onSelect, onEscape]);
 
   return { containerRef, resetSelection };

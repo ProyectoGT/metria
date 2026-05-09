@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
-import { Search, Bell, ChevronDown, Menu, X, Calendar, AlertCircle, CheckCircle2, LifeBuoy, Languages, Check } from "lucide-react";
+
+import { Search, Bell, ChevronDown, Menu, Calendar, AlertCircle, CheckCircle2, LifeBuoy, Languages, Check, Command } from "lucide-react";
 import { logout } from "@/app/(auth)/actions";
 import Avatar from "@/components/ui/avatar";
 import { useTheme, THEMES } from "@/lib/theme-context";
 import { PRIORITY_TONE, normalizePriority } from "@/lib/design-system";
 import { localeLabels, useI18n, type Locale } from "@/lib/i18n";
 import type { NotificationItem } from "./app-shell";
-import type { SearchResult } from "@/app/api/search/route";
+import SpotlightSearch from "@/components/ui/spotlight-search";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -24,49 +24,11 @@ function formatFecha(fecha: string | null, locale = "es-ES"): string {
   return new Date(fecha).toLocaleDateString(locale, { day: "numeric", month: "short" });
 }
 
-const TYPE_LABEL_KEYS: Record<SearchResult["type"], string> = {
-  zona: "search.typeZona", sector: "search.typeSector", finca: "search.typeFinca",
-  propiedad: "search.typePropiedad", solicitud: "search.typeSolicitud",
-  usuario: "search.typeUsuario", ticket: "search.typeTicket", tarea: "search.typeTarea", contacto: "search.typeContacto", email: "search.typeEmail",
-};
-
-const TYPE_COLORS: Record<SearchResult["type"], string> = {
-  zona:      "bg-primary/10    text-primary",
-  sector:    "bg-primary/15    text-primary",
-  finca:     "bg-accent/10     text-accent",
-  propiedad: "bg-success/10    text-success",
-  solicitud: "bg-primary/10 text-primary",
-  usuario:   "bg-primary/10 text-primary",
-  ticket:    "bg-danger/10     text-danger",
-  tarea:     "bg-secondary/10  text-secondary",
-  contacto:  "bg-success/10 text-success",
-  email:     "bg-primary/10 text-primary",
-};
-
 const LANGUAGE_OPTIONS: Array<{ label: string; value: Locale; flag: string }> = [
   { label: "Español", value: "es", flag: "🇪🇸" },
   { label: "English", value: "en", flag: "🇬🇧" },
   { label: "Italiano", value: "it", flag: "🇮🇹" },
 ];
-
-function getPlaceholderKey(pathname: string): string {
-  if (pathname.startsWith("/zona"))        return "search.zones";
-  if (pathname.startsWith("/solicitudes")) return "search.requests";
-  if (pathname.startsWith("/usuarios"))    return "search.users";
-  if (pathname.startsWith("/soporte"))     return "search.tickets";
-  if (pathname.startsWith("/contactos"))   return "search.contacts";
-  return "search.global";
-}
-
-function getCtx(pathname: string): string {
-  if (pathname.startsWith("/zona"))        return "zona";
-  if (pathname.startsWith("/solicitudes")) return "solicitudes";
-  if (pathname.startsWith("/usuarios"))    return "usuarios";
-  if (pathname.startsWith("/soporte"))     return "soporte";
-  if (pathname.startsWith("/contactos"))   return "contactos";
-  if (pathname.startsWith("/email"))       return "general";
-  return "general";
-}
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
@@ -78,12 +40,7 @@ interface HeaderProps {
 }
 
 export default function Header({ userName, userEmail, avatarUrl, notifications = [] }: HeaderProps) {
-  const router   = useRouter();
-  const pathname = usePathname();
   const { locale, setLocale, t } = useI18n();
-
-  const placeholder = t(getPlaceholderKey(pathname));
-  const ctx         = getCtx(pathname);
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   const { theme, applyTheme } = useTheme();
@@ -91,35 +48,29 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
   // ── State ──────────────────────────────────────────────────────────────────
   const [menuOpen,       setMenuOpen]       = useState(false);
   const [bellOpen,       setBellOpen]       = useState(false);
-  const [searchValue,    setSearchValue]    = useState("");
-  const [searchResults,  setSearchResults]  = useState<SearchResult[]>([]);
-  const [searchOpen,     setSearchOpen]     = useState(false);
-  const [searchLoading,  setSearchLoading]  = useState(false);
+  const [spotlightOpen,  setSpotlightOpen]  = useState(false);
 
   const menuRef   = useRef<HTMLDivElement>(null);
   const bellRef   = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLDivElement>(null);
-  const debounce  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Reset search on page navigation
-  useEffect(() => {
-    setSearchValue("");
-    setSearchResults([]);
-    setSearchOpen(false);
-  }, [pathname]);
-
-  // Close dropdowns on outside click
+  // Close dropdowns on outside click; open spotlight on "/"
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (menuRef.current   && !menuRef.current.contains(e.target as Node))   setMenuOpen(false);
       if (bellRef.current   && !bellRef.current.contains(e.target as Node))   setBellOpen(false);
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false);
     }
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setMenuOpen(false);
         setBellOpen(false);
-        setSearchOpen(false);
+      }
+      // "/" to open spotlight (only when not typing in an input)
+      if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag !== "INPUT" && tag !== "TEXTAREA" && !(e.target as HTMLElement).isContentEditable) {
+          e.preventDefault();
+          setSpotlightOpen(true);
+        }
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -129,43 +80,6 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
       document.removeEventListener("keydown", handleKey);
     };
   }, []);
-
-  // ── Search ─────────────────────────────────────────────────────────────────
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchValue(value);
-    if (debounce.current) clearTimeout(debounce.current);
-
-    if (value.trim().length < 2) {
-      setSearchResults([]);
-      setSearchOpen(false);
-      return;
-    }
-
-    setSearchLoading(true);
-    debounce.current = setTimeout(async () => {
-      try {
-        const res  = await fetch(`/api/search?q=${encodeURIComponent(value.trim())}&ctx=${ctx}`);
-        const json = await res.json();
-        setSearchResults(json.results ?? []);
-        setSearchOpen(true);
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setSearchLoading(false);
-      }
-    }, 300);
-  }, [ctx]);
-
-  function clearSearch() {
-    setSearchValue("");
-    setSearchResults([]);
-    setSearchOpen(false);
-  }
-
-  function handleResultClick(href: string) {
-    clearSearch();
-    router.push(href);
-  }
 
   const unreadCount = notifications.length;
 
@@ -181,80 +95,20 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
         <Menu className="h-5 w-5" />
       </button>
 
-      {/* ── Search ────────────────────────────────────────────────── */}
-      <div ref={searchRef} className="relative min-w-0 flex-1 md:max-w-md">
-        <div className="relative flex items-center">
-          <Search className="absolute left-3 h-4 w-4 text-text-secondary/70 pointer-events-none" />
-          <input
-            type="text"
-            value={searchValue}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Escape") clearSearch(); }}
-            onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
-            placeholder={placeholder}
-            aria-label={t("search.global") || "Buscar..."}
-            className="h-9 w-full rounded-xl border border-border bg-surface pl-9 pr-8 text-sm text-text-primary placeholder:text-text-secondary/60 outline-none transition-all hover:border-border-strong focus:bg-surface-elevated focus:ring-2 focus:ring-state-focus"
-          />
-          {searchValue && (
-            <button
-              onClick={clearSearch}
-              className="absolute right-2.5 rounded-md p-0.5 text-text-secondary hover:text-text-primary"
-              aria-label={t("common.clear") || "Limpiar búsqueda"}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
+      {/* ── Spotlight search trigger ──────────────────────────────── */}
+      <button
+        onClick={() => setSpotlightOpen(true)}
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-border bg-surface px-4 py-2 text-left text-sm text-text-secondary/60 transition-all hover:border-border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-state-focus md:max-w-md"
+      >
+        <Search className="h-4 w-4 shrink-0 text-text-secondary/50" />
+        <span className="min-w-0 flex-1 truncate">{t("search.global")}</span>
+        <kbd className="hidden shrink-0 items-center gap-0.5 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[11px] font-medium text-text-secondary/50 sm:inline-flex">
+          <Command className="h-3 w-3" />K
+        </kbd>
+      </button>
 
-        {/* Resultados de búsqueda */}
-        <AnimatePresence>
-          {searchOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: -4, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -4, scale: 0.97 }}
-              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute left-0 top-full mt-1.5 w-full min-w-0 overflow-hidden rounded-xl border border-border bg-surface-elevated shadow-layer-2 sm:min-w-[340px]"
-            >
-              {searchLoading ? (
-                <p className="px-4 py-3 text-sm text-text-secondary">{t("common.searching")}</p>
-              ) : searchResults.length === 0 ? (
-                <p className="px-4 py-3 text-sm text-text-secondary">
-                  {t("common.noResultsFor", { query: searchValue })}
-                </p>
-              ) : (
-                <ul className="max-h-72 divide-y divide-border overflow-y-auto">
-                  {searchResults.map((r, i) => (
-                    <motion.li
-                      key={r.id}
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.02, duration: 0.15 }}
-                    >
-                      <button
-                        onClick={() => handleResultClick(r.href)}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-state-hover"
-                      >
-                        <span className={`shrink-0 rounded-lg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLORS[r.type]}`}>
-                          {t(TYPE_LABEL_KEYS[r.type])}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-text-primary">
-                            {r.label}
-                          </span>
-                          {r.sublabel && (
-                            <span className="block truncate text-xs text-text-secondary">{r.sublabel}</span>
-                          )}
-                        </span>
-                      </button>
-                    </motion.li>
-                  ))}
-                </ul>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+      {/* Spotlight modal */}
+      <SpotlightSearch open={spotlightOpen} onOpenChange={setSpotlightOpen} />
 
       {/* ── Spacer ────────────────────────────────────────────────── */}
       <div className="hidden flex-1 md:block" />
