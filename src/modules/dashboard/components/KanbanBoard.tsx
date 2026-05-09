@@ -434,6 +434,7 @@ function KanbanBoard({
       </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
+        {/* Desktop columns */}
         <div className="@container hidden flex-row gap-3 overflow-x-auto overscroll-x-contain pb-2 md:flex">
           {columns.map((column) => (
             <KanbanColumn
@@ -446,7 +447,6 @@ function KanbanBoard({
             />
           ))}
 
-          {/* Añadir columna (solo desktop) */}
           {addingColumn ? (
             <div className="mt-0 hidden h-fit w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col gap-2 rounded-2xl border border-dashed border-border bg-surface p-3 md:flex">
               <input
@@ -489,20 +489,20 @@ function KanbanBoard({
             </button>
           )}
         </div>
-      </DragDropContext>
 
-      {/* ── Mobile: only show selected column ─────────────────────── */}
-      <div className="md:hidden">
-        {columns[mobileColIndex] && (
-          <KanbanColumn
-            column={columns[mobileColIndex]}
-            onDeleteColumn={requestDeleteColumn}
-            onAddCard={(colId) => setAddingCardCol(colId)}
-            onCompleteCard={handleCompleteCard}
-            onDetailCard={handleOpenDetail}
-          />
-        )}
-      </div>
+        {/* Mobile: only show selected column (inside DragDropContext) */}
+        <div className="md:hidden">
+          {columns[mobileColIndex] && (
+            <KanbanColumn
+              column={columns[mobileColIndex]}
+              onDeleteColumn={requestDeleteColumn}
+              onAddCard={(colId) => setAddingCardCol(colId)}
+              onCompleteCard={handleCompleteCard}
+              onDetailCard={handleOpenDetail}
+            />
+          )}
+        </div>
+      </DragDropContext>
 
       {/* Drawer detalle de tarjeta */}
       {detailCard && (
