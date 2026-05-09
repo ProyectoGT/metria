@@ -11,6 +11,13 @@ import {
   normalizeUserRole,
   type UserRole,
 } from "@/lib/roles";
+import {
+  mapDbRoleToCanonical,
+  can,
+  type Role as CanonicalRole,
+  type Action,
+  type Module,
+} from "@/lib/access-control";
 
 export type CurrentUserContext = {
   id: number;
@@ -19,6 +26,7 @@ export type CurrentUserContext = {
   nombre: string;
   apellidos: string;
   role: UserRole;
+  canonicalRole: CanonicalRole;
   empresaId: number | null;
   equipoId: number | null;
   canDeletePropiedades: boolean;
@@ -28,6 +36,7 @@ export type CurrentUserContext = {
   canManageConfirmationPassword: boolean;
   canViewAllAgents: boolean;
   supervisedAgentIds: number[];
+  can: (action: Action, module: Module) => boolean;
 };
 
 // cache() deduplicates calls within the same render request — no extra DB queries
@@ -77,6 +86,7 @@ export const getCurrentUserContext = cache(async (): Promise<CurrentUserContext 
   if (!profile) return null;
 
   const role = normalizeUserRole(profile.rol);
+  const canonicalRole = mapDbRoleToCanonical(profile.rol);
 
   let supervisedAgentIds: number[] = [];
   if (canViewSupervisedAgents(role)) {
@@ -87,13 +97,14 @@ export const getCurrentUserContext = cache(async (): Promise<CurrentUserContext 
     supervisedAgentIds = (supervised ?? []).map((u) => u.id);
   }
 
-  return {
+  const ctx = {
     id: profile.id,
     authId: profile.auth_id,
     email: user.email ?? profile.correo ?? null,
     nombre: profile.nombre,
     apellidos: profile.apellidos,
     role,
+    canonicalRole,
     empresaId: profile.empresa_id ?? null,
     equipoId: profile.equipo_id ?? null,
     canDeletePropiedades: canDeletePropiedades(role),
@@ -103,5 +114,8 @@ export const getCurrentUserContext = cache(async (): Promise<CurrentUserContext 
     canManageConfirmationPassword: canManageConfirmationPassword(role),
     canViewAllAgents: canViewAllAgents(role),
     supervisedAgentIds,
+    can: (action: Action, module: Module) => can(ctx, action, module),
   };
+
+  return ctx;
 });

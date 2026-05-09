@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
+import { requirePermission } from "@/lib/access-control";
 import { validatePropertyForWeb } from "@/modules/propiedades/services/validate-property-for-web";
 import { canUseFeature } from "@/lib/access-control/can-access";
 
@@ -29,6 +30,7 @@ export async function updatePropiedadMetaAction(data: {
 }): Promise<void> {
   const supabase = await createClient();
   const yo = await getAuthContext();
+  await requirePermission("update", "propiedades");
 
   const { error } = await supabase
     .from("propiedades")

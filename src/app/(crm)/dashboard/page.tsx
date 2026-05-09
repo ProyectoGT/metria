@@ -482,7 +482,7 @@ export default async function DashboardPage() {
       },
       {
         id: "en_progreso",
-        title: "Orden del dia",
+        title: "Agenda hoy",
         fixed: true,
         cards: [
           ...myAgendaHoy.filter((a) => !a.completed).map(agendaToCard),

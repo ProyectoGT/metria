@@ -161,7 +161,7 @@ function MapaDashboard({
   }, []);
 
   return (
-    <div className="map-surface h-full w-full overflow-hidden rounded-ds-lg" style={{ minHeight: 380 }}>
+    <div className="map-surface h-full w-full overflow-hidden" style={{ minHeight: 380 }}>
       <APIProvider apiKey={apiKey}>
         <Map
           defaultCenter={OFICINA}

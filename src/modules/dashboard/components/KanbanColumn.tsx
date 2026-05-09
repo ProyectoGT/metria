@@ -43,7 +43,7 @@ function KanbanColumn({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-      className="flex w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col rounded-ds-lg border border-border bg-surface shadow-layer-1"
+      className="flex w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col overflow-hidden rounded-ds-lg border border-border bg-surface shadow-layer-1"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >

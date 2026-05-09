@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
+import { requirePermission } from "@/lib/access-control";
 import { revalidatePath } from "next/cache";
 import { DEFAULT_ACTIVITY_TIME, localDateKey, normalizeDateKey, normalizeTime } from "@/lib/local-date-time";
 import { normalizeActivityPriority, normalizeActivityType } from "@/lib/activity-options";
@@ -20,6 +21,9 @@ export async function createTareaAction(data: {
   const supabase = await createClient();
   const yo = await getCurrentUserContext();
   if (!yo) throw new Error("No autenticado");
+  await requirePermission("create", "tareas").catch(() => {
+    throw new Error("No tienes permiso para crear tareas");
+  });
 
   const assignedUserIds = data.assignedUserIds?.length ? data.assignedUserIds : [yo.id];
   const { data: row, error } = await supabase.rpc("create_pending_tarea", {
@@ -52,6 +56,9 @@ export async function createAgendaAction(data: {
   const supabase = await createClient();
   const yo = await getCurrentUserContext();
   if (!yo) throw new Error("No autenticado");
+  await requirePermission("create", "calendario").catch(() => {
+    throw new Error("No tienes permiso para crear actividades en el calendario");
+  });
 
   if (!data.assignedUserIds?.length) throw new Error("Debe asignarse al menos un usuario");
 

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
+import { requirePermission } from "@/lib/access-control";
 import { canSetVendido } from "@/lib/roles";
 import { revalidatePath } from "next/cache";
 
@@ -27,6 +28,9 @@ export async function upsertPropiedadAction(
 ): Promise<{ data?: Record<string, unknown>; error?: string }> {
   const yo = await getCurrentUserContext();
   if (!yo) return { error: "No autenticado" };
+
+  const permError = await requirePermission("update", "propiedades").then(() => null).catch((e: Error) => e.message);
+  if (permError) return { error: permError };
 
   // Validar permiso para marcar como vendido
   if (payload.estado === "vendido") {
