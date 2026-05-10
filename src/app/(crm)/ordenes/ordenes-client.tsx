@@ -11,6 +11,7 @@ import { DEFAULT_ACTIVITY_TIME, normalizeTime, calcDurationMinutes, formatDurati
 import { useToast, Toaster } from "@/components/ui/toast";
 import { isActivityPriority, isActivityType, normalizeActivityPriority, normalizeActivityType, type ActivityType } from "@/lib/activity-options";
 import { AuditTimelineCard } from "@/components/audit/audit-timeline";
+import { useI18n } from "@/lib/i18n";
 
 type Usuario = { id: number; nombre: string; apellidos: string };
 
@@ -41,21 +42,14 @@ type Props = {
   today: string;
 };
 
-const PRIORIDADES = [
-  { value: "alta", label: "Alta", badge: "bg-red-500/15 text-red-700 dark:text-red-400", border: "border-l-red-500", dot: "bg-red-500", text: "text-red-700 dark:text-red-400" },
-  { value: "media", label: "Media", badge: "bg-amber-500/15 text-amber-700 dark:text-amber-400", border: "border-l-amber-400", dot: "bg-amber-400", text: "text-amber-700 dark:text-amber-400" },
-  { value: "baja", label: "Baja", badge: "bg-blue-500/15 text-blue-700 dark:text-blue-400", border: "border-l-blue-400", dot: "bg-blue-400", text: "text-text-secondary" },
+// Static style data — labels come from t() inside the component
+const PRIORITY_STYLES = [
+  { value: "alta",  badge: "bg-red-500/15 text-red-700 dark:text-red-400",    border: "border-l-red-500",  dot: "bg-red-500",  text: "text-red-700 dark:text-red-400" },
+  { value: "media", badge: "bg-amber-500/15 text-amber-700 dark:text-amber-400", border: "border-l-amber-400", dot: "bg-amber-400", text: "text-amber-700 dark:text-amber-400" },
+  { value: "baja",  badge: "bg-blue-500/15 text-blue-700 dark:text-blue-400",  border: "border-l-blue-400", dot: "bg-blue-400",  text: "text-text-secondary" },
 ];
 
-const TIPOS_ACTIVIDAD: Array<{ value: ActivityType; label: string }> = [
-  { value: "actividad", label: "Actividad" },
-  { value: "llamada", label: "Llamada" },
-  { value: "visita", label: "Visita" },
-  { value: "reunion", label: "Reunion" },
-  { value: "seguimiento", label: "Seguimiento" },
-  { value: "formacion", label: "Formacion" },
-  { value: "otro", label: "Otro" },
-];
+const TIPO_VALUES: ActivityType[] = ["actividad", "llamada", "visita", "reunion", "seguimiento", "formacion", "otro"];
 
 function nombreCompleto(u: Usuario) {
   return `${u.nombre} ${u.apellidos}`.trim();
@@ -63,15 +57,6 @@ function nombreCompleto(u: Usuario) {
 
 function canManageOthers(role: UserRole | null) {
   return role === "Administrador" || role === "Director" || role === "Responsable";
-}
-
-function priorityMeta(priority: string | null) {
-  return PRIORIDADES.find((p) => p.value === priority) ?? PRIORIDADES[1];
-}
-
-function tipoLabel(tipo: string | null) {
-  const normalized = normalizeActivityType(tipo);
-  return TIPOS_ACTIVIDAD.find((item) => item.value === normalized)?.label ?? "Actividad";
 }
 
 function assignedIds(actividad: Actividad) {
@@ -85,6 +70,7 @@ export default function OrdenesClient({
   usuarios,
   today,
 }: Props) {
+  const { t } = useI18n();
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const { toast, toasts } = useToast();
@@ -108,6 +94,17 @@ export default function OrdenesClient({
     reminderMinutes: null as number | null,
   });
 
+  // Translated label arrays (stable when locale is stable)
+  const PRIORIDADES = useMemo(() => PRIORITY_STYLES.map((p) => ({
+    ...p,
+    label: t(`statuses.${p.value === "alta" ? "high" : p.value === "media" ? "medium" : "low"}`),
+  })), [t]);
+
+  const TIPOS_ACTIVIDAD = useMemo((): Array<{ value: ActivityType; label: string }> =>
+    TIPO_VALUES.map((v) => ({ value: v, label: t(`ordenes.tipos.${v}`) })),
+    [t]
+  );
+
   const userMap = useMemo(() => {
     const map = new Map<number, string>();
     for (const usuario of usuarios) map.set(usuario.id, nombreCompleto(usuario));
@@ -126,6 +123,15 @@ export default function OrdenesClient({
     completed: filteredActividades.filter((a) => a.completed).length,
     pending: filteredActividades.filter((a) => !a.completed).length,
   }), [filteredActividades]);
+
+  function priorityMeta(priority: string | null) {
+    return PRIORIDADES.find((p) => p.value === priority) ?? PRIORIDADES[1];
+  }
+
+  function tipoLabel(tipo: string | null) {
+    const normalized = normalizeActivityType(tipo);
+    return TIPOS_ACTIVIDAD.find((item) => item.value === normalized)?.label ?? t("ordenes.tipos.actividad");
+  }
 
   function openCreate() {
     setEditing(null);
@@ -174,24 +180,23 @@ export default function OrdenesClient({
     const tipo = normalizeActivityType(form.tipo);
 
     if (!isActivityPriority(priority) || !isActivityType(tipo)) {
-      toast("Prioridad o tipo de actividad no validos", "error");
+      toast(t("ordenes.prioridadTipoInvalidos"), "error");
       return;
     }
 
     if (!form.description.trim() || form.assignedUserIds.length === 0) {
-      toast("Debes indicar titulo y al menos un usuario", "error");
+      toast(t("ordenes.tituloUsuarioRequerido"), "error");
       return;
     }
 
-    // Validar hora fin
     const normalizedStart = normalizeTime(form.time, DEFAULT_ACTIVITY_TIME);
     const normalizedEnd = form.time_end ? normalizeTime(form.time_end, "") : null;
     if (normalizedEnd && normalizedEnd <= normalizedStart) {
-      toast("La hora de fin debe ser posterior a la hora de inicio", "error");
+      toast(t("ordenes.horaFinInvalida"), "error");
       return;
     }
     if (form.reminderMinutes != null && !form.time.trim()) {
-      toast("Se requiere hora de inicio para configurar un recordatorio", "error");
+      toast(t("ordenes.recordatorioRequiereHora"), "error");
       return;
     }
 
@@ -242,7 +247,7 @@ export default function OrdenesClient({
     setSaving(false);
     if (error || !data) {
       setActividades(previousActividades);
-      toast(error?.message ?? "Error al guardar", "error");
+      toast(error?.message ?? t("errors.saveFailed"), "error");
       return;
     }
 
@@ -259,7 +264,7 @@ export default function OrdenesClient({
       : prev.map((a) => a.id === optimisticId ? withUsers : a)
           .sort((a, b) => normalizeTime(a.time).localeCompare(normalizeTime(b.time))));
     router.refresh();
-    toast(editing ? "Actividad actualizada" : "Actividad creada");
+    toast(editing ? t("ordenes.actividadActualizada") : t("ordenes.actividadCreada"));
   }
 
   async function setCompleted(actividad: Actividad, completed: boolean) {
@@ -274,11 +279,11 @@ export default function OrdenesClient({
     setCompletingId(null);
     if (error || !data) {
       setActividades((prev) => prev.map((a) => a.id === actividad.id ? { ...a, completed: !completed } : a));
-      toast(error?.message ?? "Error al actualizar", "error");
+      toast(error?.message ?? t("errors.generic"), "error");
       return;
     }
     router.refresh();
-    toast(completed ? "Actividad completada" : "Actividad pendiente");
+    toast(completed ? t("ordenes.actividadCompletada") : t("ordenes.actividadPendiente"));
   }
 
   async function archiveActividad(id: number) {
@@ -289,22 +294,23 @@ export default function OrdenesClient({
     }
     setActividades((prev) => prev.filter((a) => a.id !== id));
     router.refresh();
-    toast("Actividad archivada");
+    toast(t("ordenes.actividadArchivada"));
   }
 
   return (
     <div className="flex h-full flex-col gap-5">
       <Toaster toasts={toasts} />
 
+      {/* Stats + actions bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-ds-lg border border-border bg-surface px-4 py-3 shadow-layer-1">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5 text-sm">
             <Clock className="h-3.5 w-3.5 text-primary" />
             <span className="font-semibold text-text-primary">{stats.completed}/{stats.total}</span>
-            <span className="text-text-secondary">completadas hoy</span>
+            <span className="text-text-secondary">{t("ordenes.completadasHoy")}</span>
           </div>
           <div className="text-sm text-text-secondary">
-            {stats.pending} pendientes
+            {stats.pending} {t("ordenes.pendientes")}
           </div>
         </div>
 
@@ -316,7 +322,7 @@ export default function OrdenesClient({
                 onChange={(e) => setFilterUserId(e.target.value ? Number(e.target.value) : null)}
                 className="input h-9 appearance-none py-0 pl-3 pr-8 text-sm"
               >
-                <option value="">Todos</option>
+                <option value="">{t("ordenes.todos")}</option>
                 {usuarios.map((u) => <option key={u.id} value={u.id}>{nombreCompleto(u)}</option>)}
               </select>
               <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-secondary" />
@@ -325,25 +331,26 @@ export default function OrdenesClient({
           <button
             onClick={openCreate}
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
-            aria-label="Nueva actividad"
+            aria-label={t("ordenes.nuevaActividad")}
           >
             <Plus className="h-4 w-4" />
-            Nueva
+            {t("ordenes.nueva")}
           </button>
         </div>
       </div>
 
+      {/* Activity list */}
       <div className="overflow-hidden rounded-ds-lg border border-border bg-surface shadow-layer-1">
         {filteredActividades.length === 0 ? (
           <div className="flex flex-col items-center px-6 py-14 text-center">
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-raised text-text-secondary">
               <Clock className="h-5 w-5" />
             </div>
-            <p className="text-sm font-medium text-text-primary">Sin actividades para hoy</p>
-            <p className="mt-1 max-w-sm text-sm text-text-secondary">Crea una actividad para organizar el trabajo del dia sin saturar la vista principal.</p>
-            <button onClick={openCreate} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark" aria-label="Añadir actividad">
+            <p className="text-sm font-medium text-text-primary">{t("ordenes.sinActividades")}</p>
+            <p className="mt-1 max-w-sm text-sm text-text-secondary">{t("ordenes.creaActividad")}</p>
+            <button onClick={openCreate} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark" aria-label={t("ordenes.anadirActividad")}>
               <Plus className="h-4 w-4" />
-              Anadir actividad
+              {t("ordenes.anadirActividad")}
             </button>
           </div>
         ) : (
@@ -410,15 +417,16 @@ export default function OrdenesClient({
         )}
       </div>
 
+      {/* Create / Edit Drawer */}
       <Drawer
         open={showModal}
         onClose={() => setShowModal(false)}
-        title={editing ? "Editar actividad" : "Nueva actividad"}
+        title={editing ? t("ordenes.editarActividad") : t("ordenes.nuevaActividad")}
         width="md"
         footer={
           <div className="flex justify-end gap-3">
             <button type="button" onClick={() => setShowModal(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background">
-              Cancelar
+              {t("ordenes.cancelar")}
             </button>
             <button
               form="ordenes-form"
@@ -427,14 +435,14 @@ export default function OrdenesClient({
               className="pressable inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {saving ? "Guardando..." : "Guardar"}
+              {saving ? t("ordenes.guardando") : t("common.save")}
             </button>
           </div>
         }
       >
         <form id="ordenes-form" onSubmit={saveActividad} className="space-y-4 px-5 py-5">
           <div>
-            <label className="mb-1 block text-xs font-medium text-text-secondary">Titulo *</label>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.titulo")} *</label>
             <input
               value={form.description}
               onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
@@ -445,7 +453,7 @@ export default function OrdenesClient({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-text-secondary">Hora inicio *</label>
+              <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.horaInicio")} *</label>
               <input
                 type="time"
                 value={form.time}
@@ -455,7 +463,7 @@ export default function OrdenesClient({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-text-secondary">Hora fin</label>
+              <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.horaFin")}</label>
               <input
                 type="time"
                 value={form.time_end}
@@ -469,12 +477,12 @@ export default function OrdenesClient({
             return dur ? (
               <p className="flex items-center gap-1 text-xs text-text-secondary -mt-2">
                 <Clock className="h-3 w-3" />
-                Duración: <span className="font-medium text-text-primary">{formatDuration(dur)}</span>
+                {t("ordenes.duracion")} <span className="font-medium text-text-primary">{formatDuration(dur)}</span>
               </p>
             ) : null;
           })()}
           <div>
-            <label className="mb-1 block text-xs font-medium text-text-secondary">Prioridad</label>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.prioridad")}</label>
             <select
               value={form.priority}
               onChange={(e) => setForm((prev) => ({ ...prev, priority: e.target.value }))}
@@ -484,7 +492,7 @@ export default function OrdenesClient({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-text-secondary">Recordatorio</label>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.recordatorio")}</label>
             <select
               value={form.reminderMinutes == null ? "" : String(form.reminderMinutes)}
               onChange={(e) => setForm((prev) => ({ ...prev, reminderMinutes: e.target.value === "" ? null : Number(e.target.value) }))}
@@ -498,7 +506,7 @@ export default function OrdenesClient({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-text-secondary">Tipo de actividad</label>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.tipoActividad")}</label>
             <select
               value={form.tipo}
               onChange={(e) => setForm((prev) => ({ ...prev, tipo: e.target.value }))}
@@ -510,7 +518,7 @@ export default function OrdenesClient({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-text-secondary">Usuarios *</label>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.usuarios")} *</label>
             <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
               {usuarios.map((u) => (
                 <label key={u.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-background">
@@ -533,11 +541,11 @@ export default function OrdenesClient({
                 onChange={(e) => setForm((prev) => ({ ...prev, completed: e.target.checked }))}
                 className="h-4 w-4 accent-primary"
               />
-              <span className="text-sm text-text-secondary">Marcar como completada</span>
+              <span className="text-sm text-text-secondary">{t("ordenes.marcarCompletada")}</span>
             </label>
           )}
           <div>
-            <label className="mb-1 block text-xs font-medium text-text-secondary">Resultado / notas</label>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.resultadoNotas")}</label>
             <textarea
               value={form.result}
               onChange={(e) => setForm((prev) => ({ ...prev, result: e.target.value }))}
@@ -548,12 +556,12 @@ export default function OrdenesClient({
         </form>
       </Drawer>
 
-      {/* Detalle de actividad */}
+      {/* Detail Drawer */}
       <Drawer
         open={detailActividad !== null}
         onClose={() => setDetailActividad(null)}
         title={detailActividad?.description ?? ""}
-        subtitle="Orden del dia"
+        subtitle={t("ordenes.ordenDelDia")}
         width="md"
         headerActions={
           <div className="flex items-center gap-1">
@@ -566,7 +574,7 @@ export default function OrdenesClient({
                 setTimeout(() => openEdit(a), 150);
               }}
               className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
-              aria-label="Editar"
+              aria-label={t("common.edit")}
             >
               <Pencil className="h-4 w-4" />
             </button>
@@ -575,7 +583,7 @@ export default function OrdenesClient({
                 type="button"
                 onClick={() => setConfirmDeleteActividad(detailActividad)}
                 className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
-                aria-label="Eliminar"
+                aria-label={t("common.delete")}
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -587,28 +595,28 @@ export default function OrdenesClient({
           <div className="space-y-5 px-5 py-5">
             <div className="rounded-ds-lg border border-border bg-surface-elevated p-4 shadow-layer-1">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${priorityMeta(detailActividad.priority).text}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${priorityMeta(detailActividad.priority).dot}`} />
-                {priorityMeta(detailActividad.priority).label}
-              </span>
-              {detailActividad.completed && (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-success">
-                  <CheckCircle2 className="complete-pop h-3.5 w-3.5" />
-                  Completada
+                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${priorityMeta(detailActividad.priority).text}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${priorityMeta(detailActividad.priority).dot}`} />
+                  {priorityMeta(detailActividad.priority).label}
                 </span>
-              )}
-              <span className="text-xs font-medium text-text-secondary">
-                {tipoLabel(detailActividad.tipo)}
-              </span>
+                {detailActividad.completed && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-success">
+                    <CheckCircle2 className="complete-pop h-3.5 w-3.5" />
+                    {t("ordenes.completada")}
+                  </span>
+                )}
+                <span className="text-xs font-medium text-text-secondary">
+                  {tipoLabel(detailActividad.tipo)}
+                </span>
               </div>
             </div>
 
             <div className="space-y-2 rounded-ds-lg border border-border bg-surface p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Planificacion</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{t("ordenes.planificacion")}</p>
               <div className="flex items-center gap-2 text-sm text-text-secondary">
                 <Calendar className="h-4 w-4 shrink-0" />
                 <span>
-                  {new Date(detailActividad.event_date + "T12:00:00").toLocaleDateString("es-ES", {
+                  {new Date(detailActividad.event_date + "T12:00:00").toLocaleDateString(undefined, {
                     weekday: "long", day: "numeric", month: "long", year: "numeric",
                   })}
                 </span>
@@ -636,7 +644,7 @@ export default function OrdenesClient({
 
             {assignedIds(detailActividad).length > 0 && (
               <div className="space-y-2 rounded-ds-lg border border-border bg-surface p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Asignado a</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{t("ordenes.asignadoA")}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {assignedIds(detailActividad).map((uid) => (
                     <span key={uid} className="inline-flex items-center gap-1 rounded-md bg-surface-raised px-2.5 py-1 text-xs font-medium text-text-primary">
@@ -650,7 +658,7 @@ export default function OrdenesClient({
 
             {detailActividad.completed && detailActividad.result && (
               <div className="rounded-ds-lg border border-success/20 bg-success/8 px-4 py-3">
-                <p className="text-xs font-semibold text-success">Resultado</p>
+                <p className="text-xs font-semibold text-success">{t("ordenes.resultado")}</p>
                 <p className="mt-1 text-sm text-text-primary">{detailActividad.result}</p>
               </div>
             )}
@@ -662,7 +670,7 @@ export default function OrdenesClient({
             />
 
             <div className="rounded-ds-lg bg-surface-raised px-4 py-3 text-xs text-text-secondary">
-              <p>Actividad de calendario · ID: {detailActividad.id}</p>
+              <p>{t("ordenes.actividadId")} {detailActividad.id}</p>
             </div>
           </div>
         )}
@@ -671,9 +679,9 @@ export default function OrdenesClient({
       {confirmDeleteActividad && (
         <ConfirmDialog
           open
-          title="Eliminar actividad"
-          description="Esta actividad se archivara. Esta accion no se puede deshacer."
-          confirmLabel="Eliminar"
+          title={t("ordenes.eliminarActividad")}
+          description={t("ordenes.irrecuperable")}
+          confirmLabel={t("common.delete")}
           onCancel={() => {
             setConfirmDeleteActividad(null);
             setDetailActividad(null);

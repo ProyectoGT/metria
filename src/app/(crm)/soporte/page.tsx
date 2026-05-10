@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";

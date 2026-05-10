@@ -25,8 +25,9 @@ function formatFecha(fecha: string | null, locale = "es-ES"): string {
 }
 
 const LANGUAGE_OPTIONS: Array<{ label: string; value: Locale; flag: string }> = [
-  { label: "Español", value: "es", flag: "🇪🇸" },
-  { label: "English", value: "en", flag: "🇬🇧" },
+  { label: "Español",  value: "es", flag: "🇪🇸" },
+  { label: "Català",   value: "ca", flag: "🏴" },
+  { label: "English",  value: "en", flag: "🇬🇧" },
   { label: "Italiano", value: "it", flag: "🇮🇹" },
 ];
 

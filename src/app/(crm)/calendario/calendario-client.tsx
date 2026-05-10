@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
@@ -16,8 +16,10 @@ import { isActivityPriority, isActivityType, normalizeActivityPriority, normaliz
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import Drawer from "@/components/ui/drawer";
 import { AuditTimelineCard } from "@/components/audit/audit-timeline";
+import { useI18n } from "@/lib/i18n";
+import { localeLabels } from "@/lib/i18n/config";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type AgendaEvent = {
   id: number;
@@ -95,35 +97,26 @@ type Props = {
   archivedGoogleEventIds: string[];
 };
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const TIPOS: {
-  value: string; label: string; icon: React.ElementType;
-  dot: string; bg: string; text: string; border: string;
-}[] = [
-  { value: "visita",      label: "Visita",      icon: Home,     dot: "bg-emerald-500",  bg: "bg-emerald-500/10",  text: "text-emerald-700 dark:text-emerald-400",  border: "border-emerald-500/30" },
-  { value: "llamada",     label: "Llamada",     icon: Phone,    dot: "bg-blue-500",     bg: "bg-blue-500/10",     text: "text-blue-700 dark:text-blue-400",        border: "border-blue-500/30"    },
-  { value: "reunion",     label: "Reunion",     icon: Users,    dot: "bg-violet-500",   bg: "bg-violet-500/10",   text: "text-violet-700 dark:text-violet-400",    border: "border-violet-500/30"  },
-  { value: "seguimiento", label: "Seguimiento", icon: Clock,    dot: "bg-amber-500",    bg: "bg-amber-500/10",    text: "text-amber-700 dark:text-amber-400",      border: "border-amber-500/30"   },
-  { value: "formacion",   label: "Formacion",   icon: BookOpen, dot: "bg-indigo-500",   bg: "bg-indigo-500/10",   text: "text-indigo-700 dark:text-indigo-400",    border: "border-indigo-500/30"  },
-  { value: "actividad",   label: "Actividad",   icon: Activity, dot: "bg-gray-400",     bg: "bg-gray-500/10",     text: "text-gray-600 dark:text-gray-400",        border: "border-gray-400/30"    },
-  { value: "otro",        label: "Otro",        icon: Star,     dot: "bg-rose-400",     bg: "bg-rose-500/10",     text: "text-rose-700 dark:text-rose-400",        border: "border-rose-400/30"    },
+// Static style data â€” labels computed inside component via t()
+const TIPOS_META: { value: string; icon: React.ElementType; dot: string; bg: string; text: string; border: string }[] = [
+  { value: "visita",      icon: Home,     dot: "bg-emerald-500",  bg: "bg-emerald-500/10",  text: "text-emerald-700 dark:text-emerald-400",  border: "border-emerald-500/30" },
+  { value: "llamada",     icon: Phone,    dot: "bg-blue-500",     bg: "bg-blue-500/10",     text: "text-blue-700 dark:text-blue-400",        border: "border-blue-500/30"    },
+  { value: "reunion",     icon: Users,    dot: "bg-violet-500",   bg: "bg-violet-500/10",   text: "text-violet-700 dark:text-violet-400",    border: "border-violet-500/30"  },
+  { value: "seguimiento", icon: Clock,    dot: "bg-amber-500",    bg: "bg-amber-500/10",    text: "text-amber-700 dark:text-amber-400",      border: "border-amber-500/30"   },
+  { value: "formacion",   icon: BookOpen, dot: "bg-indigo-500",   bg: "bg-indigo-500/10",   text: "text-indigo-700 dark:text-indigo-400",    border: "border-indigo-500/30"  },
+  { value: "actividad",   icon: Activity, dot: "bg-gray-400",     bg: "bg-gray-500/10",     text: "text-gray-600 dark:text-gray-400",        border: "border-gray-400/30"    },
+  { value: "otro",        icon: Star,     dot: "bg-rose-400",     bg: "bg-rose-500/10",     text: "text-rose-700 dark:text-rose-400",        border: "border-rose-400/30"    },
 ];
 
-const PRIORITIES = [
-  { value: "alta",  label: "Alta",  dot: "ring-2 ring-red-500",   badge: "bg-red-500/15 text-red-700 dark:text-red-400",       text: "text-red-700 dark:text-red-400" },
-  { value: "media", label: "Media", dot: "ring-2 ring-amber-400", badge: "bg-amber-500/15 text-amber-700 dark:text-amber-400", text: "text-amber-700 dark:text-amber-400" },
-  { value: "baja",  label: "Baja",  dot: "ring-2 ring-blue-400",  badge: "bg-blue-500/15 text-blue-700 dark:text-blue-400",    text: "text-text-secondary" },
+const PRIORITY_STYLES = [
+  { value: "alta",  dot: "ring-2 ring-red-500",   badge: "bg-red-500/15 text-red-700 dark:text-red-400",       text: "text-red-700 dark:text-red-400" },
+  { value: "media", dot: "ring-2 ring-amber-400", badge: "bg-amber-500/15 text-amber-700 dark:text-amber-400", text: "text-amber-700 dark:text-amber-400" },
+  { value: "baja",  dot: "ring-2 ring-blue-400",  badge: "bg-blue-500/15 text-blue-700 dark:text-blue-400",    text: "text-text-secondary" },
 ];
 
-const MONTH_NAMES = [
-  "Enero","Febrero","Marzo","Abril","Mayo","Junio",
-  "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
-];
-const WEEKDAYS_SHORT = ["Lun","Mar","Mie","Jue","Vie","Sab","Dom"];
-const WEEKDAYS_LONG  = ["Lunes","Martes","Miercoles","Jueves","Viernes","Sabado","Domingo"];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function toDateStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -178,11 +171,11 @@ function emptyForm(date?: Date, syncToGcal = false): FormState {
 }
 
 function tipoMeta(tipo: string) {
-  return TIPOS.find((t) => t.value === tipo) ?? TIPOS.find((t) => t.value === "actividad")!;
+  return TIPOS_META.find((m) => m.value === tipo) ?? TIPOS_META.find((m) => m.value === "actividad")!;
 }
 
-function priorityMeta(priority: string) {
-  return PRIORITIES.find((p) => p.value === priority) ?? PRIORITIES[1];
+function priorityStyleMeta(priority: string) {
+  return PRIORITY_STYLES.find((p) => p.value === priority) ?? PRIORITY_STYLES[1];
 }
 
 const canSeeOthers = (role: UserRole) =>
@@ -206,7 +199,7 @@ function normalizeCalendarEvent(ev: AgendaEvent): AgendaEvent {
   };
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function CalendarioClient({
   initialEvents,
@@ -219,6 +212,44 @@ export default function CalendarioClient({
   filterableUsers,
   archivedGoogleEventIds,
 }: Props) {
+  const { t, locale } = useI18n();
+  const region = localeLabels[locale].region;
+
+  // Locale-aware helpers
+  const TIPOS = useMemo(() => TIPOS_META.map((m) => ({
+    ...m,
+    label: t(`calendar.tipos.${m.value}`),
+  })), [t]);
+
+  const PRIORITIES = useMemo(() => PRIORITY_STYLES.map((p) => ({
+    ...p,
+    label: t(`statuses.${p.value === "alta" ? "high" : p.value === "media" ? "medium" : "low"}`),
+  })), [t]);
+
+  function tipoLabel(tipo: string) {
+    return TIPOS.find((tp) => tp.value === tipo)?.label ?? t("calendar.tipos.actividad");
+  }
+
+  function priorityMeta(priority: string) {
+    return PRIORITIES.find((p) => p.value === priority) ?? PRIORITIES[1];
+  }
+
+  // Locale-aware month/weekday helpers (use Intl instead of hardcoded arrays)
+  function getMonthName(month: number, year: number): string {
+    return new Intl.DateTimeFormat(region, { month: "long" }).format(new Date(year, month, 1));
+  }
+
+  function getWeekdayShort(dayIndex: number): string {
+    // dayIndex 0=Mon, 6=Sun
+    const ref = new Date(2024, 0, 1 + dayIndex); // 2024-01-01 is a Monday
+    return new Intl.DateTimeFormat(region, { weekday: "short" }).format(ref).slice(0, 3);
+  }
+
+  function getWeekdayLong(dayIndex: number): string {
+    const ref = new Date(2024, 0, 1 + dayIndex);
+    return new Intl.DateTimeFormat(region, { weekday: "long" }).format(ref);
+  }
+
   const today = useMemo(() => new Date(), []);
   const router = useRouter();
 
@@ -253,7 +284,7 @@ export default function CalendarioClient({
   useEffect(() => { setTareas(initialTareas); }, [initialTareas]);
   const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
 
-  // Filter by user — default "all" for managers, currentUserId for agents
+  // Filter by user â€” default "all" for managers, currentUserId for agents
   const [filterUserId, setFilterUserId] = useState<number | "all">(() =>
     canSeeOthers(role) ? "all" : currentUserId
   );
@@ -261,9 +292,9 @@ export default function CalendarioClient({
   const supabase = useMemo(() => createClient(), []);
   const { toasts, toast } = useToast();
 
-  // filterableUsers comes from the server — always complete regardless of events loaded
+  // filterableUsers comes from the server â€” always complete regardless of events loaded
 
-  // ── Apply user filter ──────────────────────────────────────────────────────
+  // â”€â”€ Apply user filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const filteredEvents = useMemo(() =>
     filterUserId === "all" ? events : events.filter((e) => e.owner_user_id === filterUserId || e.user_id === filterUserId || agendaAssignedIds(e).includes(filterUserId)),
@@ -275,7 +306,7 @@ export default function CalendarioClient({
     [tareas, filterUserId]
   );
 
-  // ── Calendar data maps ─────────────────────────────────────────────────────
+  // â”€â”€ Calendar data maps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const calendarDays = useMemo(
     () => getCalendarDays(currentDate.getFullYear(), currentDate.getMonth()),
@@ -323,7 +354,7 @@ export default function CalendarioClient({
     return map;
   }, [filteredTareas]);
 
-  // ── Google Calendar fetch ──────────────────────────────────────────────────
+  // â”€â”€ Google Calendar fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const gcalAbortRef = useRef<AbortController | null>(null);
 
@@ -391,7 +422,7 @@ export default function CalendarioClient({
 
   useEffect(() => { fetchGcalEvents(); }, [fetchGcalEvents]);
 
-  // ── Navigation ─────────────────────────────────────────────────────────────
+  // â”€â”€ Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function prevPeriod() {
     if (viewMode === "month") {
@@ -422,7 +453,7 @@ export default function CalendarioClient({
     setViewMode(mode);
   }
 
-  // ── Modal ──────────────────────────────────────────────────────────────────
+  // â”€â”€ Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function openCreate(date?: Date) {
     setEditId(null);
@@ -459,7 +490,7 @@ export default function CalendarioClient({
     });
   }
 
-  // ── Save ───────────────────────────────────────────────────────────────────
+  // â”€â”€ Save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async function handleSave() {
     const priority = normalizeActivityPriority(form.priority);
@@ -467,11 +498,11 @@ export default function CalendarioClient({
 
     if (!form.description.trim()) return;
     if (!isActivityPriority(priority) || !isActivityType(tipo)) {
-      setSaveError("Prioridad o tipo de actividad no validos");
+      setSaveError(t("calendar.prioridadTipoInvalidos"));
       return;
     }
     if (form.assignedUserIds.length === 0) {
-      setSaveError("Debes asignar al menos un usuario");
+      setSaveError(t("calendar.usuarioRequerido"));
       return;
     }
     setSaving(true); setSaveError(null);
@@ -480,13 +511,13 @@ export default function CalendarioClient({
     const normalizedEnd = form.time_end ? normalizeTime(form.time_end, "") : null;
     const normalizedStart = normalizeTime(form.time, DEFAULT_ACTIVITY_TIME);
     if (normalizedEnd && normalizedEnd <= normalizedStart) {
-      setSaveError("La hora de fin debe ser posterior a la hora de inicio");
+      setSaveError(t("calendar.horaFinInvalida"));
       setSaving(false);
       return;
     }
     // Validar recordatorio requiere hora inicio
     if (form.reminderMinutes != null && !form.time.trim()) {
-      setSaveError("Se requiere hora de inicio para configurar un recordatorio");
+      setSaveError(t("calendar.recordatorioRequiereHora"));
       setSaving(false);
       return;
     }
@@ -617,7 +648,7 @@ export default function CalendarioClient({
 
         setEvents((prev) => prev.map((e) => e.id === editId ? normalizedUpdated : e));
         router.refresh();
-        toast("Actividad actualizada");
+        toast(t("calendar.actividadActualizada"));
       }
     } else {
       const { data, error } = await insertOrUpdate(payload);
@@ -693,13 +724,13 @@ export default function CalendarioClient({
           }
         }
         router.refresh();
-        toast("Actividad creada");
+        toast(t("calendar.actividadCreada"));
       }
     }
     setSaving(false);
   }
 
-  // ── Delete ─────────────────────────────────────────────────────────────────
+  // â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async function handleDelete(eventId?: number) {
     const id = eventId ?? deleteId;
@@ -718,21 +749,21 @@ export default function CalendarioClient({
     }
     const { error } = await supabase.rpc("archive_agenda", { p_agenda_id: id, p_reason: "archived_from_calendar" });
     if (error) toast("Error al eliminar: " + error.message, "error");
-    else { setEvents((prev) => prev.filter((e) => e.id !== id)); if (!eventId) setDeleteId(null); toast("Actividad eliminada"); }
+    else { setEvents((prev) => prev.filter((e) => e.id !== id)); if (!eventId) setDeleteId(null); toast(t("calendar.actividadEliminada")); }
     setDeleting(false);
   }
 
-  // ── Complete tarea ─────────────────────────────────────────────────────────
+  // â”€â”€ Complete tarea â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async function handleCompleteTarea(id: number) {
     setCompletingTaskIds((prev) => new Set(prev).add(id));
     setTareas((prev) => prev.map((t) => (t.id === id ? { ...t, estado: "completado" } : t)));
     try {
       await updateTareaEstadoAction(id, "completado");
-      toast("Tarea completada");
+      toast(t("tasks.completed"));
     } catch {
       setTareas((prev) => prev.map((t) => (t.id === id ? { ...t, estado: "pendiente" } : t)));
-      toast("Error al completar la tarea", "error");
+      toast(t("calendar.errorCompletar"), "error");
     } finally {
       setCompletingTaskIds((prev) => {
         const next = new Set(prev);
@@ -742,7 +773,7 @@ export default function CalendarioClient({
     }
   }
 
-  // ── Complete agenda ────────────────────────────────────────────────────────
+  // â”€â”€ Complete agenda â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async function handleCompleteAgenda(id: number, completed: boolean) {
     setCompletingAgendaIds((prev) => new Set(prev).add(id));
@@ -754,7 +785,7 @@ export default function CalendarioClient({
     });
     if (error) {
       setEvents((prev) => prev.map((e) => e.id === id ? { ...e, completed: !completed } : e));
-      toast("Error al completar la actividad", "error");
+      toast(t("calendar.errorCompletar"), "error");
       setCompletingAgendaIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
@@ -763,7 +794,7 @@ export default function CalendarioClient({
       return;
     }
     router.refresh();
-    toast(completed ? "Actividad completada" : "Actividad pendiente");
+    toast(completed ? t("calendar.actividadCompletada") : t("calendar.actividadPendiente"));
     setCompletingAgendaIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -771,7 +802,7 @@ export default function CalendarioClient({
     });
   }
 
-  // ── Derived ────────────────────────────────────────────────────────────────
+  // â”€â”€ Derived â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const todayStr        = toDateStr(today);
   const selectedDateStr = toDateStr(selectedDate);
@@ -781,15 +812,15 @@ export default function CalendarioClient({
 
   // Period label
   const periodLabel = viewMode === "month"
-    ? `${MONTH_NAMES[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+    ? `${getMonthName(currentDate.getMonth(), currentDate.getFullYear())} ${currentDate.getFullYear()}`
     : (() => {
         const we = new Date(weekStart); we.setDate(we.getDate() + 6);
         const sameMonth = weekStart.getMonth() === we.getMonth();
-        if (sameMonth) return `${weekStart.getDate()} – ${we.getDate()} ${MONTH_NAMES[we.getMonth()]} ${we.getFullYear()}`;
-        return `${weekStart.getDate()} ${MONTH_NAMES[weekStart.getMonth()]} – ${we.getDate()} ${MONTH_NAMES[we.getMonth()]} ${we.getFullYear()}`;
+        if (sameMonth) return `${weekStart.getDate()} â€“ ${we.getDate()} ${getMonthName(we.getMonth(), we.getFullYear())} ${we.getFullYear()}`;
+        return `${weekStart.getDate()} ${getMonthName(weekStart.getMonth(), weekStart.getFullYear())} â€“ ${we.getDate()} ${getMonthName(we.getMonth(), we.getFullYear())} ${we.getFullYear()}`;
       })();
 
-  // ── Render helpers ─────────────────────────────────────────────────────────
+  // â”€â”€ Render helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function DayEventDots({ dateStr }: { dateStr: string }) {
     const localEvs = eventsByDate[dateStr] ?? [];
@@ -801,9 +832,9 @@ export default function CalendarioClient({
     return (
       <div className="flex flex-col gap-0.5 overflow-hidden">
         {localEvs.slice(0, 2).map((ev) => {
-          const t = tipoMeta(ev.tipo);
+          const tp = tipoMeta(ev.tipo);
           return (
-            <div key={ev.id} className={`group flex items-center gap-1 rounded px-1 py-0.5 ${ev.completed ? "opacity-50" : t.bg}`}>
+            <div key={ev.id} className={`group flex items-center gap-1 rounded px-1 py-0.5 ${ev.completed ? "opacity-50" : tp.bg}`}>
               <button
                 onClick={(e) => { e.stopPropagation(); handleCompleteAgenda(ev.id, !ev.completed); }}
                 className={`shrink-0 ${ev.completed ? "text-green-500" : "text-text-secondary opacity-0 group-hover:opacity-100 hover:text-green-500"}`}
@@ -814,15 +845,15 @@ export default function CalendarioClient({
                     ? <Check className="complete-pop h-2.5 w-2.5" />
                     : <Circle className="h-2.5 w-2.5" />}
               </button>
-              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${ev.completed ? "opacity-0" : t.dot}`} />
-              <span className={`truncate text-[10px] font-medium leading-none ${ev.completed ? "line-through text-text-secondary" : t.text}`}>{ev.description}</span>
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${ev.completed ? "opacity-0" : tp.dot}`} />
+              <span className={`truncate text-[10px] font-medium leading-none ${ev.completed ? "line-through text-text-secondary" : tp.text}`}>{ev.description}</span>
             </div>
           );
         })}
-        {tareaEvs.slice(0, 1).map((t) => (
-          <div key={`t-${t.id}`} className="flex items-center gap-1 rounded bg-violet-500/10 px-1 py-0.5">
+        {tareaEvs.slice(0, 1).map((tarea) => (
+          <div key={`t-${tarea.id}`} className="flex items-center gap-1 rounded bg-violet-500/10 px-1 py-0.5">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-500" />
-            <span className="truncate text-[10px] font-medium leading-none text-violet-700 dark:text-violet-400">{t.titulo}</span>
+            <span className="truncate text-[10px] font-medium leading-none text-violet-700 dark:text-violet-400">{tarea.titulo}</span>
           </div>
         ))}
         {gcalEvs.slice(0, 1).map((ev) => (
@@ -831,7 +862,7 @@ export default function CalendarioClient({
             <span className="truncate text-[10px] font-medium leading-none text-blue-700 dark:text-blue-400">{ev.summary}</span>
           </div>
         ))}
-        {total > 3 && <span className="pl-1 text-[10px] text-text-secondary">+{total - 3} mas</span>}
+        {total > 3 && <span className="pl-1 text-[10px] text-text-secondary">{t("calendar.masEventos", { count: total - 3 })}</span>}
       </div>
     );
   }
@@ -846,30 +877,30 @@ export default function CalendarioClient({
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-raised text-text-secondary">
             <Calendar className="h-5 w-5" />
           </div>
-          <p className="text-sm font-medium text-text-primary">Sin actividades este dia</p>
-          <p className="mt-1 max-w-[240px] text-sm text-text-secondary">Este hueco queda libre para nuevas visitas, llamadas o seguimientos.</p>
+          <p className="text-sm font-medium text-text-primary">{t("calendar.sinActividadesEsteDia")}</p>
+          <p className="mt-1 max-w-[240px] text-sm text-text-secondary">{t("calendar.huecoPendiente")}</p>
           <button onClick={() => openCreate(date)} className="mt-4 inline-flex items-center rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-primary-dark">
-            Anadir actividad
+            {t("calendar.anadirActividad")}
           </button>
         </div>
       );
     }
     return (
       <div className="space-y-2">
-        {tEvs.map((t) => {
-          const p = PRIORITIES.find((pr) => pr.value === t.prioridad);
-          const completada = t.estado === "completado";
-          const hora = t.fecha.includes("T") ? new Date(t.fecha).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
-          const ownerName = showOwner && t.owner_user_id && t.owner_user_id !== currentUserId ? usersMap[t.owner_user_id] : null;
+        {tEvs.map((tarea) => {
+          const p = PRIORITIES.find((pr) => pr.value === tarea.prioridad);
+          const completada = tarea.estado === "completado";
+          const hora = tarea.fecha.includes("T") ? new Date(tarea.fecha).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
+          const ownerName = showOwner && tarea.owner_user_id && tarea.owner_user_id !== currentUserId ? usersMap[tarea.owner_user_id] : null;
           return (
-            <div key={`tarea-${t.id}`} className="group rounded-ds-lg border border-border bg-surface-elevated p-3 shadow-layer-1">
+            <div key={`tarea-${tarea.id}`} className="group rounded-ds-lg border border-border bg-surface-elevated p-3 shadow-layer-1">
               <div className="flex items-start gap-2">
                 <button
-                  onClick={() => !completada && handleCompleteTarea(t.id)}
+                  onClick={() => !completada && handleCompleteTarea(tarea.id)}
                   title={completada ? "Completada" : "Marcar como completada"}
                   className={`mt-0.5 shrink-0 transition-colors ${completada ? "text-green-500 cursor-default" : "text-violet-400 hover:text-green-500"}`}
                 >
-                  {completingTaskIds.has(t.id)
+                  {completingTaskIds.has(tarea.id)
                     ? <Loader2 className="h-4 w-4 animate-spin" />
                     : completada
                       ? <Check className="complete-pop h-4 w-4" />
@@ -877,11 +908,11 @@ export default function CalendarioClient({
                 </button>
                 <div className="min-w-0 flex-1">
                   <p className={`text-sm font-medium leading-snug ${completada ? "line-through text-text-secondary" : "text-text-primary"}`}>
-                    {t.titulo}
+                    {tarea.titulo}
                   </p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {hora && <span className="text-xs text-text-secondary">{hora}</span>}
-                    <span className="text-[10px] font-medium text-violet-700 dark:text-violet-400">Tarea</span>
+                    <span className="text-[10px] font-medium text-violet-700 dark:text-violet-400">{t("calendar.tarea")}</span>
                     {p && <span className={`text-[10px] font-medium ${p.text}`}>{p.label}</span>}
                     {ownerName && <span className="text-[10px] text-text-secondary">{ownerName}</span>}
                   </div>
@@ -891,15 +922,15 @@ export default function CalendarioClient({
           );
         })}
         {localEvs.map((ev) => {
-          const t = tipoMeta(ev.tipo);
+          const tp = tipoMeta(ev.tipo);
           const p = priorityMeta(ev.priority);
-          const Icon = t.icon;
+          const Icon = tp.icon;
           const ownerName = showOwner && ev.owner_user_id && ev.owner_user_id !== currentUserId ? usersMap[ev.owner_user_id] : null;
           return (
             <div
               key={ev.id}
               onClick={() => setDetailEvent(ev)}
-              className={`group relative cursor-pointer rounded-ds-lg border border-border bg-surface-elevated p-3 shadow-layer-1 transition-colors hover:border-primary/25 hover:bg-surface ${t.border}`}
+              className={`group relative cursor-pointer rounded-ds-lg border border-border bg-surface-elevated p-3 shadow-layer-1 transition-colors hover:border-primary/25 hover:bg-surface ${tp.border}`}
             >
               <div className="flex items-start gap-2">
                 <button
@@ -913,8 +944,8 @@ export default function CalendarioClient({
                       ? <CheckCircle2 className="complete-pop h-4 w-4" />
                       : <Circle className="h-4 w-4" />}
                 </button>
-                <div className={`mt-0.5 shrink-0 rounded-md p-1 ${t.bg}`}>
-                  <Icon className={`h-3.5 w-3.5 ${t.text}`} />
+                <div className={`mt-0.5 shrink-0 rounded-md p-1 ${tp.bg}`}>
+                  <Icon className={`h-3.5 w-3.5 ${tp.text}`} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className={`text-sm font-medium leading-snug ${ev.completed ? "line-through text-text-secondary" : "text-text-primary"}`}>
@@ -923,11 +954,11 @@ export default function CalendarioClient({
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {ev.time && (
                       <span className="text-xs font-medium text-text-secondary">
-                        {ev.time}{ev.time_end ? ` – ${ev.time_end}` : ""}
+                        {ev.time}{ev.time_end ? ` â€“ ${ev.time_end}` : ""}
                         {(() => { const d = calcDurationMinutes(ev.time, ev.time_end); return d ? ` (${formatDuration(d)})` : ""; })()}
                       </span>
                     )}
-                    <span className={`text-[10px] font-medium ${t.text}`}>{t.label}</span>
+                    <span className={`text-[10px] font-medium ${tp.text}`}>{tipoLabel(ev.tipo)}</span>
                     <span className={`text-[10px] font-medium ${p.text}`}>{p.label}</span>
                     {ev.reminder_minutes_before != null && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-primary">
@@ -935,8 +966,8 @@ export default function CalendarioClient({
                         {formatReminderLabel(ev.reminder_minutes_before)}
                       </span>
                     )}
-                    {ev.gcal_event_id && <span className="text-[10px] font-medium text-blue-700 dark:text-blue-400">GCal</span>}
-                    {ev.completed && <span className="text-[10px] font-medium text-success">Completada</span>}
+                    {ev.gcal_event_id && <span className="text-[10px] font-medium text-blue-700 dark:text-blue-400">{t("calendar.gcal")}</span>}
+                    {ev.completed && <span className="text-[10px] font-medium text-success">{t("calendar.completada")}</span>}
                     {ownerName && <span className="text-[10px] text-text-secondary">{ownerName}</span>}
                   </div>
                   {ev.result && <p className="mt-1.5 text-xs text-text-secondary line-clamp-2">{ev.result}</p>}
@@ -971,7 +1002,7 @@ export default function CalendarioClient({
     );
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   return (
     <>
@@ -980,21 +1011,21 @@ export default function CalendarioClient({
         {/* Left: title + view toggle + filter */}
         <div className="flex flex-wrap items-center gap-3">
           <div>
-            <h1 className="text-xl font-bold text-text-primary leading-tight">Calendario</h1>
-            <p className="text-xs text-text-secondary">Agenda y actividades</p>
+            <h1 className="text-xl font-bold text-text-primary leading-tight">{t("calendar.title")}</h1>
+            <p className="text-xs text-text-secondary">{t("calendar.agendaYActividades")}</p>
           </div>
           <div className="flex overflow-hidden rounded-lg border border-border text-sm font-medium">
             <button
               onClick={() => switchView("month")}
               className={`px-4 py-2 transition-colors ${viewMode === "month" ? "bg-primary text-white" : "text-text-secondary hover:bg-background"}`}
             >
-              Mes
+              {t("calendar.month")}
             </button>
             <button
               onClick={() => switchView("week")}
               className={`border-l border-border px-4 py-2 transition-colors ${viewMode === "week" ? "bg-primary text-white" : "text-text-secondary hover:bg-background"}`}
             >
-              Semana
+              {t("calendar.week")}
             </button>
           </div>
 
@@ -1008,17 +1039,17 @@ export default function CalendarioClient({
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border text-text-secondary hover:bg-background"
                 }`}
-                aria-label="Filtrar por usuario"
+                aria-label={t("calendar.filtroPorUsuario")}
                 aria-expanded={filterOpen}
                 aria-haspopup="listbox"
               >
                 <Filter className="h-4 w-4" />
-                {filterUserId === "all" ? "Todos" : (usersMap[filterUserId as number] ?? "Usuario")}
+                {filterUserId === "all" ? t("calendar.todos") : (usersMap[filterUserId as number] ?? t("common.user"))}
                 {filterUserId !== "all" && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setFilterUserId("all"); }}
                     className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary/20 text-primary hover:bg-primary/30"
-                    aria-label="Quitar filtro"
+                    aria-label={t("calendar.quitarFiltro")}
                   >
                     <X className="h-2.5 w-2.5" />
                   </button>
@@ -1033,7 +1064,7 @@ export default function CalendarioClient({
                       aria-selected={filterUserId === "all"}
                       className={`flex w-full items-center px-4 py-2.5 text-sm transition-colors hover:bg-background ${filterUserId === "all" ? "font-semibold text-primary" : "text-text-primary"}`}
                     >
-                      Todos los usuarios
+                      {t("calendar.todosLosUsuarios")}
                     </button>
                     {filterableUsers.map((u) => (
                       <button
@@ -1045,7 +1076,7 @@ export default function CalendarioClient({
                       >
                         {u.name}
                         {u.id === currentUserId && (
-                          <span className="ml-1.5 text-xs text-text-secondary">(yo)</span>
+                          <span className="ml-1.5 text-xs text-text-secondary">({t("calendar.yo")})</span>
                         )}
                       </button>
                     ))}
@@ -1061,26 +1092,26 @@ export default function CalendarioClient({
           {isConnected ? (
             <>
               <span className="flex items-center gap-1.5 rounded-full bg-success/15 px-3 py-1 text-xs font-medium text-success">
-                <span className="h-1.5 w-1.5 rounded-full bg-green-500" /> Conectado
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500" /> {t("calendar.conectado")}
               </span>
               <a href="/api/google/disconnect" className="text-xs text-text-secondary underline-offset-2 hover:underline">
-                Desconectar
+                {t("calendar.desconectar")}
               </a>
             </>
           ) : (
             <>
               <span className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium text-text-secondary">
-                <span className="h-1.5 w-1.5 rounded-full bg-gray-400" /> No conectado
+                <span className="h-1.5 w-1.5 rounded-full bg-gray-400" /> {t("calendar.noConectado")}
               </span>
               <a href="/api/google/auth" className="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-background">
-                Conectar Google Calendar
+                {t("calendar.conectarGoogle")}
               </a>
             </>
           )}
         </div>
       </div>
 
-      {/* ─── MONTH VIEW ────────────────────────────────────────────────────────── */}
+      {/* â”€â”€â”€ MONTH VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {viewMode === "month" && (
         <div className="flex flex-col gap-5 lg:flex-row">
           {/* Calendar grid */}
@@ -1089,13 +1120,13 @@ export default function CalendarioClient({
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <h2 className="text-lg font-semibold text-text-primary">{periodLabel}</h2>
               <div className="flex items-center gap-1.5">
-                <button onClick={prevPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary" aria-label="Mes anterior">
+                <button onClick={prevPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary" aria-label={t("calendar.mesAnterior")}>
                   <ChevronLeft className="h-4 w-4" />
                 </button>
                 <button onClick={goToday} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-background">
-                  Hoy
+                  {t("calendar.hoy")}
                 </button>
-                <button onClick={nextPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary" aria-label="Mes siguiente">
+                <button onClick={nextPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary" aria-label={t("calendar.mesSiguiente")}>
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
@@ -1103,8 +1134,8 @@ export default function CalendarioClient({
 
             {/* Weekday headers */}
             <div className="grid grid-cols-7 border-b border-border">
-              {WEEKDAYS_SHORT.map((d) => (
-                <div key={d} className="py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-text-secondary">{d}</div>
+              {Array.from({ length: 7 }, (_, i) => (
+                <div key={i} className="py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-text-secondary">{getWeekdayShort(i)}</div>
               ))}
             </div>
 
@@ -1138,15 +1169,15 @@ export default function CalendarioClient({
 
             {/* Legend */}
             <div className="flex flex-wrap items-center gap-3 border-t border-border px-6 py-3">
-              {TIPOS.map((t) => (
-                <div key={t.value} className="flex items-center gap-1.5">
-                  <span className={`h-2 w-2 rounded-full ${t.dot}`} />
-                  <span className="text-xs text-text-secondary">{t.label}</span>
+              {TIPOS.map((tp) => (
+                <div key={tp.value} className="flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${tp.dot}`} />
+                  <span className="text-xs text-text-secondary">{tp.label}</span>
                 </div>
               ))}
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-violet-500" />
-                <span className="text-xs text-text-secondary">Tarea</span>
+                <span className="text-xs text-text-secondary">{t("calendar.tarea")}</span>
               </div>
               {isConnected && (
                 <div className="flex items-center gap-1.5">
@@ -1161,7 +1192,7 @@ export default function CalendarioClient({
           <div className="w-full shrink-0 rounded-2xl border border-border bg-surface shadow-sm lg:w-80">
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <div>
-                <h3 className="text-sm font-semibold text-text-primary">Actividades del dia</h3>
+                <h3 className="text-sm font-semibold text-text-primary">{t("calendar.actividadesDelDia")}</h3>
                 <p className="mt-0.5 text-xs text-text-secondary capitalize">
                   {selectedDate.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
                 </p>
@@ -1169,9 +1200,9 @@ export default function CalendarioClient({
               <button
                 onClick={() => openCreate(selectedDate)}
                 className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-dark"
-                aria-label="Nueva actividad"
+                aria-label={t("calendar.nuevaActividadLabel")}
               >
-                + Nueva
+                {t("calendar.nuevaPlus")}
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
@@ -1181,20 +1212,20 @@ export default function CalendarioClient({
         </div>
       )}
 
-      {/* ─── WEEK VIEW ─────────────────────────────────────────────────────────── */}
+      {/* â”€â”€â”€ WEEK VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {viewMode === "week" && (
         <div className="overflow-hidden rounded-ds-lg border border-border bg-surface shadow-layer-1">
           {/* Nav */}
           <div className="flex items-center justify-between border-b border-border bg-surface-elevated px-6 py-4">
             <h2 className="text-base font-semibold text-text-primary">{periodLabel}</h2>
             <div className="flex items-center gap-1.5">
-              <button onClick={prevPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary" aria-label="Semana anterior">
+              <button onClick={prevPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary" aria-label={t("calendar.semanaAnterior")}>
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button onClick={goToday} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-background">
-                Hoy
+                {t("calendar.hoy")}
               </button>
-              <button onClick={nextPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary" aria-label="Semana siguiente">
+              <button onClick={nextPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary" aria-label={t("calendar.semanaSiguiente")}>
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
@@ -1218,7 +1249,7 @@ export default function CalendarioClient({
                   className={`flex flex-col items-center gap-1 px-2 py-3 transition-colors hover:bg-surface-elevated ${isSelected ? "bg-primary/5" : ""}`}
                 >
                   <span className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-                    {WEEKDAYS_LONG[i].slice(0, 3)}
+                    {getWeekdayLong(i).slice(0, 3)}
                   </span>
                   <span className={[
                     "flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold",
@@ -1236,7 +1267,7 @@ export default function CalendarioClient({
             })}
           </div>
 
-          {/* Week event rows — show all days side by side */}
+          {/* Week event rows â€” show all days side by side */}
           <div className="grid min-h-[420px] min-w-[640px] grid-cols-7 divide-x divide-border/70">
             {weekDays.map((date, i) => {
               const dateStr   = toDateStr(date);
@@ -1261,20 +1292,20 @@ export default function CalendarioClient({
                   </button>
 
                   <div className="space-y-1.5">
-                    {tEvs.map((t) => {
-                      const completada = t.estado === "completado";
-                      const hora = t.fecha.includes("T") ? new Date(t.fecha).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
+                    {tEvs.map((tarea) => {
+                      const completada = tarea.estado === "completado";
+                      const hora = tarea.fecha.includes("T") ? new Date(tarea.fecha).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
                       return (
                         <div
-                          key={`t-${t.id}`}
+                          key={`t-${tarea.id}`}
                           onClick={(e) => e.stopPropagation()}
                           className="flex items-start gap-1.5 rounded-md border border-border bg-surface-elevated px-2 py-1.5 shadow-layer-1"
                         >
                           <button
-                            onClick={() => !completada && handleCompleteTarea(t.id)}
+                            onClick={() => !completada && handleCompleteTarea(tarea.id)}
                             className={`mt-0.5 shrink-0 ${completada ? "text-green-500 cursor-default" : "text-violet-400 hover:text-green-500"}`}
                           >
-                            {completingTaskIds.has(t.id)
+                            {completingTaskIds.has(tarea.id)
                               ? <Loader2 className="h-3 w-3 animate-spin" />
                               : completada
                                 ? <Check className="complete-pop h-3 w-3" />
@@ -1283,19 +1314,19 @@ export default function CalendarioClient({
                           <div className="min-w-0">
                             {hora && <p className="text-[10px] font-semibold text-violet-600 dark:text-violet-400">{hora}</p>}
                             <p className={`truncate text-[11px] font-medium leading-tight ${completada ? "line-through text-text-secondary" : "text-text-primary"}`}>
-                              {t.titulo}
+                              {tarea.titulo}
                             </p>
                           </div>
                         </div>
                       );
                     })}
                     {localEvs.map((ev) => {
-                      const t = tipoMeta(ev.tipo);
+                      const tp = tipoMeta(ev.tipo);
                       return (
                         <div
                           key={ev.id}
                           onClick={(e) => { e.stopPropagation(); setDetailEvent(ev); }}
-                          className={`group/event flex cursor-pointer items-start gap-1.5 rounded-md border border-border bg-surface-elevated px-2 py-1.5 shadow-layer-1 transition-colors hover:border-primary/25 hover:bg-surface ${t.border}`}
+                          className={`group/event flex cursor-pointer items-start gap-1.5 rounded-md border border-border bg-surface-elevated px-2 py-1.5 shadow-layer-1 transition-colors hover:border-primary/25 hover:bg-surface ${tp.border}`}
                         >
                           <button
                             onClick={(e) => { e.stopPropagation(); handleCompleteAgenda(ev.id, !ev.completed); }}
@@ -1307,9 +1338,9 @@ export default function CalendarioClient({
                                 ? <Check className="complete-pop h-2.5 w-2.5" />
                                 : <Circle className="h-2.5 w-2.5" />}
                           </button>
-                          <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${t.dot} ${ev.completed ? "opacity-0" : ""}`} />
+                          <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${tp.dot} ${ev.completed ? "opacity-0" : ""}`} />
                           <div className="min-w-0">
-                            {ev.time && <p className={`text-[10px] font-semibold ${t.text}`}>{ev.time}</p>}
+                            {ev.time && <p className={`text-[10px] font-semibold ${tp.text}`}>{ev.time}</p>}
                             <p className={`truncate text-[11px] font-medium leading-tight ${ev.completed ? "line-through text-text-secondary" : "text-text-primary"}`}>
                               {ev.description}
                             </p>
@@ -1334,7 +1365,7 @@ export default function CalendarioClient({
                       <button
                         onClick={(e) => { e.stopPropagation(); openCreate(date); }}
                         className="flex w-full items-center justify-center rounded-md border border-dashed border-border py-3 text-xs text-text-secondary opacity-60 transition-all hover:border-primary hover:text-primary hover:opacity-100"
-                        title="Nueva actividad"
+                        title={t("calendar.nuevaActividadLabel")}
                       >
                         +
                       </button>
@@ -1357,7 +1388,7 @@ export default function CalendarioClient({
                 onClick={() => openCreate(selectedDate)}
                 className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-dark"
               >
-                + Nueva actividad
+                {t("calendar.nuevaActividad")}
               </button>
             </div>
             <div className="px-5 pb-5">
@@ -1367,16 +1398,16 @@ export default function CalendarioClient({
         </div>
       )}
 
-      {/* ── Create / Edit Drawer ── */}
+      {/* â”€â”€ Create / Edit Drawer â”€â”€ */}
       <Drawer
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editId !== null ? "Editar actividad" : "Nueva actividad"}
+        title={editId !== null ? t("calendar.editarActividad") : t("calendar.nuevaActividadLabel")}
         width="md"
         footer={
           <div className="flex justify-end gap-3">
             <button onClick={() => setModalOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">
-              Cancelar
+              {t("calendar.cancelar")}
             </button>
             <button
               onClick={handleSave}
@@ -1384,7 +1415,7 @@ export default function CalendarioClient({
               className="pressable inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {saving ? "Guardando..." : editId !== null ? "Guardar cambios" : "Crear actividad"}
+              {saving ? t("calendar.guardando") : editId !== null ? t("calendar.guardarCambios") : t("calendar.crearActividad")}
             </button>
           </div>
         }
@@ -1393,24 +1424,24 @@ export default function CalendarioClient({
           {/* Tipo selector */}
           <div>
             <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Tipo de actividad
+              {t("ordenes.tipoActividad")}
             </label>
             <div className="grid grid-cols-4 gap-1.5">
-              {TIPOS.map((t) => {
-                const Icon = t.icon;
-                const active = form.tipo === t.value;
+              {TIPOS.map((tp) => {
+                const Icon = tp.icon;
+                const active = form.tipo === tp.value;
                 return (
                   <button
-                    key={t.value}
+                    key={tp.value}
                     type="button"
-                    onClick={() => setForm({ ...form, tipo: t.value })}
+                    onClick={() => setForm({ ...form, tipo: tp.value })}
                     className={[
                       "flex flex-col items-center gap-1 rounded-xl border py-2.5 px-1 text-center transition-all",
-                      active ? `${t.bg} ${t.border} ${t.text} border-2` : "border-border text-text-secondary hover:bg-background",
+                      active ? `${tp.bg} ${tp.border} ${tp.text} border-2` : "border-border text-text-secondary hover:bg-background",
                     ].join(" ")}
                   >
                     <Icon className="h-4 w-4" />
-                    <span className="text-[10px] font-medium">{t.label}</span>
+                    <span className="text-[10px] font-medium">{tp.label}</span>
                   </button>
                 );
               })}
@@ -1419,13 +1450,13 @@ export default function CalendarioClient({
 
           {/* Description */}
           <div>
-            <label className="text-xs font-medium text-text-secondary">Descripcion *</label>
+            <label className="text-xs font-medium text-text-secondary">{t("calendar.descripcion")} *</label>
             <input
               type="text"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               onKeyDown={(e) => e.key === "Enter" && handleSave()}
-              placeholder="Describe la actividad..."
+              placeholder={t("calendar.describeLaActividad")}
               className="input mt-1.5"
               autoFocus
             />
@@ -1433,19 +1464,19 @@ export default function CalendarioClient({
 
           {/* Date */}
           <div>
-            <label className="text-xs font-medium text-text-secondary">Fecha</label>
+            <label className="text-xs font-medium text-text-secondary">{t("calendar.fecha")}</label>
             <input type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} className="input mt-1.5" />
           </div>
 
-          {/* Hora inicio / fin / duración */}
+          {/* Hora inicio / fin / duraciÃ³n */}
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-text-secondary">Hora inicio</label>
+                <label className="text-xs font-medium text-text-secondary">{t("calendar.horaInicio")}</label>
                 <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="input mt-1.5" />
               </div>
               <div>
-                <label className="text-xs font-medium text-text-secondary">Hora fin</label>
+                <label className="text-xs font-medium text-text-secondary">{t("calendar.horaFin")}</label>
                 <input type="time" value={form.time_end} onChange={(e) => setForm({ ...form, time_end: e.target.value })} className="input mt-1.5" />
               </div>
             </div>
@@ -1455,7 +1486,7 @@ export default function CalendarioClient({
               return (
                 <p className="flex items-center gap-1 text-xs text-text-secondary">
                   <Clock className="h-3 w-3" />
-                  Duración: <span className="font-medium text-text-primary">{formatDuration(dur)}</span>
+                  DuraciÃ³n: <span className="font-medium text-text-primary">{formatDuration(dur)}</span>
                 </p>
               );
             })()}
@@ -1463,7 +1494,7 @@ export default function CalendarioClient({
 
           {/* Recordatorio */}
           <div>
-            <label className="text-xs font-medium text-text-secondary">Recordatorio</label>
+            <label className="text-xs font-medium text-text-secondary">{t("calendar.recordatorio")}</label>
             <select
               value={form.reminderMinutes == null ? "" : String(form.reminderMinutes)}
               onChange={(e) => setForm({ ...form, reminderMinutes: e.target.value === "" ? null : Number(e.target.value) })}
@@ -1477,13 +1508,13 @@ export default function CalendarioClient({
               ))}
             </select>
             {!form.time.trim() && (
-              <p className="mt-1 text-[10px] text-text-secondary">Introduce una hora de inicio para activar el recordatorio.</p>
+              <p className="mt-1 text-[10px] text-text-secondary">{t("calendar.duracionHint")}</p>
             )}
           </div>
 
           {/* Priority */}
           <div>
-            <label className="text-xs font-medium text-text-secondary">Prioridad</label>
+            <label className="text-xs font-medium text-text-secondary">{t("calendar.prioridad")}</label>
             <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
               {PRIORITIES.map((p, i) => (
                 <button
@@ -1504,7 +1535,7 @@ export default function CalendarioClient({
 
           {/* Assigned users */}
           <div>
-            <label className="text-xs font-medium text-text-secondary">Usuarios asignados *</label>
+            <label className="text-xs font-medium text-text-secondary">{t("calendar.usuariosAsignados")} *</label>
             <div className="mt-1.5 max-h-32 space-y-1 overflow-y-auto rounded-xl border border-border bg-background p-2">
               {[
                 { id: currentUserId, name: usersMap[currentUserId] ?? "Yo" },
@@ -1527,17 +1558,17 @@ export default function CalendarioClient({
           {editId !== null && (
             <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background p-3">
               <input type="checkbox" checked={form.completed} onChange={(e) => setForm({ ...form, completed: e.target.checked })} className="h-4 w-4 accent-primary" />
-              <span className="text-sm text-text-secondary">Marcar como completada</span>
+              <span className="text-sm text-text-secondary">{t("calendar.marcarCompletada")}</span>
             </label>
           )}
 
           {/* Notes / result */}
           <div>
-            <label className="text-xs font-medium text-text-secondary">Notas / resultado</label>
+            <label className="text-xs font-medium text-text-secondary">{t("calendar.notasResultado")}</label>
             <textarea
               value={form.result}
               onChange={(e) => setForm({ ...form, result: e.target.value })}
-              placeholder="Observaciones, resultado de la actividad..."
+              placeholder={t("calendar.observaciones")}
               rows={3}
               className="input mt-1.5 resize-none"
             />
@@ -1548,8 +1579,8 @@ export default function CalendarioClient({
             <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background p-3">
               <input type="checkbox" checked={form.syncToGcal} onChange={(e) => setForm({ ...form, syncToGcal: e.target.checked })} className="h-4 w-4 accent-primary" />
               <div>
-                <p className="text-sm font-medium text-text-primary">Sincronizar con Google Calendar</p>
-                <p className="text-xs text-text-secondary">Se creara un evento en tu calendario de Google</p>
+                <p className="text-sm font-medium text-text-primary">{t("calendar.sincronizarGcal")}</p>
+                <p className="text-xs text-text-secondary">{t("calendar.sincronizarGcalDesc")}</p>
               </div>
             </label>
           )}
@@ -1560,12 +1591,12 @@ export default function CalendarioClient({
         </div>
       </Drawer>
 
-      {/* ── Detail Drawer ── */}
+      {/* â”€â”€ Detail Drawer â”€â”€ */}
       <Drawer
         open={detailEvent !== null}
         onClose={() => setDetailEvent(null)}
         title={detailEvent?.description ?? ""}
-        subtitle="Actividad de calendario"
+        subtitle={t("calendar.actividadDeCalendario")}
         width="md"
         headerActions={
           <div className="flex items-center gap-1">
@@ -1579,8 +1610,8 @@ export default function CalendarioClient({
                   setDetailEvent(null);
                 }}
                 className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-success/10 hover:text-success"
-                aria-label="Marcar como completada"
-                title="Marcar como completada"
+                aria-label={t("calendar.marcarCompletada")}
+                title={t("calendar.marcarCompletada")}
               >
                 <CheckCircle2 className="h-4 w-4" />
               </button>
@@ -1594,7 +1625,7 @@ export default function CalendarioClient({
                 setTimeout(() => openEdit(ev), 150);
               }}
               className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
-              aria-label="Editar"
+              aria-label={t("common.edit")}
             >
               <Pencil className="h-4 w-4" />
             </button>
@@ -1606,7 +1637,7 @@ export default function CalendarioClient({
                   setConfirmDeleteEvent(detailEvent);
                 }}
                 className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
-                aria-label="Eliminar"
+                aria-label={t("common.delete")}
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -1618,13 +1649,13 @@ export default function CalendarioClient({
           <div className="space-y-5 px-5 py-5">
             <div className="flex flex-wrap items-center gap-2">
               {(() => {
-                const t = tipoMeta(detailEvent.tipo);
+                const tp = tipoMeta(detailEvent.tipo);
                 const p = priorityMeta(detailEvent.priority);
                 return (
                   <>
-                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${t.bg} ${t.text}`}>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${tp.bg} ${tp.text}`}>
                       <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                      {t.label}
+                      {tipoLabel(detailEvent.tipo)}
                     </span>
                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${p.badge}`}>
                       {p.label}
@@ -1636,7 +1667,7 @@ export default function CalendarioClient({
                       </span>
                     )}
                     {detailEvent.gcal_event_id && (
-                      <span className="rounded-full bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-400">GCal</span>
+                      <span className="rounded-full bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-400">{t("calendar.gcal")}</span>
                     )}
                   </>
                 );
@@ -1657,7 +1688,7 @@ export default function CalendarioClient({
                   <Clock className="h-4 w-4 shrink-0" />
                   <span>
                     {normalizeTime(detailEvent.time, "")}
-                    {detailEvent.time_end && ` – ${normalizeTime(detailEvent.time_end, "")}`}
+                    {detailEvent.time_end && ` â€“ ${normalizeTime(detailEvent.time_end, "")}`}
                     {(() => {
                       const d = calcDurationMinutes(detailEvent.time, detailEvent.time_end);
                       return d ? <span className="ml-1 rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium">{formatDuration(d)}</span> : null;
@@ -1678,7 +1709,7 @@ export default function CalendarioClient({
               if (ids.length === 0) return null;
               return (
                 <div className="space-y-1.5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Asignado a</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{t("calendar.asignadoA")}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {ids.map((uid) => (
                       <span key={uid} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
@@ -1693,7 +1724,7 @@ export default function CalendarioClient({
 
             {detailEvent.completed && detailEvent.result && (
               <div className="rounded-xl bg-success/8 px-4 py-3">
-                <p className="text-xs font-semibold text-success">Resultado</p>
+                <p className="text-xs font-semibold text-success">{t("calendar.resultado")}</p>
                 <p className="mt-1 text-sm text-text-primary">{detailEvent.result}</p>
               </div>
             )}
@@ -1705,23 +1736,23 @@ export default function CalendarioClient({
             />
 
             <div className="rounded-xl bg-surface-raised px-4 py-3 text-xs text-text-secondary">
-              <p>Actividad de calendario · ID: {detailEvent.id}</p>
+              <p>Actividad de calendario Â· ID: {detailEvent.id}</p>
             </div>
           </div>
         )}
       </Drawer>
 
-      {/* ── Detail Delete Confirmation ── */}
+      {/* â”€â”€ Detail Delete Confirmation â”€â”€ */}
       {confirmDeleteEvent !== null && (
         <ConfirmDialog
           open
-          title="Eliminar actividad"
+          title={t("calendar.eliminarActividad")}
           description={
             confirmDeleteEvent.gcal_event_id && isConnected
-              ? "Se eliminara tambien de Google Calendar. Esta accion no se puede deshacer."
-              : "Esta accion no se puede deshacer."
+              ? t("calendar.seEliminaGcal")
+              : t("calendar.irrecuperable")
           }
-          confirmLabel="Eliminar"
+          confirmLabel={t("common.delete")}
           pending={deleting}
           onCancel={() => {
             setConfirmDeleteEvent(null);
@@ -1737,17 +1768,17 @@ export default function CalendarioClient({
         />
       )}
 
-      {/* ── Delete Confirmation (legacy) ── */}
+      {/* â”€â”€ Delete Confirmation (legacy) â”€â”€ */}
       {deleteId !== null && (
         <ConfirmDialog
           open={deleteId !== null}
-          title="Eliminar actividad"
+          title={t("calendar.eliminarActividad")}
           description={
             deleteTarget?.gcal_event_id && isConnected
-              ? "Se eliminara tambien de Google Calendar. Esta accion no se puede deshacer."
-              : "Esta accion no se puede deshacer."
+              ? t("calendar.seEliminaGcal")
+              : t("calendar.irrecuperable")
           }
-          confirmLabel="Eliminar"
+          confirmLabel={t("common.delete")}
           pending={deleting}
           onCancel={() => setDeleteId(null)}
           onConfirm={handleDelete}
@@ -1758,3 +1789,6 @@ export default function CalendarioClient({
     </>
   );
 }
+
+
+

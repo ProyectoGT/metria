@@ -12,10 +12,12 @@ import {
 import {
   defaultLocale,
   detectBrowserLocale,
+  localeCookieName,
   localeLabels,
   localeStorageKey,
   localeToHtmlLang,
   normalizeLocale,
+  readLocaleCookie,
   type Locale,
 } from "./config";
 import { dictionaries, flattenMessages } from "./dictionaries";
@@ -45,19 +47,27 @@ function interpolate(template: string, params?: Params) {
   });
 }
 
+function persistLocale(locale: Locale) {
+  window.localStorage.setItem(localeStorageKey, locale);
+  document.cookie = `${localeCookieName}=${locale};path=/;max-age=${60 * 60 * 24 * 365};samesite=lax`;
+}
+
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(defaultLocale);
 
+  // On mount: read cookie first (SSR-consistent), then localStorage, then browser
   useEffect(() => {
     const id = window.setTimeout(() => {
-      const stored = window.localStorage.getItem(localeStorageKey);
-      setLocaleState(stored ? normalizeLocale(stored) : detectBrowserLocale());
+      const fromCookie = readLocaleCookie();
+      const fromStorage = window.localStorage.getItem(localeStorageKey);
+      const resolved = fromCookie ?? (fromStorage ? normalizeLocale(fromStorage) : detectBrowserLocale());
+      setLocaleState(resolved);
     }, 0);
     return () => window.clearTimeout(id);
   }, []);
 
   const setLocale = useCallback((nextLocale: Locale) => {
-    window.localStorage.setItem(localeStorageKey, nextLocale);
+    persistLocale(nextLocale);
     setLocaleState(nextLocale);
     window.dispatchEvent(new CustomEvent("metria:language-change", { detail: nextLocale }));
   }, []);

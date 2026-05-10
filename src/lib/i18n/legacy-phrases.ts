@@ -149,4 +149,5 @@ export const legacyPhrases: Record<Locale, PhraseMap> = {
   es: {},
   en,
   it: {},
+  ca: {},
 };

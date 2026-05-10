@@ -1,8 +1,0 @@
-{
-  "required": "This field is required",
-  "invalidEmail": "Invalid email",
-  "passwordRequired": "Password is required",
-  "invalidDateFormat": "Invalid date format",
-  "invalidTimeFormat": "Invalid time format",
-  "invalidEndTimeFormat": "Invalid end time format"
-}
