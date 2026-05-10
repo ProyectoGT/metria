@@ -15,6 +15,12 @@ const priorityBadge: Record<KanbanPriority, { cls: string; label: string; dot: s
   baja:  { cls: PRIORITY_TONE.baja.badge,  label: PRIORITY_LABEL.baja,  dot: PRIORITY_TONE.baja.dot },
 };
 
+const priorityText: Record<KanbanPriority, string> = {
+  alta: "text-danger",
+  media: "text-warning",
+  baja: "text-text-secondary",
+};
+
 function formatDate(iso: string) {
   const datePart = iso.split("T")[0];
   const [y, m, d] = datePart.split("-");
@@ -113,12 +119,12 @@ function KanbanCard({
       tabIndex={isInteractive ? 0 : undefined}
       aria-label={isInteractive ? card.title : undefined}
       className={[
-        "pressable group relative rounded-ds-lg border bg-surface p-4 pb-3 shadow-layer-1",
+        "pressable group relative rounded-ds-lg border bg-surface px-4 py-3.5 shadow-layer-1",
         "select-none",
         isInteractive ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background" : "",
         isCompleted
           ? "border-border bg-muted opacity-60"
-          : "border-border hover:border-primary/20",
+          : "border-border/80 hover:border-primary/25 hover:bg-surface-elevated",
         isDragging ? "z-50 drag-feedback" : "",
       ].join(" ")}
       style={isDragging ? { pointerEvents: "none" } : undefined}
@@ -126,15 +132,14 @@ function KanbanCard({
       layoutId={card.id}
     >
       {/* ── Cabecera: badges + acciones ────────────────────────────── */}
-      <div className="mb-2.5 flex items-center justify-between gap-2">
-        {/* Badges de estado */}
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.cls} ${isCompleted ? "opacity-40" : ""}`}>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${priorityText[card.priority]} ${isCompleted ? "opacity-40" : ""}`}>
             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${badge.dot}`} />
             {badge.label}
           </span>
           {card.fromOrdenDia && !isCompleted && (
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+            <span className="inline-flex items-center text-[11px] font-medium text-primary">
               Hoy
             </span>
           )}
@@ -158,7 +163,7 @@ function KanbanCard({
 
       {/* ── Título ────────────────────────────────────────────────── */}
       <p className={[
-        "text-sm font-medium leading-snug transition-all duration-300",
+        "text-[15px] font-semibold leading-snug transition-all duration-300",
         isCompleted ? "line-through text-text-secondary" : "text-text-primary",
       ].join(" ")}>
         {card.title}
@@ -166,21 +171,21 @@ function KanbanCard({
 
       {/* ── Descripción ──────────────────────────────────────────── */}
       {card.description && !isCompleted && (
-        <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-text-secondary">
+        <p className="mt-1.5 line-clamp-1 text-xs leading-relaxed text-text-secondary">
           {card.description}
         </p>
       )}
 
       {/* ── Resultado al completar ────────────────────────────────── */}
       {isCompleted && card.resultado && (
-        <p className="mt-2.5 rounded-xl bg-success/8 px-2.5 py-2 text-xs leading-relaxed text-success">
+        <p className="mt-2.5 rounded-ds-md bg-success/8 px-2.5 py-2 text-xs leading-relaxed text-success">
           ✓ {card.resultado}
         </p>
       )}
 
       {/* ── Footer: fecha + duración + recordatorio + asignados ─────── */}
       {!isCompleted && (card.dueDate || card.assignedUsers?.length || card.assignedBy || card.reminderMinutesBefore != null) && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-2.5">
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-ds-md bg-surface-raised/45 px-3 py-2">
           {card.dueDate && (() => {
             const status = getDateStatus(card.dueDate);
             const style  = DATE_STYLES[status];
@@ -216,7 +221,7 @@ function KanbanCard({
             </span>
           )}
           {(card.assignedUsers?.length || card.assignedBy) && (
-            <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+            <span className="flex items-center gap-1 text-[11px] font-medium text-text-secondary">
               <User className="h-3 w-3" />
               {card.assignedUsers?.length
                 ? card.assignedUsers.slice(0, 2).join(", ") + (card.assignedUsers.length > 2 ? ` +${card.assignedUsers.length - 2}` : "")

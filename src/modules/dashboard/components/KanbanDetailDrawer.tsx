@@ -9,10 +9,10 @@ import Drawer from "@/components/ui/drawer";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import { AuditTimelineCard } from "@/components/audit/audit-timeline";
 
-const priorityMeta: Record<KanbanPriority, { label: string; cls: string }> = {
-  alta:  { label: "Alta",  cls: "bg-danger/10 text-danger" },
-  media: { label: "Media", cls: "bg-accent/15 text-amber-700 dark:text-amber-300" },
-  baja:  { label: "Baja",  cls: "bg-muted text-text-secondary" },
+const priorityMeta: Record<KanbanPriority, { label: string; dot: string; text: string }> = {
+  alta:  { label: "Alta",  dot: "bg-danger", text: "text-danger" },
+  media: { label: "Media", dot: "bg-amber-400", text: "text-amber-700 dark:text-amber-300" },
+  baja:  { label: "Baja",  dot: "bg-blue-400", text: "text-text-secondary" },
 };
 
 function formatDateTime(iso?: string) {
@@ -90,32 +90,35 @@ export default function KanbanDetailDrawer({
       >
         <div className="space-y-5 px-5 py-5">
           {/* Estado y prioridad */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${priorityInfo.cls}`}>
-              <span className="h-1.5 w-1.5 rounded-full bg-current" />
+          <div className="rounded-ds-lg border border-border bg-surface-elevated p-4 shadow-layer-1">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${priorityInfo.text}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${priorityInfo.dot}`} />
               {priorityInfo.label}
             </span>
             {card.isCompleted && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-success">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 Completada
               </span>
             )}
             {card.fromOrdenDia && !card.isCompleted && (
-              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+              <span className="text-xs font-semibold text-primary">
                 Orden del dia
               </span>
             )}
             {isAgenda && card.tipo && (
-              <span className="rounded-full bg-surface-raised px-2.5 py-1 text-xs font-medium text-text-secondary">
+              <span className="text-xs font-medium text-text-secondary">
                 {tipoLabel(card.tipo) ?? card.tipo}
               </span>
             )}
+            </div>
           </div>
 
           {/* Fecha y hora */}
           {card.dueDate && (
-            <div className="space-y-1.5">
+            <div className="space-y-2 rounded-ds-lg border border-border bg-surface p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Planificacion</p>
               <div className="flex items-center gap-2 text-sm text-text-secondary">
                 {(() => {
                   const today = new Date();
@@ -160,12 +163,12 @@ export default function KanbanDetailDrawer({
 
           {/* Usuarios asignados */}
           {(card.assignedUsers?.length || card.assignedUserIds?.length) && (
-            <div className="space-y-1.5">
+            <div className="space-y-2 rounded-ds-lg border border-border bg-surface p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Asignado a</p>
               <div className="flex flex-wrap gap-1.5">
                 {card.assignedUsers?.length ? (
                   card.assignedUsers.map((name, i) => (
-                    <span key={i} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                    <span key={i} className="inline-flex items-center gap-1 rounded-md bg-surface-raised px-2.5 py-1 text-xs font-medium text-text-primary">
                       <User className="h-3 w-3" />
                       {name}
                     </span>
@@ -181,7 +184,7 @@ export default function KanbanDetailDrawer({
 
           {/* Resultado si completada */}
           {card.isCompleted && card.resultado && (
-            <div className="rounded-xl bg-success/8 px-4 py-3">
+            <div className="rounded-ds-lg border border-success/20 bg-success/8 px-4 py-3">
               <p className="text-xs font-semibold text-success">Resultado</p>
               <p className="mt-1 text-sm text-text-primary">{card.resultado}</p>
             </div>
@@ -189,7 +192,7 @@ export default function KanbanDetailDrawer({
 
           {/* Google Calendar link */}
           {card.gcalEventId && (
-            <div className="rounded-xl bg-blue-500/8 px-4 py-3">
+            <div className="rounded-ds-lg border border-blue-500/15 bg-blue-500/8 px-4 py-3">
               <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">Sincronizado con Google Calendar</p>
             </div>
           )}
@@ -202,7 +205,7 @@ export default function KanbanDetailDrawer({
           />
 
           {/* Metadata */}
-          <div className="rounded-xl bg-surface-raised px-4 py-3 text-xs text-text-secondary">
+          <div className="rounded-ds-lg bg-surface-raised px-4 py-3 text-xs text-text-secondary">
             <p>
               {isAgenda ? "Actividad de calendario" : "Tarea pendiente"} · ID: {card.dbId}
             </p>

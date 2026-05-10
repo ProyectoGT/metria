@@ -42,9 +42,9 @@ type Props = {
 };
 
 const PRIORIDADES = [
-  { value: "alta", label: "Alta", badge: "bg-red-500/15 text-red-700 dark:text-red-400", border: "border-l-red-500" },
-  { value: "media", label: "Media", badge: "bg-amber-500/15 text-amber-700 dark:text-amber-400", border: "border-l-amber-400" },
-  { value: "baja", label: "Baja", badge: "bg-blue-500/15 text-blue-700 dark:text-blue-400", border: "border-l-blue-400" },
+  { value: "alta", label: "Alta", badge: "bg-red-500/15 text-red-700 dark:text-red-400", border: "border-l-red-500", dot: "bg-red-500", text: "text-red-700 dark:text-red-400" },
+  { value: "media", label: "Media", badge: "bg-amber-500/15 text-amber-700 dark:text-amber-400", border: "border-l-amber-400", dot: "bg-amber-400", text: "text-amber-700 dark:text-amber-400" },
+  { value: "baja", label: "Baja", badge: "bg-blue-500/15 text-blue-700 dark:text-blue-400", border: "border-l-blue-400", dot: "bg-blue-400", text: "text-text-secondary" },
 ];
 
 const TIPOS_ACTIVIDAD: Array<{ value: ActivityType; label: string }> = [
@@ -296,14 +296,14 @@ export default function OrdenesClient({
     <div className="flex h-full flex-col gap-5">
       <Toaster toasts={toasts} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-ds-lg border border-border bg-surface px-4 py-3 shadow-layer-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5 text-sm">
             <Clock className="h-3.5 w-3.5 text-primary" />
-            <span className="text-xs font-semibold text-primary">{stats.completed}/{stats.total}</span>
-            <span className="text-xs text-text-secondary">hoy</span>
+            <span className="font-semibold text-text-primary">{stats.completed}/{stats.total}</span>
+            <span className="text-text-secondary">completadas hoy</span>
           </div>
-          <div className="rounded-xl border border-border bg-surface px-3 py-2 text-xs text-text-secondary shadow-sm">
+          <div className="text-sm text-text-secondary">
             {stats.pending} pendientes
           </div>
         </div>
@@ -333,25 +333,29 @@ export default function OrdenesClient({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-border bg-surface shadow-sm">
+      <div className="overflow-hidden rounded-ds-lg border border-border bg-surface shadow-layer-1">
         {filteredActividades.length === 0 ? (
-          <div className="flex flex-col items-center py-12 text-center">
-            <Clock className="mb-3 h-10 w-10 text-text-secondary/40" />
+          <div className="flex flex-col items-center px-6 py-14 text-center">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-raised text-text-secondary">
+              <Clock className="h-5 w-5" />
+            </div>
             <p className="text-sm font-medium text-text-primary">Sin actividades para hoy</p>
-            <button onClick={openCreate} className="mt-3 text-xs font-medium text-primary hover:underline" aria-label="Añadir actividad">
-              + Anadir actividad
+            <p className="mt-1 max-w-sm text-sm text-text-secondary">Crea una actividad para organizar el trabajo del dia sin saturar la vista principal.</p>
+            <button onClick={openCreate} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark" aria-label="Añadir actividad">
+              <Plus className="h-4 w-4" />
+              Anadir actividad
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-border/70">
             {filteredActividades.map((actividad) => {
               const meta = priorityMeta(actividad.priority);
               const ids = assignedIds(actividad);
               return (
-                <div key={actividad.id} className="p-2">
+                <div key={actividad.id} className="px-2 py-1.5">
                   <div
                     onClick={() => setDetailActividad(actividad)}
-                    className={`group flex cursor-pointer items-start gap-3 rounded-xl border border-l-4 bg-surface px-4 py-3 transition-all hover:bg-background hover:shadow-sm ${meta.border} border-border`}
+                    className={`group flex cursor-pointer items-start gap-3 rounded-ds-lg border-l-2 bg-surface px-4 py-3 transition-all hover:bg-surface-elevated hover:shadow-layer-1 ${meta.border}`}
                   >
                     <button
                       onClick={(e) => {
@@ -375,7 +379,7 @@ export default function OrdenesClient({
                       <p className={`break-words text-sm font-medium leading-snug ${actividad.completed ? "line-through text-text-secondary" : "text-text-primary"}`}>
                         {actividad.description}
                       </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-text-secondary">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
                         <span>
                           {normalizeTime(actividad.time, DEFAULT_ACTIVITY_TIME)}
                           {actividad.time_end ? ` – ${actividad.time_end}` : ""}
@@ -394,7 +398,8 @@ export default function OrdenesClient({
                         <p className="mt-1 text-xs italic text-text-secondary line-clamp-1">{actividad.result}</p>
                       )}
                     </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${meta.badge}`}>
+                    <span className={`mt-0.5 inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold ${meta.text}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
                       {meta.label}
                     </span>
                   </div>
@@ -580,23 +585,26 @@ export default function OrdenesClient({
       >
         {detailActividad && (
           <div className="space-y-5 px-5 py-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${priorityMeta(detailActividad.priority).badge}`}>
-                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+            <div className="rounded-ds-lg border border-border bg-surface-elevated p-4 shadow-layer-1">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${priorityMeta(detailActividad.priority).text}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${priorityMeta(detailActividad.priority).dot}`} />
                 {priorityMeta(detailActividad.priority).label}
               </span>
               {detailActividad.completed && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-success">
                   <CheckCircle2 className="complete-pop h-3.5 w-3.5" />
                   Completada
                 </span>
               )}
-              <span className="rounded-full bg-surface-raised px-2.5 py-1 text-xs font-medium text-text-secondary">
+              <span className="text-xs font-medium text-text-secondary">
                 {tipoLabel(detailActividad.tipo)}
               </span>
+              </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-2 rounded-ds-lg border border-border bg-surface p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Planificacion</p>
               <div className="flex items-center gap-2 text-sm text-text-secondary">
                 <Calendar className="h-4 w-4 shrink-0" />
                 <span>
@@ -627,11 +635,11 @@ export default function OrdenesClient({
             </div>
 
             {assignedIds(detailActividad).length > 0 && (
-              <div className="space-y-1.5">
+              <div className="space-y-2 rounded-ds-lg border border-border bg-surface p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Asignado a</p>
                 <div className="flex flex-wrap gap-1.5">
                   {assignedIds(detailActividad).map((uid) => (
-                    <span key={uid} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                    <span key={uid} className="inline-flex items-center gap-1 rounded-md bg-surface-raised px-2.5 py-1 text-xs font-medium text-text-primary">
                       <User className="h-3 w-3" />
                       {userMap.get(uid) ?? `Usuario ${uid}`}
                     </span>
@@ -641,7 +649,7 @@ export default function OrdenesClient({
             )}
 
             {detailActividad.completed && detailActividad.result && (
-              <div className="rounded-xl bg-success/8 px-4 py-3">
+              <div className="rounded-ds-lg border border-success/20 bg-success/8 px-4 py-3">
                 <p className="text-xs font-semibold text-success">Resultado</p>
                 <p className="mt-1 text-sm text-text-primary">{detailActividad.result}</p>
               </div>
@@ -653,7 +661,7 @@ export default function OrdenesClient({
               compact
             />
 
-            <div className="rounded-xl bg-surface-raised px-4 py-3 text-xs text-text-secondary">
+            <div className="rounded-ds-lg bg-surface-raised px-4 py-3 text-xs text-text-secondary">
               <p>Actividad de calendario · ID: {detailActividad.id}</p>
             </div>
           </div>

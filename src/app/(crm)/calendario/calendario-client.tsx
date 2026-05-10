@@ -111,9 +111,9 @@ const TIPOS: {
 ];
 
 const PRIORITIES = [
-  { value: "alta",  label: "Alta",  dot: "ring-2 ring-red-500",   badge: "bg-red-500/15 text-red-700 dark:text-red-400"       },
-  { value: "media", label: "Media", dot: "ring-2 ring-amber-400", badge: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
-  { value: "baja",  label: "Baja",  dot: "ring-2 ring-blue-400",  badge: "bg-blue-500/15 text-blue-700 dark:text-blue-400"    },
+  { value: "alta",  label: "Alta",  dot: "ring-2 ring-red-500",   badge: "bg-red-500/15 text-red-700 dark:text-red-400",       text: "text-red-700 dark:text-red-400" },
+  { value: "media", label: "Media", dot: "ring-2 ring-amber-400", badge: "bg-amber-500/15 text-amber-700 dark:text-amber-400", text: "text-amber-700 dark:text-amber-400" },
+  { value: "baja",  label: "Baja",  dot: "ring-2 ring-blue-400",  badge: "bg-blue-500/15 text-blue-700 dark:text-blue-400",    text: "text-text-secondary" },
 ];
 
 const MONTH_NAMES = [
@@ -842,11 +842,14 @@ export default function CalendarioClient({
     const tEvs     = tareasByDate[dateStr] ?? [];
     if (localEvs.length === 0 && gcalEvs.length === 0 && tEvs.length === 0) {
       return (
-        <div className="flex flex-col items-center py-12">
-          <Calendar className="mb-3 h-10 w-10 text-text-secondary/30" />
-          <p className="text-sm text-text-secondary">Sin actividades este dia</p>
-          <button onClick={() => openCreate(date)} className="mt-3 text-xs font-medium text-primary hover:underline">
-            + Anadir actividad
+        <div className="flex flex-col items-center px-4 py-12 text-center">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-raised text-text-secondary">
+            <Calendar className="h-5 w-5" />
+          </div>
+          <p className="text-sm font-medium text-text-primary">Sin actividades este dia</p>
+          <p className="mt-1 max-w-[240px] text-sm text-text-secondary">Este hueco queda libre para nuevas visitas, llamadas o seguimientos.</p>
+          <button onClick={() => openCreate(date)} className="mt-4 inline-flex items-center rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-primary-dark">
+            Anadir actividad
           </button>
         </div>
       );
@@ -859,7 +862,7 @@ export default function CalendarioClient({
           const hora = t.fecha.includes("T") ? new Date(t.fecha).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
           const ownerName = showOwner && t.owner_user_id && t.owner_user_id !== currentUserId ? usersMap[t.owner_user_id] : null;
           return (
-            <div key={`tarea-${t.id}`} className="group rounded-xl border border-violet-500/30 bg-violet-500/8 p-3">
+            <div key={`tarea-${t.id}`} className="group rounded-ds-lg border border-border bg-surface-elevated p-3 shadow-layer-1">
               <div className="flex items-start gap-2">
                 <button
                   onClick={() => !completada && handleCompleteTarea(t.id)}
@@ -878,8 +881,8 @@ export default function CalendarioClient({
                   </p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {hora && <span className="text-xs text-text-secondary">{hora}</span>}
-                    <span className="rounded-full bg-violet-500/15 px-1.5 py-px text-[10px] font-medium text-violet-700 dark:text-violet-400">Tarea</span>
-                    {p && <span className={`rounded-full px-1.5 py-px text-[10px] font-medium ${p.badge}`}>{p.label}</span>}
+                    <span className="text-[10px] font-medium text-violet-700 dark:text-violet-400">Tarea</span>
+                    {p && <span className={`text-[10px] font-medium ${p.text}`}>{p.label}</span>}
                     {ownerName && <span className="text-[10px] text-text-secondary">{ownerName}</span>}
                   </div>
                 </div>
@@ -896,7 +899,7 @@ export default function CalendarioClient({
             <div
               key={ev.id}
               onClick={() => setDetailEvent(ev)}
-              className={`group relative cursor-pointer rounded-xl border p-3 transition-colors hover:brightness-95 ${t.bg} ${t.border}`}
+              className={`group relative cursor-pointer rounded-ds-lg border border-border bg-surface-elevated p-3 shadow-layer-1 transition-colors hover:border-primary/25 hover:bg-surface ${t.border}`}
             >
               <div className="flex items-start gap-2">
                 <button
@@ -924,16 +927,16 @@ export default function CalendarioClient({
                         {(() => { const d = calcDurationMinutes(ev.time, ev.time_end); return d ? ` (${formatDuration(d)})` : ""; })()}
                       </span>
                     )}
-                    <span className={`rounded-full px-1.5 py-px text-[10px] font-medium ${t.bg} ${t.text}`}>{t.label}</span>
-                    <span className={`rounded-full px-1.5 py-px text-[10px] font-medium ${p.badge}`}>{p.label}</span>
+                    <span className={`text-[10px] font-medium ${t.text}`}>{t.label}</span>
+                    <span className={`text-[10px] font-medium ${p.text}`}>{p.label}</span>
                     {ev.reminder_minutes_before != null && (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary">
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-primary">
                         <Bell className="h-2.5 w-2.5" />
                         {formatReminderLabel(ev.reminder_minutes_before)}
                       </span>
                     )}
-                    {ev.gcal_event_id && <span className="rounded-full bg-blue-500/15 px-1.5 py-px text-[10px] font-medium text-blue-700 dark:text-blue-400">GCal</span>}
-                    {ev.completed && <span className="rounded-full bg-success/15 px-1.5 py-px text-[10px] font-medium text-success">Completada</span>}
+                    {ev.gcal_event_id && <span className="text-[10px] font-medium text-blue-700 dark:text-blue-400">GCal</span>}
+                    {ev.completed && <span className="text-[10px] font-medium text-success">Completada</span>}
                     {ownerName && <span className="text-[10px] text-text-secondary">{ownerName}</span>}
                   </div>
                   {ev.result && <p className="mt-1.5 text-xs text-text-secondary line-clamp-2">{ev.result}</p>}
@@ -943,7 +946,7 @@ export default function CalendarioClient({
           );
         })}
         {gcalEvs.map((ev) => (
-          <div key={ev.id} className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3">
+          <div key={ev.id} className="rounded-ds-lg border border-border bg-surface-elevated p-3 shadow-layer-1">
             <div className="flex items-start gap-2">
               <div className="mt-0.5 shrink-0 rounded-md bg-blue-500/20 p-1">
                 <Calendar className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
@@ -1180,9 +1183,9 @@ export default function CalendarioClient({
 
       {/* ─── WEEK VIEW ─────────────────────────────────────────────────────────── */}
       {viewMode === "week" && (
-        <div className="rounded-2xl border border-border bg-surface shadow-sm">
+        <div className="overflow-hidden rounded-ds-lg border border-border bg-surface shadow-layer-1">
           {/* Nav */}
-          <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <div className="flex items-center justify-between border-b border-border bg-surface-elevated px-6 py-4">
             <h2 className="text-base font-semibold text-text-primary">{periodLabel}</h2>
             <div className="flex items-center gap-1.5">
               <button onClick={prevPeriod} className="rounded-lg p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary" aria-label="Semana anterior">
@@ -1199,7 +1202,7 @@ export default function CalendarioClient({
 
           {/* Week columns header */}
           <div className="overflow-x-auto">
-          <div className="grid grid-cols-7 divide-x divide-border border-b border-border min-w-[560px]">
+          <div className="grid min-w-[640px] grid-cols-7 divide-x divide-border/70 border-b border-border bg-surface">
             {weekDays.map((date, i) => {
               const dateStr    = toDateStr(date);
               const isToday    = dateStr === todayStr;
@@ -1212,7 +1215,7 @@ export default function CalendarioClient({
                 <button
                   key={i}
                   onClick={() => setSelectedDate(new Date(date))}
-                  className={`flex flex-col items-center gap-1 px-1 py-3 transition-colors hover:bg-background ${isSelected ? "bg-primary/5" : ""}`}
+                  className={`flex flex-col items-center gap-1 px-2 py-3 transition-colors hover:bg-surface-elevated ${isSelected ? "bg-primary/5" : ""}`}
                 >
                   <span className="text-xs font-medium uppercase tracking-wide text-text-secondary">
                     {WEEKDAYS_LONG[i].slice(0, 3)}
@@ -1224,7 +1227,7 @@ export default function CalendarioClient({
                     {date.getDate()}
                   </span>
                   {total > 0 && (
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                    <span className="text-[11px] font-semibold text-primary">
                       {total}
                     </span>
                   )}
@@ -1234,7 +1237,7 @@ export default function CalendarioClient({
           </div>
 
           {/* Week event rows — show all days side by side */}
-          <div className="grid grid-cols-7 divide-x divide-border min-h-[400px] min-w-[560px]">
+          <div className="grid min-h-[420px] min-w-[640px] grid-cols-7 divide-x divide-border/70">
             {weekDays.map((date, i) => {
               const dateStr   = toDateStr(date);
               const localEvs  = [...(eventsByDate[dateStr] ?? [])].sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
@@ -1247,17 +1250,17 @@ export default function CalendarioClient({
                 <div
                   key={i}
                   onClick={() => setSelectedDate(new Date(date))}
-                  className={`min-h-[400px] cursor-pointer p-2 transition-colors hover:bg-background/50 ${isSelected ? "bg-primary/5" : ""} ${isToday ? "ring-1 ring-inset ring-primary/30" : ""}`}
+                  className={`group min-h-[420px] cursor-pointer p-2.5 transition-colors hover:bg-surface-elevated/60 ${isSelected ? "bg-primary/5" : ""} ${isToday ? "ring-1 ring-inset ring-primary/25" : ""}`}
                 >
                   {/* New button on hover */}
                   <button
                     onClick={(e) => { e.stopPropagation(); openCreate(date); }}
-                    className="mb-2 hidden w-full rounded-lg border border-dashed border-border py-1 text-xs text-text-secondary transition-colors hover:border-primary hover:text-primary group-hover:flex"
+                    className="mb-2 flex w-full items-center justify-center rounded-lg border border-dashed border-border py-1 text-xs text-text-secondary opacity-0 transition-all hover:border-primary hover:text-primary group-hover:opacity-100"
                   >
                     +
                   </button>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     {tEvs.map((t) => {
                       const completada = t.estado === "completado";
                       const hora = t.fecha.includes("T") ? new Date(t.fecha).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
@@ -1265,7 +1268,7 @@ export default function CalendarioClient({
                         <div
                           key={`t-${t.id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="flex items-start gap-1 rounded-lg border border-violet-500/30 bg-violet-500/10 px-1.5 py-1"
+                          className="flex items-start gap-1.5 rounded-md border border-border bg-surface-elevated px-2 py-1.5 shadow-layer-1"
                         >
                           <button
                             onClick={() => !completada && handleCompleteTarea(t.id)}
@@ -1278,8 +1281,8 @@ export default function CalendarioClient({
                                 : <Circle className="h-3 w-3" />}
                           </button>
                           <div className="min-w-0">
-                            {hora && <p className="text-[9px] font-medium text-violet-600 dark:text-violet-400">{hora}</p>}
-                            <p className={`truncate text-[10px] font-medium leading-tight ${completada ? "line-through text-text-secondary" : "text-text-primary"}`}>
+                            {hora && <p className="text-[10px] font-semibold text-violet-600 dark:text-violet-400">{hora}</p>}
+                            <p className={`truncate text-[11px] font-medium leading-tight ${completada ? "line-through text-text-secondary" : "text-text-primary"}`}>
                               {t.titulo}
                             </p>
                           </div>
@@ -1292,11 +1295,11 @@ export default function CalendarioClient({
                         <div
                           key={ev.id}
                           onClick={(e) => { e.stopPropagation(); setDetailEvent(ev); }}
-                          className={`group flex cursor-pointer items-start gap-1 rounded-lg border px-1.5 py-1 transition-colors hover:brightness-95 ${t.bg} ${t.border}`}
+                          className={`group/event flex cursor-pointer items-start gap-1.5 rounded-md border border-border bg-surface-elevated px-2 py-1.5 shadow-layer-1 transition-colors hover:border-primary/25 hover:bg-surface ${t.border}`}
                         >
                           <button
                             onClick={(e) => { e.stopPropagation(); handleCompleteAgenda(ev.id, !ev.completed); }}
-                            className={`mt-0.5 shrink-0 ${ev.completed ? "text-green-500" : "text-text-secondary opacity-0 group-hover:opacity-100 hover:text-green-500"}`}
+                            className={`mt-0.5 shrink-0 ${ev.completed ? "text-green-500" : "text-text-secondary opacity-0 group-hover/event:opacity-100 hover:text-green-500"}`}
                           >
                             {completingAgendaIds.has(ev.id)
                               ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
@@ -1306,8 +1309,8 @@ export default function CalendarioClient({
                           </button>
                           <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${t.dot} ${ev.completed ? "opacity-0" : ""}`} />
                           <div className="min-w-0">
-                            {ev.time && <p className={`text-[9px] font-medium ${t.text}`}>{ev.time}</p>}
-                            <p className={`truncate text-[10px] font-medium leading-tight ${ev.completed ? "line-through text-text-secondary" : "text-text-primary"}`}>
+                            {ev.time && <p className={`text-[10px] font-semibold ${t.text}`}>{ev.time}</p>}
+                            <p className={`truncate text-[11px] font-medium leading-tight ${ev.completed ? "line-through text-text-secondary" : "text-text-primary"}`}>
                               {ev.description}
                             </p>
                           </div>
@@ -1315,22 +1318,22 @@ export default function CalendarioClient({
                       );
                     })}
                     {gcalEvs.map((ev) => (
-                      <div key={ev.id} className="flex items-start gap-1 rounded-lg border border-blue-500/30 bg-blue-500/10 px-1.5 py-1">
+                      <div key={ev.id} className="flex items-start gap-1.5 rounded-md border border-border bg-surface-elevated px-2 py-1.5 shadow-layer-1">
                         <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
                         <div className="min-w-0">
                           {ev.start.dateTime && (
-                            <p className="text-[9px] font-medium text-blue-600">
+                            <p className="text-[10px] font-semibold text-blue-600">
                               {new Date(ev.start.dateTime).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
                             </p>
                           )}
-                          <p className="truncate text-[10px] font-medium leading-tight text-text-primary">{ev.summary}</p>
+                          <p className="truncate text-[11px] font-medium leading-tight text-text-primary">{ev.summary}</p>
                         </div>
                       </div>
                     ))}
                     {tEvs.length === 0 && localEvs.length === 0 && gcalEvs.length === 0 && (
                       <button
                         onClick={(e) => { e.stopPropagation(); openCreate(date); }}
-                        className="flex w-full items-center justify-center rounded-lg border border-dashed border-border py-2 text-xs text-text-secondary opacity-50 transition-opacity hover:opacity-100 hover:text-primary hover:border-primary"
+                        className="flex w-full items-center justify-center rounded-md border border-dashed border-border py-3 text-xs text-text-secondary opacity-60 transition-all hover:border-primary hover:text-primary hover:opacity-100"
                         title="Nueva actividad"
                       >
                         +

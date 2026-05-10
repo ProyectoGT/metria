@@ -171,20 +171,18 @@ function IntelligenceCard({
     <button
       type="button"
       onClick={onOpen}
-      className="w-full rounded-2xl border border-border bg-surface p-4 text-left shadow-sm transition-all duration-200 hover:border-secondary/35 hover:shadow-md"
+      className="w-full rounded-ds-lg border border-transparent bg-surface-elevated p-4 text-left shadow-layer-1 transition-all duration-200 hover:border-border-strong hover:shadow-layer-2"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="mb-2 flex items-center gap-2">
+          <div className="mb-3 flex items-center gap-2">
             <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${accent}`}>
               <Icon className="h-4 w-4" />
             </span>
-            <span className="rounded-full bg-surface-raised px-2.5 py-1 text-xs font-medium text-text-secondary">
-              {count}
-            </span>
+            <span className="text-xs font-semibold text-text-secondary">{count} pendientes</span>
           </div>
-          <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
-          <p className="mt-1 text-sm text-text-secondary">{description}</p>
+          <h3 className="text-sm font-semibold leading-snug text-text-primary">{title}</h3>
+          <p className="mt-1 text-sm leading-relaxed text-text-secondary">{description}</p>
         </div>
         <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-text-secondary" />
       </div>
@@ -256,19 +254,19 @@ function DashboardMetricCard({
     <button type="button" onClick={onClick} className="h-full w-full text-left">
       <Card
         className={[
-          "h-full transition-all duration-200",
+          "h-full overflow-hidden transition-all duration-200",
           isActive
-            ? "border-primary shadow-md ring-2 ring-primary/20"
-            : "border-border hover:border-secondary/35 hover:shadow-md",
+            ? "border-primary shadow-layer-2 ring-2 ring-primary/20"
+            : "border-border/80 hover:border-primary/25 hover:bg-surface-elevated hover:shadow-layer-2",
         ].join(" ")}
         padding="md"
       >
-        <div className="flex h-full flex-col justify-between gap-4">
+        <div className="flex h-full flex-col justify-between gap-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-xs font-medium uppercase tracking-[0.14em] text-text-secondary">{card.title}</p>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${card.accent}`}>Activo</span>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-secondary">{card.title}</p>
+                {isActive && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
               </div>
               <p className="mt-3 text-3xl font-semibold tracking-tight text-text-primary">{card.value}</p>
             </div>
@@ -276,12 +274,10 @@ function DashboardMetricCard({
               <card.icon className="h-5 w-5" />
             </span>
           </div>
-          <div className="rounded-2xl border border-border bg-surface-raised/35 px-3 py-3">
-            <p className="text-sm text-text-secondary">{card.subtitle}</p>
-          </div>
+          <p className="min-h-[40px] text-sm leading-relaxed text-text-secondary">{card.subtitle}</p>
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-medium text-text-secondary">
-              {isActive ? "Filtro activo — pulsa para quitar" : "Pulsa para filtrar"}
+              {isActive ? "Filtro activo - pulsa para quitar" : "Pulsa para filtrar"}
             </span>
             <span className={`inline-flex shrink-0 items-center gap-1 text-xs font-medium ${isActive ? "text-primary" : "text-text-secondary"}`}>
               {isActive ? "Activo" : "Filtrar"}

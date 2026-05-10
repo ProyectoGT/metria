@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
+
+export const dynamic = "force-dynamic";
 import { getCurrentUserContext } from "@/lib/current-user";
 import PageHeader from "@/components/layout/page-header";
 import PedidosClient from "./solicitudes-client";
