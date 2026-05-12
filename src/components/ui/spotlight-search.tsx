@@ -79,7 +79,8 @@ export default function SpotlightSearch({ open, onOpenChange }: SpotlightSearchP
       setQuery("");
       setResults([]);
       setSelectedIndex(-1);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      const id = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(id);
     }
   }, [open]);
 

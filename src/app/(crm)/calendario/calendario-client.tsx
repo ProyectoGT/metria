@@ -822,7 +822,7 @@ export default function CalendarioClient({
 
   // â”€â”€ Render helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  function DayEventDots({ dateStr }: { dateStr: string }) {
+  function renderDayEventDots(dateStr: string) {
     const localEvs = eventsByDate[dateStr] ?? [];
     const gcalEvs  = gcalByDate[dateStr]   ?? [];
     const tareaEvs = tareasByDate[dateStr]  ?? [];
@@ -867,7 +867,7 @@ export default function CalendarioClient({
     );
   }
 
-  function DayActivitiesList({ dateStr, date }: { dateStr: string; date: Date }) {
+  function renderDayActivitiesList(dateStr: string, date: Date) {
     const localEvs = [...(eventsByDate[dateStr] ?? [])].sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
     const gcalEvs  = gcalByDate[dateStr]   ?? [];
     const tEvs     = tareasByDate[dateStr] ?? [];
@@ -1161,7 +1161,7 @@ export default function CalendarioClient({
                     ].join(" ")}>
                       {date.getDate()}
                     </span>
-                    <DayEventDots dateStr={dateStr} />
+                    {renderDayEventDots(dateStr)}
                   </button>
                 );
               })}
@@ -1206,7 +1206,7 @@ export default function CalendarioClient({
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
-              <DayActivitiesList dateStr={selectedDateStr} date={selectedDate} />
+              {renderDayActivitiesList(selectedDateStr, selectedDate)}
             </div>
           </div>
         </div>
@@ -1392,7 +1392,7 @@ export default function CalendarioClient({
               </button>
             </div>
             <div className="px-5 pb-5">
-              <DayActivitiesList dateStr={selectedDateStr} date={selectedDate} />
+              {renderDayActivitiesList(selectedDateStr, selectedDate)}
             </div>
           </div>
         </div>

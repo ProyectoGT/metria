@@ -182,10 +182,10 @@ function ScientificCalc() {
       return;
     }
     if (btn === ".") {
-      if (!display.includes(".")) setDisplay(display + ".");
+      setDisplay((prev) => prev.includes(".") ? prev : prev + ".");
       return;
     }
-    setDisplay(display === "0" ? btn : display + btn);
+    setDisplay((prev) => prev === "0" ? btn : prev + btn);
   }
 
   function btnClass(btn: string) {
