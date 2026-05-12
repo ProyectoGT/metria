@@ -1,18 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Calculator,
   Handshake,
   Landmark,
   Receipt,
   TrendingUp,
+  ArrowLeft,
   ChevronRight,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = "cientifica" | "comision" | "hipoteca" | "plusvalia" | "rentabilidad";
+type CalculatorId = "comision" | "hipoteca" | "plusvalia" | "rentabilidad" | "cientifica";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -33,7 +35,7 @@ function fmtEur(n: number): string {
   });
 }
 
-// ─── Result components ────────────────────────────────────────────────────────
+// ─── Shared UI ────────────────────────────────────────────────────────────────
 
 function ResultRow({
   label,
@@ -182,10 +184,10 @@ function ScientificCalc() {
       return;
     }
     if (btn === ".") {
-      setDisplay((prev) => prev.includes(".") ? prev : prev + ".");
+      setDisplay((prev) => (prev.includes(".") ? prev : prev + "."));
       return;
     }
-    setDisplay((prev) => prev === "0" ? btn : prev + btn);
+    setDisplay((prev) => (prev === "0" ? btn : prev + btn));
   }
 
   function btnClass(btn: string) {
@@ -204,7 +206,6 @@ function ScientificCalc() {
 
   return (
     <div className="mx-auto w-full max-w-sm">
-      {/* Display */}
       <div className="mb-4 overflow-hidden rounded-2xl border border-border bg-background">
         <div className="px-5 pb-4 pt-3">
           <p className="h-5 truncate text-right text-xs text-text-secondary">{expr || " "}</p>
@@ -219,7 +220,6 @@ function ScientificCalc() {
         </div>
       </div>
 
-      {/* Buttons */}
       <div className="space-y-1.5">
         {BUTTONS.map((row, ri) => (
           <div
@@ -257,35 +257,27 @@ function ComisionCalc() {
 
   const porcentajeValido = !isNaN(p) && p >= 0 && p < 1;
 
-  // ── Base → Final ──────────────────────────────────────────────────────────
-  // Precio sin IVA sobre comisión
   const finalSinIvaCalc = !porcentajeValido || isNaN(base) ? null : base / (1 - p);
   const comEuros = finalSinIvaCalc !== null ? finalSinIvaCalc - base : null;
   const ivaComision = incluirIva && comEuros !== null ? comEuros * IVA : null;
   const finalCalc = finalSinIvaCalc !== null ? finalSinIvaCalc + (ivaComision ?? 0) : null;
   const baseVerif = finalSinIvaCalc !== null ? finalSinIvaCalc * (1 - p) : null;
 
-  // ── Final → Base ──────────────────────────────────────────────────────────
-  // Si hay IVA activado, el precio introducido es el total con IVA incluido
   const factorIva = porcentajeValido && incluirIva ? 1 + p * IVA : 1;
   const finalSinIvaFromFinal =
     !porcentajeValido || isNaN(totalFinal) ? null : totalFinal / factorIva;
-
   const baseFromFinal =
     finalSinIvaFromFinal !== null ? finalSinIvaFromFinal * (1 - p) : null;
-
   const comFromFinal =
     finalSinIvaFromFinal !== null && baseFromFinal !== null
       ? finalSinIvaFromFinal - baseFromFinal
       : null;
-
   const ivaFromFinal =
     incluirIva && comFromFinal !== null ? comFromFinal * IVA : null;
 
   const labelPrecioComprador = incluirIva
     ? "Precio al comprador (IVA incl.)"
     : "Precio al comprador";
-
   const labelComision = incluirIva
     ? `Comisión (${pct}% s/final sin IVA)`
     : `Comisión (${pct}% s/final)`;
@@ -295,9 +287,7 @@ function ComisionCalc() {
       <InfoBox>
         La comisión se calcula <strong className="text-text-primary">sobre el precio final</strong>.
         {incluirIva && (
-          <>
-            {" "}Si activas el IVA, se suma el <strong className="text-text-primary">21%</strong> solo sobre la comisión.
-          </>
+          <> Si activas el IVA, se suma el <strong className="text-text-primary">21%</strong> solo sobre la comisión.</>
         )}
         <span className="mt-2 block font-mono text-xs text-text-primary">
           {incluirIva
@@ -306,16 +296,13 @@ function ComisionCalc() {
         </span>
       </InfoBox>
 
-      {/* Modo */}
       <div>
         <SectionLabel>Modo de cálculo</SectionLabel>
         <div className="mt-2 flex overflow-hidden rounded-xl border border-border">
           <button
             onClick={() => setModo("base_a_final")}
             className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
-              modo === "base_a_final"
-                ? "bg-primary text-white"
-                : "bg-surface text-text-secondary hover:bg-background"
+              modo === "base_a_final" ? "bg-primary text-white" : "bg-surface text-text-secondary hover:bg-background"
             }`}
           >
             Base → Precio final
@@ -323,9 +310,7 @@ function ComisionCalc() {
           <button
             onClick={() => setModo("final_a_base")}
             className={`flex-1 border-l border-border py-2.5 text-sm font-medium transition-colors ${
-              modo === "final_a_base"
-                ? "bg-primary text-white"
-                : "bg-surface text-text-secondary hover:bg-background"
+              modo === "final_a_base" ? "bg-primary text-white" : "bg-surface text-text-secondary hover:bg-background"
             }`}
           >
             Final → Neto vendedor
@@ -333,7 +318,6 @@ function ComisionCalc() {
         </div>
       </div>
 
-      {/* % comisión */}
       <div>
         <SectionLabel>Comisión (%)</SectionLabel>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -342,9 +326,7 @@ function ComisionCalc() {
               key={v}
               onClick={() => setPct(v)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                pct === v
-                  ? "bg-primary text-white"
-                  : "border border-border bg-surface text-text-secondary hover:bg-background"
+                pct === v ? "bg-primary text-white" : "border border-border bg-surface text-text-secondary hover:bg-background"
               }`}
             >
               {v}%
@@ -362,23 +344,18 @@ function ComisionCalc() {
         </div>
       </div>
 
-      {/* Toggle IVA */}
       <div>
         <SectionLabel>IVA sobre la comisión</SectionLabel>
         <div className="mt-2 flex items-center gap-2">
           <button
             onClick={() => setIncluirIva((v) => !v)}
             className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              incluirIva
-                ? "bg-primary text-white"
-                : "border border-border bg-surface text-text-secondary hover:bg-background"
+              incluirIva ? "bg-primary text-white" : "border border-border bg-surface text-text-secondary hover:bg-background"
             }`}
           >
             {incluirIva ? "IVA 21% activado" : "Añadir IVA 21%"}
           </button>
-          <span className="text-xs text-text-secondary">
-            Se aplica solo sobre la comisión
-          </span>
+          <span className="text-xs text-text-secondary">Se aplica solo sobre la comisión</span>
         </div>
       </div>
 
@@ -403,22 +380,16 @@ function ComisionCalc() {
               className="input mt-1.5"
             />
           </div>
-
           {finalCalc !== null && (
             <div className="space-y-2">
               <SectionLabel>Resultado</SectionLabel>
               <ResultsCard>
                 <ResultRow label={labelPrecioComprador} value={fmtEur(finalCalc)} highlight />
-                {incluirIva && (
-                  <ResultRow label="Precio sin IVA" value={fmtEur(finalSinIvaCalc!)} />
-                )}
+                {incluirIva && <ResultRow label="Precio sin IVA" value={fmtEur(finalSinIvaCalc!)} />}
                 <ResultRow label={labelComision} value={fmtEur(comEuros!)} />
-                {incluirIva && (
-                  <ResultRow label="IVA 21% sobre comisión" value={fmtEur(ivaComision!)} />
-                )}
+                {incluirIva && <ResultRow label="IVA 21% sobre comisión" value={fmtEur(ivaComision!)} />}
                 <ResultRow label="Neto para el vendedor" value={fmtEur(base)} />
               </ResultsCard>
-
               <div className="rounded-xl border border-success/30 bg-success/8 px-4 py-3">
                 <p className="text-xs font-semibold text-success">Verificación</p>
                 {incluirIva ? (
@@ -440,9 +411,7 @@ function ComisionCalc() {
         <>
           <div>
             <label className="text-xs font-medium text-text-secondary">
-              {incluirIva
-                ? "Precio final al comprador (€) (IVA incluido)"
-                : "Precio final al comprador (€)"}
+              {incluirIva ? "Precio final al comprador (€) (IVA incluido)" : "Precio final al comprador (€)"}
             </label>
             <input
               type="text"
@@ -453,22 +422,16 @@ function ComisionCalc() {
               className="input mt-1.5"
             />
           </div>
-
           {baseFromFinal !== null && (
             <div className="space-y-2">
               <SectionLabel>Resultado</SectionLabel>
               <ResultsCard>
                 <ResultRow label="Neto para el vendedor" value={fmtEur(baseFromFinal)} highlight />
-                {incluirIva && (
-                  <ResultRow label="Precio sin IVA" value={fmtEur(finalSinIvaFromFinal!)} />
-                )}
+                {incluirIva && <ResultRow label="Precio sin IVA" value={fmtEur(finalSinIvaFromFinal!)} />}
                 <ResultRow label={labelComision} value={fmtEur(comFromFinal!)} />
-                {incluirIva && (
-                  <ResultRow label="IVA 21% sobre comisión" value={fmtEur(ivaFromFinal!)} />
-                )}
+                {incluirIva && <ResultRow label="IVA 21% sobre comisión" value={fmtEur(ivaFromFinal!)} />}
                 <ResultRow label={labelPrecioComprador} value={fmtEur(totalFinal)} />
               </ResultsCard>
-
               <div className="rounded-xl border border-success/30 bg-success/8 px-4 py-3">
                 <p className="text-xs font-semibold text-success">Verificación</p>
                 {incluirIva ? (
@@ -558,13 +521,9 @@ function HipotecaCalc() {
             />
             <ResultRow label="Total pagado" value={fmtEur(totalPagado!)} />
             <ResultRow label="Total intereses" value={fmtEur(totalIntereses!)} />
-            <ResultRow
-              label="Intereses sobre capital"
-              value={`${fmt(pctIntereses!)}%`}
-            />
+            <ResultRow label="Intereses sobre capital" value={`${fmt(pctIntereses!)}%`} />
           </ResultsCard>
 
-          {/* Barra de desglose */}
           <div className="rounded-xl border border-border bg-background p-4">
             <p className="mb-3 text-xs font-medium text-text-secondary">Desglose del total pagado</p>
             <div className="overflow-hidden rounded-full bg-border">
@@ -601,8 +560,8 @@ function PlusvaliaCalc() {
 
   const vc = parseFloat(valorCatastral.replace(/\./g, "").replace(",", "."));
   const pSuelo = parseFloat(pctSuelo) / 100;
-  const n = Math.min(Math.max(parseInt(aniosTenencia), 1), 20);
-  const coef = coeficientes[n] ?? 0.08;
+  const nYears = Math.min(Math.max(parseInt(aniosTenencia), 1), 20);
+  const coef = coeficientes[nYears] ?? 0.08;
   const tipo = parseFloat(tipoGravamen) / 100;
 
   const baseImponible = isNaN(vc) ? null : vc * pSuelo * coef;
@@ -737,9 +696,7 @@ function RentabilidadCalc() {
           />
         </div>
         <div>
-          <label className="text-xs font-medium text-text-secondary">
-            Gastos anuales (€)
-          </label>
+          <label className="text-xs font-medium text-text-secondary">Gastos anuales (€)</label>
           <input
             type="text"
             inputMode="decimal"
@@ -771,12 +728,8 @@ function RentabilidadCalc() {
             )}
             <ResultRow label="Inversión total (con gastos)" value={fmtEur(inversionTotal)} />
             <ResultRow label="Ingresos brutos anuales" value={fmtEur(ingresosBrutos)} />
-            {ga > 0 && (
-              <ResultRow label="Ingresos netos anuales" value={fmtEur(ingresosNetos!)} />
-            )}
-            {payback && (
-              <ResultRow label="Payback estimado" value={`${fmt(payback, 1)} años`} />
-            )}
+            {ga > 0 && <ResultRow label="Ingresos netos anuales" value={fmtEur(ingresosNetos!)} />}
+            {payback && <ResultRow label="Payback estimado" value={`${fmt(payback, 1)} años`} />}
           </ResultsCard>
         </div>
       )}
@@ -784,120 +737,209 @@ function RentabilidadCalc() {
   );
 }
 
-// ─── Tab config ───────────────────────────────────────────────────────────────
+// ─── Dashboard config ─────────────────────────────────────────────────────────
 
-const TABS: {
-  id: Tab;
+type CalcConfig = {
+  id: CalculatorId;
   label: string;
   description: string;
+  longDesc: string;
   Icon: React.ElementType;
-}[] = [
+  iconBg: string;
+  iconColor: string;
+  colSpan?: boolean;
+  Component: React.ComponentType;
+};
+
+const CALCULATORS: CalcConfig[] = [
   {
     id: "comision",
     label: "Comisión",
-    description: "Precio transparente con comisión",
+    description: "Precio con comisión de agencia",
+    longDesc: "Calcula el precio final al comprador con la comisión de agencia e IVA desglosados, en ambas direcciones.",
     Icon: Handshake,
+    iconBg: "bg-primary/10",
+    iconColor: "text-primary",
+    Component: ComisionCalc,
   },
   {
     id: "hipoteca",
     label: "Hipoteca",
     description: "Cuota mensual y coste total",
+    longDesc: "Simula la cuota mensual, total pagado e intereses de cualquier préstamo hipotecario.",
     Icon: Landmark,
+    iconBg: "bg-emerald-500/10",
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+    Component: HipotecaCalc,
   },
   {
     id: "plusvalia",
-    label: "Plusvalía",
-    description: "Impuesto municipal sobre venta",
+    label: "Plusvalía municipal",
+    description: "Impuesto municipal sobre la venta",
+    longDesc: "Estima el impuesto sobre el incremento del valor de terrenos urbanos (IIVTNU) según el método objetivo.",
     Icon: Receipt,
+    iconBg: "bg-amber-500/10",
+    iconColor: "text-amber-600 dark:text-amber-400",
+    Component: PlusvaliaCalc,
   },
   {
     id: "rentabilidad",
     label: "Rentabilidad",
     description: "Análisis de inversión en alquiler",
+    longDesc: "Calcula la rentabilidad bruta, neta y el tiempo de retorno (payback) de una propiedad en alquiler.",
     Icon: TrendingUp,
+    iconBg: "bg-violet-500/10",
+    iconColor: "text-violet-600 dark:text-violet-400",
+    Component: RentabilidadCalc,
   },
   {
     id: "cientifica",
-    label: "Científica",
-    description: "Calculadora de uso general",
+    label: "Calculadora científica",
+    description: "Operaciones avanzadas de uso general",
+    longDesc: "Calculadora completa con funciones trigonométricas, logaritmos y constantes matemáticas para cálculos avanzados.",
     Icon: Calculator,
+    iconBg: "bg-background",
+    iconColor: "text-text-secondary",
+    colSpan: true,
+    Component: ScientificCalc,
   },
 ];
+
+// ─── Animation variants ───────────────────────────────────────────────────────
+
+const EASE_OUT = [0.22, 1, 0.36, 1] as [number, number, number, number];
+const EASE_IN  = [0.4, 0, 1, 1]    as [number, number, number, number];
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.32, delay: i * 0.07, ease: EASE_OUT },
+  }),
+};
+
+const focusedVariants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, ease: EASE_OUT },
+  },
+  exit: {
+    opacity: 0,
+    y: 10,
+    transition: { duration: 0.18, ease: EASE_IN },
+  },
+};
+
+const contentVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.28, delay: 0.14, ease: EASE_OUT },
+  },
+};
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function CalculadoraClient() {
-  const [tab, setTab] = useState<Tab>("comision");
-  const active = TABS.find((t) => t.id === tab)!;
+  const [active, setActive] = useState<CalculatorId | null>(null);
+  const activeCalc = CALCULATORS.find((c) => c.id === active) ?? null;
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_1fr]">
-      {/* Sidebar */}
-      <div className="rounded-2xl border border-border bg-surface shadow-sm lg:self-start">
-        <div className="border-b border-border px-4 py-3.5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-            Herramientas
-          </p>
-        </div>
-        <nav className="flex flex-row flex-wrap gap-1 p-2 lg:flex-col">
-          {TABS.map((t) => {
-            const Icon = t.Icon;
-            const isActive = tab === t.id;
+    <AnimatePresence mode="wait">
+      {active === null ? (
+        <motion.div
+          key="dashboard"
+          initial="hidden"
+          animate="visible"
+          exit={{ opacity: 0, transition: { duration: 0.14 } }}
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+        >
+          {CALCULATORS.map((calc, i) => {
+            const Icon = calc.Icon;
             return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
-                  isActive
-                    ? "bg-primary/10"
-                    : "hover:bg-background"
-                }`}
+              <motion.button
+                key={calc.id}
+                custom={i}
+                variants={cardVariants}
+                whileHover={{ y: -3, transition: { duration: 0.18 } }}
+                whileTap={{ scale: 0.99 }}
+                onClick={() => setActive(calc.id)}
+                className={[
+                  "group flex flex-col rounded-2xl border border-border bg-surface text-left shadow-sm",
+                  "transition-shadow hover:shadow-md",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                  calc.colSpan ? "sm:col-span-2" : "",
+                ].join(" ")}
+                aria-label={`Abrir ${calc.label}`}
               >
-                <div
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                    isActive
-                      ? "bg-primary text-white shadow-sm"
-                      : "bg-background text-text-secondary"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div className="hidden min-w-0 lg:block">
-                  <p className={`text-sm font-medium leading-tight ${isActive ? "text-primary" : "text-text-primary"}`}>
-                    {t.label}
+                <div className="flex-1 p-6">
+                  <div className={`mb-4 inline-flex size-11 items-center justify-center rounded-xl border border-border ${calc.iconBg}`}>
+                    <Icon className={`size-5 ${calc.iconColor}`} />
+                  </div>
+                  <h3 className="text-base font-semibold text-text-primary">{calc.label}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-text-secondary">
+                    {calc.longDesc}
                   </p>
-                  <p className="mt-0.5 truncate text-xs leading-tight text-text-secondary">{t.description}</p>
                 </div>
-                <span className="lg:hidden text-sm font-medium text-text-primary">{t.label}</span>
-                {isActive && <ChevronRight className="ml-auto hidden h-3.5 w-3.5 shrink-0 text-primary lg:block" />}
-              </button>
+                <div className="flex items-center justify-between border-t border-border px-6 py-4">
+                  <span className="text-sm font-medium text-primary">Abrir calculadora</span>
+                  <ChevronRight className="size-4 text-primary transition-transform duration-150 group-hover:translate-x-0.5" />
+                </div>
+              </motion.button>
             );
           })}
-        </nav>
-      </div>
-
-      {/* Content */}
-      <div className="rounded-2xl border border-border bg-surface shadow-sm">
-        <div className="border-b border-border px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-              <active.Icon className="h-5 w-5 text-primary" />
+        </motion.div>
+      ) : (
+        activeCalc && (
+          <motion.div
+            key={`focused-${active}`}
+            variants={focusedVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="rounded-2xl border border-border bg-surface shadow-sm"
+          >
+            {/* Header */}
+            <div className="flex items-center gap-3 border-b border-border px-6 py-4">
+              <button
+                onClick={() => setActive(null)}
+                className={[
+                  "flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background",
+                  "text-text-secondary transition-colors hover:bg-border hover:text-text-primary",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                ].join(" ")}
+                aria-label="Volver al panel de calculadoras"
+              >
+                <ArrowLeft className="size-4" />
+              </button>
+              <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg border border-border ${activeCalc.iconBg}`}>
+                <activeCalc.Icon className={`size-4 ${activeCalc.iconColor}`} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-base font-semibold text-text-primary">{activeCalc.label}</h2>
+                <p className="truncate text-xs text-text-secondary">{activeCalc.description}</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base font-semibold text-text-primary">{active.label}</h2>
-              <p className="text-xs text-text-secondary">{active.description}</p>
-            </div>
-          </div>
-        </div>
 
-        <div className="p-6">
-          {tab === "cientifica"   && <ScientificCalc />}
-          {tab === "comision"     && <ComisionCalc />}
-          {tab === "hipoteca"     && <HipotecaCalc />}
-          {tab === "plusvalia"    && <PlusvaliaCalc />}
-          {tab === "rentabilidad" && <RentabilidadCalc />}
-        </div>
-      </div>
-    </div>
+            {/* Calculator content */}
+            <motion.div
+              variants={contentVariants}
+              initial="hidden"
+              animate="visible"
+              className="p-6"
+            >
+              {(() => {
+                const Comp = activeCalc.Component;
+                return <Comp />;
+              })()}
+            </motion.div>
+          </motion.div>
+        )
+      )}
+    </AnimatePresence>
   );
 }
