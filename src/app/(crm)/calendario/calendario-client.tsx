@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, useId } from "react";
 import {
   Phone, Users, Home, Clock, BookOpen, Star, Activity, Calendar,
   ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter, Pencil, CheckCircle2, User, Bell, Loader2,
@@ -250,7 +250,7 @@ export default function CalendarioClient({
     return new Intl.DateTimeFormat(region, { weekday: "long" }).format(ref);
   }
 
-  const today = useMemo(() => new Date(), []);
+  const [today] = useState(() => new Date());
   const router = useRouter();
 
   const [viewMode, setViewMode]       = useState<ViewMode>("week");
@@ -291,6 +291,7 @@ export default function CalendarioClient({
 
   const supabase = useMemo(() => createClient(), []);
   const { toasts, toast } = useToast();
+  const formId = useId();
 
   // filterableUsers comes from the server â€” always complete regardless of events loaded
 
@@ -1434,7 +1435,7 @@ export default function CalendarioClient({
                   <button
                     key={tp.value}
                     type="button"
-                    onClick={() => setForm({ ...form, tipo: tp.value })}
+                    onClick={() => setForm((prev) => ({ ...prev, tipo: tp.value }))}
                     className={[
                       "flex flex-col items-center gap-1 rounded-xl border py-2.5 px-1 text-center transition-all",
                       active ? `${tp.bg} ${tp.border} ${tp.text} border-2` : "border-border text-text-secondary hover:bg-background",
@@ -1450,34 +1451,34 @@ export default function CalendarioClient({
 
           {/* Description */}
           <div>
-            <label className="text-xs font-medium text-text-secondary">{t("calendar.descripcion")} *</label>
+            <label htmlFor={`${formId}-descripcion`} className="text-xs font-medium text-text-secondary">{t("calendar.descripcion")} *</label>
             <input
+              id={`${formId}-descripcion`}
               type="text"
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
               onKeyDown={(e) => e.key === "Enter" && handleSave()}
               placeholder={t("calendar.describeLaActividad")}
               className="input mt-1.5"
-              autoFocus
             />
           </div>
 
           {/* Date */}
           <div>
-            <label className="text-xs font-medium text-text-secondary">{t("calendar.fecha")}</label>
-            <input type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} className="input mt-1.5" />
+            <label htmlFor={`${formId}-fecha`} className="text-xs font-medium text-text-secondary">{t("calendar.fecha")}</label>
+            <input id={`${formId}-fecha`} type="date" value={form.event_date} onChange={(e) => setForm((prev) => ({ ...prev, event_date: e.target.value }))} className="input mt-1.5" />
           </div>
 
           {/* Hora inicio / fin / duraciÃ³n */}
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-text-secondary">{t("calendar.horaInicio")}</label>
-                <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="input mt-1.5" />
+                <label htmlFor={`${formId}-hora-inicio`} className="text-xs font-medium text-text-secondary">{t("calendar.horaInicio")}</label>
+                <input id={`${formId}-hora-inicio`} type="time" value={form.time} onChange={(e) => setForm((prev) => ({ ...prev, time: e.target.value }))} className="input mt-1.5" />
               </div>
               <div>
-                <label className="text-xs font-medium text-text-secondary">{t("calendar.horaFin")}</label>
-                <input type="time" value={form.time_end} onChange={(e) => setForm({ ...form, time_end: e.target.value })} className="input mt-1.5" />
+                <label htmlFor={`${formId}-hora-fin`} className="text-xs font-medium text-text-secondary">{t("calendar.horaFin")}</label>
+                <input id={`${formId}-hora-fin`} type="time" value={form.time_end} onChange={(e) => setForm((prev) => ({ ...prev, time_end: e.target.value }))} className="input mt-1.5" />
               </div>
             </div>
             {(() => {
@@ -1494,10 +1495,11 @@ export default function CalendarioClient({
 
           {/* Recordatorio */}
           <div>
-            <label className="text-xs font-medium text-text-secondary">{t("calendar.recordatorio")}</label>
+            <label htmlFor={`${formId}-recordatorio`} className="text-xs font-medium text-text-secondary">{t("calendar.recordatorio")}</label>
             <select
+              id={`${formId}-recordatorio`}
               value={form.reminderMinutes == null ? "" : String(form.reminderMinutes)}
-              onChange={(e) => setForm({ ...form, reminderMinutes: e.target.value === "" ? null : Number(e.target.value) })}
+              onChange={(e) => setForm((prev) => ({ ...prev, reminderMinutes: e.target.value === "" ? null : Number(e.target.value) }))}
               className="input mt-1.5"
               disabled={!form.time.trim()}
             >
@@ -1520,7 +1522,7 @@ export default function CalendarioClient({
                 <button
                   key={p.value}
                   type="button"
-                  onClick={() => setForm({ ...form, priority: p.value })}
+                  onClick={() => setForm((prev) => ({ ...prev, priority: p.value }))}
                   className={[
                     "flex-1 py-2 text-sm font-medium transition-colors",
                     i > 0 ? "border-l border-border" : "",
@@ -1557,17 +1559,18 @@ export default function CalendarioClient({
           {/* Completed (edit only) */}
           {editId !== null && (
             <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background p-3">
-              <input type="checkbox" checked={form.completed} onChange={(e) => setForm({ ...form, completed: e.target.checked })} className="h-4 w-4 accent-primary" />
+              <input type="checkbox" checked={form.completed} onChange={(e) => setForm((prev) => ({ ...prev, completed: e.target.checked }))} className="h-4 w-4 accent-primary" />
               <span className="text-sm text-text-secondary">{t("calendar.marcarCompletada")}</span>
             </label>
           )}
 
           {/* Notes / result */}
           <div>
-            <label className="text-xs font-medium text-text-secondary">{t("calendar.notasResultado")}</label>
+            <label htmlFor={`${formId}-notas`} className="text-xs font-medium text-text-secondary">{t("calendar.notasResultado")}</label>
             <textarea
+              id={`${formId}-notas`}
               value={form.result}
-              onChange={(e) => setForm({ ...form, result: e.target.value })}
+              onChange={(e) => setForm((prev) => ({ ...prev, result: e.target.value }))}
               placeholder={t("calendar.observaciones")}
               rows={3}
               className="input mt-1.5 resize-none"
@@ -1577,7 +1580,7 @@ export default function CalendarioClient({
           {/* GCal sync */}
           {editId === null && isConnected && (
             <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background p-3">
-              <input type="checkbox" checked={form.syncToGcal} onChange={(e) => setForm({ ...form, syncToGcal: e.target.checked })} className="h-4 w-4 accent-primary" />
+              <input type="checkbox" checked={form.syncToGcal} onChange={(e) => setForm((prev) => ({ ...prev, syncToGcal: e.target.checked }))} className="h-4 w-4 accent-primary" />
               <div>
                 <p className="text-sm font-medium text-text-primary">{t("calendar.sincronizarGcal")}</p>
                 <p className="text-xs text-text-secondary">{t("calendar.sincronizarGcalDesc")}</p>

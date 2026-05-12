@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import {
   Send, Archive, RotateCcw, UserCheck, Loader2,
   ArrowLeft, MessageSquare, Calendar,
@@ -62,6 +62,7 @@ export default function TicketDetailSidePanel({
   currentUserNombre, agents, onClose, onRefresh,
 }: Props) {
   const { toast } = useToast();
+  const uid = useId();
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
   const [estado, setEstado] = useState(ticket.estado);
@@ -146,7 +147,7 @@ export default function TicketDetailSidePanel({
         {/* ── Header ── */}
         <div className="flex items-center gap-3 border-b border-border px-5 py-4">
           <button onClick={onClose} className="rounded-lg p-1.5 text-text-secondary hover:bg-surface-raised hover:text-text-primary">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="size-4" />
           </button>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-xs text-text-secondary">
@@ -223,7 +224,7 @@ export default function TicketDetailSidePanel({
                 disabled={sending || !replyText.trim()}
                 className="flex items-center gap-1.5 self-end rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
               >
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
                 Enviar
               </button>
             </div>
@@ -264,18 +265,18 @@ export default function TicketDetailSidePanel({
                 {/* Prioridad + Asignacion */}
                 <div className="flex flex-wrap gap-3">
                   <div className="flex-1">
-                    <label className="mb-1.5 block text-[11px] font-medium text-text-secondary">Prioridad</label>
-                    <select value={prioridad} onChange={(e) => setPrioridad(e.target.value)} className="input h-9 text-xs">
+                    <label htmlFor={`${uid}-prioridad`} className="mb-1.5 block text-[11px] font-medium text-text-secondary">Prioridad</label>
+                    <select id={`${uid}-prioridad`} value={prioridad} onChange={(e) => setPrioridad(e.target.value)} className="input h-9 text-xs">
                       {Object.entries(PRIORIDAD_LABELS).map(([k, v]) => (
                         <option key={k} value={k}>{v}</option>
                       ))}
                     </select>
                   </div>
                   <div className="flex-1">
-                    <label className="mb-1.5 block text-[11px] font-medium text-text-secondary">Asignado a</label>
+                    <label htmlFor={`${uid}-asignado`} className="mb-1.5 block text-[11px] font-medium text-text-secondary">Asignado a</label>
                     <div className="flex items-center gap-1.5">
-                      <UserCheck className="h-3.5 w-3.5 shrink-0 text-text-secondary" />
-                      <select value={asignadoA} onChange={(e) => setAsignadoA(e.target.value)} className="input h-9 text-xs">
+                      <UserCheck className="size-3.5 shrink-0 text-text-secondary" />
+                      <select id={`${uid}-asignado`} value={asignadoA} onChange={(e) => setAsignadoA(e.target.value)} className="input h-9 text-xs">
                         <option value="">Sin asignar</option>
                         {agents.map((a) => (
                           <option key={a.id} value={a.id}>{a.nombre}</option>

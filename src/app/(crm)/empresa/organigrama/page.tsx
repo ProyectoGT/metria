@@ -56,22 +56,23 @@ export default async function OrganigramaPage() {
         )
       : allUsers;
 
-  const users: OrgUser[] = visibleUsers
-    .filter((u) => {
-      const r = (u.rol ?? "").toLowerCase();
-      return r !== "administrador" && r !== "admin";
-    })
-    .map((u) => ({
-    id: u.id,
-    nombre: u.nombre,
-    apellidos: u.apellidos,
-    correo: u.correo,
-    rol: u.rol ?? "Agente",
-    estado: (u.estado ?? "active") as OrgUser["estado"],
-    supervisorId: u.supervisor_id,
-    equipoId: u.equipo_id,
-    equipoNombre: u.equipo_id ? (equipoMap.get(u.equipo_id) ?? null) : null,
-  }));
+  const users: OrgUser[] = visibleUsers.reduce<OrgUser[]>((acc, u) => {
+    const r = (u.rol ?? "").toLowerCase();
+    if (r !== "administrador" && r !== "admin") {
+      acc.push({
+        id: u.id,
+        nombre: u.nombre,
+        apellidos: u.apellidos,
+        correo: u.correo,
+        rol: u.rol ?? "Agente",
+        estado: (u.estado ?? "active") as OrgUser["estado"],
+        supervisorId: u.supervisor_id,
+        equipoId: u.equipo_id,
+        equipoNombre: u.equipo_id ? (equipoMap.get(u.equipo_id) ?? null) : null,
+      });
+    }
+    return acc;
+  }, []);
 
   return (
     <>

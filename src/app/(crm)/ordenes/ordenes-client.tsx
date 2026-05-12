@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useId } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Calendar, CheckCircle2, ChevronDown, Circle, Clock, Loader2, Pencil, Plus, Trash2, User } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
@@ -82,6 +82,7 @@ export default function OrdenesClient({
   const [confirmDeleteActividad, setConfirmDeleteActividad] = useState<Actividad | null>(null);
   const [saving, setSaving] = useState(false);
   const [completingId, setCompletingId] = useState<number | null>(null);
+  const formId = useId();
   const [form, setForm] = useState({
     description: "",
     time: DEFAULT_ACTIVITY_TIME,
@@ -118,11 +119,11 @@ export default function OrdenesClient({
     });
   }, [actividades, filterUserId]);
 
-  const stats = useMemo(() => ({
-    total: filteredActividades.length,
-    completed: filteredActividades.filter((a) => a.completed).length,
-    pending: filteredActividades.filter((a) => !a.completed).length,
-  }), [filteredActividades]);
+  const stats = useMemo(() => {
+    let completed = 0;
+    for (const a of filteredActividades) if (a.completed) completed++;
+    return { total: filteredActividades.length, completed, pending: filteredActividades.length - completed };
+  }, [filteredActividades]);
 
   function priorityMeta(priority: string | null) {
     return PRIORIDADES.find((p) => p.value === priority) ?? PRIORIDADES[1];
@@ -442,19 +443,20 @@ export default function OrdenesClient({
       >
         <form id="ordenes-form" onSubmit={saveActividad} className="space-y-4 px-5 py-5">
           <div>
-            <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.titulo")} *</label>
+            <label htmlFor={`${formId}-titulo`} className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.titulo")} *</label>
             <input
+              id={`${formId}-titulo`}
               value={form.description}
               onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
               className="input text-sm"
               required
-              autoFocus
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.horaInicio")} *</label>
+              <label htmlFor={`${formId}-hora-inicio`} className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.horaInicio")} *</label>
               <input
+                id={`${formId}-hora-inicio`}
                 type="time"
                 value={form.time}
                 onChange={(e) => setForm((prev) => ({ ...prev, time: e.target.value }))}
@@ -463,8 +465,9 @@ export default function OrdenesClient({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.horaFin")}</label>
+              <label htmlFor={`${formId}-hora-fin`} className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.horaFin")}</label>
               <input
+                id={`${formId}-hora-fin`}
                 type="time"
                 value={form.time_end}
                 onChange={(e) => setForm((prev) => ({ ...prev, time_end: e.target.value }))}
@@ -482,8 +485,9 @@ export default function OrdenesClient({
             ) : null;
           })()}
           <div>
-            <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.prioridad")}</label>
+            <label htmlFor={`${formId}-prioridad`} className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.prioridad")}</label>
             <select
+              id={`${formId}-prioridad`}
               value={form.priority}
               onChange={(e) => setForm((prev) => ({ ...prev, priority: e.target.value }))}
               className="input text-sm"
@@ -492,8 +496,9 @@ export default function OrdenesClient({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.recordatorio")}</label>
+            <label htmlFor={`${formId}-recordatorio`} className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.recordatorio")}</label>
             <select
+              id={`${formId}-recordatorio`}
               value={form.reminderMinutes == null ? "" : String(form.reminderMinutes)}
               onChange={(e) => setForm((prev) => ({ ...prev, reminderMinutes: e.target.value === "" ? null : Number(e.target.value) }))}
               className="input text-sm"
@@ -506,8 +511,9 @@ export default function OrdenesClient({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.tipoActividad")}</label>
+            <label htmlFor={`${formId}-tipo`} className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.tipoActividad")}</label>
             <select
+              id={`${formId}-tipo`}
               value={form.tipo}
               onChange={(e) => setForm((prev) => ({ ...prev, tipo: e.target.value }))}
               className="input text-sm"
@@ -545,8 +551,9 @@ export default function OrdenesClient({
             </label>
           )}
           <div>
-            <label className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.resultadoNotas")}</label>
+            <label htmlFor={`${formId}-resultado`} className="mb-1 block text-xs font-medium text-text-secondary">{t("ordenes.resultadoNotas")}</label>
             <textarea
+              id={`${formId}-resultado`}
               value={form.result}
               onChange={(e) => setForm((prev) => ({ ...prev, result: e.target.value }))}
               rows={3}
