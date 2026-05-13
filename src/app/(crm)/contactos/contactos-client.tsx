@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  Archive, Download, Mail, Pencil, Phone, Plus, RotateCcw, Search,
+  Archive, Download, Plus, RotateCcw, Search,
   History, SlidersHorizontal, Upload, User, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
@@ -11,7 +11,7 @@ import ContactoTimeline, { type TimelineEvent } from "@/modules/contactos/compon
 import RelatedEmailsPanel from "@/modules/email/components/RelatedEmailsPanel";
 import Drawer from "@/components/ui/drawer";
 import { ContactosTable } from "./contactos-table";
-import type { Contacto, ContactoTipo, ContactoEstado } from "@/types";
+import type { Contacto, ContactoTipo, ContactoEstado, ContactoInsert } from "@/types";
 import type { UserRole } from "@/lib/roles";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -175,13 +175,7 @@ function rowToInsert(row: ParsedCSVRow): ContactoFormPayload | null {
 
 // ─── Tipos locales ─────────────────────────────────────────────────────────────
 
-type ContactoFormPayload = {
-  nombre: string; apellidos: string | null; empresa: string | null; cargo: string | null;
-  tipo: ContactoTipo; email: string | null; telefono: string | null;
-  telefono_secundario: string | null; direccion: string | null; ciudad: string | null;
-  provincia: string | null; codigo_postal: string | null; pais: string;
-  notas: string | null; origen: string | null; estado: ContactoEstado; visibility: string;
-};
+type ContactoFormPayload = ContactoInsert;
 
 type ContactoForm = {
   nombre: string; apellidos: string; empresa: string; cargo: string;
@@ -215,8 +209,7 @@ type Props = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ContactosClient({ initialContactos, currentUserId, currentUserRole }: Props) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = useMemo(() => createClient() as any, []);
+  const db = useMemo(() => createClient(), []);
   const { toast, toasts } = useToast();
 
   const [contactos, setContactos] = useState<Contacto[]>(initialContactos);
@@ -286,7 +279,7 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
       visibility: c.visibility ?? "company",
     });
     setSaveError(null); setModalOpen(true);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const closeModal = useCallback(() => { setModalOpen(false); setEditId(null); setSaveError(null); }, []);
   function setField<K extends keyof ContactoForm>(key: K, value: ContactoForm[K]) {

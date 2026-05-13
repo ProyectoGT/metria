@@ -3378,6 +3378,54 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_agenda_activity_v2: {
+        Args: {
+          p_agenda_id: number
+          p_assigned_user_ids?: number[]
+          p_completed?: boolean
+          p_description?: string
+          p_event_date?: string
+          p_priority?: string
+          p_reminder_minutes?: number
+          p_result?: string
+          p_time?: string
+          p_time_end?: string
+          p_tipo?: string
+        }
+        Returns: {
+          archived_at: string | null
+          archived_reason: string | null
+          completed: boolean
+          converted_to_tarea_id: number | null
+          created_at: string
+          description: string
+          empresa_id: number | null
+          equipo_id: number | null
+          event_date: string
+          gcal_event_id: string | null
+          google_calendar_id: string | null
+          id: number
+          last_synced_at: string | null
+          owner_user_id: number | null
+          priority: string
+          reminder_minutes_before: number | null
+          result: string | null
+          sync_error: string | null
+          sync_status: string
+          time: string | null
+          time_end: string | null
+          timezone: string
+          tipo: string
+          user_id: number | null
+          visibility: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agenda"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       update_pending_tarea: {
         Args: {
           p_assigned_user_ids?: number[]

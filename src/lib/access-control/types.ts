@@ -42,7 +42,7 @@ export const ALL_ROLES: Role[] = ["admin", "manager", "commercial", "support", "
 
 export const ADMIN_ROLES: Role[] = ["admin"];
 export const MANAGER_ROLES: Role[] = ["admin", "manager"];
-export const SUPERVISOR_ROLES: Role[] = ["admin", "manager"];
-export const COMMERCIAL_ROLES: Role[] = ["admin", "manager", "commercial"];
+export const SUPERVISOR_ROLES: Role[] = ["admin", "manager", "support"];
+export const COMMERCIAL_ROLES: Role[] = ["admin", "manager", "support", "commercial"];
 export const SUPPORT_ROLES: Role[] = ["admin", "manager", "commercial", "support"];
 export const EVERYONE: Role[] = ["admin", "manager", "commercial", "support", "viewer"];

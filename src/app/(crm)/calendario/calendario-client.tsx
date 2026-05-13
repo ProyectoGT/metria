@@ -565,7 +565,7 @@ export default function CalendarioClient({
     async function insertOrUpdate(p: typeof payload) {
       const assignedUserIds = form.assignedUserIds.length ? form.assignedUserIds : [currentUserId];
       if (editId !== null) {
-        return supabase.rpc("update_agenda_activity", {
+        return supabase.rpc("update_agenda_activity_v2", {
           p_agenda_id: editId,
           p_description: p.description,
           p_event_date: p.event_date,
