@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { X, Plus } from "lucide-react";
@@ -11,10 +11,10 @@ import ConfirmDialog from "@/components/ui/confirm-dialog";
 
 // Lazy-load heavy drawers/modals — they're only needed after user interaction,
 // not on initial board render. This reduces the initial JS bundle size.
-const KanbanAddCard     = dynamic(() => import("./KanbanAddCard"),     { ssr: false });
-const KanbanEditCard    = dynamic(() => import("./KanbanEditCard"),    { ssr: false });
+const KanbanAddCard      = dynamic(() => import("./KanbanAddCard"),      { ssr: false });
+const KanbanEditCard     = dynamic(() => import("./KanbanEditCard"),     { ssr: false });
 const KanbanDetailDrawer = dynamic(() => import("./KanbanDetailDrawer"), { ssr: false });
-const KanbanConvertCard = dynamic(() => import("./KanbanConvertCard"), { ssr: false });
+const KanbanConvertCard  = dynamic(() => import("./KanbanConvertCard"),  { ssr: false });
 import type { KanbanData, KanbanColumnData, KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import type { UserRole } from "@/lib/roles";
 import type { ActivityType } from "@/lib/activity-options";
@@ -36,15 +36,103 @@ import { DEFAULT_ACTIVITY_TIME, localDateKey, splitLocalDateTime } from "@/lib/l
 import { useKanbanBoard, useMoveKanbanCard } from "@/modules/kanban/hooks/use-kanban-board";
 import type { KanbanQueryParams } from "@/modules/kanban/types";
 
+// ─── Modal state machine ──────────────────────────────────────────────────────
+//
+// All mutually-exclusive UI overlays (detail drawer, edit drawer, add-card
+// drawer, confirm dialogs, resultado drawer, convert drawer) live in a single
+// discriminated union.  This prevents impossible combinations like
+// "editing AND converting simultaneously" and makes transitions explicit.
+//
+// Exception: "confirm_delete_from_detail" keeps the card data so the
+// KanbanDetailDrawer can remain visible behind the ConfirmDialog, matching the
+// original behaviour where both detailCard and confirmDeleteCard could be set.
+
+type DeleteTarget = {
+  type:      "column" | "card";
+  columnId:  string;
+  cardId?:   string;
+  isAgenda?: boolean;
+};
+
+export type KanbanModalState =
+  | { type: "idle" }
+  | { type: "detail";                   columnId: string; card: KanbanCardData }
+  | { type: "editing";                  columnId: string; card: KanbanCardData }
+  | { type: "adding";                   columnId: string }
+  | { type: "confirm_delete_from_detail"; columnId: string; card: KanbanCardData }
+  | { type: "confirm_delete_target";    target: DeleteTarget }
+  | { type: "resultado";                columnId: string; cardId: string; titulo: string; text: string }
+  | { type: "converting";               card: KanbanCardData; sourceColId: string; destColId: string; sourceIndex: number; destIndex: number };
+
+export type KanbanModalAction =
+  | { type: "OPEN_DETAIL";                      columnId: string; card: KanbanCardData }
+  | { type: "OPEN_EDITING";                     columnId: string; card: KanbanCardData }
+  | { type: "OPEN_ADD_CARD";                    columnId: string }
+  | { type: "REQUEST_DELETE_COLUMN";            columnId: string }
+  | { type: "REQUEST_DELETE_CARD_FROM_DETAIL" }
+  | { type: "OPEN_RESULTADO";                   columnId: string; cardId: string; titulo: string }
+  | { type: "OPEN_CONVERTING";                  card: KanbanCardData; sourceColId: string; destColId: string; sourceIndex: number; destIndex: number }
+  | { type: "CLOSE" }
+  | { type: "SET_RESULTADO_TEXT";               text: string };
+
+function kanbanModalReducer(state: KanbanModalState, action: KanbanModalAction): KanbanModalState {
+  switch (action.type) {
+    case "OPEN_DETAIL":
+      return { type: "detail", columnId: action.columnId, card: action.card };
+
+    case "OPEN_EDITING":
+      return { type: "editing", columnId: action.columnId, card: action.card };
+
+    case "OPEN_ADD_CARD":
+      return { type: "adding", columnId: action.columnId };
+
+    case "REQUEST_DELETE_COLUMN":
+      return { type: "confirm_delete_target", target: { type: "column", columnId: action.columnId } };
+
+    case "REQUEST_DELETE_CARD_FROM_DETAIL":
+      // Transition is only valid when a detail drawer is open.
+      // The card data is preserved so KanbanDetailDrawer can remain visible
+      // underneath the ConfirmDialog (same behaviour as original code).
+      if (state.type !== "detail") return state;
+      return { type: "confirm_delete_from_detail", columnId: state.columnId, card: state.card };
+
+    case "OPEN_RESULTADO":
+      // text starts empty; the user fills it in before confirming
+      return { type: "resultado", columnId: action.columnId, cardId: action.cardId, titulo: action.titulo, text: "" };
+
+    case "OPEN_CONVERTING":
+      return {
+        type:        "converting",
+        card:        action.card,
+        sourceColId: action.sourceColId,
+        destColId:   action.destColId,
+        sourceIndex: action.sourceIndex,
+        destIndex:   action.destIndex,
+      };
+
+    case "CLOSE":
+      return { type: "idle" };
+
+    case "SET_RESULTADO_TEXT":
+      if (state.type !== "resultado") return state;
+      return { ...state, text: action.text };
+
+    default:
+      return state;
+  }
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 type NewKanbanCard = Omit<KanbanCardData, "id" | "source" | "dbId">;
 
 type KanbanBoardProps = {
-  initialData: KanbanData;
+  initialData:    KanbanData;
   customColumns?: Array<{ id: string; title: string }>;
-  role: UserRole;
-  currentUserId: string;
-  empresaId: number | null;
-  agents?: Array<{ id: string; nombre: string }>;
+  role:           UserRole;
+  currentUserId:  string;
+  empresaId:      number | null;
+  agents?:        Array<{ id: string; nombre: string }>;
 };
 
 function KanbanBoard({
@@ -61,56 +149,44 @@ function KanbanBoard({
     if (empresaId == null || Number.isNaN(currentUserIdNum)) return null;
     return {
       empresaId,
-      userId: currentUserIdNum,
+      userId:   currentUserIdNum,
       agentIds: agents.map((agent) => Number(agent.id)).filter((id) => !Number.isNaN(id)),
     };
   }, [agents, currentUserIdNum, empresaId]);
-  const kanbanQuery = useKanbanBoard(
+
+  const kanbanQuery   = useKanbanBoard(
     kanbanParams ?? { empresaId: 0, userId: 0 },
     { enabled: kanbanParams !== null, initialData },
   );
   const moveKanbanCard = useMoveKanbanCard();
+
   const [columns, setColumns] = useState<KanbanColumnData[]>(() => {
     const custom: KanbanColumnData[] = customColumns.map((c) => ({
-      id: c.id,
-      title: c.title,
-      cards: [],
-      fixed: false,
+      id: c.id, title: c.title, cards: [], fixed: false,
     }));
     return [...initialData.columns, ...custom];
   });
-  const [addingCardCol, setAddingCardCol] = useState<string | null>(null);
-  const [editingCard, setEditingCard] = useState<{ columnId: string; card: KanbanCardData } | null>(null);
-  const [detailCard, setDetailCard] = useState<{ columnId: string; card: KanbanCardData } | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ type: "column" | "card"; columnId: string; cardId?: string; isAgenda?: boolean } | null>(null);
-  const [confirmDeleteCard, setConfirmDeleteCard] = useState<{ columnId: string; card: KanbanCardData } | null>(null);
-  const [resultadoModal, setResultadoModal] = useState<{ columnId: string; cardId: string; titulo: string } | null>(null);
-  const [resultadoText, setResultadoText] = useState("");
-  const [convertingCard, setConvertingCard] = useState<{
-    card: KanbanCardData;
-    sourceColId: string;
-    destColId: string;
-    sourceIndex: number;
-    destIndex: number;
-  } | null>(null);
+
+  // Modal state — replaces 8 individual useState calls (addingCardCol,
+  // editingCard, detailCard, deleteTarget, confirmDeleteCard, resultadoModal,
+  // resultadoText, convertingCard).
+  const [modal, dispatchModal] = useReducer(kanbanModalReducer, { type: "idle" });
+
+  // Column UI state — not modal, kept as separate useState
   const [addingColumn, setAddingColumn] = useState(false);
-  const [newColTitle, setNewColTitle] = useState("");
+  const [newColTitle,  setNewColTitle]  = useState("");
+  const [mobileColIndex, setMobileColIndex] = useState(0);
   const newColInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
     const custom: KanbanColumnData[] = customColumns.map((c) => ({
-      id: c.id,
-      title: c.title,
-      cards: [],
-      fixed: false,
+      id: c.id, title: c.title, cards: [], fixed: false,
     }));
     queueMicrotask(() => {
       if (!cancelled) setColumns([...(kanbanQuery.data?.columns ?? initialData.columns), ...custom]);
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [customColumns, initialData.columns, kanbanQuery.data?.columns]);
 
   const findCard = useCallback((columnId: string, cardId: string) => {
@@ -127,23 +203,23 @@ function KanbanBoard({
 
     // Tarea → Orden del dia: abrir drawer completo de conversion
     if (moved.source === "tarea" && destination.droppableId === "en_progreso") {
-      setConvertingCard({
-        card: moved,
+      dispatchModal({
+        type:        "OPEN_CONVERTING",
+        card:        moved,
         sourceColId: source.droppableId,
-        destColId: destination.droppableId,
+        destColId:   destination.droppableId,
         sourceIndex: source.index,
-        destIndex: destination.index,
+        destIndex:   destination.index,
       });
       return;
     }
 
     const previousColumns = columns;
 
-    // Movimiento local (misma columna o columna custom)
     setColumns((prev) => {
       const next = prev.map((col) => ({ ...col, cards: [...col.cards] }));
       const sourceCol = next.find((c) => c.id === source.droppableId);
-      const destCol = next.find((c) => c.id === destination.droppableId);
+      const destCol   = next.find((c) => c.id === destination.droppableId);
       if (!sourceCol || !destCol) return prev;
       const [card] = sourceCol.cards.splice(source.index, 1);
       destCol.cards.splice(destination.index, 0, card);
@@ -161,63 +237,60 @@ function KanbanBoard({
     if (kanbanParams) {
       moveKanbanCard.mutate(
         {
-          cardId: moved.id,
-          dbId: moved.dbId,
-          source: moved.source,
-          fromCol: source.droppableId,
-          toCol: destination.droppableId,
-          toIndex: destination.index,
-          params: kanbanParams,
+          cardId:    moved.id,
+          dbId:      moved.dbId,
+          source:    moved.source,
+          fromCol:   source.droppableId,
+          toCol:     destination.droppableId,
+          toIndex:   destination.index,
+          params:    kanbanParams,
           newEstado: destination.droppableId,
         },
-        {
-          onError: () => setColumns(previousColumns),
-        },
+        { onError: () => setColumns(previousColumns) },
       );
     }
-  }, [columns, findCard, kanbanParams, moveKanbanCard, router]); // end handleDragEnd
+  }, [columns, findCard, kanbanParams, moveKanbanCard, router]);
 
   const handleConfirmConvert = useCallback(async function handleConfirmConvert(data: {
-    description: string;
-    tipo: ActivityType;
-    date: string;
-    time: string;
-    priority: KanbanPriority;
+    description:    string;
+    tipo:           ActivityType;
+    date:           string;
+    time:           string;
+    priority:       KanbanPriority;
     assignedUserIds: number[];
   }) {
-    if (!convertingCard) return;
-    const { card, sourceColId, destColId, sourceIndex, destIndex } = convertingCard;
+    if (modal.type !== "converting") return;
+    const { card, sourceColId, destColId, sourceIndex, destIndex } = modal;
 
     await convertTareaToAgendaFullAction(card.dbId, {
-      description: data.description,
-      eventDate: data.date,
-      time: data.time,
-      priority: data.priority,
-      tipo: data.tipo,
+      description:    data.description,
+      eventDate:      data.date,
+      time:           data.time,
+      priority:       data.priority,
+      tipo:           data.tipo,
       assignedUserIds: data.assignedUserIds,
     });
 
-    // Solo actualizar estado local si la conversion fue exitosa
     setColumns((prev) => {
       const next = prev.map((col) => ({ ...col, cards: [...col.cards] }));
       const sourceCol = next.find((c) => c.id === sourceColId);
-      const destCol = next.find((c) => c.id === destColId);
+      const destCol   = next.find((c) => c.id === destColId);
       if (!sourceCol || !destCol) return prev;
       const [movedCard] = sourceCol.cards.splice(sourceIndex, 1);
       destCol.cards.splice(destIndex, 0, { ...movedCard, source: "agenda" as const });
       return next;
     });
 
-    setConvertingCard(null);
+    dispatchModal({ type: "CLOSE" });
     router.refresh();
-  }, [convertingCard, router]); // end handleConfirmConvert
+  }, [modal, router]);
 
   const handleCancelConvert = useCallback(() => {
-    setConvertingCard(null);
+    dispatchModal({ type: "CLOSE" });
   }, []);
 
   const requestDeleteColumn = useCallback((columnId: string) => {
-    setDeleteTarget({ type: "column", columnId });
+    dispatchModal({ type: "REQUEST_DELETE_COLUMN", columnId });
   }, []);
 
   const handleDeleteColumn = useCallback((columnId: string) => {
@@ -234,7 +307,7 @@ function KanbanBoard({
   async function handleConfirmAddColumn() {
     const title = newColTitle.trim();
     if (!title) { setAddingColumn(false); return; }
-    const id = `custom-${Date.now()}`;
+    const id    = `custom-${Date.now()}`;
     const orden = columns.length;
     setColumns((prev) => [...prev, { id, title, cards: [], fixed: false }]);
     setAddingColumn(false);
@@ -242,19 +315,19 @@ function KanbanBoard({
     try {
       await addKanbanColumnAction({ col_id: id, titulo: title, orden });
     } catch {
-      // La columna ya se añadió localmente; el error no bloquea la UX
+      // La columna ya se añadio localmente; el error no bloquea la UX
     }
   }
 
   const handleAddCard = useCallback(async (columnId: string, newCard: NewKanbanCard) => {
     const isAgendaColumn = columnId === "en_progreso";
-    const optimisticId = `optimistic-${Date.now()}`;
+    const optimisticId   = `optimistic-${Date.now()}`;
     const optimisticCard: KanbanCardData = {
       ...newCard,
-      id: optimisticId,
-      source: isAgendaColumn ? "agenda" : "tarea",
-      dbId: -Date.now(),
-      isCompleted: false,
+      id:           optimisticId,
+      source:       isAgendaColumn ? "agenda" : "tarea",
+      dbId:         -Date.now(),
+      isCompleted:  false,
       fromOrdenDia: isAgendaColumn,
     };
     setColumns((prev) =>
@@ -263,28 +336,28 @@ function KanbanBoard({
 
     try {
       const assignedUserIds = newCard.assignedUserIds?.length ? newCard.assignedUserIds : undefined;
-      const { date, time } = splitLocalDateTime(newCard.dueDate);
+      const { date, time }  = splitLocalDateTime(newCard.dueDate);
       const created = isAgendaColumn
         ? await createAgendaAction({
-            description: newCard.title,
-            eventDate: date ?? localDateKey(),
-            time: time ?? DEFAULT_ACTIVITY_TIME,
-            priority: newCard.priority,
-            tipo: newCard.tipo ?? "actividad",
+            description:  newCard.title,
+            eventDate:    date ?? localDateKey(),
+            time:         time ?? DEFAULT_ACTIVITY_TIME,
+            priority:     newCard.priority,
+            tipo:         newCard.tipo ?? "actividad",
             assignedUserIds,
           })
         : await createTareaAction({
-            titulo: newCard.title,
-            prioridad: newCard.priority,
+            titulo:       newCard.title,
+            prioridad:    newCard.priority,
             assignedUserIds,
           });
 
       const finalCard: KanbanCardData = {
         ...newCard,
-        id: `${isAgendaColumn ? "agenda" : "tarea"}-${created.id}`,
-        source: isAgendaColumn ? "agenda" : "tarea",
-        dbId: created.id,
-        isCompleted: false,
+        id:           `${isAgendaColumn ? "agenda" : "tarea"}-${created.id}`,
+        source:       isAgendaColumn ? "agenda" : "tarea",
+        dbId:         created.id,
+        isCompleted:  false,
         fromOrdenDia: isAgendaColumn,
       };
       setColumns((prev) =>
@@ -305,28 +378,37 @@ function KanbanBoard({
     }
   }, [router]);
 
+  // Stable — passes to memo(KanbanColumn), must not close over modal
   const handleOpenDetail = useCallback((columnId: string, card: KanbanCardData) => {
-    setDetailCard({ columnId, card });
+    dispatchModal({ type: "OPEN_DETAIL", columnId, card });
+  }, []);
+
+  // Stable setter — passed as onAddCard to every KanbanColumn.
+  // Without useCallback this would be a new reference on every Board render,
+  // breaking memo(KanbanColumn) even on unrelated state changes.
+  const handleOpenAddCard = useCallback((colId: string) => {
+    dispatchModal({ type: "OPEN_ADD_CARD", columnId: colId });
   }, []);
 
   const handleEditFromDetail = useCallback(() => {
-    setDetailCard((prev) => {
-      if (!prev) return prev;
-      const { columnId, card } = prev;
-      setTimeout(() => setEditingCard({ columnId, card }), 150);
-      return null;
-    });
-  }, []);
+    // Close detail first, then open editing after a short delay (150ms) so the
+    // drawer exit animation has time to start before the edit drawer enters.
+    if (modal.type !== "detail") return;
+    const { columnId, card } = modal;
+    dispatchModal({ type: "CLOSE" });
+    setTimeout(() => dispatchModal({ type: "OPEN_EDITING", columnId, card }), 150);
+  }, [modal]);
 
   const handleRequestDeleteFromDetail = useCallback(() => {
-    setDetailCard((prev) => { if (prev) setConfirmDeleteCard(prev); return prev; });
+    // Reducer transitions detail → confirm_delete_from_detail only when state
+    // is already "detail", so this is a no-op if called unexpectedly.
+    dispatchModal({ type: "REQUEST_DELETE_CARD_FROM_DETAIL" });
   }, []);
 
   async function handleConfirmDeleteCard() {
-    if (!confirmDeleteCard) return;
-    const { columnId, card } = confirmDeleteCard;
-    setConfirmDeleteCard(null);
-    setDetailCard(null);
+    if (modal.type !== "confirm_delete_from_detail") return;
+    const { columnId, card } = modal;
+    dispatchModal({ type: "CLOSE" });
 
     try {
       if (card.source === "agenda") {
@@ -346,14 +428,14 @@ function KanbanBoard({
   }
 
   const handleSaveEdit = useCallback((updates: {
-    title: string;
-    priority: KanbanPriority;
-    dueDate?: string;
-    tipo?: ActivityType;
+    title:           string;
+    priority:        KanbanPriority;
+    dueDate?:        string;
+    tipo?:           ActivityType;
     assignedUserIds?: number[];
   }) => {
-    if (!editingCard) return;
-    const { columnId, card } = editingCard;
+    if (modal.type !== "editing") return;
+    const { columnId, card } = modal;
     setColumns((prev) =>
       prev.map((col) =>
         col.id === columnId
@@ -364,8 +446,8 @@ function KanbanBoard({
 
     if (card.source === "tarea") {
       updateTareaAction(card.dbId, {
-        titulo: updates.title,
-        prioridad: updates.priority,
+        titulo:          updates.title,
+        prioridad:       updates.priority,
         assignedUserIds: updates.assignedUserIds,
       })
         .then(() => router.refresh())
@@ -375,19 +457,19 @@ function KanbanBoard({
 
     const { date, time } = splitLocalDateTime(updates.dueDate ?? card.dueDate);
     updateAgendaAction(card.dbId, {
-      description: updates.title,
-      priority: updates.priority,
-      tipo: updates.tipo ?? card.tipo ?? "actividad",
-      eventDate: date ?? localDateKey(),
-      time: time ?? card.time ?? DEFAULT_ACTIVITY_TIME,
+      description:     updates.title,
+      priority:        updates.priority,
+      tipo:            updates.tipo ?? card.tipo ?? "actividad",
+      eventDate:       date ?? localDateKey(),
+      time:            time ?? card.time ?? DEFAULT_ACTIVITY_TIME,
       assignedUserIds: updates.assignedUserIds,
     }).then(() => router.refresh()).catch(() => router.refresh());
-  }, [editingCard, router]);
+  }, [modal, router]);
 
+  // Stable — passed to memo(KanbanColumn) via onCompleteCard
   const handleCompleteCard = useCallback((columnId: string, cardId: string, card: KanbanCardData) => {
     if (card.source === "agenda") {
-      setResultadoText("");
-      setResultadoModal({ columnId, cardId, titulo: card.title });
+      dispatchModal({ type: "OPEN_RESULTADO", columnId, cardId, titulo: card.title });
       return;
     }
 
@@ -402,11 +484,11 @@ function KanbanBoard({
   }, [router]);
 
   function handleConfirmResultado() {
-    if (!resultadoModal) return;
-    const { columnId, cardId } = resultadoModal;
-    const card = findCard(columnId, cardId);
-    const resultado = resultadoText.trim();
-    setResultadoModal(null);
+    if (modal.type !== "resultado") return;
+    const { columnId, cardId, text } = modal;
+    const card      = findCard(columnId, cardId);
+    const resultado = text.trim();
+    dispatchModal({ type: "CLOSE" });
 
     setColumns((prev) =>
       prev.map((col) =>
@@ -424,29 +506,28 @@ function KanbanBoard({
   }
 
   function handleConfirmDelete() {
-    if (!deleteTarget) return;
-    if (deleteTarget.type === "column") {
-      handleDeleteColumn(deleteTarget.columnId);
-    } else if (deleteTarget.type === "card" && deleteTarget.cardId) {
-      const card = findCard(deleteTarget.columnId, deleteTarget.cardId);
+    if (modal.type !== "confirm_delete_target") return;
+    const { target } = modal;
+    if (target.type === "column") {
+      handleDeleteColumn(target.columnId);
+    } else if (target.type === "card" && target.cardId) {
+      const card = findCard(target.columnId, target.cardId);
       setColumns((prev) =>
         prev.map((col) =>
-          col.id === deleteTarget.columnId
-            ? { ...col, cards: col.cards.filter((c) => c.id !== deleteTarget.cardId) }
+          col.id === target.columnId
+            ? { ...col, cards: col.cards.filter((c) => c.id !== target.cardId) }
             : col,
         ),
       );
-      if (!deleteTarget.isAgenda && card?.source === "tarea") {
+      if (!target.isAgenda && card?.source === "tarea") {
         deleteTareaAction(card.dbId).then(() => router.refresh()).catch(() => router.refresh());
       }
-      if (deleteTarget.isAgenda && card?.source === "agenda") {
+      if (target.isAgenda && card?.source === "agenda") {
         archiveAgendaAction(card.dbId).then(() => router.refresh()).catch(() => router.refresh());
       }
     }
-    setDeleteTarget(null);
+    dispatchModal({ type: "CLOSE" });
   }
-
-  const [mobileColIndex, setMobileColIndex] = useState(0);
 
   const isManager = role === "Administrador" || role === "Director";
   const isOwnerOrAssigned = useCallback((card: KanbanCardData) => {
@@ -457,33 +538,64 @@ function KanbanBoard({
     return isManager || isOwnerOrAssigned(card);
   }, [isManager, isOwnerOrAssigned]);
 
+  // Pre-compute per-column stats used by the mobile tab selector.
+  const mobileColumnStats = useMemo(
+    () => columns.map((col) => {
+      const activeCount = col.cards.filter((c) => !c.isCompleted).length;
+      const total       = col.cards.length;
+      return {
+        id:         col.id,
+        title:      col.title,
+        activeCount,
+        countLabel: activeCount === total ? String(activeCount) : `${activeCount}/${total}`,
+      };
+    }),
+    [columns],
+  );
+
+  // Dev-only render tracker: hooks always called, logging only in dev.
+  const _devRc = useRef(0);
+  // eslint-disable-next-line react-hooks/purity
+  const _devLt = useRef(performance.now());
+  _devRc.current += 1;
+  if (process.env.NODE_ENV === "development" && _devRc.current > 1) {
+    // eslint-disable-next-line react-hooks/purity
+    const _now   = performance.now();
+    const _delta = (_now - _devLt.current).toFixed(1);
+    _devLt.current = _now;
+    console.debug(`[PERF] KanbanBoard render #${_devRc.current} +${_delta}ms`, {
+      modalType: modal.type,
+      columnsCount: columns.length,
+      totalCards: columns.reduce((s, c) => s + c.cards.length, 0),
+    });
+  }
+
+  // Convenience derivations used in the JSX — avoids repeating type checks
+  const showDetail = modal.type === "detail" || modal.type === "confirm_delete_from_detail";
+  const detailModalData = showDetail ? modal : null;
+
   return (
     <>
       {/* ── Mobile column selector (tabs) ──────────────────────────── */}
       <div className="flex gap-1 overflow-x-auto px-1 pb-1 md:hidden" aria-label="Selector de columna">
-        {columns.map((col, i) => {
-          const activeCount = col.cards.filter((c) => !c.isCompleted).length;
-          const totalCount = col.cards.length;
-          const countLabel = activeCount === totalCount ? String(activeCount) : `${activeCount}/${totalCount}`;
-          return (
-            <button
-              key={col.id}
-              onClick={() => setMobileColIndex(i)}
-              className={`touch-target shrink-0 rounded-xl px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
-                mobileColIndex === i
-                  ? "bg-primary text-white shadow-sm"
-                  : "bg-surface text-text-secondary border border-border hover:bg-surface-raised"
-              }`}
-            >
-              {col.title}
-              <span className={`ml-1.5 rounded-full px-1.5 py-px text-[10px] ${
-                mobileColIndex === i ? "bg-white/20 text-white" : "bg-muted text-text-secondary"
-              }`}>
-                {countLabel}
-              </span>
-            </button>
-          );
-        })}
+        {mobileColumnStats.map((stat, i) => (
+          <button
+            key={stat.id}
+            onClick={() => setMobileColIndex(i)}
+            className={`touch-target shrink-0 rounded-xl px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
+              mobileColIndex === i
+                ? "bg-primary text-white shadow-sm"
+                : "bg-surface text-text-secondary border border-border hover:bg-surface-raised"
+            }`}
+          >
+            {stat.title}
+            <span className={`ml-1.5 rounded-full px-1.5 py-px text-[10px] ${
+              mobileColIndex === i ? "bg-white/20 text-white" : "bg-muted text-text-secondary"
+            }`}>
+              {stat.countLabel}
+            </span>
+          </button>
+        ))}
       </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
@@ -494,7 +606,7 @@ function KanbanBoard({
               key={column.id}
               column={column}
               onDeleteColumn={requestDeleteColumn}
-              onAddCard={(colId) => setAddingCardCol(colId)}
+              onAddCard={handleOpenAddCard}
               onCompleteCard={handleCompleteCard}
               onDetailCard={handleOpenDetail}
             />
@@ -549,7 +661,7 @@ function KanbanBoard({
             <KanbanColumn
               column={columns[mobileColIndex]}
               onDeleteColumn={requestDeleteColumn}
-              onAddCard={(colId) => setAddingCardCol(colId)}
+              onAddCard={handleOpenAddCard}
               onCompleteCard={handleCompleteCard}
               onDetailCard={handleOpenDetail}
             />
@@ -558,27 +670,27 @@ function KanbanBoard({
       </DragDropContext>
 
       {/* Drawer detalle de tarjeta */}
-      {detailCard && (
+      {detailModalData && (
         <KanbanDetailDrawer
-          card={detailCard.card}
+          card={detailModalData.card}
           open
-          onClose={() => setDetailCard(null)}
+          onClose={() => dispatchModal({ type: "CLOSE" })}
           onEdit={handleEditFromDetail}
           onDelete={handleRequestDeleteFromDetail}
           isManager={isManager}
-          isOwnerOrAssigned={isOwnerOrAssigned(detailCard.card)}
+          isOwnerOrAssigned={isOwnerOrAssigned(detailModalData.card)}
           canDelete={
-            detailCard.card.source === "tarea"
-              ? (isManager || isOwnerOrAssigned(detailCard.card))
-              : canDeleteAgenda(detailCard.card)
+            detailModalData.card.source === "tarea"
+              ? (isManager || isOwnerOrAssigned(detailModalData.card))
+              : canDeleteAgenda(detailModalData.card)
           }
         />
       )}
 
       {/* Convertir tarea → agenda (desde drag & drop) */}
-      {convertingCard && (
+      {modal.type === "converting" && (
         <KanbanConvertCard
-          card={convertingCard.card}
+          card={modal.card}
           onConfirm={handleConfirmConvert}
           onClose={handleCancelConvert}
           agents={agents}
@@ -588,57 +700,57 @@ function KanbanBoard({
       )}
 
       {/* Añadir tarjeta */}
-      {addingCardCol && (
+      {modal.type === "adding" && (
         <KanbanAddCard
           role={role}
           agents={agents}
           currentUserId={_currentUserId}
-          mode={addingCardCol === "en_progreso" ? "actividad" : "tarea"}
-          onAdd={(card) => handleAddCard(addingCardCol, card)}
-          onClose={() => setAddingCardCol(null)}
+          mode={modal.columnId === "en_progreso" ? "actividad" : "tarea"}
+          onAdd={(card) => handleAddCard(modal.columnId, card)}
+          onClose={() => dispatchModal({ type: "CLOSE" })}
         />
       )}
 
       {/* Editar tarjeta */}
-      {editingCard && (
+      {modal.type === "editing" && (
         <KanbanEditCard
-          card={editingCard.card}
+          card={modal.card}
           agents={agents}
           currentUserId={_currentUserId}
-          onSave={(updates) => { handleSaveEdit(updates); setEditingCard(null); }}
-          onClose={() => setEditingCard(null)}
+          onSave={(updates) => { handleSaveEdit(updates); dispatchModal({ type: "CLOSE" }); }}
+          onClose={() => dispatchModal({ type: "CLOSE" })}
         />
       )}
 
       {/* Confirmacion eliminar tarjeta (desde detalle) */}
-      {confirmDeleteCard && (
+      {modal.type === "confirm_delete_from_detail" && (
         <ConfirmDialog
           open
           title="Eliminar actividad"
           description={
-            confirmDeleteCard.card.source === "agenda"
+            modal.card.source === "agenda"
               ? "Esta actividad se archivara y desaparecera del tablero. Esta accion no se puede deshacer."
               : "Esta tarea se eliminara permanentemente. Esta accion no se puede deshacer."
           }
           confirmLabel="Eliminar"
-          onCancel={() => { setConfirmDeleteCard(null); }}
+          onCancel={() => dispatchModal({ type: "CLOSE" })}
           onConfirm={handleConfirmDeleteCard}
         />
       )}
 
       {/* Resultado al completar */}
-      {resultadoModal && (
+      {modal.type === "resultado" && (
         <Drawer
           open
-          onClose={() => setResultadoModal(null)}
+          onClose={() => dispatchModal({ type: "CLOSE" })}
           title="Como ha ido?"
-          subtitle={resultadoModal.titulo}
+          subtitle={modal.titulo}
           width="sm"
           footer={
             <div className="flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setResultadoModal(null)}
+                onClick={() => dispatchModal({ type: "CLOSE" })}
                 className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised"
               >
                 Cancelar
@@ -660,11 +772,11 @@ function KanbanBoard({
               </label>
               <textarea
                 autoFocus
-                value={resultadoText}
-                onChange={(e) => setResultadoText(e.target.value)}
+                value={modal.text}
+                onChange={(e) => dispatchModal({ type: "SET_RESULTADO_TEXT", text: e.target.value })}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleConfirmResultado();
-                  if (e.key === "Escape") setResultadoModal(null);
+                  if (e.key === "Escape") dispatchModal({ type: "CLOSE" });
                 }}
                 placeholder="Ej: Llamada realizada, cliente interesado. Proxima visita el martes."
                 rows={4}
@@ -677,19 +789,19 @@ function KanbanBoard({
       )}
 
       {/* Confirmacion eliminar tarjeta/columna (desde hover) */}
-      {deleteTarget && (
+      {modal.type === "confirm_delete_target" && (
         <ConfirmDialog
-          open={!!deleteTarget}
-          title={deleteTarget.type === "column" ? "Eliminar columna" : "Eliminar actividad"}
+          open
+          title={modal.target.type === "column" ? "Eliminar columna" : "Eliminar actividad"}
           description={
-            deleteTarget.type === "column"
+            modal.target.type === "column"
               ? "Esta columna desaparecera de tu tablero. Las tareas dentro NO se eliminaran de la base de datos y quedaran sin columna asignada. ¿Seguro?"
-              : deleteTarget.isAgenda
+              : modal.target.isAgenda
                 ? "Esta actividad se archivara. ¿Quieres continuar?"
                 : "¿Estas seguro de que quieres eliminar esta tarea? Esta accion no se puede deshacer."
           }
           confirmLabel="Eliminar"
-          onCancel={() => setDeleteTarget(null)}
+          onCancel={() => dispatchModal({ type: "CLOSE" })}
           onConfirm={handleConfirmDelete}
         />
       )}

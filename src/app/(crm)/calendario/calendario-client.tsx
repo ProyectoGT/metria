@@ -1,16 +1,14 @@
-﻿"use client";
+﻿﻿﻿"use client";
 
-import { useState, useMemo, useEffect, useCallback, useRef, useId } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   Phone, Users, Home, Clock, BookOpen, Star, Activity, Calendar,
   ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter, Pencil, CheckCircle2, User, Bell, Loader2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast, Toaster } from "@/components/ui/toast";
-import { saveAgendaGoogleEventIdAction } from "@/app/(crm)/calendario/actions";
 import type { UserRole } from "@/lib/roles";
-import { DEFAULT_ACTIVITY_TIME, normalizeTime, calcDurationMinutes, formatDuration, formatReminderLabel, REMINDER_OPTIONS } from "@/lib/local-date-time";
-import { isActivityPriority, isActivityType, normalizeActivityPriority, normalizeActivityType } from "@/lib/activity-options";
+import { normalizeTime, calcDurationMinutes, formatDuration, formatReminderLabel } from "@/lib/local-date-time";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import Drawer from "@/components/ui/drawer";
 import { AuditTimelineCard } from "@/components/audit/audit-timeline";
@@ -19,14 +17,13 @@ import { localeLabels } from "@/lib/i18n/config";
 import {
   useAgendaItems,
   useCompleteAgendaItem,
-  useCreateAgendaItem,
   useDeleteAgendaItem,
-  useUpdateAgendaItem,
 } from "@/modules/agenda/hooks/use-agenda-items";
 import { useCompleteTask, useTasks } from "@/modules/tareas/hooks/use-tasks";
 import type { TareaRow } from "@/modules/tareas/services/tareas.service";
+import EventFormModal from "./event-form-modal";
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Types â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 type AgendaEvent = {
   id: number;
@@ -76,19 +73,7 @@ type GCalEvent = {
   };
 };
 
-type FormState = {
-  description: string;
-  event_date: string;
-  time: string;
-  time_end: string;
-  priority: string;
-  tipo: string;
-  completed: boolean;
-  result: string;
-  syncToGcal: boolean;
-  assignedUserIds: number[];
-  reminderMinutes: number | null;
-};
+// FormState moved to event-form-modal.tsx
 
 type ViewMode = "month" | "week";
 
@@ -104,9 +89,9 @@ type Props = {
   archivedGoogleEventIds: string[];
 };
 
-// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Constants â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-// Static style data â€” labels computed inside component via t()
+// Static style data â€" labels computed inside component via t()
 const TIPOS_META: { value: string; icon: React.ElementType; dot: string; bg: string; text: string; border: string }[] = [
   { value: "visita",      icon: Home,     dot: "bg-emerald-500",  bg: "bg-emerald-500/10",  text: "text-emerald-700 dark:text-emerald-400",  border: "border-emerald-500/30" },
   { value: "llamada",     icon: Phone,    dot: "bg-blue-500",     bg: "bg-blue-500/10",     text: "text-blue-700 dark:text-blue-400",        border: "border-blue-500/30"    },
@@ -123,7 +108,7 @@ const PRIORITY_STYLES = [
   { value: "baja",  dot: "ring-2 ring-blue-400",  badge: "bg-blue-500/15 text-blue-700 dark:text-blue-400",    text: "text-text-secondary" },
 ];
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 function toDateStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -159,22 +144,6 @@ function getWeekDays(weekStart: Date): Date[] {
     d.setDate(weekStart.getDate() + i);
     return d;
   });
-}
-
-function emptyForm(date?: Date, syncToGcal = false): FormState {
-  return {
-    description: "",
-    event_date: toDateStr(date ?? new Date()),
-    time: "",
-    time_end: "",
-    priority: "media",
-    tipo: "actividad",
-    completed: false,
-    result: "",
-    syncToGcal,
-    assignedUserIds: [],
-    reminderMinutes: null,
-  };
 }
 
 function tipoMeta(tipo: string) {
@@ -214,7 +183,7 @@ function normalizeCalendarEvent(ev: AgendaEvent): AgendaEvent {
   };
 }
 
-// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Component â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 export default function CalendarioClient({
   initialEvents,
@@ -279,12 +248,13 @@ export default function CalendarioClient({
   useEffect(() => { eventsRef.current = events; }, [events]);
 
   const [modalOpen, setModalOpen]   = useState(false);
-  const [editId, setEditId]         = useState<number | null>(null);
+  const [editEvent, setEditEvent]   = useState<AgendaEvent | null>(null);
+  const [formInitialDate, setFormInitialDate] = useState(() => toDateStr(new Date()));
   const [detailEvent, setDetailEvent] = useState<AgendaEvent | null>(null);
   const [confirmDeleteEvent, setConfirmDeleteEvent] = useState<AgendaEvent | null>(null);
-  const [form, setForm] = useState<FormState>(() => emptyForm(undefined, isConnected));
+  // saving: guard used in agendaItemsQuery sync useEffect to avoid overwriting
+  // an in-progress optimistic update. EventFormModal calls onSavingChange.
   const [saving, setSaving]         = useState(false);
-  const [saveError, setSaveError]   = useState<string | null>(null);
   const [deleteId, setDeleteId]     = useState<number | null>(null);
   const [deleting, setDeleting]     = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -310,8 +280,6 @@ export default function CalendarioClient({
     from: agendaRange.start,
     to: agendaRange.end,
   });
-  const createAgendaItem = useCreateAgendaItem();
-  const updateAgendaItem = useUpdateAgendaItem();
   const deleteAgendaItem = useDeleteAgendaItem();
   const completeAgendaItem = useCompleteAgendaItem();
   const completeTask = useCompleteTask();
@@ -329,17 +297,16 @@ export default function CalendarioClient({
   }, [initialTareas, tasksQuery.data]);
   const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
 
-  // Filter by user â€” default "all" for managers, currentUserId for agents
+  // Filter by user â€" default "all" for managers, currentUserId for agents
   const [filterUserId, setFilterUserId] = useState<number | "all">(() =>
     canSeeOthers(role) ? "all" : currentUserId
   );
 
   const { toasts, toast } = useToast();
-  const formId = useId();
 
-  // filterableUsers comes from the server â€” always complete regardless of events loaded
+  // filterableUsers comes from the server â€" always complete regardless of events loaded
 
-  // â”€â”€ Apply user filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Apply user filter â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   const filteredEvents = useMemo(() =>
     filterUserId === "all" ? events : events.filter((e) => e.owner_user_id === filterUserId || e.user_id === filterUserId || agendaAssignedIds(e).includes(filterUserId)),
@@ -351,7 +318,7 @@ export default function CalendarioClient({
     [tareas, filterUserId]
   );
 
-  // â”€â”€ Calendar data maps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Calendar data maps â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   const calendarDays = useMemo(
     () => getCalendarDays(currentDate.getFullYear(), currentDate.getMonth()),
@@ -399,7 +366,7 @@ export default function CalendarioClient({
     return map;
   }, [filteredTareas]);
 
-  // â”€â”€ Google Calendar fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Google Calendar fetch â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   const gcalAbortRef = useRef<AbortController | null>(null);
 
@@ -467,7 +434,7 @@ export default function CalendarioClient({
 
   useEffect(() => { fetchGcalEvents(); }, [fetchGcalEvents]);
 
-  // â”€â”€ Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Navigation â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   function prevPeriod() {
     if (viewMode === "month") {
@@ -498,290 +465,24 @@ export default function CalendarioClient({
     setViewMode(mode);
   }
 
-  // â”€â”€ Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Modal â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   function openCreate(date?: Date) {
-    setEditId(null);
-    setForm({ ...emptyForm(date ?? selectedDate, isConnected), assignedUserIds: [currentUserId] });
-    setSaveError(null);
+    setEditEvent(null);
+    setFormInitialDate(toDateStr(date ?? selectedDate));
     setModalOpen(true);
   }
 
   function openEdit(ev: AgendaEvent) {
-    setEditId(ev.id);
-    setForm({
-      description: ev.description,
-      event_date: ev.event_date,
-      time: ev.time ?? "",
-      time_end: ev.time_end ?? "",
-      priority: ev.priority,
-      tipo: ev.tipo ?? "actividad",
-      completed: ev.completed,
-      result: ev.result ?? "",
-      syncToGcal: false,
-      assignedUserIds: agendaAssignedIds(ev).length ? agendaAssignedIds(ev) : [ev.owner_user_id ?? currentUserId],
-      reminderMinutes: ev.reminder_minutes_before ?? null,
-    });
-    setSaveError(null); setModalOpen(true);
+    setEditEvent(ev);
+    setModalOpen(true);
   }
 
-  function toggleAssignedUser(userId: number) {
-    setForm((prev) => {
-      const exists = prev.assignedUserIds.includes(userId);
-      const next = exists
-        ? prev.assignedUserIds.filter((id) => id !== userId)
-        : [...prev.assignedUserIds, userId];
-      return { ...prev, assignedUserIds: next.length ? next : prev.assignedUserIds };
-    });
-  }
+  // â"€â"€ Save â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-  // â”€â”€ Save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // handleSave lives in EventFormModal.
 
-  async function handleSave() {
-    const priority = normalizeActivityPriority(form.priority);
-    const tipo = normalizeActivityType(form.tipo);
-
-    if (!form.description.trim()) return;
-    if (!isActivityPriority(priority) || !isActivityType(tipo)) {
-      setSaveError(t("calendar.prioridadTipoInvalidos"));
-      return;
-    }
-    if (form.assignedUserIds.length === 0) {
-      setSaveError(t("calendar.usuarioRequerido"));
-      return;
-    }
-    setSaving(true); setSaveError(null);
-
-    // Validar hora de fin si se introduce
-    const normalizedEnd = form.time_end ? normalizeTime(form.time_end, "") : null;
-    const normalizedStart = normalizeTime(form.time, DEFAULT_ACTIVITY_TIME);
-    if (normalizedEnd && normalizedEnd <= normalizedStart) {
-      setSaveError(t("calendar.horaFinInvalida"));
-      setSaving(false);
-      return;
-    }
-    // Validar recordatorio requiere hora inicio
-    if (form.reminderMinutes != null && !form.time.trim()) {
-      setSaveError(t("calendar.recordatorioRequiereHora"));
-      setSaving(false);
-      return;
-    }
-
-    const payload = {
-      description: form.description.trim(),
-      event_date: form.event_date,
-      time: normalizedStart,
-      time_end: normalizedEnd,
-      priority,
-      tipo,
-      completed: form.completed,
-      result: form.result || null,
-      reminderMinutes: form.reminderMinutes,
-    };
-    const previousEvents = events;
-    const optimisticId = editId ?? -Date.now();
-    const optimisticEvent = normalizeCalendarEvent({
-      id: optimisticId,
-      description: payload.description,
-      event_date: payload.event_date,
-      time: payload.time,
-      time_end: payload.time_end,
-      priority: payload.priority,
-      tipo: payload.tipo,
-      completed: payload.completed,
-      result: payload.result,
-      reminder_minutes_before: payload.reminderMinutes,
-      gcal_event_id: editId !== null ? events.find((event) => event.id === editId)?.gcal_event_id ?? null : null,
-      owner_user_id: currentUserId,
-      user_id: currentUserId,
-      empresa_id: empresaId,
-      created_at: new Date().toISOString(),
-      agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
-    });
-
-    setEvents((prev) =>
-      editId !== null
-        ? prev.map((event) => event.id === editId ? { ...event, ...optimisticEvent, id: editId } : event)
-        : [...prev, optimisticEvent].sort((a, b) => a.event_date.localeCompare(b.event_date)),
-    );
-    setModalOpen(false);
-
-    async function insertOrUpdate(p: typeof payload) {
-      const assignedUserIds = form.assignedUserIds.length ? form.assignedUserIds : [currentUserId];
-      if (editId !== null) {
-        return updateAgendaItem.mutateAsync({
-          id: editId,
-          description: p.description,
-          eventDate: p.event_date,
-          time: p.time,
-          timeEnd: p.time_end,
-          priority: p.priority,
-          tipo: p.tipo,
-          completed: p.completed,
-          result: p.result,
-          assignedUserIds,
-          reminderMinutes: p.reminderMinutes ?? -1,
-        });
-      }
-      return createAgendaItem.mutateAsync({
-        description: p.description,
-        eventDate: p.event_date,
-        time: p.time,
-        timeEnd: p.time_end,
-        priority: p.priority,
-        tipo: p.tipo,
-        completed: p.completed,
-        result: p.result,
-        assignedUserIds,
-        visibility: "private",
-        reminderMinutes: p.reminderMinutes,
-      });
-    }
-
-    if (editId !== null) {
-      const previousEvent = events.find((event) => event.id === editId);
-      try {
-        const data = await insertOrUpdate(payload);
-
-        if (data) {
-          const updated: AgendaEvent = {
-            ...(data as unknown as AgendaEvent),
-            agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
-          };
-          const normalizedUpdated = normalizeCalendarEvent(updated);
-          const googleEventId = normalizedUpdated.gcal_event_id ?? previousEvent?.gcal_event_id ?? null;
-
-          if (isConnected && googleEventId) {
-            const gcalRes = await fetch("/api/google/events", {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                eventId: googleEventId,
-                summary: payload.description,
-                description: payload.result ?? "",
-                date: payload.event_date,
-                time: payload.time,
-                timeEnd: payload.time_end ?? undefined,
-                agendaId: editId,
-                reminderMinutes: payload.reminderMinutes ?? undefined,
-              }),
-            });
-
-            if (!gcalRes.ok) {
-              const gcalData = await gcalRes.json().catch(() => null);
-              toast(
-                `Actividad actualizada en CRM, pero no en Google Calendar: ${gcalData?.error ?? "error de sincronizacion"}`,
-                "error",
-              );
-            } else {
-              setGcalEvents((prev) =>
-                prev.map((event) =>
-                  event.id === googleEventId
-                    ? {
-                        ...event,
-                        summary: payload.description,
-                        start: { ...event.start, dateTime: `${payload.event_date}T${payload.time}:00` },
-                      }
-                    : event,
-                ),
-              );
-            }
-          }
-
-          setEvents((prev) => prev.map((e) => e.id === editId ? normalizedUpdated : e));
-          router.refresh();
-          toast(t("calendar.actividadActualizada"));
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : t("calendar.errorGuardar");
-        setEvents(previousEvents);
-        setSaveError(message);
-        toast(message, "error");
-      }
-    } else {
-      try {
-        const data = await insertOrUpdate(payload);
-
-        if (data) {
-          let saved: AgendaEvent = {
-            ...(data as unknown as AgendaEvent),
-            agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
-          };
-          saved = normalizeCalendarEvent(saved);
-
-          setEvents((prev) =>
-            [...prev.filter((event) => event.id !== optimisticId && event.id !== saved.id), saved]
-              .sort((a, b) => a.event_date.localeCompare(b.event_date))
-          );
-
-          if (isConnected && form.syncToGcal) {
-            const gcalRes = await fetch("/api/google/events", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                summary: form.description,
-                date: form.event_date,
-                time: normalizeTime(form.time, DEFAULT_ACTIVITY_TIME),
-                timeEnd: form.time_end || undefined,
-                agendaId: saved.id,
-                reminderMinutes: form.reminderMinutes ?? undefined,
-              }),
-            });
-            if (gcalRes.ok) {
-              const gcalData = await gcalRes.json();
-              if (gcalData.id) {
-                const localAgendaId = saved.id;
-                const googleEventId = gcalData.id;
-                if (process.env.NODE_ENV !== "production") {
-                  console.log("[calendario] intentando guardar gcal_event_id", {
-                    localAgendaId,
-                    googleEventId,
-                    currentUserId,
-                    empresaId,
-                  });
-                }
-
-                const syncUpdateResult = await saveAgendaGoogleEventIdAction(localAgendaId, googleEventId);
-                if (!syncUpdateResult.success) {
-                  const syncUpdateError = syncUpdateResult.error;
-                  if (process.env.NODE_ENV !== "production") {
-                    console.error("[calendario] Error guardando gcal_event_id:", {
-                      message: syncUpdateError?.message,
-                      details: syncUpdateError?.details,
-                      hint: syncUpdateError?.hint,
-                      code: syncUpdateError?.code,
-                      raw: JSON.stringify(syncUpdateError, Object.getOwnPropertyNames(syncUpdateError)),
-                    });
-                  }
-                  toast(
-                    `Actividad guardada en CRM, pero no enlazada con Google Calendar: ${syncUpdateError.message}`,
-                    "error",
-                  );
-                } else {
-                  saved = normalizeCalendarEvent({ ...saved, gcal_event_id: syncUpdateResult.data.gcal_event_id });
-                  setEvents((prev) => prev.map((event) => event.id === saved.id ? saved : event));
-                }
-              }
-            } else {
-              const gcalData = await gcalRes.json().catch(() => null);
-              const message = gcalData?.error ?? "No se pudo sincronizar con Google Calendar";
-              toast(`Actividad guardada localmente. ${message}`, "error");
-            }
-          }
-          router.refresh();
-          toast(t("calendar.actividadCreada"));
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : t("calendar.errorGuardar");
-        setEvents(previousEvents);
-        setSaveError(message);
-        toast(message, "error");
-      }
-    }
-    setSaving(false);
-  }
-
-  // â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Delete â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   async function handleDelete(eventId?: number) {
     const id = eventId ?? deleteId;
@@ -810,7 +511,7 @@ export default function CalendarioClient({
     setDeleting(false);
   }
 
-  // â”€â”€ Complete tarea â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Complete tarea â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   async function handleCompleteTarea(id: number) {
     setCompletingTaskIds((prev) => new Set(prev).add(id));
@@ -830,7 +531,7 @@ export default function CalendarioClient({
     }
   }
 
-  // â”€â”€ Complete agenda â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Complete agenda â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   async function handleCompleteAgenda(id: number, completed: boolean) {
     setCompletingAgendaIds((prev) => new Set(prev).add(id));
@@ -856,7 +557,7 @@ export default function CalendarioClient({
     });
   }
 
-  // â”€â”€ Derived â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Derived â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   const todayStr        = toDateStr(today);
   const selectedDateStr = toDateStr(selectedDate);
@@ -870,11 +571,11 @@ export default function CalendarioClient({
     : (() => {
         const we = new Date(weekStart); we.setDate(we.getDate() + 6);
         const sameMonth = weekStart.getMonth() === we.getMonth();
-        if (sameMonth) return `${weekStart.getDate()} â€“ ${we.getDate()} ${getMonthName(we.getMonth(), we.getFullYear())} ${we.getFullYear()}`;
-        return `${weekStart.getDate()} ${getMonthName(weekStart.getMonth(), weekStart.getFullYear())} â€“ ${we.getDate()} ${getMonthName(we.getMonth(), we.getFullYear())} ${we.getFullYear()}`;
+        if (sameMonth) return `${weekStart.getDate()} â€" ${we.getDate()} ${getMonthName(we.getMonth(), we.getFullYear())} ${we.getFullYear()}`;
+        return `${weekStart.getDate()} ${getMonthName(weekStart.getMonth(), weekStart.getFullYear())} â€" ${we.getDate()} ${getMonthName(we.getMonth(), we.getFullYear())} ${we.getFullYear()}`;
       })();
 
-  // â”€â”€ Render helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Render helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   function renderDayEventDots(dateStr: string) {
     const localEvs = eventsByDate[dateStr] ?? [];
@@ -1008,7 +709,7 @@ export default function CalendarioClient({
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {ev.time && (
                       <span className="text-xs font-medium text-text-secondary">
-                        {ev.time}{ev.time_end ? ` â€“ ${ev.time_end}` : ""}
+                        {ev.time}{ev.time_end ? ` â€" ${ev.time_end}` : ""}
                         {(() => { const d = calcDurationMinutes(ev.time, ev.time_end); return d ? ` (${formatDuration(d)})` : ""; })()}
                       </span>
                     )}
@@ -1056,7 +757,7 @@ export default function CalendarioClient({
     );
   }
 
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Render â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   return (
     <>
@@ -1168,7 +869,7 @@ export default function CalendarioClient({
         </div>
       </div>
 
-      {/* â”€â”€â”€ MONTH VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* â"€â"€â"€ MONTH VIEW â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
       {viewMode === "month" && (
         <div className="flex flex-col gap-5 lg:flex-row">
           {/* Calendar grid */}
@@ -1269,7 +970,7 @@ export default function CalendarioClient({
         </div>
       )}
 
-      {/* â”€â”€â”€ WEEK VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* â"€â"€â"€ WEEK VIEW â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
       {viewMode === "week" && (
         <div className="overflow-hidden rounded-ds-lg border border-border bg-surface shadow-layer-1">
           {/* Nav */}
@@ -1324,7 +1025,7 @@ export default function CalendarioClient({
             })}
           </div>
 
-          {/* Week event rows â€” show all days side by side */}
+          {/* Week event rows â€" show all days side by side */}
           <div className="grid min-h-[420px] min-w-[640px] grid-cols-7 divide-x divide-border/70">
             {weekDays.map((date, i) => {
               const dateStr   = toDateStr(date);
@@ -1455,202 +1156,24 @@ export default function CalendarioClient({
         </div>
       )}
 
-      {/* â”€â”€ Create / Edit Drawer â”€â”€ */}
-      <Drawer
+            {/* EventFormModal: isolated form state - typing does not re-render CalendarioClient */}
+      <EventFormModal
         open={modalOpen}
+        editEvent={editEvent}
+        initialDate={formInitialDate}
+        isConnected={isConnected}
+        currentUserId={currentUserId}
+        empresaId={empresaId}
+        filterableUsers={filterableUsers}
+        usersMap={usersMap}
         onClose={() => setModalOpen(false)}
-        title={editId !== null ? t("calendar.editarActividad") : t("calendar.nuevaActividadLabel")}
-        width="md"
-        footer={
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">
-              {t("calendar.cancelar")}
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving || !form.description.trim() || form.assignedUserIds.length === 0}
-              className="pressable inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60"
-            >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {saving ? t("calendar.guardando") : editId !== null ? t("calendar.guardarCambios") : t("calendar.crearActividad")}
-            </button>
-          </div>
-        }
-      >
-        <div className="space-y-4 px-5 py-5">
-          {/* Tipo selector */}
-          <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              {t("ordenes.tipoActividad")}
-            </label>
-            <div className="grid grid-cols-4 gap-1.5">
-              {TIPOS.map((tp) => {
-                const Icon = tp.icon;
-                const active = form.tipo === tp.value;
-                return (
-                  <button
-                    key={tp.value}
-                    type="button"
-                    onClick={() => setForm((prev) => ({ ...prev, tipo: tp.value }))}
-                    className={[
-                      "flex flex-col items-center gap-1 rounded-xl border py-2.5 px-1 text-center transition-all",
-                      active ? `${tp.bg} ${tp.border} ${tp.text} border-2` : "border-border text-text-secondary hover:bg-background",
-                    ].join(" ")}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="text-[10px] font-medium">{tp.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+        onEventsChange={setEvents}
+        onGcalEventsChange={setGcalEvents}
+        onSavingChange={setSaving}
+        toast={toast}
+      />
 
-          {/* Description */}
-          <div>
-            <label htmlFor={`${formId}-descripcion`} className="text-xs font-medium text-text-secondary">{t("calendar.descripcion")} *</label>
-            <input
-              id={`${formId}-descripcion`}
-              type="text"
-              value={form.description}
-              onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-              onKeyDown={(e) => e.key === "Enter" && handleSave()}
-              placeholder={t("calendar.describeLaActividad")}
-              className="input mt-1.5"
-            />
-          </div>
-
-          {/* Date */}
-          <div>
-            <label htmlFor={`${formId}-fecha`} className="text-xs font-medium text-text-secondary">{t("calendar.fecha")}</label>
-            <input id={`${formId}-fecha`} type="date" value={form.event_date} onChange={(e) => setForm((prev) => ({ ...prev, event_date: e.target.value }))} className="input mt-1.5" />
-          </div>
-
-          {/* Hora inicio / fin / duraciÃ³n */}
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor={`${formId}-hora-inicio`} className="text-xs font-medium text-text-secondary">{t("calendar.horaInicio")}</label>
-                <input id={`${formId}-hora-inicio`} type="time" value={form.time} onChange={(e) => setForm((prev) => ({ ...prev, time: e.target.value }))} className="input mt-1.5" />
-              </div>
-              <div>
-                <label htmlFor={`${formId}-hora-fin`} className="text-xs font-medium text-text-secondary">{t("calendar.horaFin")}</label>
-                <input id={`${formId}-hora-fin`} type="time" value={form.time_end} onChange={(e) => setForm((prev) => ({ ...prev, time_end: e.target.value }))} className="input mt-1.5" />
-              </div>
-            </div>
-            {(() => {
-              const dur = calcDurationMinutes(form.time, form.time_end);
-              if (!dur) return null;
-              return (
-                <p className="flex items-center gap-1 text-xs text-text-secondary">
-                  <Clock className="h-3 w-3" />
-                  DuraciÃ³n: <span className="font-medium text-text-primary">{formatDuration(dur)}</span>
-                </p>
-              );
-            })()}
-          </div>
-
-          {/* Recordatorio */}
-          <div>
-            <label htmlFor={`${formId}-recordatorio`} className="text-xs font-medium text-text-secondary">{t("calendar.recordatorio")}</label>
-            <select
-              id={`${formId}-recordatorio`}
-              value={form.reminderMinutes == null ? "" : String(form.reminderMinutes)}
-              onChange={(e) => setForm((prev) => ({ ...prev, reminderMinutes: e.target.value === "" ? null : Number(e.target.value) }))}
-              className="input mt-1.5"
-              disabled={!form.time.trim()}
-            >
-              {REMINDER_OPTIONS.map((opt) => (
-                <option key={opt.label} value={opt.value == null ? "" : String(opt.value)}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            {!form.time.trim() && (
-              <p className="mt-1 text-[10px] text-text-secondary">{t("calendar.duracionHint")}</p>
-            )}
-          </div>
-
-          {/* Priority */}
-          <div>
-            <label className="text-xs font-medium text-text-secondary">{t("calendar.prioridad")}</label>
-            <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
-              {PRIORITIES.map((p, i) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, priority: p.value }))}
-                  className={[
-                    "flex-1 py-2 text-sm font-medium transition-colors",
-                    i > 0 ? "border-l border-border" : "",
-                    form.priority === p.value ? "bg-primary text-white" : "bg-surface text-text-secondary hover:bg-background",
-                  ].join(" ")}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Assigned users */}
-          <div>
-            <label className="text-xs font-medium text-text-secondary">{t("calendar.usuariosAsignados")} *</label>
-            <div className="mt-1.5 max-h-32 space-y-1 overflow-y-auto rounded-xl border border-border bg-background p-2">
-              {[
-                { id: currentUserId, name: usersMap[currentUserId] ?? "Yo" },
-                ...filterableUsers.filter((u) => u.id !== currentUserId),
-              ].map((user) => (
-                <label key={user.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-secondary hover:bg-surface">
-                  <input
-                    type="checkbox"
-                    checked={form.assignedUserIds.includes(user.id)}
-                    onChange={() => toggleAssignedUser(user.id)}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  {user.name}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Completed (edit only) */}
-          {editId !== null && (
-            <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background p-3">
-              <input type="checkbox" checked={form.completed} onChange={(e) => setForm((prev) => ({ ...prev, completed: e.target.checked }))} className="h-4 w-4 accent-primary" />
-              <span className="text-sm text-text-secondary">{t("calendar.marcarCompletada")}</span>
-            </label>
-          )}
-
-          {/* Notes / result */}
-          <div>
-            <label htmlFor={`${formId}-notas`} className="text-xs font-medium text-text-secondary">{t("calendar.notasResultado")}</label>
-            <textarea
-              id={`${formId}-notas`}
-              value={form.result}
-              onChange={(e) => setForm((prev) => ({ ...prev, result: e.target.value }))}
-              placeholder={t("calendar.observaciones")}
-              rows={3}
-              className="input mt-1.5 resize-none"
-            />
-          </div>
-
-          {/* GCal sync */}
-          {editId === null && isConnected && (
-            <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background p-3">
-              <input type="checkbox" checked={form.syncToGcal} onChange={(e) => setForm((prev) => ({ ...prev, syncToGcal: e.target.checked }))} className="h-4 w-4 accent-primary" />
-              <div>
-                <p className="text-sm font-medium text-text-primary">{t("calendar.sincronizarGcal")}</p>
-                <p className="text-xs text-text-secondary">{t("calendar.sincronizarGcalDesc")}</p>
-              </div>
-            </label>
-          )}
-
-          {saveError && (
-            <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{saveError}</p>
-          )}
-        </div>
-      </Drawer>
-
-      {/* â”€â”€ Detail Drawer â”€â”€ */}
+      {/* â"€â"€ Detail Drawer â"€â"€ */}
       <Drawer
         open={detailEvent !== null}
         onClose={() => setDetailEvent(null)}
@@ -1747,7 +1270,7 @@ export default function CalendarioClient({
                   <Clock className="h-4 w-4 shrink-0" />
                   <span>
                     {normalizeTime(detailEvent.time, "")}
-                    {detailEvent.time_end && ` â€“ ${normalizeTime(detailEvent.time_end, "")}`}
+                    {detailEvent.time_end && ` â€" ${normalizeTime(detailEvent.time_end, "")}`}
                     {(() => {
                       const d = calcDurationMinutes(detailEvent.time, detailEvent.time_end);
                       return d ? <span className="ml-1 rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium">{formatDuration(d)}</span> : null;
@@ -1801,7 +1324,7 @@ export default function CalendarioClient({
         )}
       </Drawer>
 
-      {/* â”€â”€ Detail Delete Confirmation â”€â”€ */}
+      {/* â"€â"€ Detail Delete Confirmation â"€â"€ */}
       {confirmDeleteEvent !== null && (
         <ConfirmDialog
           open
@@ -1827,7 +1350,7 @@ export default function CalendarioClient({
         />
       )}
 
-      {/* â”€â”€ Delete Confirmation (legacy) â”€â”€ */}
+      {/* â"€â"€ Delete Confirmation (legacy) â"€â"€ */}
       {deleteId !== null && (
         <ConfirmDialog
           open={deleteId !== null}

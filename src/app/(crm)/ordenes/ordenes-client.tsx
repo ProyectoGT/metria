@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useId } from "react";
+import { memo, useCallback, useMemo, useState, useId, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Calendar, CheckCircle2, ChevronDown, Circle, Clock, Loader2, Pencil, Plus, Trash2, User } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
@@ -63,6 +63,103 @@ function assignedIds(actividad: Actividad) {
   return actividad.agenda_usuarios?.map((u) => u.usuario_id) ?? [];
 }
 
+// ─── Enriched row type ────────────────────────────────────────────────────────
+
+type PriorityMeta = (typeof PRIORITY_STYLES)[0] & { label: string };
+
+type EnrichedActividad = {
+  actividad:     Actividad;
+  meta:          PriorityMeta;
+  ids:           number[];
+  durationLabel: string | null;
+  tipoLabelStr:  string;
+};
+
+// ─── ActividadRow ────────────────────────────────────────────────────────────
+// Defined outside OrdenesClient so its reference is stable across renders and
+// React.memo can compare props without the component type changing each time.
+
+type ActividadRowProps = {
+  enriched:       EnrichedActividad;
+  isCompleting:   boolean;
+  userMap:        Map<number, string>;
+  onOpenDetail:   (actividad: Actividad) => void;
+  onSetCompleted: (actividad: Actividad, completed: boolean) => void;
+};
+
+const ActividadRow = memo(function ActividadRow({
+  enriched,
+  isCompleting,
+  userMap,
+  onOpenDetail,
+  onSetCompleted,
+}: ActividadRowProps) {
+  const { actividad, meta, ids, durationLabel, tipoLabelStr } = enriched;
+
+  return (
+    <div className="px-2 py-1.5">
+      <div
+        onClick={() => onOpenDetail(actividad)}
+        className={`group flex cursor-pointer items-start gap-3 rounded-ds-lg border-l-2 bg-surface px-4 py-3 transition-all hover:bg-surface-elevated hover:shadow-layer-1 ${meta.border}`}
+      >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!isCompleting) onSetCompleted(actividad, !actividad.completed);
+          }}
+          disabled={isCompleting}
+          className={`mt-0.5 shrink-0 transition-opacity disabled:opacity-50 ${
+            actividad.completed
+              ? "text-success"
+              : "text-text-secondary opacity-0 group-hover:opacity-100 hover:text-success"
+          }`}
+        >
+          {isCompleting
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : actividad.completed
+              ? <CheckCircle2 className="complete-pop h-4 w-4" />
+              : <Circle className="h-4 w-4" />}
+        </button>
+
+        <div className="min-w-0 flex-1">
+          <p className={`break-words text-sm font-medium leading-snug ${actividad.completed ? "line-through text-text-secondary" : "text-text-primary"}`}>
+            {actividad.description}
+          </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
+            <span>
+              {normalizeTime(actividad.time, DEFAULT_ACTIVITY_TIME)}
+              {actividad.time_end ? ` – ${actividad.time_end}` : ""}
+              {durationLabel ? ` (${durationLabel})` : ""}
+            </span>
+            <span>{tipoLabelStr}</span>
+            {actividad.reminder_minutes_before != null && (
+              <span className="inline-flex items-center gap-0.5 text-primary">
+                <Bell className="h-3 w-3" />
+                {formatReminderLabel(actividad.reminder_minutes_before)}
+              </span>
+            )}
+            {ids.map((id) => (
+              <span key={id}>{userMap.get(id) ?? `Usuario ${id}`}</span>
+            ))}
+          </div>
+          {actividad.completed && actividad.result && (
+            <p className="mt-1 text-xs italic text-text-secondary line-clamp-1">
+              {actividad.result}
+            </p>
+          )}
+        </div>
+
+        <span className={`mt-0.5 inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold ${meta.text}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
+          {meta.label}
+        </span>
+      </div>
+    </div>
+  );
+});
+
+// ─── OrdenesClient ────────────────────────────────────────────────────────────
+
 export default function OrdenesClient({
   initialActividades,
   currentUserId,
@@ -124,6 +221,69 @@ export default function OrdenesClient({
     for (const a of filteredActividades) if (a.completed) completed++;
     return { total: filteredActividades.length, completed, pending: filteredActividades.length - completed };
   }, [filteredActividades]);
+
+  // Pre-compute per-row derived data so the map in the render body is pure
+  // array access instead of calling priorityMeta / assignedIds / calcDurationMinutes
+  // on every render regardless of whether the data changed.
+  const enrichedActividades = useMemo<EnrichedActividad[]>(() =>
+    filteredActividades.map((actividad) => {
+      const meta = PRIORIDADES.find((p) => p.value === actividad.priority) ?? PRIORIDADES[1];
+      const ids = actividad.agenda_usuarios?.map((u) => u.usuario_id) ?? [];
+      const durationMinutes = calcDurationMinutes(actividad.time, actividad.time_end);
+      const normalized = normalizeActivityType(actividad.tipo);
+      return {
+        actividad,
+        meta,
+        ids,
+        durationLabel: durationMinutes ? formatDuration(durationMinutes) : null,
+        tipoLabelStr: TIPOS_ACTIVIDAD.find((item) => item.value === normalized)?.label
+          ?? t("ordenes.tipos.actividad"),
+      };
+    }),
+    [filteredActividades, PRIORIDADES, TIPOS_ACTIVIDAD, t],
+  );
+
+  // ── Dev-only render tracker (hooks always called, log only in dev) ─────────
+  const _devRc = useRef(0);
+  // eslint-disable-next-line react-hooks/purity
+  const _devLt = useRef(performance.now());
+  _devRc.current += 1;
+  if (process.env.NODE_ENV === "development" && _devRc.current > 1) {
+    // eslint-disable-next-line react-hooks/purity
+    const _now = performance.now();
+    const _delta = (_now - _devLt.current).toFixed(1);
+    _devLt.current = _now;
+    console.debug(`[PERF] OrdenesClient render #${_devRc.current} +${_delta}ms`, {
+      showModal, editing: !!editing, detailActividad: !!detailActividad,
+      filterUserId, actividadesCount: actividades.length, filteredCount: filteredActividades.length,
+    });
+  }
+
+  // Stable callbacks for ActividadRow — must not close over frequently-changing
+  // state so that memo(ActividadRow) can bail out on unrelated renders.
+  const handleRowOpenDetail = useCallback((actividad: Actividad) => {
+    setDetailActividad(actividad);
+  }, []); // setDetailActividad is a stable useState setter
+
+  const handleRowSetCompleted = useCallback(async (actividad: Actividad, completed: boolean) => {
+    // completingId guard is handled in ActividadRow via the isCompleting prop;
+    // no need to reference completingId here, keeping this callback stable.
+    setCompletingId(actividad.id);
+    setActividades((prev) => prev.map((a) => a.id === actividad.id ? { ...a, completed } : a));
+    const { data, error } = await supabase.rpc("set_agenda_completed", {
+      p_agenda_id: actividad.id,
+      p_completed: completed,
+      p_result: completed ? (actividad.result ?? undefined) : undefined,
+    });
+    setCompletingId(null);
+    if (error || !data) {
+      setActividades((prev) => prev.map((a) => a.id === actividad.id ? { ...a, completed: !completed } : a));
+      toast(error?.message ?? t("errors.generic"), "error");
+      return;
+    }
+    router.refresh();
+    toast(completed ? t("ordenes.actividadCompletada") : t("ordenes.actividadPendiente"));
+  }, [supabase, toast, router, t]);
 
   function priorityMeta(priority: string | null) {
     return PRIORIDADES.find((p) => p.value === priority) ?? PRIORIDADES[1];
@@ -268,24 +428,6 @@ export default function OrdenesClient({
     toast(editing ? t("ordenes.actividadActualizada") : t("ordenes.actividadCreada"));
   }
 
-  async function setCompleted(actividad: Actividad, completed: boolean) {
-    if (completingId === actividad.id) return;
-    setCompletingId(actividad.id);
-    setActividades((prev) => prev.map((a) => a.id === actividad.id ? { ...a, completed } : a));
-    const { data, error } = await supabase.rpc("set_agenda_completed", {
-      p_agenda_id: actividad.id,
-      p_completed: completed,
-      p_result: completed ? (actividad.result ?? undefined) : undefined,
-    });
-    setCompletingId(null);
-    if (error || !data) {
-      setActividades((prev) => prev.map((a) => a.id === actividad.id ? { ...a, completed: !completed } : a));
-      toast(error?.message ?? t("errors.generic"), "error");
-      return;
-    }
-    router.refresh();
-    toast(completed ? t("ordenes.actividadCompletada") : t("ordenes.actividadPendiente"));
-  }
 
   async function archiveActividad(id: number) {
     const { error } = await supabase.rpc("archive_agenda", { p_agenda_id: id, p_reason: "archived_from_ordenes" });
@@ -356,64 +498,16 @@ export default function OrdenesClient({
           </div>
         ) : (
           <div className="divide-y divide-border/70">
-            {filteredActividades.map((actividad) => {
-              const meta = priorityMeta(actividad.priority);
-              const ids = assignedIds(actividad);
-              return (
-                <div key={actividad.id} className="px-2 py-1.5">
-                  <div
-                    onClick={() => setDetailActividad(actividad)}
-                    className={`group flex cursor-pointer items-start gap-3 rounded-ds-lg border-l-2 bg-surface px-4 py-3 transition-all hover:bg-surface-elevated hover:shadow-layer-1 ${meta.border}`}
-                  >
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCompleted(actividad, !actividad.completed);
-                      }}
-                      disabled={completingId === actividad.id}
-                      className={`mt-0.5 shrink-0 transition-opacity disabled:opacity-50 ${
-                        actividad.completed
-                          ? "text-success"
-                          : "text-text-secondary opacity-0 group-hover:opacity-100 hover:text-success"
-                      }`}
-                    >
-                      {completingId === actividad.id
-                        ? <Loader2 className="h-4 w-4 animate-spin" />
-                        : actividad.completed
-                          ? <CheckCircle2 className="complete-pop h-4 w-4" />
-                          : <Circle className="h-4 w-4" />}
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <p className={`break-words text-sm font-medium leading-snug ${actividad.completed ? "line-through text-text-secondary" : "text-text-primary"}`}>
-                        {actividad.description}
-                      </p>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
-                        <span>
-                          {normalizeTime(actividad.time, DEFAULT_ACTIVITY_TIME)}
-                          {actividad.time_end ? ` – ${actividad.time_end}` : ""}
-                          {(() => { const d = calcDurationMinutes(actividad.time, actividad.time_end); return d ? ` (${formatDuration(d)})` : ""; })()}
-                        </span>
-                        <span>{tipoLabel(actividad.tipo)}</span>
-                        {actividad.reminder_minutes_before != null && (
-                          <span className="inline-flex items-center gap-0.5 text-primary">
-                            <Bell className="h-3 w-3" />
-                            {formatReminderLabel(actividad.reminder_minutes_before)}
-                          </span>
-                        )}
-                        {ids.map((id) => <span key={id}>{userMap.get(id) ?? `Usuario ${id}`}</span>)}
-                      </div>
-                      {actividad.completed && actividad.result && (
-                        <p className="mt-1 text-xs italic text-text-secondary line-clamp-1">{actividad.result}</p>
-                      )}
-                    </div>
-                    <span className={`mt-0.5 inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold ${meta.text}`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
-                      {meta.label}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+            {enrichedActividades.map((enriched) => (
+              <ActividadRow
+                key={enriched.actividad.id}
+                enriched={enriched}
+                isCompleting={completingId === enriched.actividad.id}
+                userMap={userMap}
+                onOpenDetail={handleRowOpenDetail}
+                onSetCompleted={handleRowSetCompleted}
+              />
+            ))}
           </div>
         )}
       </div>
