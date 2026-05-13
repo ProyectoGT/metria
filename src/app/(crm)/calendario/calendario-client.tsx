@@ -6,7 +6,6 @@ import {
   ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter, Pencil, CheckCircle2, User, Bell, Loader2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase-browser";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { updateTareaEstadoAction } from "@/app/(crm)/dashboard/actions";
 import { saveAgendaGoogleEventIdAction } from "@/app/(crm)/calendario/actions";
@@ -18,6 +17,13 @@ import Drawer from "@/components/ui/drawer";
 import { AuditTimelineCard } from "@/components/audit/audit-timeline";
 import { useI18n } from "@/lib/i18n";
 import { localeLabels } from "@/lib/i18n/config";
+import {
+  useAgendaItems,
+  useCompleteAgendaItem,
+  useCreateAgendaItem,
+  useDeleteAgendaItem,
+  useUpdateAgendaItem,
+} from "@/modules/agenda/hooks/use-agenda-items";
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -174,10 +180,6 @@ function tipoMeta(tipo: string) {
   return TIPOS_META.find((m) => m.value === tipo) ?? TIPOS_META.find((m) => m.value === "actividad")!;
 }
 
-function priorityStyleMeta(priority: string) {
-  return PRIORITY_STYLES.find((p) => p.value === priority) ?? PRIORITY_STYLES[1];
-}
-
 const canSeeOthers = (role: UserRole) =>
   role === "Administrador" || role === "Director" || role === "Responsable";
 
@@ -276,11 +278,29 @@ export default function CalendarioClient({
   const [completingAgendaIds, setCompletingAgendaIds] = useState<Set<number>>(new Set());
   const [completingTaskIds, setCompletingTaskIds] = useState<Set<number>>(new Set());
 
-  // Sync events and tareas when server re-renders with fresh data
+  const agendaRange = useMemo(() => {
+    if (viewMode === "week") {
+      const end = new Date(weekStart);
+      end.setDate(weekStart.getDate() + 6);
+      return { start: toDateStr(weekStart), end: toDateStr(end), userId: currentUserId };
+    }
+
+    const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    return { start: toDateStr(start), end: toDateStr(end), userId: currentUserId };
+  }, [currentDate, currentUserId, viewMode, weekStart]);
+
+  const agendaItemsQuery = useAgendaItems(agendaRange);
+  const createAgendaItem = useCreateAgendaItem();
+  const updateAgendaItem = useUpdateAgendaItem();
+  const deleteAgendaItem = useDeleteAgendaItem();
+  const completeAgendaItem = useCompleteAgendaItem();
+
+  // Sync events and tareas when server/query data changes with fresh data
   useEffect(() => {
     if (saving) return;
-    setEvents(initialEvents.map(normalizeCalendarEvent));
-  }, [initialEvents, saving]);
+    setEvents((agendaItemsQuery.data ?? initialEvents).map(normalizeCalendarEvent));
+  }, [agendaItemsQuery.data, initialEvents, saving]);
   useEffect(() => { setTareas(initialTareas); }, [initialTareas]);
   const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
 
@@ -289,7 +309,6 @@ export default function CalendarioClient({
     canSeeOthers(role) ? "all" : currentUserId
   );
 
-  const supabase = useMemo(() => createClient(), []);
   const { toasts, toast } = useToast();
   const formId = useId();
 
@@ -565,167 +584,173 @@ export default function CalendarioClient({
     async function insertOrUpdate(p: typeof payload) {
       const assignedUserIds = form.assignedUserIds.length ? form.assignedUserIds : [currentUserId];
       if (editId !== null) {
-        return supabase.rpc("update_agenda_activity_v2", {
-          p_agenda_id: editId,
-          p_description: p.description,
-          p_event_date: p.event_date,
-          p_time: p.time,
-          p_time_end: p.time_end ?? undefined,
-          p_priority: p.priority,
-          p_tipo: p.tipo,
-          p_completed: p.completed,
-          p_result: p.result ?? undefined,
-          p_assigned_user_ids: assignedUserIds,
-          p_reminder_minutes: p.reminderMinutes ?? -1,
+        return updateAgendaItem.mutateAsync({
+          id: editId,
+          description: p.description,
+          eventDate: p.event_date,
+          time: p.time,
+          timeEnd: p.time_end,
+          priority: p.priority,
+          tipo: p.tipo,
+          completed: p.completed,
+          result: p.result,
+          assignedUserIds,
+          reminderMinutes: p.reminderMinutes ?? -1,
         });
       }
-      return supabase.rpc("create_agenda_activity_v2", {
-        p_description: p.description,
-        p_event_date: p.event_date,
-        p_time: p.time,
-        p_time_end: p.time_end ?? undefined,
-        p_priority: p.priority,
-        p_tipo: p.tipo,
-        p_completed: p.completed,
-        p_result: p.result ?? undefined,
-        p_assigned_user_ids: assignedUserIds,
-        p_visibility: "private",
-        p_reminder_minutes: p.reminderMinutes ?? undefined,
+      return createAgendaItem.mutateAsync({
+        description: p.description,
+        eventDate: p.event_date,
+        time: p.time,
+        timeEnd: p.time_end,
+        priority: p.priority,
+        tipo: p.tipo,
+        completed: p.completed,
+        result: p.result,
+        assignedUserIds,
+        visibility: "private",
+        reminderMinutes: p.reminderMinutes,
       });
     }
 
     if (editId !== null) {
       const previousEvent = events.find((event) => event.id === editId);
-      const { data, error } = await insertOrUpdate(payload);
-      if (error) {
-        setEvents(previousEvents);
-        setSaveError(error.message);
-        toast(error.message, "error");
-      }
-      else if (data) {
-        const updated: AgendaEvent = {
-          ...(data as unknown as AgendaEvent),
-          agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
-        };
-        const normalizedUpdated = normalizeCalendarEvent(updated);
-        const googleEventId = normalizedUpdated.gcal_event_id ?? previousEvent?.gcal_event_id ?? null;
+      try {
+        const data = await insertOrUpdate(payload);
 
-        if (isConnected && googleEventId) {
-          const gcalRes = await fetch("/api/google/events", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              eventId: googleEventId,
-              summary: payload.description,
-              description: payload.result ?? "",
-              date: payload.event_date,
-              time: payload.time,
-              timeEnd: payload.time_end ?? undefined,
-              agendaId: editId,
-              reminderMinutes: payload.reminderMinutes ?? undefined,
-            }),
-          });
+        if (data) {
+          const updated: AgendaEvent = {
+            ...(data as unknown as AgendaEvent),
+            agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
+          };
+          const normalizedUpdated = normalizeCalendarEvent(updated);
+          const googleEventId = normalizedUpdated.gcal_event_id ?? previousEvent?.gcal_event_id ?? null;
 
-          if (!gcalRes.ok) {
-            const gcalData = await gcalRes.json().catch(() => null);
-            toast(
-              `Actividad actualizada en CRM, pero no en Google Calendar: ${gcalData?.error ?? "error de sincronizacion"}`,
-              "error",
-            );
-          } else {
-            setGcalEvents((prev) =>
-              prev.map((event) =>
-                event.id === googleEventId
-                  ? {
-                      ...event,
-                      summary: payload.description,
-                      start: { ...event.start, dateTime: `${payload.event_date}T${payload.time}:00` },
-                    }
-                  : event,
-              ),
-            );
+          if (isConnected && googleEventId) {
+            const gcalRes = await fetch("/api/google/events", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                eventId: googleEventId,
+                summary: payload.description,
+                description: payload.result ?? "",
+                date: payload.event_date,
+                time: payload.time,
+                timeEnd: payload.time_end ?? undefined,
+                agendaId: editId,
+                reminderMinutes: payload.reminderMinutes ?? undefined,
+              }),
+            });
+
+            if (!gcalRes.ok) {
+              const gcalData = await gcalRes.json().catch(() => null);
+              toast(
+                `Actividad actualizada en CRM, pero no en Google Calendar: ${gcalData?.error ?? "error de sincronizacion"}`,
+                "error",
+              );
+            } else {
+              setGcalEvents((prev) =>
+                prev.map((event) =>
+                  event.id === googleEventId
+                    ? {
+                        ...event,
+                        summary: payload.description,
+                        start: { ...event.start, dateTime: `${payload.event_date}T${payload.time}:00` },
+                      }
+                    : event,
+                ),
+              );
+            }
           }
-        }
 
-        setEvents((prev) => prev.map((e) => e.id === editId ? normalizedUpdated : e));
-        router.refresh();
-        toast(t("calendar.actividadActualizada"));
+          setEvents((prev) => prev.map((e) => e.id === editId ? normalizedUpdated : e));
+          router.refresh();
+          toast(t("calendar.actividadActualizada"));
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : t("calendar.errorGuardar");
+        setEvents(previousEvents);
+        setSaveError(message);
+        toast(message, "error");
       }
     } else {
-      const { data, error } = await insertOrUpdate(payload);
-      if (error) {
-        setEvents(previousEvents);
-        setSaveError(error.message);
-        toast(error.message, "error");
-      }
-      else if (data) {
-        let saved: AgendaEvent = {
-          ...(data as unknown as AgendaEvent),
-          agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
-        };
-        saved = normalizeCalendarEvent(saved);
+      try {
+        const data = await insertOrUpdate(payload);
 
-        setEvents((prev) =>
-          [...prev.filter((event) => event.id !== optimisticId && event.id !== saved.id), saved]
-            .sort((a, b) => a.event_date.localeCompare(b.event_date))
-        );
+        if (data) {
+          let saved: AgendaEvent = {
+            ...(data as unknown as AgendaEvent),
+            agenda_usuarios: form.assignedUserIds.map((usuario_id) => ({ usuario_id, usuarios: null })),
+          };
+          saved = normalizeCalendarEvent(saved);
 
-        if (isConnected && form.syncToGcal) {
-          const gcalRes = await fetch("/api/google/events", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              summary: form.description,
-              date: form.event_date,
-              time: normalizeTime(form.time, DEFAULT_ACTIVITY_TIME),
-              timeEnd: form.time_end || undefined,
-              agendaId: saved.id,
-              reminderMinutes: form.reminderMinutes ?? undefined,
-            }),
-          });
-          if (gcalRes.ok) {
-            const gcalData = await gcalRes.json();
-            if (gcalData.id) {
-              const localAgendaId = saved.id;
-              const googleEventId = gcalData.id;
-              if (process.env.NODE_ENV !== "production") {
-                console.log("[calendario] intentando guardar gcal_event_id", {
-                  localAgendaId,
-                  googleEventId,
-                  currentUserId,
-                  empresaId,
-                });
-              }
+          setEvents((prev) =>
+            [...prev.filter((event) => event.id !== optimisticId && event.id !== saved.id), saved]
+              .sort((a, b) => a.event_date.localeCompare(b.event_date))
+          );
 
-              const syncUpdateResult = await saveAgendaGoogleEventIdAction(localAgendaId, googleEventId);
-              if (!syncUpdateResult.success) {
-                const syncUpdateError = syncUpdateResult.error;
+          if (isConnected && form.syncToGcal) {
+            const gcalRes = await fetch("/api/google/events", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                summary: form.description,
+                date: form.event_date,
+                time: normalizeTime(form.time, DEFAULT_ACTIVITY_TIME),
+                timeEnd: form.time_end || undefined,
+                agendaId: saved.id,
+                reminderMinutes: form.reminderMinutes ?? undefined,
+              }),
+            });
+            if (gcalRes.ok) {
+              const gcalData = await gcalRes.json();
+              if (gcalData.id) {
+                const localAgendaId = saved.id;
+                const googleEventId = gcalData.id;
                 if (process.env.NODE_ENV !== "production") {
-                  console.error("[calendario] Error guardando gcal_event_id:", {
-                    message: syncUpdateError?.message,
-                    details: syncUpdateError?.details,
-                    hint: syncUpdateError?.hint,
-                    code: syncUpdateError?.code,
-                    raw: JSON.stringify(syncUpdateError, Object.getOwnPropertyNames(syncUpdateError)),
+                  console.log("[calendario] intentando guardar gcal_event_id", {
+                    localAgendaId,
+                    googleEventId,
+                    currentUserId,
+                    empresaId,
                   });
                 }
-                toast(
-                  `Actividad guardada en CRM, pero no enlazada con Google Calendar: ${syncUpdateError.message}`,
-                  "error",
-                );
-              } else {
-                saved = normalizeCalendarEvent({ ...saved, gcal_event_id: syncUpdateResult.data.gcal_event_id });
-                setEvents((prev) => prev.map((event) => event.id === saved.id ? saved : event));
+
+                const syncUpdateResult = await saveAgendaGoogleEventIdAction(localAgendaId, googleEventId);
+                if (!syncUpdateResult.success) {
+                  const syncUpdateError = syncUpdateResult.error;
+                  if (process.env.NODE_ENV !== "production") {
+                    console.error("[calendario] Error guardando gcal_event_id:", {
+                      message: syncUpdateError?.message,
+                      details: syncUpdateError?.details,
+                      hint: syncUpdateError?.hint,
+                      code: syncUpdateError?.code,
+                      raw: JSON.stringify(syncUpdateError, Object.getOwnPropertyNames(syncUpdateError)),
+                    });
+                  }
+                  toast(
+                    `Actividad guardada en CRM, pero no enlazada con Google Calendar: ${syncUpdateError.message}`,
+                    "error",
+                  );
+                } else {
+                  saved = normalizeCalendarEvent({ ...saved, gcal_event_id: syncUpdateResult.data.gcal_event_id });
+                  setEvents((prev) => prev.map((event) => event.id === saved.id ? saved : event));
+                }
               }
+            } else {
+              const gcalData = await gcalRes.json().catch(() => null);
+              const message = gcalData?.error ?? "No se pudo sincronizar con Google Calendar";
+              toast(`Actividad guardada localmente. ${message}`, "error");
             }
-          } else {
-            const gcalData = await gcalRes.json().catch(() => null);
-            const message = gcalData?.error ?? "No se pudo sincronizar con Google Calendar";
-            toast(`Actividad guardada localmente. ${message}`, "error");
           }
+          router.refresh();
+          toast(t("calendar.actividadCreada"));
         }
-        router.refresh();
-        toast(t("calendar.actividadCreada"));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : t("calendar.errorGuardar");
+        setEvents(previousEvents);
+        setSaveError(message);
+        toast(message, "error");
       }
     }
     setSaving(false);
@@ -748,9 +773,15 @@ export default function CalendarioClient({
       }
       setGcalEvents((prev) => prev.filter((ev) => ev.id !== target.gcal_event_id));
     }
-    const { error } = await supabase.rpc("archive_agenda", { p_agenda_id: id, p_reason: "archived_from_calendar" });
-    if (error) toast("Error al eliminar: " + error.message, "error");
-    else { setEvents((prev) => prev.filter((e) => e.id !== id)); if (!eventId) setDeleteId(null); toast(t("calendar.actividadEliminada")); }
+    try {
+      await deleteAgendaItem.mutateAsync({ id, reason: "archived_from_calendar" });
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+      if (!eventId) setDeleteId(null);
+      toast(t("calendar.actividadEliminada"));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error al eliminar";
+      toast("Error al eliminar: " + message, "error");
+    }
     setDeleting(false);
   }
 
@@ -779,12 +810,9 @@ export default function CalendarioClient({
   async function handleCompleteAgenda(id: number, completed: boolean) {
     setCompletingAgendaIds((prev) => new Set(prev).add(id));
     setEvents((prev) => prev.map((e) => e.id === id ? { ...e, completed } : e));
-    const { error } = await supabase.rpc("set_agenda_completed", {
-      p_agenda_id: id,
-      p_completed: completed,
-      p_result: undefined,
-    });
-    if (error) {
+    try {
+      await completeAgendaItem.mutateAsync({ id, completed });
+    } catch {
       setEvents((prev) => prev.map((e) => e.id === id ? { ...e, completed: !completed } : e));
       toast(t("calendar.errorCompletar"), "error");
       setCompletingAgendaIds((prev) => {
