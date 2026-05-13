@@ -2,10 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createAdminClient } from "@/lib/supabase-admin";
 
+function sanitizeRedirect(next: string | null): string {
+  // Acepta solo rutas relativas internas: deben empezar por "/" y no contener
+  // "://" ni "//" al inicio (que indicarían esquema o host externo).
+  if (
+    typeof next === "string" &&
+    next.startsWith("/") &&
+    !next.startsWith("//") &&
+    !next.includes("://")
+  ) {
+    return next;
+  }
+  return "/dashboard";
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/dashboard";
+  const next = sanitizeRedirect(searchParams.get("next"));
 
   function redirectToLogin(error: string) {
     const url = new URL(`/login?error=${error}`, origin);
