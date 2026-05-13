@@ -14,6 +14,13 @@ interface CalendarParams {
   userId: number;
 }
 
+// userId NO se usa como filtro explícito en la query: la RLS del cliente de
+// usuario (agenda_select_safe_no_recursion) ya aísla los eventos por rol:
+//   - Agente: propios (owner_user_id / user_id / agenda_usuarios)
+//   - Responsable: propios + supervisados + company/team visibility
+//   - Admin/Director: todos los de su empresa
+// userId se incluye en CalendarParams solo para la query key de React Query,
+// garantizando que distintos usuarios nunca compartan la misma entrada de caché.
 async function fetchCalendarEvents(params: CalendarParams): Promise<Agenda[]> {
   const supabase = createClient();
 

@@ -21,6 +21,9 @@ export default async function CalendarioPage() {
   let eventsQuery;
 
   if (role === "Administrador" || role === "Director") {
+    // Admin/Director usan admin client para leer todos los eventos de la empresa
+    // en una sola query sin restricciones de RLS por usuario individual.
+    // La segunda capa de seguridad es el eq("empresa_id") explícito.
     const adminSupa = createAdminClient();
     eventsQuery = adminSupa
       .from("agenda")
@@ -29,16 +32,24 @@ export default async function CalendarioPage() {
       .order("event_date", { ascending: true });
     if (empresaId !== null) eventsQuery = eventsQuery.eq("empresa_id", empresaId);
   } else if (role === "Responsable") {
-    const adminSupa = createAdminClient();
-    eventsQuery = adminSupa
+    // Responsable usa el cliente de usuario con RLS.
+    // La migración 20260514000003 restauró la cláusula de supervisados en la
+    // policy agenda_select_safe_no_recursion usando get_supervised_user_ids()
+    // (SECURITY DEFINER, sin recursión). RLS devuelve: eventos propios +
+    // eventos de supervisados + visibilidad company/team.
+    // NO usar createAdminClient() aquí: la RLS ya hace el filtrado correcto
+    // y así el server y el hook del cliente devuelven el mismo conjunto.
+    eventsQuery = supabase
       .from("agenda")
       .select("*, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
       .eq("empresa_id", empresaId ?? -1)
       .order("event_date", { ascending: true });
   } else {
-    // Agente: usar admin client con filtro explícito para garantizar visibilidad
-    // propia sin depender del RLS. El filtro JS posterior restringe al usuario.
+    // Agente: admin client con filtro de empresa. El filtro JS posterior
+    // restringe al propio agente (solo sus eventos asignados/propios).
+    // Nota: esto es más restrictivo que RLS pura (que incluiría company/team
+    // visibility). Cambio pendiente cuando se unifique con el hook.
     const agenteSupa = createAdminClient();
     eventsQuery = agenteSupa
       .from("agenda")
@@ -71,19 +82,15 @@ export default async function CalendarioPage() {
     created_at?: string | null;
     agenda_usuarios?: { usuario_id: number }[];
   };
-  const visibleIds = [userId, ...supervisedIds];
-  const visibleEvents = role === "Responsable"
+  // Responsable: RLS ya filtra correctamente (ver migración 20260514000003).
+  // Agente: el admin client devuelve todos los eventos de la empresa;
+  //   el filtro JS restringe al agente para evitar ver eventos ajenos.
+  // Admin/Director: sin filtro JS, RLS+empresa_id es suficiente.
+  const visibleEvents = role === "Agente"
     ? ((events ?? []) as unknown as EventWithAssignments[]).filter((event) => {
         const assigned = event.agenda_usuarios?.map((u) => u.usuario_id) ?? [];
-        return assigned.some((id) => visibleIds.includes(id))
-          || (event.owner_user_id != null && visibleIds.includes(event.owner_user_id))
-          || (event.user_id != null && visibleIds.includes(event.user_id));
+        return assigned.includes(userId) || event.owner_user_id === userId || event.user_id === userId;
       })
-    : role === "Agente"
-      ? ((events ?? []) as unknown as EventWithAssignments[]).filter((event) => {
-          const assigned = event.agenda_usuarios?.map((u) => u.usuario_id) ?? [];
-          return assigned.includes(userId) || event.owner_user_id === userId || event.user_id === userId;
-        })
     : (events ?? []);
 
   if (process.env.NODE_ENV !== "production") {
