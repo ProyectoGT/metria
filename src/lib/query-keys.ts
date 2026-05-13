@@ -52,6 +52,8 @@ export type TaskListFilters = {
   status?: "pendiente" | "en_progreso" | "completado";
   assignedUserId?: number | null;
   date?: DateKey | null;
+  from?: DateKey | null;
+  to?: DateKey | null;
 };
 
 export type TodayItemsFilters = {

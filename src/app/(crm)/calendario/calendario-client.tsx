@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast, Toaster } from "@/components/ui/toast";
-import { updateTareaEstadoAction } from "@/app/(crm)/dashboard/actions";
 import { saveAgendaGoogleEventIdAction } from "@/app/(crm)/calendario/actions";
 import type { UserRole } from "@/lib/roles";
 import { DEFAULT_ACTIVITY_TIME, normalizeTime, calcDurationMinutes, formatDuration, formatReminderLabel, REMINDER_OPTIONS } from "@/lib/local-date-time";
@@ -24,6 +23,8 @@ import {
   useDeleteAgendaItem,
   useUpdateAgendaItem,
 } from "@/modules/agenda/hooks/use-agenda-items";
+import { useCompleteTask, useTasks } from "@/modules/tareas/hooks/use-tasks";
+import type { TareaRow } from "@/modules/tareas/services/tareas.service";
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -187,6 +188,18 @@ function agendaAssignedIds(ev: AgendaEvent) {
   return ev.agenda_usuarios?.map((u) => u.usuario_id) ?? [];
 }
 
+function toTareaEvent(tarea: TareaRow): TareaEvent | null {
+  if (!tarea.fecha) return null;
+  return {
+    id: tarea.id,
+    titulo: tarea.titulo,
+    prioridad: tarea.prioridad,
+    fecha: tarea.fecha,
+    estado: tarea.estado,
+    owner_user_id: tarea.owner_user_id,
+  };
+}
+
 /** Normaliza los campos que pueden venir nulos de la base de datos */
 function normalizeCalendarEvent(ev: AgendaEvent): AgendaEvent {
   return {
@@ -291,17 +304,29 @@ export default function CalendarioClient({
   }, [currentDate, currentUserId, viewMode, weekStart]);
 
   const agendaItemsQuery = useAgendaItems(agendaRange);
+  const tasksQuery = useTasks({
+    userId: currentUserId,
+    empresaId: empresaId ?? undefined,
+    from: agendaRange.start,
+    to: agendaRange.end,
+  });
   const createAgendaItem = useCreateAgendaItem();
   const updateAgendaItem = useUpdateAgendaItem();
   const deleteAgendaItem = useDeleteAgendaItem();
   const completeAgendaItem = useCompleteAgendaItem();
+  const completeTask = useCompleteTask();
 
   // Sync events and tareas when server/query data changes with fresh data
   useEffect(() => {
     if (saving) return;
     setEvents((agendaItemsQuery.data ?? initialEvents).map(normalizeCalendarEvent));
   }, [agendaItemsQuery.data, initialEvents, saving]);
-  useEffect(() => { setTareas(initialTareas); }, [initialTareas]);
+  useEffect(() => {
+    const queryTareas = tasksQuery.data
+      ?.map(toTareaEvent)
+      .filter((tarea): tarea is TareaEvent => tarea !== null);
+    setTareas(queryTareas ?? initialTareas);
+  }, [initialTareas, tasksQuery.data]);
   const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
 
   // Filter by user â€” default "all" for managers, currentUserId for agents
@@ -791,7 +816,7 @@ export default function CalendarioClient({
     setCompletingTaskIds((prev) => new Set(prev).add(id));
     setTareas((prev) => prev.map((t) => (t.id === id ? { ...t, estado: "completado" } : t)));
     try {
-      await updateTareaEstadoAction(id, "completado");
+      await completeTask.mutateAsync({ id, completed: true, source: "ordenes" });
       toast(t("tasks.completed"));
     } catch {
       setTareas((prev) => prev.map((t) => (t.id === id ? { ...t, estado: "pendiente" } : t)));

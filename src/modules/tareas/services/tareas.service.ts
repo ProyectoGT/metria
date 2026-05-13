@@ -44,10 +44,25 @@ async function list(filters: TaskListFilters): Promise<TareaRow[]> {
   if (filters.status) query = query.eq("estado", filters.status);
   if (filters.assignedUserId != null) query = query.eq("owner_user_id", filters.assignedUserId);
   if (filters.date) query = query.eq("fecha", filters.date);
+  if (filters.from) query = query.gte("fecha", filters.from);
+  if (filters.to) query = query.lte("fecha", filters.to);
 
   const { data, error } = await query;
   throwIfSupabaseError(error, "No se pudieron cargar las tareas");
   return data ?? [];
+}
+
+async function detail(id: number): Promise<TareaRow | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("tareas")
+    .select("*")
+    .eq("id", id)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  throwIfSupabaseError(error, "No se pudo cargar la tarea");
+  return data;
 }
 
 async function create(input: TareaCreateInput): Promise<TareaRow> {
@@ -97,6 +112,7 @@ async function complete(input: TareaCompleteInput): Promise<TareaRow> {
 
 export const tareasService = {
   list,
+  detail,
   create,
   update,
   complete,
