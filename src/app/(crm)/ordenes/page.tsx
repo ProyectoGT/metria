@@ -16,11 +16,10 @@ export default async function OrdenesPage() {
   }
 
   const today = localDateKey();
-  const allowedUserIds = canViewAllAgents(yo.role)
-    ? null
-    : canViewSupervisedAgents(yo.role)
-      ? [yo.id, ...yo.supervisedAgentIds]
-      : [yo.id];
+  // Orden del día es una vista personal: cada usuario ve solo sus propias
+  // actividades, independientemente del rol. Los roles de gestión no implican
+  // ver las tareas ajenas aquí; para eso existe la vista de equipo/dashboard.
+  const allowedUserIds = [yo.id];
 
   const agendaAdmin = createAdminClient();
 
