@@ -9,6 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "validate": "npm run typecheck && npm run lint",
     "generate-icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {

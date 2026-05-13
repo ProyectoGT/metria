@@ -40,3 +40,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDEs — archivos de estado local de editores
+.vs/
+.idea/
+
+# Artefactos de desarrollo local
+build_output.txt
+dev-server.*.log
