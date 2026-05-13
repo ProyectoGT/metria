@@ -1,6 +1,13 @@
 import { createClient } from "@/lib/supabase-browser";
+import { throwIfSupabaseError } from "@/modules/shared/services/service-errors";
 import type { KanbanCardData, KanbanColumnData } from "@/lib/mock/dashboard";
 import type { KanbanBoard, KanbanQueryParams } from "../types";
+
+export type KanbanMoveCardInput = {
+  dbId: number;
+  source: "tarea" | "agenda";
+  newEstado: string;
+};
 
 export async function fetchKanbanBoard(params: KanbanQueryParams): Promise<KanbanBoard> {
   const supabase = createClient();
@@ -18,7 +25,7 @@ export async function fetchKanbanBoard(params: KanbanQueryParams): Promise<Kanba
     .is("archived_at", null)
     .order("fecha", { ascending: true, nullsFirst: false });
 
-  if (error) throw error;
+  throwIfSupabaseError(error, "No se pudo cargar el tablero kanban");
 
   const pendientes: KanbanCardData[] = [];
   const enProgreso: KanbanCardData[] = [];
@@ -54,3 +61,29 @@ export async function fetchKanbanBoard(params: KanbanQueryParams): Promise<Kanba
 
   return { columns };
 }
+
+async function moveCard(input: KanbanMoveCardInput): Promise<void> {
+  const supabase = createClient();
+
+  if (input.source === "agenda") {
+    const completed = input.newEstado === "completado";
+    const { error } = await supabase.rpc("update_agenda_activity_v2", {
+      p_agenda_id: input.dbId,
+      p_completed: completed,
+    });
+    throwIfSupabaseError(error, "No se pudo mover la actividad de agenda");
+    return;
+  }
+
+  const estado = input.newEstado === "completado" ? "completado" : input.newEstado;
+  const { error } = await supabase
+    .from("tareas")
+    .update({ estado })
+    .eq("id", input.dbId);
+  throwIfSupabaseError(error, "No se pudo mover la tarea");
+}
+
+export const kanbanService = {
+  getBoard: fetchKanbanBoard,
+  moveCard,
+};

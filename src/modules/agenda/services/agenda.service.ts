@@ -1,5 +1,39 @@
 import { createClient } from "@/lib/supabase-browser";
+import { throwIfSupabaseError } from "@/modules/shared/services/service-errors";
 import type { AgendaEvent, AgendaEventsFilters } from "../types";
+import type { Database, Tables } from "@/types/database.types";
+
+type CreateAgendaArgs = Database["public"]["Functions"]["create_agenda_activity_v2"]["Args"];
+type UpdateAgendaArgs = Database["public"]["Functions"]["update_agenda_activity_v2"]["Args"];
+export type AgendaRow = Tables<"agenda">;
+
+export type AgendaCreateInput = {
+  description: string;
+  eventDate: string;
+  time: string;
+  timeEnd?: string | null;
+  priority?: string;
+  tipo?: string;
+  completed?: boolean;
+  result?: string | null;
+  assignedUserIds?: number[];
+  visibility?: string;
+  reminderMinutes?: number | null;
+};
+
+export type AgendaUpdateInput = {
+  id: number;
+  description?: string;
+  eventDate?: string;
+  time?: string;
+  timeEnd?: string | null;
+  priority?: string;
+  tipo?: string;
+  completed?: boolean;
+  result?: string | null;
+  assignedUserIds?: number[];
+  reminderMinutes?: number | null;
+};
 
 // userId is part of the cache key, but RLS decides the actual visible rows.
 export async function fetchAgendaEvents(params: AgendaEventsFilters): Promise<AgendaEvent[]> {
@@ -19,6 +53,54 @@ export async function fetchAgendaEvents(params: AgendaEventsFilters): Promise<Ag
     .is("archived_at", null)
     .order("event_date", { ascending: true });
 
-  if (error) throw error;
+  throwIfSupabaseError(error, "No se pudieron cargar los eventos de agenda");
   return (data ?? []) as unknown as AgendaEvent[];
 }
+
+async function create(input: AgendaCreateInput): Promise<AgendaRow> {
+  const supabase = createClient();
+  const args: CreateAgendaArgs = {
+    p_description: input.description,
+    p_event_date: input.eventDate,
+    p_time: input.time,
+    p_time_end: input.timeEnd ?? undefined,
+    p_priority: input.priority,
+    p_tipo: input.tipo,
+    p_completed: input.completed,
+    p_result: input.result ?? undefined,
+    p_assigned_user_ids: input.assignedUserIds,
+    p_visibility: input.visibility,
+    p_reminder_minutes: input.reminderMinutes ?? undefined,
+  };
+
+  const { data, error } = await supabase.rpc("create_agenda_activity_v2", args);
+  throwIfSupabaseError(error, "No se pudo crear la actividad de agenda");
+  return data;
+}
+
+async function update(input: AgendaUpdateInput): Promise<AgendaRow> {
+  const supabase = createClient();
+  const args: UpdateAgendaArgs = {
+    p_agenda_id: input.id,
+    p_description: input.description,
+    p_event_date: input.eventDate,
+    p_time: input.time,
+    p_time_end: input.timeEnd ?? undefined,
+    p_priority: input.priority,
+    p_tipo: input.tipo,
+    p_completed: input.completed,
+    p_result: input.result ?? undefined,
+    p_assigned_user_ids: input.assignedUserIds,
+    p_reminder_minutes: input.reminderMinutes ?? undefined,
+  };
+
+  const { data, error } = await supabase.rpc("update_agenda_activity_v2", args);
+  throwIfSupabaseError(error, "No se pudo actualizar la actividad de agenda");
+  return data;
+}
+
+export const agendaService = {
+  list: fetchAgendaEvents,
+  create,
+  update,
+};

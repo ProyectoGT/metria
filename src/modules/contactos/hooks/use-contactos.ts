@@ -1,55 +1,34 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase-browser";
 import { queryKeys } from "@/lib/query-keys";
-import type { Contacto } from "@/types";
+import { contactsService, type ContactRow } from "@/modules/contactos/services/contacts.service";
+import type { ContactsListFilters } from "@/lib/query-keys";
 
-// ─── Fetch ────────────────────────────────────────────────────────────────────
-
-interface ContactosParams {
-  empresaId:  number;
-  search?:    string;
-  tipo?:      string | null;
-  agentId?:   number | null;
-}
-
-async function fetchContactos(params: ContactosParams): Promise<Contacto[]> {
-  const supabase = createClient();
-
-  let query = supabase
-    .from("contactos")
-    .select(
-      "id, nombre, apellidos, email, telefono, tipo, empresa_id, owner_user_id, created_at, estado, updated_at, visibility"
-    )
-    .eq("empresa_id", params.empresaId)
-    .is("archived_at", null)
-    .order("nombre", { ascending: true });
-
-  if (params.tipo)    query = query.eq("tipo", params.tipo);
-  if (params.agentId) query = query.eq("owner_user_id", params.agentId);
-  if (params.search) {
-    query = query.or(
-      `nombre.ilike.%${params.search}%,apellidos.ilike.%${params.search}%,email.ilike.%${params.search}%`
-    );
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as unknown as Contacto[];
-}
-
-// ─── Hook ─────────────────────────────────────────────────────────────────────
+type ContactosParams = ContactsListFilters & {
+  agentId?: number | null;
+};
 
 interface UseContactosOptions {
-  params:       ContactosParams;
-  initialData?: Contacto[];
+  params: ContactosParams;
+  initialData?: ContactRow[];
+}
+
+function toContactFilters(params: ContactosParams): ContactsListFilters {
+  return {
+    empresaId: params.empresaId,
+    search: params.search,
+    tipo: params.tipo,
+    ownerUserId: params.ownerUserId ?? params.agentId,
+  };
 }
 
 export function useContactos({ params, initialData }: UseContactosOptions) {
+  const filters = toContactFilters(params);
+
   return useQuery({
-    queryKey: queryKeys.contactos.list(params as unknown as Record<string, unknown>),
-    queryFn:  () => fetchContactos(params),
+    queryKey: queryKeys.contacts.list(filters),
+    queryFn: () => contactsService.list(filters),
     initialData,
     placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 5,

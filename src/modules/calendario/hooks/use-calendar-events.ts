@@ -3,7 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { eventBus } from "@/lib/event-bus";
-import { fetchAgendaEvents } from "@/modules/agenda/services/agenda.service";
+import { agendaService } from "@/modules/agenda/services/agenda.service";
 import type { Agenda } from "@/types";
 
 interface UseCalendarEventsOptions {
@@ -23,7 +23,7 @@ export function useCalendarEvents({
 }: UseCalendarEventsOptions) {
   return useQuery({
     queryKey: queryKeys.calendar.events.range({ start, end, userId }),
-    queryFn: () => fetchAgendaEvents({ start, end, userId }),
+    queryFn: () => agendaService.list({ start, end, userId }),
     initialData,
     placeholderData: keepPreviousData,
     enabled,
@@ -34,7 +34,7 @@ export function useCalendarEvents({
 export function useDayEvents(date: string, userId: number, initialData?: Agenda[]) {
   return useQuery({
     queryKey: queryKeys.calendar.events.day(date, userId),
-    queryFn: () => fetchAgendaEvents({ start: date, end: date, userId, view: "day" }),
+    queryFn: () => agendaService.list({ start: date, end: date, userId, view: "day" }),
     initialData,
     placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 2,

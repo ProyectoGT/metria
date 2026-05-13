@@ -3,7 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { eventBus } from "@/lib/event-bus";
-import { fetchKanbanBoard } from "@/modules/kanban/services/kanban.service";
+import { kanbanService } from "@/modules/kanban/services/kanban.service";
 import type { KanbanData, KanbanCardData } from "@/lib/mock/dashboard";
 import type { KanbanQueryParams } from "@/modules/kanban/types";
 
@@ -15,7 +15,7 @@ interface UseKanbanOptions {
 export function useKanban({ params, initialData }: UseKanbanOptions) {
   return useQuery({
     queryKey: queryKeys.kanban.board(params),
-    queryFn: () => fetchKanbanBoard(params),
+    queryFn: () => kanbanService.getBoard(params),
     initialData,
     placeholderData: keepPreviousData,
     staleTime: 1000 * 30,
