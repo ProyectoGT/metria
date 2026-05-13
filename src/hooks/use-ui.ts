@@ -1,41 +1,49 @@
-"use client";
+﻿"use client";
 
 /**
- * Typed selector hooks for the UI Zustand store.
+ * Fine-grained selector hooks for the UI Zustand store.
  *
- * Why: calling `useUIStore()` without a selector subscribes to the ENTIRE
- * store — any state change causes a re-render even if the component only
- * uses `sidebarOpen`. These hooks subscribe to specific slices so components
- * only re-render when their relevant piece of state changes.
- *
- * Usage:
- *   const open    = useSidebarOpen();
- *   const toggle  = useSidebarToggle();
- *   const panelId = useActivePanelId();
+ * Do not call useUIStore() without a selector in components. These hooks keep
+ * modal/sidebar/search changes from re-rendering unrelated dashboard sections.
  */
 
 import { useUIStore } from "@/stores/ui.store";
 
-// ── Sidebar ───────────────────────────────────────────────────────────────────
-export const useSidebarOpen   = () => useUIStore((s) => s.sidebarOpen);
-export const useSidebarToggle = () => useUIStore((s) => s.toggleSidebar);
-export const useOpenSidebar   = () => useUIStore((s) => s.openSidebar);
-export const useCloseSidebar  = () => useUIStore((s) => s.closeSidebar);
+// Sidebar
+export const useSidebarOpen = () => useUIStore((state) => state.sidebarOpen);
+export const useSidebarToggle = () => useUIStore((state) => state.toggleSidebar);
+export const useOpenSidebar = () => useUIStore((state) => state.openSidebar);
+export const useCloseSidebar = () => useUIStore((state) => state.closeSidebar);
 
-// ── Panel ─────────────────────────────────────────────────────────────────────
-export const useActivePanelId = () => useUIStore((s) => s.activePanelId);
-export const useOpenPanel     = () => useUIStore((s) => s.openPanel);
-export const useClosePanel    = () => useUIStore((s) => s.closePanel);
+// Side panel
+export const useActivePanelId = () => useUIStore((state) => state.activePanelId);
+export const useOpenPanel = () => useUIStore((state) => state.openPanel);
+export const useClosePanel = () => useUIStore((state) => state.closePanel);
 
-// ── Selection ─────────────────────────────────────────────────────────────────
-export const useSelectedId    = () => useUIStore((s) => s.selectedId);
-export const useSelectedType  = () => useUIStore((s) => s.selectedType);
-export const useSetSelected   = () => useUIStore((s) => s.setSelected);
-export const useClearSelected = () => useUIStore((s) => s.clearSelected);
+// Selected entity identity
+export const useSelectedId = () => useUIStore((state) => state.selectedId);
+export const useSelectedType = () => useUIStore((state) => state.selectedType);
+export const useSetSelected = () => useUIStore((state) => state.setSelected);
+export const useClearSelected = () => useUIStore((state) => state.clearSelected);
 
-// ── Modals ────────────────────────────────────────────────────────────────────
-export const useOpenModal     = () => useUIStore((s) => s.openModal);
-export const useCloseModal    = () => useUIStore((s) => s.closeModal);
-export const useCloseAllModals = () => useUIStore((s) => s.closeAllModals);
-/** Returns whether a specific modal id is open. Memoized by id. */
-export const useIsModalOpen   = (id: string) => useUIStore((s) => s.openModalIds.has(id));
+// Drawers
+export const useActiveDrawer = () => useUIStore((state) => state.activeDrawer);
+export const useOpenDrawer = () => useUIStore((state) => state.openDrawer);
+export const useCloseDrawer = () => useUIStore((state) => state.closeDrawer);
+
+// Modals
+export const useOpenModal = () => useUIStore((state) => state.openModal);
+export const useCloseModal = () => useUIStore((state) => state.closeModal);
+export const useCloseAllModals = () => useUIStore((state) => state.closeAllModals);
+export const useIsModalOpen = (id: string) => useUIStore((state) => state.openModalIds.has(id));
+
+// Spotlight / global search
+export const useSpotlightOpen = () => useUIStore((state) => state.spotlightOpen);
+export const useOpenSpotlight = () => useUIStore((state) => state.openSpotlight);
+export const useCloseSpotlight = () => useUIStore((state) => state.closeSpotlight);
+export const useSetSpotlightOpen = () => useUIStore((state) => state.setSpotlightOpen);
+export const useToggleSpotlight = () => useUIStore((state) => state.toggleSpotlight);
+
+// Calendar view preference
+export const useCalendarViewMode = () => useUIStore((state) => state.calendarViewMode);
+export const useSetCalendarViewMode = () => useUIStore((state) => state.setCalendarViewMode);

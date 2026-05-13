@@ -12,6 +12,7 @@ import { PRIORITY_TONE, normalizePriority } from "@/lib/design-system";
 import { localeLabels, useI18n, type Locale } from "@/lib/i18n";
 import type { NotificationItem } from "./app-shell";
 import SpotlightSearch from "@/components/ui/spotlight-search";
+import { useSetSpotlightOpen, useSpotlightOpen } from "@/hooks/use-ui";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -49,7 +50,8 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
   // ── State ──────────────────────────────────────────────────────────────────
   const [menuOpen,       setMenuOpen]       = useState(false);
   const [bellOpen,       setBellOpen]       = useState(false);
-  const [spotlightOpen,  setSpotlightOpen]  = useState(false);
+  const spotlightOpen = useSpotlightOpen();
+  const setSpotlightOpen = useSetSpotlightOpen();
 
   const menuRef   = useRef<HTMLDivElement>(null);
   const bellRef   = useRef<HTMLDivElement>(null);
@@ -80,7 +82,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
       document.removeEventListener("mousedown", handleClick);
       document.removeEventListener("keydown", handleKey);
     };
-  }, []);
+  }, [setSpotlightOpen]);
 
   const unreadCount = notifications.length;
 
