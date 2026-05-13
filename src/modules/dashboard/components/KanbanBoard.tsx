@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { X, Plus } from "lucide-react";
@@ -33,6 +33,8 @@ import {
   updateTareaAction,
 } from "@/app/(crm)/dashboard/actions";
 import { DEFAULT_ACTIVITY_TIME, localDateKey, splitLocalDateTime } from "@/lib/local-date-time";
+import { useKanbanBoard, useMoveKanbanCard } from "@/modules/kanban/hooks/use-kanban-board";
+import type { KanbanQueryParams } from "@/modules/kanban/types";
 
 type NewKanbanCard = Omit<KanbanCardData, "id" | "source" | "dbId">;
 
@@ -41,6 +43,7 @@ type KanbanBoardProps = {
   customColumns?: Array<{ id: string; title: string }>;
   role: UserRole;
   currentUserId: string;
+  empresaId: number | null;
   agents?: Array<{ id: string; nombre: string }>;
 };
 
@@ -49,9 +52,24 @@ function KanbanBoard({
   customColumns = [],
   role,
   currentUserId: _currentUserId,
+  empresaId,
   agents = [],
 }: KanbanBoardProps) {
   const router = useRouter();
+  const currentUserIdNum = useMemo(() => Number(_currentUserId), [_currentUserId]);
+  const kanbanParams = useMemo<KanbanQueryParams | null>(() => {
+    if (empresaId == null || Number.isNaN(currentUserIdNum)) return null;
+    return {
+      empresaId,
+      userId: currentUserIdNum,
+      agentIds: agents.map((agent) => Number(agent.id)).filter((id) => !Number.isNaN(id)),
+    };
+  }, [agents, currentUserIdNum, empresaId]);
+  const kanbanQuery = useKanbanBoard(
+    kanbanParams ?? { empresaId: 0, userId: 0 },
+    { enabled: kanbanParams !== null, initialData },
+  );
+  const moveKanbanCard = useMoveKanbanCard();
   const [columns, setColumns] = useState<KanbanColumnData[]>(() => {
     const custom: KanbanColumnData[] = customColumns.map((c) => ({
       id: c.id,
@@ -79,9 +97,25 @@ function KanbanBoard({
   const [newColTitle, setNewColTitle] = useState("");
   const newColInputRef = useRef<HTMLInputElement>(null);
 
-  function findCard(columnId: string, cardId: string) {
+  useEffect(() => {
+    let cancelled = false;
+    const custom: KanbanColumnData[] = customColumns.map((c) => ({
+      id: c.id,
+      title: c.title,
+      cards: [],
+      fixed: false,
+    }));
+    queueMicrotask(() => {
+      if (!cancelled) setColumns([...(kanbanQuery.data?.columns ?? initialData.columns), ...custom]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [customColumns, initialData.columns, kanbanQuery.data?.columns]);
+
+  const findCard = useCallback((columnId: string, cardId: string) => {
     return columns.find((c) => c.id === columnId)?.cards.find((c) => c.id === cardId) ?? null;
-  }
+  }, [columns]);
 
   const handleDragEnd = useCallback(function handleDragEnd(result: DropResult) {
     const { source, destination, draggableId } = result;
@@ -103,6 +137,8 @@ function KanbanBoard({
       return;
     }
 
+    const previousColumns = columns;
+
     // Movimiento local (misma columna o columna custom)
     setColumns((prev) => {
       const next = prev.map((col) => ({ ...col, cards: [...col.cards] }));
@@ -119,8 +155,27 @@ function KanbanBoard({
       convertAgendaToTareaAction(moved.dbId, moved.assignedUserIds)
         .then(() => router.refresh())
         .catch(() => router.refresh());
+      return;
     }
-  }, [router]); // end handleDragEnd
+
+    if (kanbanParams) {
+      moveKanbanCard.mutate(
+        {
+          cardId: moved.id,
+          dbId: moved.dbId,
+          source: moved.source,
+          fromCol: source.droppableId,
+          toCol: destination.droppableId,
+          toIndex: destination.index,
+          params: kanbanParams,
+          newEstado: destination.droppableId,
+        },
+        {
+          onError: () => setColumns(previousColumns),
+        },
+      );
+    }
+  }, [columns, findCard, kanbanParams, moveKanbanCard, router]); // end handleDragEnd
 
   const handleConfirmConvert = useCallback(async function handleConfirmConvert(data: {
     description: string;
@@ -394,8 +449,6 @@ function KanbanBoard({
   const [mobileColIndex, setMobileColIndex] = useState(0);
 
   const isManager = role === "Administrador" || role === "Director";
-  const currentUserIdNum = useMemo(() => Number(_currentUserId), [_currentUserId]);
-
   const isOwnerOrAssigned = useCallback((card: KanbanCardData) => {
     return card.assignedUserIds?.includes(currentUserIdNum) ?? false;
   }, [currentUserIdNum]);

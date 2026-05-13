@@ -449,6 +449,7 @@ export default function DashboardWorkspace(props: Props) {
           customColumns={kanbanCols}
           role={role}
           currentUserId={String(currentUserId)}
+          empresaId={empresaId}
           agents={assignableAgents}
         />
       </SectionCard>
