@@ -1,63 +1,29 @@
 "use client";
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase-browser";
 import { queryKeys } from "@/lib/query-keys";
 import { eventBus } from "@/lib/event-bus";
+import { fetchAgendaEvents } from "@/modules/agenda/services/agenda.service";
 import type { Agenda } from "@/types";
 
-// ─── Fetch ────────────────────────────────────────────────────────────────────
-
-interface CalendarParams {
-  start:  string;
-  end:    string;
-  userId: number;
-}
-
-// userId NO se usa como filtro explícito en la query: la RLS del cliente de
-// usuario (agenda_select_safe_no_recursion) ya aísla los eventos por rol:
-//   - Agente: propios (owner_user_id / user_id / agenda_usuarios)
-//   - Responsable: propios + supervisados + company/team visibility
-//   - Admin/Director: todos los de su empresa
-// userId se incluye en CalendarParams solo para la query key de React Query,
-// garantizando que distintos usuarios nunca compartan la misma entrada de caché.
-async function fetchCalendarEvents(params: CalendarParams): Promise<Agenda[]> {
-  const supabase = createClient();
-
-  const { data, error } = await supabase
-    .from("agenda")
-    .select(`
-      id, description, event_date, time, time_end, priority, tipo,
-      completed, result, reminder_minutes_before, gcal_event_id,
-      converted_to_tarea_id, owner_user_id, user_id, empresa_id,
-      equipo_id, visibility, archived_at, created_at,
-      agenda_usuarios(usuario_id, usuarios(nombre, apellidos))
-    `)
-    .gte("event_date", params.start)
-    .lte("event_date", params.end)
-    .is("archived_at", null)
-    .order("event_date", { ascending: true });
-
-  if (error) throw error;
-  return (data ?? []) as unknown as Agenda[];
-}
-
-// ─── Query hooks ──────────────────────────────────────────────────────────────
-
 interface UseCalendarEventsOptions {
-  start:        string;
-  end:          string;
-  userId:       number;
+  start: string;
+  end: string;
+  userId: number;
   initialData?: Agenda[];
-  enabled?:     boolean;
+  enabled?: boolean;
 }
 
 export function useCalendarEvents({
-  start, end, userId, initialData, enabled = true,
+  start,
+  end,
+  userId,
+  initialData,
+  enabled = true,
 }: UseCalendarEventsOptions) {
   return useQuery({
-    queryKey:  queryKeys.agenda.range(start, end, userId),
-    queryFn:   () => fetchCalendarEvents({ start, end, userId }),
+    queryKey: queryKeys.calendar.events.range({ start, end, userId }),
+    queryFn: () => fetchAgendaEvents({ start, end, userId }),
     initialData,
     placeholderData: keepPreviousData,
     enabled,
@@ -65,31 +31,25 @@ export function useCalendarEvents({
   });
 }
 
-export function useDayEvents(
-  date: string,
-  userId: number,
-  initialData?: Agenda[]
-) {
+export function useDayEvents(date: string, userId: number, initialData?: Agenda[]) {
   return useQuery({
-    queryKey:  queryKeys.agenda.day(date, userId),
-    queryFn:   () => fetchCalendarEvents({ start: date, end: date, userId }),
+    queryKey: queryKeys.calendar.events.day(date, userId),
+    queryFn: () => fetchAgendaEvents({ start: date, end: date, userId, view: "day" }),
     initialData,
     placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 2,
   });
 }
 
-// ─── Mutations ────────────────────────────────────────────────────────────────
-
 type CreateEventServerAction = (data: {
-  description:      string;
-  eventDate:        string;
-  time?:            string | null;
-  timeEnd?:         string | null;
-  priority?:        string;
-  tipo?:            string;
-  completed?:       boolean;
-  result?:          string | null;
+  description: string;
+  eventDate: string;
+  time?: string | null;
+  timeEnd?: string | null;
+  priority?: string;
+  tipo?: string;
+  completed?: boolean;
+  result?: string | null;
   assignedUserIds?: number[];
   reminderMinutes?: number | null;
 }) => Promise<{ id: number }>;
@@ -99,7 +59,7 @@ export function useCreateCalendarEvent(serverAction: CreateEventServerAction) {
     mutationFn: serverAction,
     onSuccess: (result, vars) => {
       eventBus.emit({
-        type:    "calendar.event.created",
+        type: "calendar.event.created",
         payload: { agendaId: result.id, date: vars.eventDate },
       });
     },
@@ -107,7 +67,7 @@ export function useCreateCalendarEvent(serverAction: CreateEventServerAction) {
 }
 
 type UpdateEventServerAction = (args: {
-  id:      number;
+  id: number;
   changes: Partial<Agenda>;
 }) => Promise<void>;
 
@@ -116,7 +76,7 @@ export function useUpdateCalendarEvent(serverAction: UpdateEventServerAction) {
     mutationFn: serverAction,
     onSuccess: (_data, { id, changes }) => {
       eventBus.emit({
-        type:    "calendar.event.updated",
+        type: "calendar.event.updated",
         payload: { agendaId: id, date: changes.event_date ?? undefined },
       });
     },
@@ -141,28 +101,26 @@ export function useDeleteCalendarEvent(serverAction: DeleteEventServerAction) {
 
   return useMutation({
     mutationFn: serverAction,
-
-    // Optimistic removal so the event disappears immediately in the UI
     onMutate: async (id) => {
-      await qc.cancelQueries({ queryKey: queryKeys.agenda.all() });
-      const snapshots = qc.getQueriesData<Agenda[]>({ queryKey: queryKeys.agenda.all() });
+      await qc.cancelQueries({ queryKey: queryKeys.calendar.events.all() });
+      const snapshots = qc.getQueriesData<Agenda[]>({ queryKey: queryKeys.calendar.events.all() });
+
       qc.setQueriesData<Agenda[]>(
-        { queryKey: queryKeys.agenda.all() },
-        (old) => old?.filter((e) => e.id !== id) ?? []
+        { queryKey: queryKeys.calendar.events.all() },
+        (old) => old?.filter((event) => event.id !== id) ?? []
       );
+
       return { snapshots };
     },
-
     onError: (_err, _id, context) => {
-      // Rollback all agenda cache snapshots
       context?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data));
     },
-
     onSuccess: (_data, id) => {
       eventBus.emit({ type: "calendar.event.deleted", payload: { agendaId: id } });
     },
-
     onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.calendar.events.all() });
+      // Legacy invalidation during migration.
       qc.invalidateQueries({ queryKey: queryKeys.agenda.all() });
     },
   });
