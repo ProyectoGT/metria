@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase";
+import { getCurrentUserContext } from "@/lib/current-user";
 import { rateLimiter, getIp } from "@/lib/rate-limiter";
 import { SearchSchema } from "@/lib/validations/search";
 
@@ -35,10 +36,20 @@ export async function GET(request: NextRequest) {
 
   const { q, ctx } = parsed.data;
 
+  // Segunda capa defensiva de multi-tenant: aunque RLS ya aísla por empresa,
+  // añadimos filtros explícitos en código para que un fallo de RLS no exponga
+  // datos de otros tenants. empresaId null solo ocurre si el perfil CRM no
+  // existe aún; en ese caso las queries sensibles retornan vacío.
+  const currentUser = await getCurrentUserContext();
+  const empresaId = currentUser?.empresaId ?? null;
+  const currentUserId = currentUser?.id ?? null;
+
   const supabase = await createClient();
   const results: SearchResult[] = [];
 
-  // ── Zona / Sectores / Fincas / Propiedades ──────────────────────
+  // ── Zona / Sectores / Fincas / Propiedades ──────────────────────────────────
+  // La jerarquía física del CRM no tiene empresa_id por fila; el aislamiento
+  // de tenant se gestiona íntegramente por la RLS de zona_acceso.
   if (ctx === "zona" || ctx === "general") {
     const [
       { data: zonas },
@@ -122,13 +133,14 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── Solicitudes ─────────────────────────────────────────────────
+  // ── Solicitudes ─────────────────────────────────────────────────────────────
   if (ctx === "solicitudes" || ctx === "general") {
-    const { data: pedidos } = await supabase
+    let pedidosQ = supabase
       .from("pedidos")
       .select("id, nombre_cliente, tipo_propiedad, origen, referencia")
-      .or(`nombre_cliente.ilike.%${q}%,tipo_propiedad.ilike.%${q}%,origen.ilike.%${q}%,referencia.ilike.%${q}%`)
-      .limit(ctx === "solicitudes" ? 10 : 5);
+      .or(`nombre_cliente.ilike.%${q}%,tipo_propiedad.ilike.%${q}%,origen.ilike.%${q}%,referencia.ilike.%${q}%`);
+    if (empresaId !== null) pedidosQ = pedidosQ.eq("empresa_id", empresaId);
+    const { data: pedidos } = await pedidosQ.limit(ctx === "solicitudes" ? 10 : 5);
 
     for (const p of pedidos ?? []) {
       results.push({
@@ -141,13 +153,14 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── Usuarios ────────────────────────────────────────────────────
+  // ── Usuarios ─────────────────────────────────────────────────────────────────
   if (ctx === "usuarios" || ctx === "general") {
-    const { data: usuarios } = await supabase
+    let usuariosQ = supabase
       .from("usuarios")
       .select("id, nombre, apellidos, correo, rol")
-      .or(`nombre.ilike.%${q}%,apellidos.ilike.%${q}%,correo.ilike.%${q}%,rol.ilike.%${q}%`)
-      .limit(ctx === "usuarios" ? 10 : 5);
+      .or(`nombre.ilike.%${q}%,apellidos.ilike.%${q}%,correo.ilike.%${q}%,rol.ilike.%${q}%`);
+    if (empresaId !== null) usuariosQ = usuariosQ.eq("empresa_id", empresaId);
+    const { data: usuarios } = await usuariosQ.limit(ctx === "usuarios" ? 10 : 5);
 
     for (const u of usuarios ?? []) {
       results.push({
@@ -160,13 +173,14 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── Tickets de soporte ──────────────────────────────────────────
+  // ── Tickets de soporte ───────────────────────────────────────────────────────
   if (ctx === "soporte" || ctx === "general") {
-    const { data: tickets } = await supabase
+    let ticketsQ = supabase
       .from("tickets_soporte")
       .select("id, asunto, estado, tipo, nombre_usuario")
-      .or(`asunto.ilike.%${q}%,tipo.ilike.%${q}%,nombre_usuario.ilike.%${q}%,descripcion.ilike.%${q}%`)
-      .limit(ctx === "soporte" ? 10 : 5);
+      .or(`asunto.ilike.%${q}%,tipo.ilike.%${q}%,nombre_usuario.ilike.%${q}%,descripcion.ilike.%${q}%`);
+    if (empresaId !== null) ticketsQ = ticketsQ.eq("empresa_id", empresaId);
+    const { data: tickets } = await ticketsQ.limit(ctx === "soporte" ? 10 : 5);
 
     for (const t of (tickets ?? []) as Array<{ id: number; asunto: string | null; estado: string | null; tipo: string | null; nombre_usuario: string | null }>) {
       results.push({
@@ -179,15 +193,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── Contactos ────────────────────────────────────────────────────
+  // ── Contactos ─────────────────────────────────────────────────────────────────
+  // TODO(deuda): contactos no está en database.types.ts — el `as any` es necesario
+  // hasta que se regeneren los tipos con `supabase gen types typescript`.
   if (ctx === "contactos" || ctx === "general") {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: contactos } = await (supabase as any)
+    let contactosQ = (supabase as any)
       .from("contactos")
       .select("id, nombre, apellidos, empresa, tipo, email, telefono")
       .is("archived_at", null)
-      .or(`nombre.ilike.%${q}%,apellidos.ilike.%${q}%,empresa.ilike.%${q}%,email.ilike.%${q}%,telefono.ilike.%${q}%`)
-      .limit(ctx === "contactos" ? 10 : 5);
+      .or(`nombre.ilike.%${q}%,apellidos.ilike.%${q}%,empresa.ilike.%${q}%,email.ilike.%${q}%,telefono.ilike.%${q}%`);
+    if (empresaId !== null) contactosQ = contactosQ.eq("empresa_id", empresaId);
+    const { data: contactos } = await contactosQ.limit(ctx === "contactos" ? 10 : 5);
 
     for (const c of (contactos ?? []) as Array<{ id: number; nombre: string; apellidos: string | null; empresa: string | null; tipo: string | null; email: string | null; telefono: string | null }>) {
       const nombre = [c.nombre, c.apellidos].filter(Boolean).join(" ");
@@ -201,14 +218,15 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── Tareas ───────────────────────────────────────────────────────
+  // ── Tareas ────────────────────────────────────────────────────────────────────
   if (ctx === "general") {
-    const { data: tareas } = await supabase
+    let tareasQ = supabase
       .from("tareas")
       .select("id, titulo, fecha, prioridad, estado")
       .ilike("titulo", `%${q}%`)
-      .is("archived_at", null)
-      .limit(6);
+      .is("archived_at", null);
+    if (empresaId !== null) tareasQ = tareasQ.eq("empresa_id", empresaId);
+    const { data: tareas } = await tareasQ.limit(6);
 
     for (const t of tareas ?? []) {
       results.push({
@@ -224,13 +242,15 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── Agenda (actividades / orden del dia) ─────────────────────────
+  // ── Agenda ────────────────────────────────────────────────────────────────────
   if (ctx === "general") {
-    const { data: actividades } = await supabase
+    let agendaQ = supabase
       .from("agenda")
       .select("id, description, event_date, time, priority, tipo, completed, owner_user_id")
       .is("archived_at", null)
-      .or(`description.ilike.%${q}%,tipo.ilike.%${q}%`)
+      .or(`description.ilike.%${q}%,tipo.ilike.%${q}%`);
+    if (empresaId !== null) agendaQ = agendaQ.eq("empresa_id", empresaId);
+    const { data: actividades } = await agendaQ
       .order("event_date", { ascending: false, nullsFirst: false })
       .limit(6);
 
@@ -249,11 +269,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  if (ctx === "general") {
+  // ── Email ──────────────────────────────────────────────────────────────────────
+  // La RLS de email_messages ya filtra por user_id + empresa_id. Añadimos ambos
+  // filtros explícitos como segunda capa. Sin currentUserId conocido no ejecutamos
+  // la query: si RLS fallara sin estos filtros, cualquier usuario vería todos los
+  // correos del sistema.
+  if (ctx === "general" && currentUserId !== null && empresaId !== null) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: emails } = await (supabase as any)
       .from("email_messages")
       .select("id, subject, from_email, from_name, snippet, received_at, body_text")
+      .eq("user_id", currentUserId)
+      .eq("empresa_id", empresaId)
       .or(`subject.ilike.%${q}%,from_email.ilike.%${q}%,from_name.ilike.%${q}%,snippet.ilike.%${q}%,body_text.ilike.%${q}%`)
       .order("received_at", { ascending: false, nullsFirst: false })
       .limit(5);
