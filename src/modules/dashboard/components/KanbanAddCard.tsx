@@ -7,6 +7,8 @@ import type { UserRole } from "@/lib/roles";
 import { DEFAULT_ACTIVITY_TIME, localDateKey } from "@/lib/local-date-time";
 import { type ActivityType } from "@/lib/activity-options";
 import Drawer from "@/components/ui/drawer";
+import TaskCardForm from "@/modules/tareas/components/TaskCardForm";
+import type { TaskCardFormValues } from "@/modules/tareas/schemas/task.schema";
 
 type NewCard = Omit<KanbanCardData, "id" | "source" | "dbId">;
 
@@ -56,6 +58,18 @@ export default function KanbanAddCard({
   const isActivity = mode === "actividad";
   const availableAgents = agents.length ? agents : [{ id: currentUserId, nombre: "Yo" }];
 
+  function handleTaskSubmit(values: TaskCardFormValues) {
+    onAdd({
+      title: values.title,
+      description: values.description?.trim() || undefined,
+      priority: values.priority,
+      assignedBy: null,
+      assignedTo: String(values.assignedUserIds[0] ?? currentUserId),
+      assignedUserIds: values.assignedUserIds,
+    });
+    onClose();
+  }
+
   function toggleAssigned(id: string) {
     setAssignedUserIds((prev) => {
       const next = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
@@ -79,6 +93,33 @@ export default function KanbanAddCard({
       assignedUserIds: assignedUserIds.map(Number),
     });
     onClose();
+  }
+
+  if (!isActivity) {
+    return (
+      <Drawer
+        open
+        onClose={onClose}
+        title="Nueva tarea"
+        width="md"
+        footer={null}
+      >
+        <TaskCardForm
+          formId="kanban-add-form"
+          defaultValues={{
+            title: "",
+            description: "",
+            priority: "media",
+            assignedUserIds: [Number(currentUserId)],
+          }}
+          agents={availableAgents}
+          canAssign={canAssign}
+          submitLabel="Anadir tarea"
+          onSubmit={handleTaskSubmit}
+          onCancel={onClose}
+        />
+      </Drawer>
+    );
   }
 
   return (

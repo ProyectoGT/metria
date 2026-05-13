@@ -6,6 +6,8 @@ import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import { DEFAULT_ACTIVITY_TIME, normalizeTime, splitLocalDateTime } from "@/lib/local-date-time";
 import { ACTIVITY_TYPES as ACTIVITY_TYPE_VALUES, type ActivityType } from "@/lib/activity-options";
 import Drawer from "@/components/ui/drawer";
+import TaskCardForm from "@/modules/tareas/components/TaskCardForm";
+import type { TaskCardFormValues } from "@/modules/tareas/schemas/task.schema";
 
 type EditUpdates = {
   title: string;
@@ -57,6 +59,14 @@ export default function KanbanEditCard({ card, onSave, onClose, agents = [], cur
   const isActivity = card.source === "agenda";
   const availableAgents = agents.length ? agents : [{ id: currentUserId, nombre: "Yo" }];
 
+  function handleTaskSubmit(values: TaskCardFormValues) {
+    onSave({
+      title: values.title,
+      priority: values.priority,
+      assignedUserIds: values.assignedUserIds,
+    });
+  }
+
   function toggleAssigned(id: string) {
     setAssignedUserIds((prev) => {
       const next = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
@@ -76,6 +86,33 @@ export default function KanbanEditCard({ card, onSave, onClose, agents = [], cur
       ...(isActivity ? { tipo } : {}),
       assignedUserIds: assignedUserIds.map(Number).filter(Number.isFinite),
     });
+  }
+
+  if (!isActivity) {
+    return (
+      <Drawer
+        open
+        onClose={onClose}
+        title="Editar tarea"
+        width="md"
+        footer={null}
+      >
+        <TaskCardForm
+          formId="kanban-edit-form"
+          defaultValues={{
+            title: card.title,
+            description: card.description ?? "",
+            priority: card.priority,
+            assignedUserIds: card.assignedUserIds?.length ? card.assignedUserIds : [Number(currentUserId)],
+          }}
+          agents={availableAgents}
+          canAssign
+          submitLabel="Guardar cambios"
+          onSubmit={handleTaskSubmit}
+          onCancel={onClose}
+        />
+      </Drawer>
+    );
   }
 
   return (
