@@ -1100,13 +1100,16 @@ export default function CalendarioClient({
                 <Filter className="h-4 w-4" />
                 {filterUserId === "all" ? t("calendar.todos") : (usersMap[filterUserId as number] ?? t("common.user"))}
                 {filterUserId !== "all" && (
-                  <button
+                  <span
+                    role="button"
+                    tabIndex={-1}
                     onClick={(e) => { e.stopPropagation(); setFilterUserId("all"); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setFilterUserId("all"); } }}
                     className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary/20 text-primary hover:bg-primary/30"
                     aria-label={t("calendar.quitarFiltro")}
                   >
                     <X className="h-2.5 w-2.5" />
-                  </button>
+                  </span>
                 )}
               </button>
               {filterOpen && (
