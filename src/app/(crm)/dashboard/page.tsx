@@ -426,7 +426,7 @@ export default async function DashboardPage() {
   });
 
   const myTareas = tareas.filter((t) => assignedIdsFromRows(t.tarea_usuarios).includes(userId) || t.owner_user_id === userId);
-  const myAgendaHoy = agendaHoy.filter((a) => assignedIdsFromRows(a.agenda_usuarios).includes(userId) || a.owner_user_id === userId || a.user_id === userId);
+  const myAgendaHoy = agendaHoy.filter((a) => assignedIdsFromRows(a.agenda_usuarios).includes(userId) || a.user_id === userId);
 
   function toCard(t: TareaDbRow) {
     return {

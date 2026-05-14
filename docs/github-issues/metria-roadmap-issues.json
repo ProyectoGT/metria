@@ -1,0 +1,176 @@
+[
+  {
+    "order": 1,
+    "title": "ARCH: Definir estructura estándar de módulos",
+    "body": "## Descripción\nDefinir una estructura común para los módulos funcionales de Metria.\n\n## Contexto\nAgenda, tareas, kanban, contactos y dashboard deben seguir patrones consistentes de carpetas, servicios, hooks y estado.\n\n## Objetivo\nCrear una convención estable para nuevos módulos y migraciones incrementales.\n\n## Tareas técnicas\n- Definir estructura base: components, hooks, services, schemas, query-keys.ts, mutations.ts, types.ts.\n- Documentar responsabilidades de cada carpeta.\n- Crear ejemplo de módulo de referencia.\n- Revisar agenda, tareas y kanban como casos piloto.\n\n## Criterios de aceptación\n- Existe documentación en src/modules/README.md o ADR.\n- La estructura estándar queda definida con ejemplos.\n- Nuevos módulos pueden seguir la convención sin ambigüedad.\n\n## Prioridad\nAlta\n\n## Dependencias\nNinguna\n\n## Tamaño\nM",
+    "labels": ["architecture", "modules", "docs", "priority:high", "size:M"]
+  },
+  {
+    "order": 2,
+    "title": "ARCH: Documentar frontera UI / lógica / servicios / estado",
+    "body": "## Descripción\nDocumentar qué lógica vive en componentes, hooks, servicios, stores y server actions.\n\n## Contexto\nEvitar que componentes acumulen lógica de negocio, llamadas a Supabase o reglas de permisos.\n\n## Objetivo\nEstablecer fronteras técnicas claras para PRs y futuras migraciones.\n\n## Tareas técnicas\n- Definir responsabilidades de componentes UI, componentes feature, hooks, services, stores y server actions.\n- Añadir ejemplos correctos e incorrectos.\n- Documentar cuándo usar client service vs server action.\n- Documentar dónde validar permisos.\n\n## Criterios de aceptación\n- Existe documento o ADR.\n- Incluye ejemplos aplicados a agenda, tareas y kanban.\n- El equipo puede usarlo como referencia en PRs.\n\n## Prioridad\nAlta\n\n## Dependencias\n#1\n\n## Tamaño\nM",
+    "labels": ["architecture", "docs", "standards", "priority:high", "size:M"]
+  },
+  {
+    "order": 3,
+    "title": "ADR: Crear plantilla y registrar primeras decisiones técnicas",
+    "body": "## Descripción\nCrear sistema mínimo de ADRs para decisiones relevantes.\n\n## Contexto\nLas decisiones sobre TanStack Query, Zustand, RBAC y design system deben quedar trazables.\n\n## Objetivo\nEvitar conocimiento tribal y facilitar mantenimiento.\n\n## Tareas técnicas\n- Crear carpeta docs/adr si no existe.\n- Crear plantilla ADR.\n- Registrar ADRs iniciales: arquitectura modular, server state con TanStack Query, UI state con Zustand, permisos centralizados y design system mínimo.\n\n## Criterios de aceptación\n- Existe plantilla ADR.\n- Hay al menos 4 ADRs iniciales.\n- Cada ADR incluye contexto, decisión y consecuencias.\n\n## Prioridad\nMedia\n\n## Dependencias\n#1, #2\n\n## Tamaño\nS",
+    "labels": ["docs", "adr", "architecture", "priority:medium", "size:S"]
+  },
+  {
+    "order": 4,
+    "title": "QUERY: Centralizar queryKeys por dominio",
+    "body": "## Descripción\nDefinir query keys consistentes por dominio funcional.\n\n## Contexto\nLas invalidaciones cross-view necesitan claves predecibles y centralizadas.\n\n## Objetivo\nEvitar query keys hardcodeadas y dispersas.\n\n## Tareas técnicas\n- Crear o normalizar query-keys.ts por dominio.\n- Definir keys para agenda, tareas, kanban, contactos y dashboard.\n- Crear convención de naming.\n- Sustituir hardcoded keys existentes donde sea seguro.\n\n## Criterios de aceptación\n- Cada dominio principal tiene query keys centralizadas.\n- No se crean nuevas query keys inline en código migrado.\n- Las keys soportan filtros y detalle.\n\n## Prioridad\nAlta\n\n## Dependencias\n#1\n\n## Tamaño\nM",
+    "labels": ["query", "tanstack-query", "architecture", "priority:high", "size:M"]
+  },
+  {
+    "order": 5,
+    "title": "PERMS: Centralizar can(user, action, resource)",
+    "body": "## Descripción\nCrear capa mínima RBAC reutilizable.\n\n## Contexto\nLa lógica de permisos no debe repetirse en componentes ni depender de checks sueltos de rol.\n\n## Objetivo\nExponer helpers estables: can, canView, canCreate, canUpdate y canDelete.\n\n## Tareas técnicas\n- Definir modelo mínimo de acciones y recursos.\n- Crear helper can.\n- Crear helpers derivados.\n- Añadir tipos TypeScript.\n- Añadir tests unitarios básicos.\n- Exportar API pública desde access-control.\n\n## Criterios de aceptación\n- Los componentes pueden consultar permisos sin comparar roles directamente.\n- Existen tests para permitido y bloqueado.\n- Recursos principales están modelados.\n\n## Prioridad\nAlta\n\n## Dependencias\n#2\n\n## Tamaño\nM",
+    "labels": ["permissions", "rbac", "security", "priority:high", "size:M"]
+  },
+  {
+    "order": 6,
+    "title": "QUERY: Crear invalidation map cross-view",
+    "body": "## Descripción\nCrear mapa central de invalidaciones entre vistas relacionadas.\n\n## Contexto\nAcciones en tareas, agenda o kanban afectan varias pantallas.\n\n## Objetivo\nCentralizar invalidaciones para evitar inconsistencias.\n\n## Tareas técnicas\n- Crear o normalizar invalidation-map.\n- Definir eventos task.created, task.updated, task.completed, agenda.created, agenda.updated y kanban.cardMoved.\n- Mapear cada evento a query keys afectadas.\n- Añadir helper invalidateAfterMutation.\n\n## Criterios de aceptación\n- Las mutations no invalidan queries manualmente salvo excepción justificada.\n- Agenda, tareas y kanban se actualizan correctamente tras cambios cruzados.\n- El mapa es extensible por dominio.\n\n## Prioridad\nAlta\n\n## Dependencias\n#4\n\n## Tamaño\nL",
+    "labels": ["query", "invalidation", "tanstack-query", "priority:high", "size:L"]
+  },
+  {
+    "order": 7,
+    "title": "QUERY: Migrar agenda a TanStack Query",
+    "body": "## Descripción\nMigrar lectura y mutations de agenda a TanStack Query.\n\n## Contexto\nAgenda es una vista central y afecta dashboard y kanban.\n\n## Objetivo\nUsar server state consistente y cache invalidation centralizada.\n\n## Tareas técnicas\n- Crear agenda.service.ts tipado.\n- Crear hooks useAgendaItems, useCreateAgendaItem, useUpdateAgendaItem, useDeleteAgendaItem y useCompleteAgendaItem.\n- Usar query keys del dominio.\n- Integrar invalidation map.\n- Mantener UX actual.\n\n## Criterios de aceptación\n- Agenda carga con useQuery.\n- Create/update/delete/complete usan useMutation.\n- No hay regresiones visibles en calendario.\n- Invalidaciones cruzadas funcionan.\n\n## Prioridad\nAlta\n\n## Dependencias\n#4, #6\n\n## Tamaño\nL",
+    "labels": ["query", "agenda", "tanstack-query", "priority:high", "size:L"]
+  },
+  {
+    "order": 8,
+    "title": "QUERY: Migrar tareas a TanStack Query",
+    "body": "## Descripción\nMigrar tareas a servicios tipados y hooks TanStack Query.\n\n## Contexto\nTareas impacta hoy, dashboard, kanban y agenda.\n\n## Objetivo\nUnificar server state de tareas.\n\n## Tareas técnicas\n- Crear o normalizar tareas.service.ts.\n- Crear hooks useTasks, useTask, useCreateTask, useUpdateTask y useCompleteTask.\n- Integrar invalidation map.\n- Evitar duplicación de fetch/update en componentes.\n\n## Criterios de aceptación\n- Tareas usan useQuery/useMutation.\n- Mutations invalidan vistas relacionadas.\n- No quedan llamadas duplicadas relevantes desde componentes migrados.\n\n## Prioridad\nAlta\n\n## Dependencias\n#4, #6\n\n## Tamaño\nL",
+    "labels": ["query", "tasks", "tanstack-query", "priority:high", "size:L"]
+  },
+  {
+    "order": 9,
+    "title": "QUERY: Migrar kanban a TanStack Query",
+    "body": "## Descripción\nMigrar tablero kanban a TanStack Query con optimistic updates controlados.\n\n## Contexto\nKanban depende de tareas y agenda, y necesita sincronización cross-view.\n\n## Objetivo\nCentralizar carga, movimiento y refresco de cards.\n\n## Tareas técnicas\n- Crear o normalizar kanban.service.ts.\n- Crear hook useKanbanBoard.\n- Crear mutation useMoveKanbanCard.\n- Implementar optimistic update con rollback.\n- Integrar invalidation map.\n- No modificar estructura crítica de drag/drop salvo necesario.\n\n## Criterios de aceptación\n- El tablero carga desde query centralizada.\n- Mover card actualiza UI optimistamente.\n- Si falla, se restaura snapshot.\n- Agenda/tareas se invalidan correctamente.\n\n## Prioridad\nAlta\n\n## Dependencias\n#4, #6, #7, #8\n\n## Tamaño\nXL",
+    "labels": ["query", "kanban", "tanstack-query", "optimistic-update", "priority:high", "size:XL"]
+  },
+  {
+    "order": 10,
+    "title": "QUERY: Crear servicios tipados por dominio",
+    "body": "## Descripción\nNormalizar servicios de datos para dominios principales.\n\n## Contexto\nLos componentes no deberían conocer detalles de Supabase/RPC.\n\n## Objetivo\nConcentrar acceso a datos en servicios tipados.\n\n## Tareas técnicas\n- Revisar servicios de agenda, tareas, kanban y contactos.\n- Definir inputs/outputs TypeScript.\n- Usar helpers comunes de errores.\n- Evitar payloads any salvo integración inevitable.\n\n## Criterios de aceptación\n- Los hooks consumen services, no Supabase directo.\n- Los inputs de mutations están tipados.\n- Los errores de Supabase se normalizan.\n\n## Prioridad\nAlta\n\n## Dependencias\n#7, #8, #9\n\n## Tamaño\nL",
+    "labels": ["services", "typescript", "architecture", "priority:high", "size:L"]
+  },
+  {
+    "order": 11,
+    "title": "STATE: Crear ui.store con Zustand",
+    "body": "## Descripción\nCrear store mínimo para estado global de UI.\n\n## Contexto\nNo todo debe vivir en React Query ni en estados locales profundos.\n\n## Objetivo\nCentralizar estado efímero de UI compartido.\n\n## Tareas técnicas\n- Crear src/stores/ui.store.ts.\n- Definir estado mínimo: sidebar abierto/cerrado, panel lateral activo, modal activo opcional y densidad/list view si aplica.\n- Crear acciones simples.\n- Evitar mezclar server state.\n\n## Criterios de aceptación\n- Existe store UI tipado.\n- No contiene datos remotos.\n- Puede ser usado desde layout y pantallas feature.\n\n## Prioridad\nMedia\n\n## Dependencias\n#2\n\n## Tamaño\nM",
+    "labels": ["state", "zustand", "ui", "priority:medium", "size:M"]
+  },
+  {
+    "order": 12,
+    "title": "STATE: Mover filtros compartidos a Zustand",
+    "body": "## Descripción\nMover filtros compartidos entre vistas a store dedicado.\n\n## Contexto\nFiltros repetidos pueden provocar prop drilling y renders innecesarios.\n\n## Objetivo\nCentralizar filtros de UI donde haya beneficio real.\n\n## Tareas técnicas\n- Crear o normalizar filters.store.ts.\n- Identificar filtros compartidos en dashboard/calendario/kanban.\n- Migrar solo filtros con uso cross-view o prop drilling claro.\n- Mantener filtros puramente locales donde no haya beneficio.\n\n## Criterios de aceptación\n- Filtros seleccionados viven en Zustand.\n- No se mezcla con cache de datos.\n- Se reducen props pasadas entre niveles.\n\n## Prioridad\nMedia\n\n## Dependencias\n#11\n\n## Tamaño\nM",
+    "labels": ["state", "zustand", "filters", "priority:medium", "size:M"]
+  },
+  {
+    "order": 13,
+    "title": "STATE: Mover panel lateral/drawer a Zustand",
+    "body": "## Descripción\nCentralizar estado de panel lateral cuando se comparte entre componentes.\n\n## Contexto\nDrawers y side panels pueden provocar renders y lógica duplicada.\n\n## Objetivo\nUnificar apertura/cierre y entidad seleccionada.\n\n## Tareas técnicas\n- Definir shape del estado: activePanel, entityType, entityId, openPanel y closePanel.\n- Migrar un flujo piloto.\n- Evitar guardar objetos completos si basta con IDs.\n\n## Criterios de aceptación\n- Un flujo usa drawer desde store.\n- No se guardan datos pesados en Zustand.\n- Cierre/apertura queda desacoplado del componente profundo.\n\n## Prioridad\nMedia\n\n## Dependencias\n#11\n\n## Tamaño\nM",
+    "labels": ["state", "zustand", "drawer", "priority:medium", "size:M"]
+  },
+  {
+    "order": 14,
+    "title": "FORMS: Crear schemas base con Zod",
+    "body": "## Descripción\nDefinir patrón de validación con Zod para formularios.\n\n## Contexto\nAntes de migrar formularios grandes, conviene estandarizar validación.\n\n## Objetivo\nCrear base reusable para RHF + Zod.\n\n## Tareas técnicas\n- Definir carpeta schemas por dominio.\n- Crear helpers de validación comunes.\n- Documentar patrón RHF + Zod.\n- Crear schema piloto para tarea o agenda.\n\n## Criterios de aceptación\n- Existe patrón documentado.\n- Hay al menos un schema implementado.\n- El schema se comparte entre form y service/server action si aplica.\n\n## Prioridad\nAlta\n\n## Dependencias\n#1, #2\n\n## Tamaño\nM",
+    "labels": ["forms", "zod", "validation", "priority:high", "size:M"]
+  },
+  {
+    "order": 15,
+    "title": "FORMS: Migrar formulario de agenda a RHF + Zod",
+    "body": "## Descripción\nMigrar formulario de agenda a React Hook Form con validación Zod.\n\n## Contexto\nAgenda requiere validación consistente en creación/edición.\n\n## Objetivo\nMejorar fiabilidad y reducir estado manual.\n\n## Tareas técnicas\n- Crear agenda.schema.ts.\n- Migrar form a RHF.\n- Mostrar errores por campo.\n- Mantener UX actual.\n- Conectar con mutations existentes.\n\n## Criterios de aceptación\n- Form crea y edita agenda correctamente.\n- Validaciones funcionan antes de enviar.\n- No se duplican validaciones manuales innecesarias.\n\n## Prioridad\nAlta\n\n## Dependencias\n#7, #14\n\n## Tamaño\nL",
+    "labels": ["forms", "agenda", "react-hook-form", "zod", "priority:high", "size:L"]
+  },
+  {
+    "order": 16,
+    "title": "FORMS: Migrar formulario de tarea a RHF + Zod",
+    "body": "## Descripción\nMigrar formulario de tarea a React Hook Form con Zod.\n\n## Contexto\nTareas se crea desde varios puntos, incluido kanban.\n\n## Objetivo\nUnificar validación y estado del formulario.\n\n## Tareas técnicas\n- Crear task.schema.ts.\n- Migrar create/edit form.\n- Integrar con mutations de tareas.\n- Validar prioridad, asignados y resultado si aplica.\n\n## Criterios de aceptación\n- Crear/editar tarea funciona.\n- Validaciones son consistentes.\n- El form no mantiene estado manual innecesario.\n\n## Prioridad\nAlta\n\n## Dependencias\n#8, #14\n\n## Tamaño\nL",
+    "labels": ["forms", "tasks", "react-hook-form", "zod", "priority:high", "size:L"]
+  },
+  {
+    "order": 17,
+    "title": "FORMS: Migrar formulario de contacto a RHF + Zod",
+    "body": "## Descripción\nMigrar formulario de contacto a React Hook Form + Zod.\n\n## Contexto\nContactos suele tener campos con validación sensible: email, teléfono, origen, etc.\n\n## Objetivo\nEstandarizar validación sin cambiar la UI.\n\n## Tareas técnicas\n- Crear contact.schema.ts.\n- Migrar form a RHF.\n- Validar campos principales.\n- Evitar guardar datos no normalizados si ya hay reglas existentes.\n\n## Criterios de aceptación\n- Crear/editar contacto funciona.\n- Errores se muestran por campo.\n- No hay regresión en datos existentes.\n\n## Prioridad\nMedia\n\n## Dependencias\n#14\n\n## Tamaño\nL",
+    "labels": ["forms", "contacts", "react-hook-form", "zod", "priority:medium", "size:L"]
+  },
+  {
+    "order": 18,
+    "title": "PERF: Audit dashboard/calendario/kanban",
+    "body": "## Descripción\nAuditar renders, queries, waterfalls y componentes pesados.\n\n## Contexto\nAntes de optimizar, hay que medir.\n\n## Objetivo\nIdentificar causas reales de lentitud.\n\n## Tareas técnicas\n- Revisar dashboard, calendario y kanban.\n- Medir renders con React DevTools/profiling.\n- Revisar query waterfalls.\n- Revisar modales/drawers y listas.\n- Crear reporte con hallazgos priorizados.\n\n## Criterios de aceptación\n- Existe informe de performance.\n- Incluye problemas, impacto y propuesta.\n- No se hacen refactors grandes dentro del audit.\n\n## Prioridad\nMedia\n\n## Dependencias\n#7, #8, #9\n\n## Tamaño\nM",
+    "labels": ["performance", "audit", "dashboard", "kanban", "calendar", "priority:medium", "size:M"]
+  },
+  {
+    "order": 19,
+    "title": "PERF: Reducir renders por modales/filtros",
+    "body": "## Descripción\nAplicar optimizaciones detectadas en el audit.\n\n## Contexto\nModales, filtros y drawers pueden disparar renders globales innecesarios.\n\n## Objetivo\nReducir renders sin reescribir pantallas.\n\n## Tareas técnicas\n- Memoizar callbacks/props donde tenga impacto medido.\n- Separar componentes pesados.\n- Usar Zustand para estado de UI compartido si aplica.\n- Evitar pasar objetos inline a listas grandes.\n- Validar que no se rompa drag/drop.\n\n## Criterios de aceptación\n- Hay reducción observable de renders en flujos medidos.\n- No se introduce complejidad prematura.\n- Se mantiene comportamiento actual.\n\n## Prioridad\nMedia\n\n## Dependencias\n#11, #12, #13, #18\n\n## Tamaño\nL",
+    "labels": ["performance", "react", "renders", "priority:medium", "size:L"]
+  },
+  {
+    "order": 20,
+    "title": "DS: Definir tokens semánticos",
+    "body": "## Descripción\nDefinir tokens mínimos del design system.\n\n## Contexto\nEvitar clases visuales sueltas y preparar dark mode real.\n\n## Objetivo\nCrear contrato visual estable.\n\n## Tareas técnicas\n- Definir tokens background, surface, surface-muted, border, text-primary, text-secondary, primary, danger, success y warning.\n- Añadir spacing scale, radius scale, shadows/elevation y estados hover/focus/disabled/loading.\n- Documentar uso.\n\n## Criterios de aceptación\n- Tokens existen en CSS/Tailwind.\n- Light/dark mode tienen valores reales.\n- Documentación actualizada.\n\n## Prioridad\nAlta\n\n## Dependencias\n#2\n\n## Tamaño\nM",
+    "labels": ["design-system", "tokens", "ui", "priority:high", "size:M"]
+  },
+  {
+    "order": 21,
+    "title": "DS: Crear Button/Input/Select/Dialog/Card base",
+    "body": "## Descripción\nCrear componentes base reutilizables.\n\n## Contexto\nMetria necesita reemplazo progresivo de duplicados sin rediseño global.\n\n## Objetivo\nEstabilizar primitives de UI.\n\n## Tareas técnicas\n- Crear o normalizar Button, Input, Select, Dialog, Drawer y Card.\n- Soportar variantes mínimas.\n- Soportar disabled/loading/focus.\n- Documentar ejemplos.\n\n## Criterios de aceptación\n- Componentes están en src/components/ui.\n- Usan tokens semánticos.\n- No fuerzan rediseño global.\n- Pueden adoptarse progresivamente.\n\n## Prioridad\nAlta\n\n## Dependencias\n#20\n\n## Tamaño\nL",
+    "labels": ["design-system", "components", "ui", "priority:high", "size:L"]
+  },
+  {
+    "order": 22,
+    "title": "DS: Crear Badge/Table/EmptyState/LoadingState/ErrorState",
+    "body": "## Descripción\nCompletar primitives necesarias para pantallas SaaS operativas.\n\n## Contexto\nTablas y estados de datos se repiten en muchos módulos.\n\n## Objetivo\nReducir duplicación en estados comunes.\n\n## Tareas técnicas\n- Crear o normalizar Badge, Table, EmptyState, LoadingState y ErrorState.\n- Añadir variantes semánticas.\n- Integrar con tokens de estado.\n- Documentar ejemplos.\n\n## Criterios de aceptación\n- Los componentes existen y son reutilizables.\n- Cubren estados básicos de datos.\n- No introducen estilos hardcoded innecesarios.\n\n## Prioridad\nMedia\n\n## Dependencias\n#20\n\n## Tamaño\nM",
+    "labels": ["design-system", "components", "tables", "states", "priority:medium", "size:M"]
+  },
+  {
+    "order": 23,
+    "title": "PERMS: Proteger server actions críticas",
+    "body": "## Descripción\nAplicar guards server-side a acciones críticas.\n\n## Contexto\nLa UI puede ocultar/desactivar, pero la seguridad real debe vivir en servidor.\n\n## Objetivo\nEvitar mutaciones sensibles sin permiso.\n\n## Tareas técnicas\n- Identificar server actions críticas: crear/editar/completar tarea, crear/editar agenda, mover kanban card y eliminar/contactos si aplica.\n- Aplicar requirePermission o helpers derivados.\n- Validar ownership/team scope cuando aplique.\n- Añadir tests o smoke checks.\n\n## Criterios de aceptación\n- Las server actions críticas validan permisos.\n- No dependen solo de checks UI.\n- Los errores son claros y no filtran datos sensibles.\n\n## Prioridad\nAlta\n\n## Dependencias\n#5\n\n## Tamaño\nL",
+    "labels": ["permissions", "security", "server-actions", "priority:high", "size:L"]
+  },
+  {
+    "order": 24,
+    "title": "PERMS: Integrar permisos en UI",
+    "body": "## Descripción\nUsar permisos centralizados para ocultar o desactivar acciones.\n\n## Contexto\nLos componentes no deben comparar roles directamente.\n\n## Objetivo\nConectar UI a la capa can.\n\n## Tareas técnicas\n- Migrar checks en agenda, tareas, kanban y contactos.\n- Reemplazar checks directos de rol.\n- Usar canView, canCreate, canUpdate y canDelete.\n- Mantener fallback visual coherente.\n\n## Criterios de aceptación\n- No hay checks nuevos tipo role ===.\n- Acciones críticas se ocultan/desactivan según permisos.\n- La seguridad real sigue estando en server.\n\n## Prioridad\nMedia\n\n## Dependencias\n#5, #23\n\n## Tamaño\nL",
+    "labels": ["permissions", "ui", "rbac", "priority:medium", "size:L"]
+  },
+  {
+    "order": 25,
+    "title": "OBS: Logger server-side mínimo",
+    "body": "## Descripción\nCrear logger estructurado server-side.\n\n## Contexto\nSe necesita depurar producción sin Sentry ni sistema grande.\n\n## Objetivo\nRegistrar eventos y errores operativos con contexto mínimo.\n\n## Tareas técnicas\n- Definir estructura de log: userId, orgId, module, action, entityId y errorCode.\n- Crear helper trackAppEvent.\n- Crear helper trackAppError.\n- Añadir redacción de campos sensibles.\n- Usar stdout como sink inicial.\n\n## Criterios de aceptación\n- Existe helper central.\n- No hay logging sensible.\n- Logging no bloquea UX.\n- Los logs son estructurados.\n\n## Prioridad\nAlta\n\n## Dependencias\n#2\n\n## Tamaño\nM",
+    "labels": ["observability", "logging", "production-debug", "priority:high", "size:M"]
+  },
+  {
+    "order": 26,
+    "title": "OBS: Instrumentar mutations críticas",
+    "body": "## Descripción\nAñadir tracking a mutations y RPCs principales.\n\n## Contexto\nHay que poder saber qué falla en producción.\n\n## Objetivo\nCubrir eventos mínimos del roadmap.\n\n## Tareas técnicas\n- Instrumentar tarea creada, tarea completada, actividad agenda creada, actividad agenda editada, kanban card movida, error RPC y error mutation.\n- Añadir error codes estables.\n- Evitar payloads completos.\n- Mantener logging best-effort.\n\n## Criterios de aceptación\n- Los 7 eventos mínimos quedan cubiertos.\n- Cada error incluye module, action, entityId si existe y errorCode.\n- No se guarda PII innecesaria.\n\n## Prioridad\nAlta\n\n## Dependencias\n#25\n\n## Tamaño\nL",
+    "labels": ["observability", "mutations", "rpc", "debugging", "priority:high", "size:L"]
+  },
+  {
+    "order": 27,
+    "title": "CI: Typecheck obligatorio",
+    "body": "## Descripción\nAñadir validación obligatoria de TypeScript en CI.\n\n## Contexto\nEl proyecto debe bloquear PRs con errores de tipos.\n\n## Objetivo\nGarantizar tsc --noEmit antes de merge.\n\n## Tareas técnicas\n- Crear workflow GitHub Actions.\n- Ejecutar install reproducible.\n- Ejecutar npm run typecheck.\n- Cachear dependencias si aplica.\n- Documentar requisito en PR checklist.\n\n## Criterios de aceptación\n- CI corre en PR.\n- PR falla si typecheck falla.\n- Workflow queda documentado.\n\n## Prioridad\nAlta\n\n## Dependencias\nNinguna\n\n## Tamaño\nS",
+    "labels": ["ci", "typescript", "quality", "priority:high", "size:S"]
+  },
+  {
+    "order": 28,
+    "title": "CI: Lint obligatorio",
+    "body": "## Descripción\nAñadir lint a CI, resolviendo o aislando deuda previa.\n\n## Contexto\nEl lint global puede fallar por deuda existente; hay que decidir estrategia.\n\n## Objetivo\nEvitar introducir nueva deuda.\n\n## Tareas técnicas\n- Ejecutar npm run lint en CI.\n- Si hay deuda existente, crear issue separado o baseline temporal.\n- Corregir errores bloqueantes mínimos.\n- Documentar reglas.\n\n## Criterios de aceptación\n- CI valida lint.\n- La estrategia para deuda existente queda clara.\n- Nuevos PRs no pueden añadir errores de lint.\n\n## Prioridad\nMedia\n\n## Dependencias\n#27\n\n## Tamaño\nM",
+    "labels": ["ci", "lint", "quality", "priority:medium", "size:M"]
+  },
+  {
+    "order": 29,
+    "title": "CI: Smoke tests de flujos principales",
+    "body": "## Descripción\nCrear smoke tests mínimos para flujos críticos.\n\n## Contexto\nNo se busca cobertura exhaustiva todavía, sino detectar roturas obvias.\n\n## Objetivo\nValidar que los flujos principales cargan y no rompen.\n\n## Tareas técnicas\n- Definir flujos: login o sesión mockeada, dashboard carga, calendario carga, kanban carga y contactos carga.\n- Elegir herramienta: Playwright o tests ligeros existentes.\n- Añadir workflow CI.\n- Documentar cómo ejecutarlos localmente.\n\n## Criterios de aceptación\n- Smoke tests corren en CI.\n- Fallan ante errores críticos de render/navegación.\n- No son frágiles por datos reales.\n\n## Prioridad\nMedia\n\n## Dependencias\n#27, #28\n\n## Tamaño\nL",
+    "labels": ["ci", "testing", "smoke-tests", "priority:medium", "size:L"]
+  }
+]
