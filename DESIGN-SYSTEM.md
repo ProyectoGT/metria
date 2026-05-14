@@ -148,6 +148,79 @@ import { PriorityBadge, StatusBadge } from "@/components/ui/badge";
 <span className={STATUS_TONE.completado.badge}>{STATUS_LABEL.completado}</span>
 ```
 
+---
+
+## Contrato minimo de tokens
+
+Este contrato permite evolucionar la UI sin redisenarla de golpe. En codigo nuevo, usar tokens semanticos antes que clases visuales sueltas.
+
+| Token | Uso |
+|-------|-----|
+| `bg-background` | Fondo general de pagina o app shell |
+| `bg-surface` | Cards, paneles, inputs y superficies base |
+| `bg-surface-muted` | Fondos secundarios dentro de una superficie |
+| `border-border` | Bordes neutrales |
+| `text-text-primary` | Texto principal |
+| `text-text-secondary` | Texto auxiliar, labels y hints |
+| `bg-primary` / `text-primary` | Accion principal o enfasis interactivo |
+| `bg-danger` / `text-danger` | Acciones destructivas y errores |
+| `bg-success` / `text-success` | Exito, completado, activo |
+| `bg-warning` / `text-warning` | Advertencias y atencion |
+| `bg-primary-soft` | Fondo suave de enfasis primario |
+| `bg-danger-soft` | Fondo suave de error |
+| `bg-success-soft` | Fondo suave de exito |
+| `bg-warning-soft` | Fondo suave de advertencia |
+
+Evitar `bg-white`, `text-gray-*`, `border-gray-*` y hexadecimales en nuevo codigo cuando exista token equivalente. Las reglas de compatibilidad dark mode solo existen para migracion incremental.
+
+---
+
+## Estados interactivos
+
+| Estado | Patron |
+|--------|--------|
+| Hover | `hover:bg-state-hover`, `hover:border-border-strong` |
+| Focus | `focus-visible:ring-state-focus` o `UI.focus` |
+| Disabled | `disabled:bg-disabled-bg disabled:text-disabled-text disabled:opacity-60` |
+| Loading | `LoadingState`, `Button loading` o `bg-state-loading` en skeletons puntuales |
+| Active/selected | `bg-state-active`, `border-primary`, `ring-state-focus` |
+
+---
+
+## Componentes prioritarios
+
+1. `Button`
+2. `Input`, `Textarea`, `Select`
+3. `Badge`, `PriorityBadge`, `StatusBadge`
+4. `Card`, `SectionCard`
+5. `TableContainer`, `Table`, `TableHead`, `Th`, `TableBody`, `Tr`, `Td`
+6. `Modal`, `Drawer`
+7. `EmptyState`, `LoadingState`, `ErrorState`
+
+---
+
+## Plan de migracion incremental
+
+1. Mantener primitives en `src/components/ui` antes de tocar pantallas.
+2. En cada PR, reemplazar duplicados visibles solo dentro del area funcional modificada.
+3. Migrar primero `Button`, `Input`, `Select`, `Badge` y `Card`.
+4. Consolidar tablas despues con la familia `Table*`.
+5. Usar `EmptyState`, `LoadingState` y `ErrorState` para estados de datos antes de crear variantes locales.
+6. Eliminar clases hardcoded solo cuando exista token equivalente.
+7. Validar light, dark y dark-black antes de considerar una pantalla migrada.
+
+---
+
+## Criterios de aceptacion para nuevas UI
+
+- Usa tokens semanticos para superficie, texto, borde e intents.
+- No introduce colores hardcoded si existe token.
+- Tiene estados hover, focus, disabled y loading definidos.
+- Funciona con teclado y focus visible.
+- Se ve correctamente en light, dark y dark-black.
+- Usa primitives existentes antes de crear componentes visuales nuevos.
+- No cambia layout global ni jerarquia visual fuera del alcance del flujo tocado.
+
 `src/lib/theme.ts` mantiene exports compatibles (`PRIORITY_BADGE`, `ESTADO_PROPIEDAD`, `ROL_BADGE`, `ESTADO_USUARIO`) para no romper módulos existentes mientras se migra.
 
 ---

@@ -6,7 +6,8 @@ export const UI = {
   surface: {
     base: "bg-surface text-text-primary",
     elevated: "bg-surface-elevated text-text-primary",
-    muted: "bg-muted text-text-secondary",
+    muted: "bg-surface-muted text-text-secondary",
+    legacyMuted: "bg-muted text-text-secondary",
   },
   border: {
     base: "border border-border",
@@ -27,6 +28,12 @@ export const UI = {
   focus:
     "outline-none focus-visible:ring-2 focus-visible:ring-state-focus focus-visible:ring-offset-1 focus-visible:ring-offset-background",
   transition: "transition-all duration-200",
+  state: {
+    hover: "hover:bg-state-hover",
+    focus: "focus-visible:ring-2 focus-visible:ring-state-focus",
+    disabled: "disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-text disabled:opacity-60",
+    loading: "cursor-wait bg-state-loading text-text-secondary",
+  },
 } as const;
 
 export type Priority = "baja" | "media" | "alta";
