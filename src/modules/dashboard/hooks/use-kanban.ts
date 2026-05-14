@@ -3,6 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { eventBus } from "@/lib/event-bus";
+import { trackAppEvent, trackMutationError, trackRpcError } from "@/lib/observability";
 import { kanbanService } from "@/modules/kanban/services/kanban.service";
 import type { KanbanData, KanbanCardData } from "@/lib/mock/dashboard";
 import type { KanbanQueryParams } from "@/modules/kanban/types";
@@ -78,10 +79,49 @@ export function useKanbanMoveCard(serverAction: MoveCardServerAction) {
 
       return { snapshot, qk };
     },
-    onError: (_err, _vars, context) => {
+    onError: (error, vars, context) => {
       if (context?.snapshot) qc.setQueryData(context.qk, context.snapshot);
+      trackMutationError({
+        module: "kanban",
+        action: "move",
+        entityType: "kanban_card",
+        entityId: vars.cardId,
+        errorCode: "KANBAN_MOVE_FAILED",
+        error,
+        metadata: {
+          source: vars.source,
+          sourceColumnId: vars.fromCol,
+          targetColumnId: vars.toCol,
+        },
+      });
+      if (vars.source === "agenda") {
+        trackRpcError({
+          module: "kanban",
+          action: "move",
+          entityType: "agenda_activity",
+          entityId: vars.dbId,
+          errorCode: "KANBAN_AGENDA_MOVE_RPC_FAILED",
+          error,
+          metadata: { targetColumnId: vars.toCol },
+        });
+      }
     },
-    onSuccess: (_data, { dbId, fromCol, toCol }) => {
+    onSuccess: (_data, { cardId, dbId, source, fromCol, toCol, params }) => {
+      trackAppEvent({
+        event: "kanban_card.moved",
+        userId: params.userId,
+        orgId: params.empresaId,
+        module: "kanban",
+        action: "move",
+        entityType: "kanban_card",
+        entityId: cardId,
+        metadata: {
+          dbId,
+          source,
+          sourceColumnId: fromCol,
+          targetColumnId: toCol,
+        },
+      });
       eventBus.emit({ type: "task.moved", payload: { tareaId: dbId, fromCol, toCol } });
     },
     onSettled: (_data, _err, { params }) => {
@@ -102,9 +142,27 @@ export function useKanbanCreateCard(serverAction: CreateCardServerAction, empres
   return useMutation({
     mutationFn: serverAction,
     onSuccess: (result) => {
+      trackAppEvent({
+        event: "task.created",
+        orgId: empresaId,
+        module: "tareas",
+        action: "create",
+        entityType: "task",
+        entityId: result.id,
+        metadata: { source: "kanban" },
+      });
       eventBus.emit({
         type: "task.created",
         payload: { tareaId: result.id, empresaId },
+      });
+    },
+    onError: (error) => {
+      trackMutationError({
+        module: "kanban",
+        action: "create",
+        entityType: "kanban_card",
+        errorCode: "KANBAN_CREATE_CARD_FAILED",
+        error,
       });
     },
   });
@@ -121,10 +179,29 @@ export function useKanbanCompleteCard(serverAction: CompleteCardServerAction) {
     mutationFn: serverAction,
     onSuccess: (_data, { dbId, source }) => {
       if (source === "tarea") {
+        trackAppEvent({
+          event: "task.completed",
+          module: "tareas",
+          action: "complete",
+          entityType: "task",
+          entityId: dbId,
+          metadata: { source: "kanban" },
+        });
         eventBus.emit({ type: "task.completed", payload: { tareaId: dbId, source: "kanban" } });
       } else {
         eventBus.emit({ type: "calendar.event.completed", payload: { agendaId: dbId } });
       }
+    },
+    onError: (error, input) => {
+      trackMutationError({
+        module: "kanban",
+        action: "complete",
+        entityType: input.source === "tarea" ? "task" : "agenda_activity",
+        entityId: input.dbId,
+        errorCode: "KANBAN_COMPLETE_CARD_FAILED",
+        error,
+        metadata: { source: input.source },
+      });
     },
   });
 }
@@ -143,6 +220,17 @@ export function useKanbanDeleteCard(serverAction: DeleteCardServerAction) {
       } else {
         eventBus.emit({ type: "calendar.event.deleted", payload: { agendaId: dbId } });
       }
+    },
+    onError: (error, input) => {
+      trackMutationError({
+        module: "kanban",
+        action: "error",
+        entityType: input.source === "tarea" ? "task" : "agenda_activity",
+        entityId: input.dbId,
+        errorCode: "KANBAN_DELETE_CARD_FAILED",
+        error,
+        metadata: { source: input.source },
+      });
     },
   });
 }

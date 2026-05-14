@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase-browser";
+import { trackRpcError } from "@/lib/observability";
 import { throwIfSupabaseError } from "@/modules/shared/services/service-errors";
 import type { Database, Tables } from "@/types/database.types";
 import type { TaskListFilters } from "@/lib/query-keys";
@@ -77,6 +78,15 @@ async function create(input: TareaCreateInput): Promise<TareaRow> {
   };
 
   const { data, error } = await supabase.rpc("create_pending_tarea", args);
+  if (error) {
+    trackRpcError({
+      module: "tareas",
+      action: "create",
+      entityType: "task",
+      errorCode: "CREATE_PENDING_TAREA_RPC_FAILED",
+      error,
+    });
+  }
   throwIfSupabaseError(error, "No se pudo crear la tarea");
   return data;
 }
@@ -93,6 +103,16 @@ async function update(input: TareaUpdateInput): Promise<TareaRow> {
   };
 
   const { data, error } = await supabase.rpc("update_pending_tarea", args);
+  if (error) {
+    trackRpcError({
+      module: "tareas",
+      action: "update",
+      entityType: "task",
+      entityId: input.id,
+      errorCode: "UPDATE_PENDING_TAREA_RPC_FAILED",
+      error,
+    });
+  }
   throwIfSupabaseError(error, "No se pudo actualizar la tarea");
   return data;
 }
@@ -106,6 +126,16 @@ async function complete(input: TareaCompleteInput): Promise<TareaRow> {
   };
 
   const { data, error } = await supabase.rpc("set_tarea_completed", args);
+  if (error) {
+    trackRpcError({
+      module: "tareas",
+      action: "complete",
+      entityType: "task",
+      entityId: input.id,
+      errorCode: "SET_TAREA_COMPLETED_RPC_FAILED",
+      error,
+    });
+  }
   throwIfSupabaseError(error, "No se pudo completar la tarea");
   return data;
 }

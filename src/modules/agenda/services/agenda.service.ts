@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase-browser";
+import { trackRpcError } from "@/lib/observability";
 import { throwIfSupabaseError } from "@/modules/shared/services/service-errors";
 import type { AgendaEvent, AgendaEventsFilters } from "../types";
 import type { Database, Tables } from "@/types/database.types";
@@ -87,6 +88,15 @@ async function create(input: AgendaCreateInput): Promise<AgendaRow> {
   };
 
   const { data, error } = await supabase.rpc("create_agenda_activity_v2", args);
+  if (error) {
+    trackRpcError({
+      module: "agenda",
+      action: "create",
+      entityType: "agenda_activity",
+      errorCode: "CREATE_AGENDA_ACTIVITY_RPC_FAILED",
+      error,
+    });
+  }
   throwIfSupabaseError(error, "No se pudo crear la actividad de agenda");
   return data;
 }
@@ -108,6 +118,16 @@ async function update(input: AgendaUpdateInput): Promise<AgendaRow> {
   };
 
   const { data, error } = await supabase.rpc("update_agenda_activity_v2", args);
+  if (error) {
+    trackRpcError({
+      module: "agenda",
+      action: "update",
+      entityType: "agenda_activity",
+      entityId: input.id,
+      errorCode: "UPDATE_AGENDA_ACTIVITY_RPC_FAILED",
+      error,
+    });
+  }
   throwIfSupabaseError(error, "No se pudo actualizar la actividad de agenda");
   return data;
 }
@@ -120,6 +140,16 @@ async function archive(input: AgendaDeleteInput): Promise<AgendaRow> {
   };
 
   const { data, error } = await supabase.rpc("archive_agenda", args);
+  if (error) {
+    trackRpcError({
+      module: "agenda",
+      action: "update",
+      entityType: "agenda_activity",
+      entityId: input.id,
+      errorCode: "ARCHIVE_AGENDA_RPC_FAILED",
+      error,
+    });
+  }
   throwIfSupabaseError(error, "No se pudo eliminar la actividad de agenda");
   return data;
 }
@@ -133,6 +163,16 @@ async function complete(input: AgendaCompleteInput): Promise<AgendaRow> {
   };
 
   const { data, error } = await supabase.rpc("set_agenda_completed", args);
+  if (error) {
+    trackRpcError({
+      module: "agenda",
+      action: "complete",
+      entityType: "agenda_activity",
+      entityId: input.id,
+      errorCode: "SET_AGENDA_COMPLETED_RPC_FAILED",
+      error,
+    });
+  }
   throwIfSupabaseError(error, "No se pudo cambiar el estado de la actividad");
   return data;
 }

@@ -46,6 +46,32 @@ export type EventPayload = {
   route?: string;
 };
 
+export type AppEventName =
+  | "task.created"
+  | "task.completed"
+  | "agenda_activity.created"
+  | "agenda_activity.updated"
+  | "kanban_card.moved"
+  | "rpc.error"
+  | "mutation.error";
+
+export type AppEventModule = "tareas" | "agenda" | "kanban" | "rpc" | "mutation";
+export type AppEventAction = "create" | "update" | "complete" | "move" | "error";
+
+export type AppEventInput = {
+  event: AppEventName;
+  level?: LogLevel;
+  userId?: number | string | null;
+  orgId?: number | string | null;
+  module: AppEventModule;
+  action: AppEventAction;
+  entityType?: string;
+  entityId?: string | number | null;
+  errorCode?: string;
+  error?: unknown;
+  metadata?: Record<string, unknown>;
+};
+
 // ─── Sensitive keys to redact ────────────────────────────────────────────────
 
 const SENSITIVE_KEYS = new Set([
@@ -68,6 +94,22 @@ function redact(data: Record<string, unknown> | undefined): Record<string, unkno
     }
   }
   return safe;
+}
+
+function getErrorMessage(error: unknown): string | undefined {
+  if (!error) return undefined;
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+function getErrorCode(error: unknown, fallback?: string): string | undefined {
+  if (fallback) return fallback;
+  if (error && typeof error === "object") {
+    const err = error as { code?: unknown; name?: unknown };
+    if (typeof err.code === "string") return err.code;
+    if (typeof err.name === "string" && err.name !== "Error") return err.name;
+  }
+  return undefined;
 }
 
 // ─── User / route context (client) ───────────────────────────────────────────
@@ -238,6 +280,94 @@ export function trackEvent(name: string, properties?: Record<string, unknown>) {
       }).catch(() => {});
     }
   }
+}
+
+function writeServerStructuredEvent(input: AppEventInput) {
+  if (IS_CLIENT) return;
+  const payload = redact({
+    event: input.event,
+    level: input.level ?? "info",
+    timestamp: new Date().toISOString(),
+    userId: input.userId ?? undefined,
+    orgId: input.orgId ?? undefined,
+    module: input.module,
+    action: input.action,
+    entityType: input.entityType,
+    entityId: input.entityId ?? undefined,
+    errorCode: getErrorCode(input.error, input.errorCode),
+    errorMessage: getErrorMessage(input.error),
+    metadata: input.metadata,
+  });
+  console.log(JSON.stringify({ type: "app_event", ...payload }));
+}
+
+export function trackAppEvent(input: AppEventInput) {
+  try {
+    const properties = {
+      userId: input.userId ?? undefined,
+      orgId: input.orgId ?? undefined,
+      module: input.module,
+      action: input.action,
+      entityType: input.entityType,
+      entityId: input.entityId ?? undefined,
+      errorCode: input.errorCode,
+      metadata: input.metadata,
+    };
+
+    if (IS_CLIENT) {
+      trackEvent(input.event, properties);
+    } else {
+      writeServerStructuredEvent(input);
+    }
+  } catch {
+    // Observability is best-effort and must never block product flows.
+  }
+}
+
+export function trackAppError(input: AppEventInput) {
+  try {
+    const errorCode = getErrorCode(input.error, input.errorCode);
+    const safeData = {
+      event: input.event,
+      userId: input.userId ?? undefined,
+      orgId: input.orgId ?? undefined,
+      module: input.module,
+      action: input.action,
+      entityType: input.entityType,
+      entityId: input.entityId ?? undefined,
+      errorCode,
+      metadata: input.metadata,
+    };
+
+    if (IS_CLIENT) {
+      logError(input.module, input.event, input.error, safeData);
+    } else {
+      writeServerStructuredEvent({ ...input, level: "error", errorCode });
+    }
+  } catch {
+    // Observability is best-effort and must never block product flows.
+  }
+}
+
+export function trackMutationError(input: Omit<AppEventInput, "event" | "action"> & { action?: AppEventAction }) {
+  trackAppError({
+    ...input,
+    event: "mutation.error",
+    module: input.module,
+    action: input.action ?? "error",
+  });
+}
+
+export function trackRpcError(input: Omit<AppEventInput, "event" | "module" | "action"> & {
+  module?: AppEventModule;
+  action?: AppEventAction;
+}) {
+  trackAppError({
+    ...input,
+    event: "rpc.error",
+    module: input.module ?? "rpc",
+    action: input.action ?? "error",
+  });
 }
 
 // ─── Performance ─────────────────────────────────────────────────────────────

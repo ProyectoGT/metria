@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invalidateAfterMutation } from "@/lib/invalidation-map";
+import { trackAppEvent, trackMutationError } from "@/lib/observability";
 import { agendaQueryKeys } from "../query-keys";
 import {
   agendaService,
@@ -31,9 +32,27 @@ export function useCreateAgendaItem() {
   return useMutation({
     mutationFn: (input: AgendaCreateInput) => agendaService.create(input),
     onSuccess: async (row: AgendaRow) => {
+      trackAppEvent({
+        event: "agenda_activity.created",
+        orgId: row.empresa_id,
+        module: "agenda",
+        action: "create",
+        entityType: "agenda_activity",
+        entityId: row.id,
+        metadata: { date: row.event_date },
+      });
       await invalidateAfterMutation(queryClient, {
         type: "agenda.created",
         payload: { agendaId: row.id, date: row.event_date },
+      });
+    },
+    onError: (error) => {
+      trackMutationError({
+        module: "agenda",
+        action: "create",
+        entityType: "agenda_activity",
+        errorCode: "AGENDA_CREATE_FAILED",
+        error,
       });
     },
   });
@@ -45,9 +64,28 @@ export function useUpdateAgendaItem() {
   return useMutation({
     mutationFn: (input: AgendaUpdateInput) => agendaService.update(input),
     onSuccess: async (row: AgendaRow) => {
+      trackAppEvent({
+        event: "agenda_activity.updated",
+        orgId: row.empresa_id,
+        module: "agenda",
+        action: "update",
+        entityType: "agenda_activity",
+        entityId: row.id,
+        metadata: { date: row.event_date },
+      });
       await invalidateAfterMutation(queryClient, {
         type: "agenda.updated",
         payload: { agendaId: row.id, date: row.event_date },
+      });
+    },
+    onError: (error, input) => {
+      trackMutationError({
+        module: "agenda",
+        action: "update",
+        entityType: "agenda_activity",
+        entityId: input.id,
+        errorCode: "AGENDA_UPDATE_FAILED",
+        error,
       });
     },
   });
@@ -64,6 +102,16 @@ export function useDeleteAgendaItem() {
         payload: { agendaId: row.id, date: row.event_date },
       });
     },
+    onError: (error, input) => {
+      trackMutationError({
+        module: "agenda",
+        action: "update",
+        entityType: "agenda_activity",
+        entityId: input.id,
+        errorCode: "AGENDA_DELETE_FAILED",
+        error,
+      });
+    },
   });
 }
 
@@ -76,6 +124,16 @@ export function useCompleteAgendaItem() {
       await invalidateAfterMutation(queryClient, {
         type: "agenda.completed",
         payload: { agendaId: row.id, date: row.event_date },
+      });
+    },
+    onError: (error, input) => {
+      trackMutationError({
+        module: "agenda",
+        action: "complete",
+        entityType: "agenda_activity",
+        entityId: input.id,
+        errorCode: "AGENDA_COMPLETE_FAILED",
+        error,
       });
     },
   });

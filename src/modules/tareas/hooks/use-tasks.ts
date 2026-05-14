@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invalidateAfterMutation } from "@/lib/invalidation-map";
+import { trackAppEvent, trackMutationError } from "@/lib/observability";
 import { tasksQueryKeys } from "../query-keys";
 import {
   tareasService,
@@ -48,9 +49,26 @@ export function useCreateTask() {
   return useMutation({
     mutationFn: (input: TareaCreateInput) => tareasService.create(input),
     onSuccess: async (row: TareaRow) => {
+      trackAppEvent({
+        event: "task.created",
+        orgId: row.empresa_id,
+        module: "tareas",
+        action: "create",
+        entityType: "task",
+        entityId: row.id,
+      });
       await invalidateAfterMutation(queryClient, {
         type: "task.created",
         payload: { tareaId: row.id, empresaId: row.empresa_id ?? 0, date: row.fecha },
+      });
+    },
+    onError: (error) => {
+      trackMutationError({
+        module: "tareas",
+        action: "create",
+        entityType: "task",
+        errorCode: "TASK_CREATE_FAILED",
+        error,
       });
     },
   });
@@ -70,6 +88,16 @@ export function useUpdateTask() {
         }),
       ]);
     },
+    onError: (error, input) => {
+      trackMutationError({
+        module: "tareas",
+        action: "update",
+        entityType: "task",
+        entityId: input.id,
+        errorCode: "TASK_UPDATE_FAILED",
+        error,
+      });
+    },
   });
 }
 
@@ -84,6 +112,15 @@ export function useCompleteTask() {
         resultado: input.resultado,
       }),
     onSuccess: async (row: TareaRow, variables) => {
+      trackAppEvent({
+        event: "task.completed",
+        orgId: row.empresa_id,
+        module: "tareas",
+        action: "complete",
+        entityType: "task",
+        entityId: row.id,
+        metadata: { source: variables.source },
+      });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: tasksQueryKeys.detail(row.id) }),
         invalidateAfterMutation(queryClient, {
@@ -91,6 +128,17 @@ export function useCompleteTask() {
           payload: { tareaId: row.id, source: variables.source },
         }),
       ]);
+    },
+    onError: (error, input) => {
+      trackMutationError({
+        module: "tareas",
+        action: "complete",
+        entityType: "task",
+        entityId: input.id,
+        errorCode: "TASK_COMPLETE_FAILED",
+        error,
+        metadata: { source: input.source },
+      });
     },
   });
 }

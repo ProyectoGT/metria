@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invalidateAfterMutation } from "@/lib/invalidation-map";
+import { trackAppEvent, trackMutationError, trackRpcError } from "@/lib/observability";
 import { kanbanQueryKeys } from "../query-keys";
 import { kanbanService, type KanbanMoveCardInput } from "../services/kanban.service";
 import type { KanbanBoard, KanbanQueryParams } from "../types";
@@ -87,12 +88,51 @@ export function useMoveKanbanCard() {
 
       return { queryKey, snapshot };
     },
-    onError: (_error, _input, context) => {
+    onError: (error, input, context) => {
       if (context?.snapshot) {
         queryClient.setQueryData(context.queryKey, context.snapshot);
       }
+      trackMutationError({
+        module: "kanban",
+        action: "move",
+        entityType: "kanban_card",
+        entityId: input.cardId,
+        errorCode: "KANBAN_MOVE_FAILED",
+        error,
+        metadata: {
+          source: input.source,
+          sourceColumnId: input.fromCol,
+          targetColumnId: input.toCol,
+        },
+      });
+      if (input.source === "agenda") {
+        trackRpcError({
+          module: "kanban",
+          action: "move",
+          entityType: "agenda_activity",
+          entityId: input.dbId,
+          errorCode: "KANBAN_AGENDA_MOVE_RPC_FAILED",
+          error,
+          metadata: { targetColumnId: input.toCol },
+        });
+      }
     },
     onSuccess: async (_data, input) => {
+      trackAppEvent({
+        event: "kanban_card.moved",
+        userId: input.params.userId,
+        orgId: input.params.empresaId,
+        module: "kanban",
+        action: "move",
+        entityType: "kanban_card",
+        entityId: input.cardId,
+        metadata: {
+          dbId: input.dbId,
+          source: input.source,
+          sourceColumnId: input.fromCol,
+          targetColumnId: input.toCol,
+        },
+      });
       await invalidateAfterMutation(queryClient, {
         type: "kanban.cardMoved",
         payload: {
