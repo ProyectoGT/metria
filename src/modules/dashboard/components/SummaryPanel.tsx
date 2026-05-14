@@ -69,7 +69,9 @@ function estadoBadge(estado: string) {
 
 // ─── Property table ───────────────────────────────────────────────────────────
 
-function PropertyTable({ listings }: { listings: PropertyListing[] }) {
+function PropertyTable({ listings, type }: { listings: PropertyListing[]; type: SummaryType }) {
+  const isPedidos = type === "pedidosActivos";
+
   if (listings.length === 0) {
     return (
       <p className="py-12 text-center text-sm text-text-secondary">
@@ -84,14 +86,19 @@ function PropertyTable({ listings }: { listings: PropertyListing[] }) {
         <thead>
           <tr className="border-b border-border">
             <th className="pb-3 pr-6 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Propiedad
+              {isPedidos ? "Nombre" : "Finca"}
             </th>
             <th className="pb-3 pr-6 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Sector
+              {isPedidos ? "Tipo" : "Propiedad"}
             </th>
             <th className="pb-3 pr-6 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Finca
+              Zona
             </th>
+            {!isPedidos && (
+              <th className="pb-3 pr-6 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                Propietario
+              </th>
+            )}
             <th className="pb-3 pr-6 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
               Estado
             </th>
@@ -116,9 +123,12 @@ function PropertyTable({ listings }: { listings: PropertyListing[] }) {
                 key={item.id}
                 className="group border-b border-border last:border-0 transition-colors hover:bg-background"
               >
-                <td className="py-3 pr-6 font-medium text-text-primary">{item.nombre}</td>
-                <td className="py-3 pr-6 text-text-secondary">{item.sector}</td>
-                <td className="py-3 pr-6 text-text-secondary">{item.finca}</td>
+                <td className="py-3 pr-6 font-medium text-text-primary">{isPedidos ? item.nombre : item.finca}</td>
+                <td className="py-3 pr-6 text-text-secondary">{isPedidos ? item.finca : item.nombre}</td>
+                <td className="py-3 pr-6 text-text-secondary">{isPedidos ? item.sector : item.zona ?? item.sector}</td>
+                {!isPedidos && (
+                  <td className="py-3 pr-6 text-text-secondary">{item.propietario ?? "—"}</td>
+                )}
                 <td className="py-3 pr-6">
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${estadoBadge(item.estado)}`}
@@ -211,7 +221,7 @@ export default function SummaryPanel({ summary, listings }: SummaryPanelProps) {
           {/* Contenido */}
           <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-7">
             <div className="rounded-2xl border border-border bg-surface shadow-sm">
-              <PropertyTable listings={listings[activeKey]} />
+              <PropertyTable listings={listings[activeKey]} type={activeKey} />
             </div>
           </div>
         </div>

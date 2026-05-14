@@ -121,7 +121,7 @@ export default async function DashboardPage() {
   }
 
   // ─── 1. Summary counts + listings (paralelo) ────────────────────────────
-  const propSelect = "id, planta, puerta, propietario, estado, fincas(id, numero, sectores(id, numero, zona_id)), usuarios:usuarios!propiedades_agente_asignado_fkey(nombre, apellidos)";
+  const propSelect = "id, planta, puerta, propietario, estado, fincas(id, numero, sectores(id, numero, zona_id, zona(nombre))), usuarios:usuarios!propiedades_agente_asignado_fkey(nombre, apellidos)";
 
   const [
     { count: noticiasCount },
@@ -182,7 +182,6 @@ export default async function DashboardPage() {
       .in("estado", ["pendiente", "completado"])
       .order("id", { ascending: false }),
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     createAdminClient()
       .from("agenda")
       .select("id, description, event_date, time, time_end, priority, tipo, completed, result, reminder_minutes_before, gcal_event_id, user_id, owner_user_id, empresa_id, created_at, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
@@ -241,20 +240,19 @@ export default async function DashboardPage() {
     puerta: string | null;
     propietario: string | null;
     estado: string | null;
-    fincas: { id: number; numero: string; sectores: { id: number; numero: number; zona_id: number } | null } | null;
+    fincas: { id: number; numero: string; sectores: { id: number; numero: number; zona_id: number; zona: { nombre: string | null } | null } | null } | null;
     usuarios: { nombre: string | null; apellidos: string | null } | null;
   };
 
   function mapPropiedad(p: PropRow): PropertyListing {
     const planta = p.planta ?? "";
     const puerta = p.puerta ?? "";
-    const nombre = p.propietario?.trim()
-      ? p.propietario
-      : planta || puerta
-        ? `Planta ${planta}${puerta ? ` ${puerta}` : ""}`.trim()
-        : `Propiedad #${p.id}`;
+    const nombre = planta || puerta
+      ? `Planta ${planta}${puerta ? ` ${puerta}` : ""}`.trim()
+      : `Propiedad #${p.id}`;
     const finca = p.fincas?.numero != null ? p.fincas.numero : "—";
     const sector = p.fincas?.sectores?.numero != null ? `Sector ${p.fincas.sectores.numero}` : "—";
+    const zona = p.fincas?.sectores?.zona?.nombre ?? sector;
     const agente = p.usuarios
       ? `${p.usuarios.nombre ?? ""} ${p.usuarios.apellidos ?? ""}`.trim() || "Sin asignar"
       : "Sin asignar";
@@ -263,6 +261,8 @@ export default async function DashboardPage() {
       nombre,
       sector,
       finca,
+      zona,
+      propietario: p.propietario?.trim() || "—",
       estado: p.estado ?? "—",
       agente,
       fincaId: p.fincas?.id,

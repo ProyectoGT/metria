@@ -201,12 +201,15 @@ function ListingTable({ rows, titleKey }: { rows: PropertyListing[]; titleKey: M
   }
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] text-sm">
+      <table className="w-full min-w-[780px] text-sm">
         <thead className="border-b border-border bg-surface-raised/55">
           <tr>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Nombre</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">{isPedidos ? "Tipo" : "Sector"}</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">{isPedidos ? "Zona" : "Finca"}</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">{isPedidos ? "Nombre" : "Finca"}</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">{isPedidos ? "Tipo" : "Propiedad"}</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Zona</th>
+            {!isPedidos && (
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Propietario</th>
+            )}
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Estado</th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Agente</th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Ficha</th>
@@ -215,9 +218,12 @@ function ListingTable({ rows, titleKey }: { rows: PropertyListing[]; titleKey: M
         <tbody className="divide-y divide-border">
           {rows.map((row) => (
             <tr key={row.id} className="hover:bg-surface-raised/55">
-              <td className="px-5 py-3 font-medium text-text-primary">{row.nombre}</td>
-              <td className="px-5 py-3 text-text-secondary">{row.sector}</td>
-              <td className="px-5 py-3 text-text-secondary">{row.finca}</td>
+              <td className="px-5 py-3 font-medium text-text-primary">{isPedidos ? row.nombre : row.finca}</td>
+              <td className="px-5 py-3 text-text-secondary">{isPedidos ? row.finca : row.nombre}</td>
+              <td className="px-5 py-3 text-text-secondary">{isPedidos ? row.sector : row.zona ?? row.sector}</td>
+              {!isPedidos && (
+                <td className="px-5 py-3 text-text-secondary">{row.propietario ?? "—"}</td>
+              )}
               <td className="px-5 py-3 text-text-secondary">{row.estado}</td>
               <td className="px-5 py-3 text-text-secondary">{row.agente}</td>
               <td className="px-5 py-3">

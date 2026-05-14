@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { isRedirectError } from "next/dist/client/components/redirect";
 import { login, loginWithGoogle } from "./actions";
 import { useI18n } from "@/lib/i18n";
 import { translateVisibleText } from "@/lib/i18n/translate-text";
@@ -37,9 +38,14 @@ export default function LoginForm() {
   function handleSubmit(formData: FormData) {
     setError(null);
     startTransition(async () => {
-      const result = await login(formData);
-      if (result?.error) {
-        setError(result.error);
+      try {
+        const result = await login(formData);
+        if (result?.error) {
+          setError(result.error);
+        }
+      } catch (e) {
+        if (isRedirectError(e)) throw e;
+        setError("Error inesperado. Intentalo de nuevo.");
       }
     });
   }
@@ -47,9 +53,14 @@ export default function LoginForm() {
   function handleGoogleLogin() {
     setError(null);
     startGoogleTransition(async () => {
-      const result = await loginWithGoogle();
-      if (result?.error) {
-        setError(result.error);
+      try {
+        const result = await loginWithGoogle();
+        if (result?.error) {
+          setError(result.error);
+        }
+      } catch (e) {
+        if (isRedirectError(e)) throw e;
+        setError("Error inesperado. Intentalo de nuevo.");
       }
     });
   }

@@ -16,6 +16,8 @@ export type PropertyListing = {
   nombre: string;
   sector: string;
   finca: string;
+  zona?: string;
+  propietario?: string;
   estado: string;
   agente: string;
   detailHref?: string;
