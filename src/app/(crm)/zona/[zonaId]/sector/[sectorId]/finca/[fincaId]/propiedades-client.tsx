@@ -9,7 +9,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import { deletePropiedadAction } from "@/app/actions/security";
 import { createAgendaAction } from "@/app/(crm)/dashboard/actions";
 import { updatePropiedadesPosicionesAction, upsertPropiedadAction, toggleContactadoAction } from "@/app/(crm)/zona/actions";
-import { canSetVendido, type UserRole } from "@/lib/roles";
+import { canBeAssignedProperty, canSetVendido, type UserRole } from "@/lib/roles";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { AnimatedAccordion } from "@/components/ui/animated";
@@ -21,6 +21,7 @@ type Agente = {
   id: number;
   nombre: string;
   apellidos: string;
+  rol: string | null;
 };
 
 type Propiedad = {
@@ -35,13 +36,15 @@ type Propiedad = {
   honorarios: number | null;
   posicion: number | null;
   agente_asignado: number | null;
+  created_by_user_id?: number | null;
   finca_id: number | null;
   latitud?: number | null;
   longitud?: number | null;
   created_at?: string | null;
   contactado?: boolean;
   contactado_hasta?: string | null;
-  usuarios: { id: number; nombre: string; apellidos: string } | null;
+  usuarios: { id: number; nombre: string; apellidos: string; rol?: string | null } | null;
+  creador?: { id: number; nombre: string; apellidos: string; rol?: string | null } | null;
   _order?: number;
 };
 
@@ -233,6 +236,20 @@ export default function PropiedadesClient({
   const router = useRouter();
   const { toasts, toast } = useToast();
 
+  const agentesAsignables = useMemo(
+    () => agentes.filter((agente) => canBeAssignedProperty(agente.rol)),
+    [agentes]
+  );
+  const currentUserAssignable = currentUserRole !== "Administrador";
+  const selectedAgent = form.agente_asignado
+    ? agentes.find((agente) => String(agente.id) === form.agente_asignado)
+    : null;
+  const selectedAgentIsInvalid = Boolean(selectedAgent && !canBeAssignedProperty(selectedAgent.rol));
+
+  function userName(user: { nombre: string | null; apellidos: string | null } | null | undefined) {
+    return user ? `${user.nombre ?? ""} ${user.apellidos ?? ""}`.trim() : "";
+  }
+
   // IDs ya procesados para no disparar el mismo RPC más de una vez
   // aunque `propiedades` cambie por otras razones (edición, reorden, etc.)
   const processedExpiradasRef = useRef<Set<number>>(new Set());
@@ -293,7 +310,7 @@ export default function PropiedadesClient({
     setForm({
       ...EMPTY_FORM,
       fecha_visita: nowLocalDatetime(),
-      agente_asignado: currentUserId ? currentUserId.toString() : "",
+      agente_asignado: currentUserAssignable && currentUserId ? currentUserId.toString() : "",
     });
     setSaveError(null);
     setModalOpen(true);
@@ -377,6 +394,14 @@ export default function PropiedadesClient({
     setSaving(true);
     setSaveError(null);
 
+    const agenteId = form.agente_asignado ? Number(form.agente_asignado) : null;
+    const agente = agenteId ? agentes.find((item) => item.id === agenteId) : null;
+    if (!agenteId || !agente || !canBeAssignedProperty(agente.rol)) {
+      setSaveError("Los usuarios administradores no pueden tener propiedades asignadas. Selecciona un agente para esta propiedad.");
+      setSaving(false);
+      return;
+    }
+
     const today = new Date();
     const todayDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
@@ -389,7 +414,7 @@ export default function PropiedadesClient({
       fecha_visita: form.notas ? todayDate : (form.fecha_visita || null),
       notas: form.notas || null,
       honorarios: form.estado === "vendido" && form.honorarios ? parseFloat(form.honorarios) : null,
-      agente_asignado: form.agente_asignado ? Number(form.agente_asignado) : null,
+      agente_asignado: agenteId,
       latitud: form.latitud ? parseFloat(form.latitud) : null,
       longitud: form.longitud ? parseFloat(form.longitud) : null,
     };
@@ -1438,14 +1463,38 @@ export default function PropiedadesClient({
               onChange={(e) => setField("agente_asignado", e.target.value)}
               className="input"
             >
-              <option value="">Sin asignar</option>
-              {agentes.map((agente) => (
+              <option value="">Selecciona un agente</option>
+              {agentesAsignables.map((agente) => (
                 <option key={agente.id} value={agente.id}>
                   {agente.nombre} {agente.apellidos}
                 </option>
               ))}
             </select>
+            <p className="text-xs text-text-secondary">
+              Por defecto se asigna al agente que crea la propiedad.
+            </p>
           </FormField>
+
+          {!editTarget && !currentUserAssignable && (
+            <p className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+              Los usuarios administradores no pueden tener propiedades asignadas. Selecciona un agente para esta propiedad.
+            </p>
+          )}
+
+          {selectedAgentIsInvalid && (
+            <p className="rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-xs font-medium text-danger">
+              Esta propiedad tiene asignado un usuario administrador por datos anteriores. Selecciona un agente valido antes de guardar.
+            </p>
+          )}
+
+          {editTarget && (
+            <div className="rounded-lg border border-border bg-background px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Creada por</p>
+              <p className="mt-0.5 text-sm font-medium text-text-primary">
+                {userName(editTarget.creador) || "Sin creador registrado"}
+              </p>
+            </div>
+          )}
 
           <FormField label="Notas">
             <textarea

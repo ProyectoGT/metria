@@ -43,6 +43,8 @@ export type PropiedadDetail = {
   finca_numero: string | null;
   agente_nombre: string | null;
   agente_id: number | null;
+  creador_nombre: string | null;
+  creador_id: number | null;
 };
 
 export default async function PropiedadDetailPage({
@@ -67,9 +69,10 @@ export default async function PropiedadDetailPage({
       publicar_en_web, estado_publicacion_web, web_titulo, web_descripcion,
       web_precio_visible, web_destacada, web_ultima_sincronizacion, web_error_sync,
       ficha_completa, calidad_ficha_score, faltantes_ficha,
-      created_at, updated_at, agente_asignado, finca_id, empresa_id,
+      created_at, updated_at, agente_asignado, created_by_user_id, finca_id, empresa_id,
       fincas(id, numero, sectores(id, numero, zona(id, nombre))),
-      agente:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)
+      agente:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos),
+      creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos)
     `)
     .eq("id", propiedadId)
     .single();
@@ -87,6 +90,7 @@ export default async function PropiedadDetailPage({
       } | null;
     } | null;
     agente: { id: number; nombre: string; apellidos: string } | null;
+    creador: { id: number; nombre: string; apellidos: string } | null;
   };
 
   const r = raw as unknown as RawDetail;
@@ -129,6 +133,8 @@ export default async function PropiedadDetailPage({
     finca_numero:              r.fincas?.numero ?? null,
     agente_nombre:             r.agente ? `${r.agente.nombre} ${r.agente.apellidos}`.trim() : null,
     agente_id:                 r.agente?.id ?? null,
+    creador_nombre:            r.creador ? `${r.creador.nombre} ${r.creador.apellidos}`.trim() : null,
+    creador_id:                r.creador?.id ?? null,
   };
 
   const displayTitle = propiedad.titulo

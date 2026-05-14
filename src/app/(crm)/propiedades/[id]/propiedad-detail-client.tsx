@@ -269,21 +269,27 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref }
             <InfoRow label="Longitud" value={propiedad.longitud} />
           </Section>
 
-          {/* Agente */}
-          <Section title="Agente responsable">
-            {propiedad.agente_nombre ? (
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">
-                  {propiedad.agente_nombre.slice(0, 2).toUpperCase()}
+          {/* Responsabilidad */}
+          <Section title="Responsabilidad">
+            <div className="space-y-3">
+              {propiedad.agente_nombre ? (
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">
+                    {propiedad.agente_nombre.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="font-medium text-text-primary">{propiedad.agente_nombre}</p>
+                    <p className="text-xs text-text-secondary flex items-center gap-1"><User className="h-3 w-3" /> Agente asignado</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-text-primary">{propiedad.agente_nombre}</p>
-                  <p className="text-xs text-text-secondary flex items-center gap-1"><User className="h-3 w-3" /> Agente asignado</p>
-                </div>
+              ) : (
+                <p className="text-sm text-text-secondary">Sin agente asignado</p>
+              )}
+              <div className="border-t border-border pt-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Creada por</p>
+                <p className="mt-1 text-sm font-medium text-text-primary">{propiedad.creador_nombre ?? "Sin creador registrado"}</p>
               </div>
-            ) : (
-              <p className="text-sm text-text-secondary">Sin agente asignado</p>
-            )}
+            </div>
           </Section>
         </div>
 

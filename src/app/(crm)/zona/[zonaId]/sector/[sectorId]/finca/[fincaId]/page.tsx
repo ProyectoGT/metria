@@ -18,7 +18,7 @@ export default async function FincaDetailPage({
 
   const propQuery = supabase
     .from("propiedades")
-    .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)")
+    .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol), creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos, rol)")
     .eq("finca_id", Number(fincaId))
     .order("planta")
     .order("puerta");
@@ -37,7 +37,7 @@ export default async function FincaDetailPage({
     isAgente
       ? propQuery.or(`agente_asignado.eq.${user.id},owner_user_id.eq.${user.id}`)
       : propQuery,
-    supabase.from("usuarios").select("id, nombre, apellidos").order("nombre"),
+    supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
     getUserOrdenAction("propiedades"),
   ]);
 

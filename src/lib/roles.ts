@@ -100,6 +100,10 @@ export function canViewAllAgents(role: UserRole) {
   return roleGte(role, "Director");
 }
 
+export function canBeAssignedProperty(role: string | null | undefined) {
+  return normalizeUserRole(role) !== "Administrador";
+}
+
 export function canViewSupervisedAgents(role: UserRole) {
   return role === "Responsable";
 }

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { requirePermission } from "@/lib/access-control";
-import { canSetVendido } from "@/lib/roles";
+import { canBeAssignedProperty, canSetVendido } from "@/lib/roles";
 import { revalidatePath } from "next/cache";
 
 type PropiedadPayload = {
@@ -32,6 +32,9 @@ export async function upsertPropiedadAction(
   const permError = await requirePermission("update", "propiedades").then(() => null).catch((e: Error) => e.message);
   if (permError) return { error: permError };
 
+  const assignedAgentError = await validateAssignablePropertyAgent(payload.agente_asignado, yo.empresaId);
+  if (assignedAgentError) return { error: assignedAgentError };
+
   // Validar permiso para marcar como vendido
   if (payload.estado === "vendido") {
     const agenteAsignado = payload.agente_asignado;
@@ -50,7 +53,7 @@ export async function upsertPropiedadAction(
     // como segunda capa defensiva (RLS también lo hace).
     const { data: existing } = await supabase
       .from("propiedades")
-      .select("empresa_id")
+      .select("empresa_id, created_by_user_id")
       .eq("id", propiedadId)
       .single();
 
@@ -61,7 +64,7 @@ export async function upsertPropiedadAction(
       .from("propiedades")
       .update(payload as never)
       .eq("id", propiedadId)
-      .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)")
+      .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol), creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos, rol)")
       .single();
 
     if (error) return { error: error.message };
@@ -72,7 +75,8 @@ export async function upsertPropiedadAction(
     const createPayload = {
       ...payload,
       finca_id: fincaId,
-      agente_asignado: payload.agente_asignado !== undefined ? payload.agente_asignado : yo.id,
+      agente_asignado: payload.agente_asignado,
+      created_by_user_id: yo.id,
       owner_user_id: yo.id,
       empresa_id: yo.empresaId ?? null,
       equipo_id: yo.equipoId ?? null,
@@ -81,7 +85,7 @@ export async function upsertPropiedadAction(
     const { data, error } = await supabase
       .from("propiedades")
       .insert(createPayload as never)
-      .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)")
+      .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol), creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos, rol)")
       .single();
 
     if (error) return { error: error.message };
@@ -177,6 +181,29 @@ async function upsertUserOrden(
     .upsert(rows, { onConflict: "usuario_id,tabla,item_id" }) as { error: { message: string } | null };
   if (error) return { error: error.message };
   return {};
+}
+
+async function validateAssignablePropertyAgent(
+  agenteId: number | null,
+  empresaId: number | null
+): Promise<string | null> {
+  if (!agenteId) return "Selecciona un agente valido para esta propiedad.";
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("usuarios")
+    .select("id, rol, empresa_id")
+    .eq("id", agenteId)
+    .maybeSingle();
+
+  if (error) return error.message;
+  if (!data) return "El agente asignado no existe o no esta disponible.";
+  if (empresaId != null && data.empresa_id !== empresaId) return "El agente asignado no pertenece a tu empresa.";
+  if (!canBeAssignedProperty(data.rol)) {
+    return "Los usuarios administradores no pueden tener propiedades asignadas. Selecciona un agente para esta propiedad.";
+  }
+
+  return null;
 }
 
 async function deleteUserOrden(tabla: Tabla, ids: number[]): Promise<{ error?: string }> {

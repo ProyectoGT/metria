@@ -1869,6 +1869,7 @@ export type Database = {
           contactado: boolean
           contactado_hasta: string | null
           created_at: string
+          created_by_user_id: number | null
           descripcion: string | null
           empresa_id: number | null
           equipo_id: number | null
@@ -1908,6 +1909,7 @@ export type Database = {
           contactado?: boolean
           contactado_hasta?: string | null
           created_at?: string
+          created_by_user_id?: number | null
           descripcion?: string | null
           empresa_id?: number | null
           equipo_id?: number | null
@@ -1947,6 +1949,7 @@ export type Database = {
           contactado?: boolean
           contactado_hasta?: string | null
           created_at?: string
+          created_by_user_id?: number | null
           descripcion?: string | null
           empresa_id?: number | null
           equipo_id?: number | null
@@ -1984,6 +1987,13 @@ export type Database = {
           {
             foreignKeyName: "propiedades_agente_asignado_fkey"
             columns: ["agente_asignado"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propiedades_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
             isOneToOne: false
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
