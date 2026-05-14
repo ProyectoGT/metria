@@ -13,6 +13,13 @@ const PERMISSIONS: Partial<Record<Module, Partial<Record<Action, PermissionRule>
     view: { roles: EVERYONE },
     export: { roles: MANAGER_ROLES },
   },
+  agenda: {
+    view: { roles: EVERYONE },
+    create: { roles: EVERYONE },
+    update: { roles: EVERYONE, entityScope: "own" },
+    delete: { roles: SUPERVISOR_ROLES },
+    export: { roles: MANAGER_ROLES },
+  },
   calendario: {
     view: { roles: EVERYONE },
     create: { roles: EVERYONE },
@@ -27,6 +34,14 @@ const PERMISSIONS: Partial<Record<Module, Partial<Record<Action, PermissionRule>
     delete: { roles: SUPERVISOR_ROLES },
     complete: { roles: EVERYONE, entityScope: "own" },
     assign: { roles: SUPERVISOR_ROLES },
+  },
+  kanban: {
+    view: { roles: EVERYONE },
+    create: { roles: EVERYONE },
+    update: { roles: EVERYONE, entityScope: "own" },
+    delete: { roles: SUPERVISOR_ROLES },
+    assign: { roles: SUPERVISOR_ROLES },
+    manage: { roles: MANAGER_ROLES },
   },
   propiedades: {
     view: { roles: EVERYONE },

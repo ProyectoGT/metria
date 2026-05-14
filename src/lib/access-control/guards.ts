@@ -36,6 +36,22 @@ export async function requirePermission(
   return currentUser;
 }
 
+export async function requireCanView(module: Module, entity?: PermissionEntity) {
+  return requirePermission("view", module, entity);
+}
+
+export async function requireCanCreate(module: Module, entity?: PermissionEntity) {
+  return requirePermission("create", module, entity);
+}
+
+export async function requireCanUpdate(module: Module, entity?: PermissionEntity) {
+  return requirePermission("update", module, entity);
+}
+
+export async function requireCanDelete(module: Module, entity?: PermissionEntity) {
+  return requirePermission("delete", module, entity);
+}
+
 export async function requirePageAccessOrRedirect(
   pageKey: string,
   redirectTo = "/dashboard"

@@ -27,7 +27,7 @@ function matchesEntityScope(
   user: UserLike
 ): boolean {
   if (!scope || scope === "any") return true;
-  if (!entity) return true;
+  if (!entity) return false;
 
   if (scope === "own") {
     if (entity.ownerId !== undefined && user.id !== undefined) {
@@ -39,6 +39,7 @@ function matchesEntityScope(
     if (entity.teamId !== undefined && user.equipoId !== undefined) {
       return entity.teamId === user.equipoId;
     }
+    return false;
   }
 
   if (scope === "team") {
@@ -49,9 +50,10 @@ function matchesEntityScope(
     if (entity.teamId !== undefined && user.equipoId !== undefined) {
       return entity.teamId === user.equipoId;
     }
+    return false;
   }
 
-  return true;
+  return false;
 }
 
 export function can(

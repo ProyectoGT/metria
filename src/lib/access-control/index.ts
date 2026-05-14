@@ -31,7 +31,27 @@ export { can, canFromContext, canOnResource } from "./can";
 export type { UserLike } from "./can";
 
 export {
+  canView,
+  canCreate,
+  canUpdate,
+  canDelete,
+  canManage,
+  canExport,
+  canAssign,
+  canComplete,
+  canDo,
+  canViewFromContext,
+  canCreateFromContext,
+  canUpdateFromContext,
+  canDeleteFromContext,
+} from "./helpers";
+
+export {
   requirePermission,
+  requireCanView,
+  requireCanCreate,
+  requireCanUpdate,
+  requireCanDelete,
   requirePageAccessOrRedirect,
   AuthorizationError,
 } from "./guards";

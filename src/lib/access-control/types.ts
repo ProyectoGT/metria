@@ -2,8 +2,10 @@ export type Role = "admin" | "manager" | "commercial" | "support" | "viewer";
 
 export type Module =
   | "dashboard"
+  | "agenda"
   | "calendario"
   | "tareas"
+  | "kanban"
   | "propiedades"
   | "contactos"
   | "usuarios"
