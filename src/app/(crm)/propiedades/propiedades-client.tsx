@@ -93,11 +93,12 @@ type Props = {
   agentes: AgenteOption[];
   isManager: boolean;
   currentUserId: number;
+  loadError?: string | null;
 };
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
-export default function PropiedadesClient({ propiedades, zonas, agentes, isManager }: Props) {
+export default function PropiedadesClient({ propiedades, zonas, agentes, isManager, loadError }: Props) {
   const [view, setView]           = useState<"table" | "cards">("table");
   const [search, setSearch]       = useState("");
   const [filterEstado, setEstado] = useState("");
@@ -133,6 +134,11 @@ export default function PropiedadesClient({ propiedades, zonas, agentes, isManag
 
   return (
     <div className="space-y-4">
+      {loadError && (
+        <div className="rounded-2xl border border-danger/25 bg-danger/10 px-4 py-3 text-sm text-danger">
+          No se han podido cargar las propiedades: {loadError}
+        </div>
+      )}
       {/* ── Barra de filtros ───────────────────────────────────────────── */}
       <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
         <div className="flex flex-wrap items-center gap-3 px-4 py-3">

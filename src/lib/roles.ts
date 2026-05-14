@@ -101,7 +101,8 @@ export function canViewAllAgents(role: UserRole) {
 }
 
 export function canBeAssignedProperty(role: string | null | undefined) {
-  return normalizeUserRole(role) !== "Administrador";
+  const normalized = normalizeRoleValue(role);
+  return !["administrador", "admin", "super_admin", "super admin", "superadministrador"].includes(normalized);
 }
 
 export function canViewSupervisedAgents(role: UserRole) {

@@ -32,7 +32,7 @@ export async function upsertPropiedadAction(
   const permError = await requirePermission("update", "propiedades").then(() => null).catch((e: Error) => e.message);
   if (permError) return { error: permError };
 
-  const assignedAgentError = await validateAssignablePropertyAgent(payload.agente_asignado, yo.empresaId);
+  const assignedAgentError = await validateAssignablePropertyAgent(payload.agente_asignado, yo.empresaId, yo.role);
   if (assignedAgentError) return { error: assignedAgentError };
 
   // Validar permiso para marcar como vendido
@@ -46,7 +46,7 @@ export async function upsertPropiedadAction(
   // Usar cliente con RLS — las policies de propiedades gestionan el acceso.
   // Para updates: RLS propiedades_update_scoped ya valida ownership + empresa.
   // Para inserts: RLS propiedades_insert_scoped ya valida empresa_id = current.
-  const supabase = await createClient();
+  const supabase = yo.role === "Administrador" ? createAdminClient() : await createClient();
 
   if (propiedadId) {
     // Verificar explícitamente que la propiedad pertenece a la empresa del usuario
@@ -58,7 +58,7 @@ export async function upsertPropiedadAction(
       .single();
 
     if (!existing) return { error: "Propiedad no encontrada o sin acceso." };
-    if (existing.empresa_id !== yo.empresaId) return { error: "Sin acceso a esta propiedad." };
+    if (yo.role !== "Administrador" && existing.empresa_id !== yo.empresaId) return { error: "Sin acceso a esta propiedad." };
 
     const { data, error } = await supabase
       .from("propiedades")
@@ -115,7 +115,8 @@ export async function toggleContactadoAction(
 
   // Si falla por columna inexistente (migración pendiente), reintenta sin ella
   if (error && error.message?.includes("contactado_hasta")) {
-    const { contactado_hasta: _ignored, ...patchSinColumna } = patch as Record<string, unknown> & { contactado_hasta?: unknown };
+    const patchSinColumna = { ...patch };
+    delete patchSinColumna.contactado_hasta;
     const retry = await supabase
       .from("propiedades")
       .update(patchSinColumna as never)
@@ -185,11 +186,12 @@ async function upsertUserOrden(
 
 async function validateAssignablePropertyAgent(
   agenteId: number | null,
-  empresaId: number | null
+  empresaId: number | null,
+  currentUserRole: string
 ): Promise<string | null> {
   if (!agenteId) return "Selecciona un agente valido para esta propiedad.";
 
-  const supabase = await createClient();
+  const supabase = currentUserRole === "Administrador" ? createAdminClient() : await createClient();
   const { data, error } = await supabase
     .from("usuarios")
     .select("id, rol, empresa_id")
@@ -198,7 +200,7 @@ async function validateAssignablePropertyAgent(
 
   if (error) return error.message;
   if (!data) return "El agente asignado no existe o no esta disponible.";
-  if (empresaId != null && data.empresa_id !== empresaId) return "El agente asignado no pertenece a tu empresa.";
+  if (currentUserRole !== "Administrador" && empresaId != null && data.empresa_id !== empresaId) return "El agente asignado no pertenece a tu empresa.";
   if (!canBeAssignedProperty(data.rol)) {
     return "Los usuarios administradores no pueden tener propiedades asignadas. Selecciona un agente para esta propiedad.";
   }

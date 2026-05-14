@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import PageHeader from "@/components/layout/page-header";
 import PropiedadDetailClient from "./propiedad-detail-client";
@@ -59,7 +60,7 @@ export default async function PropiedadDetailPage({
   const yo = await getCurrentUserContext();
   if (!yo) redirect("/login");
 
-  const supabase = await createClient();
+  const supabase = yo.role === "Administrador" ? createAdminClient() : await createClient();
 
   const { data: raw } = await supabase
     .from("propiedades")

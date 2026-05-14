@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import PageHeader from "@/components/layout/page-header";
 import PropiedadesClient from "./propiedades-client";
@@ -49,6 +50,8 @@ export default async function PropiedadesPage() {
   if (!yo) redirect("/login");
 
   const supabase = await createClient();
+  const isAdmin = yo.role === "Administrador";
+  const dataClient = isAdmin ? createAdminClient() : supabase;
 
   // ── Construir filtros de acceso según rol ─────────────────────────────
   let fincaIdFilter: number[] | null = null;
@@ -85,7 +88,7 @@ export default async function PropiedadesPage() {
 
   // ── Query de propiedades con joins ────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let query: any = supabase
+  let query: any = dataClient
     .from("propiedades")
     .select(`
       id, planta, puerta, propietario, telefono, estado, honorarios, precio,
@@ -110,7 +113,7 @@ export default async function PropiedadesPage() {
     query = query.in("agente_asignado", agentIdFilter);
   }
 
-  const { data: rawData } = await query;
+  const { data: rawData, error: loadError } = await query;
 
   // ── Normalizar filas ──────────────────────────────────────────────────
   type RawRow = {
@@ -210,6 +213,7 @@ export default async function PropiedadesPage() {
         agentes={agentes}
         isManager={isManager}
         currentUserId={yo.id}
+        loadError={loadError?.message ?? null}
       />
     </>
   );
