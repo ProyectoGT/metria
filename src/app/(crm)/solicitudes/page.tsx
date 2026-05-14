@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 import { getCurrentUserContext } from "@/lib/current-user";
-import PageHeader from "@/components/layout/page-header";
 import PedidosClient from "./solicitudes-client";
 import IdealistaClient from "./idealista-client";
 import SolicitudesTabs from "./solicitudes-tabs";
@@ -46,7 +45,6 @@ export default async function PedidosPage({
 
   return (
     <>
-      <PageHeader title="Solicitudes" description="Gestion de solicitudes y leads de clientes" />
       <SolicitudesTabs
         defaultTab={tab === "idealista" ? "idealista" : "solicitudes"}
         nuevosLeads={nuevosLeads}

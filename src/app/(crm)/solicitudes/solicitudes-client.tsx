@@ -1,7 +1,21 @@
 ﻿"use client";
 
 import { useMemo, useState } from "react";
-import { FileText, History, Users, Phone } from "lucide-react";
+import {
+  Bath,
+  BedDouble,
+  Car,
+  FileText,
+  Filter,
+  History,
+  Inbox,
+  MapPin,
+  Phone,
+  Plus,
+  SearchX,
+  SlidersHorizontal,
+  Users,
+} from "lucide-react";
 import Drawer from "@/components/ui/drawer";
 import DocumentGeneratorModal from "@/modules/documents/components/DocumentGeneratorModal";
 import ColaboracionesPanel from "@/modules/colaboraciones/components/ColaboracionesPanel";
@@ -120,12 +134,22 @@ function modalidadBadge(modalidad: string | null) {
   const option = getModalidadOption(modalidad);
   return (
     <span
-      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${option?.badgeClassName ?? "bg-gray-100 text-gray-700"}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ring-black/5 ${option?.badgeClassName ?? "bg-gray-100 text-gray-700"}`}
       title={option?.title}
     >
       {option?.label ?? modalidad}
     </span>
   );
+}
+
+function origenBadge(origen: string | null) {
+  if (origen === "oficina") {
+    return <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-700/10">Oficina</span>;
+  }
+  if (origen === "online") {
+    return <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary ring-1 ring-inset ring-primary/10">Online</span>;
+  }
+  return <span className="text-text-secondary">-</span>;
 }
 
 function TabBtn({ active, onClick, children, title }: { active: boolean; onClick: () => void; children: React.ReactNode; title?: string }) {
@@ -310,7 +334,7 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
   function scopeBadge(scope: Pedido["visibility"]) {
     const normalized = normalizeAccessScope(scope);
     return (
-      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${ACCESS_SCOPE_BADGES[normalized]}`}>
+      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ring-black/5 ${ACCESS_SCOPE_BADGES[normalized]}`}>
         {ACCESS_SCOPE_LABELS[normalized]}
       </span>
     );
@@ -318,54 +342,101 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
 
   return (
     <>
-      {/* Barra superior */}
-      <div className="mb-6 flex items-center justify-between">
-        <p className="text-sm text-text-secondary">
-          {filtered.length} {filtered.length === 1 ? "solicitud" : "solicitudes"}
-          {hasFilters && pedidos.length !== filtered.length && <span className="ml-1">de {pedidos.length}</span>}
-        </p>
-        <button onClick={openCreate} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark">
-          + Nueva solicitud
-        </button>
+      {/* Cabecera */}
+      <div className="mb-5 rounded-xl border border-border bg-surface p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <FileText className="h-4 w-4" />
+              </span>
+              <h2 className="text-lg font-semibold tracking-tight text-text-primary">Pipeline de solicitudes</h2>
+            </div>
+            <p className="mt-1 text-sm text-text-secondary">
+              Encuentra clientes por perfil, presupuesto y modalidad sin perder contexto comercial.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <div className="rounded-lg border border-border bg-background px-3 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Visibles</p>
+                <p className="mt-0.5 text-sm font-semibold text-text-primary">{filtered.length}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-background px-3 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Total</p>
+                <p className="mt-0.5 text-sm font-semibold text-text-primary">{pedidos.length}</p>
+              </div>
+            </div>
+            <button
+              onClick={openCreate}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-md"
+            >
+              <Plus className="h-4 w-4" />
+              Nueva solicitud
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Filtros */}
-      <div className="mb-6 rounded-xl border border-border bg-surface px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex min-w-[130px] flex-1 flex-col gap-1">
+      <div className="mb-5 rounded-xl border border-border bg-surface p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-background text-text-secondary">
+              <SlidersHorizontal className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-text-primary">Filtros</p>
+              <p className="text-xs text-text-secondary">Ajusta el listado sin perder la vista comercial.</p>
+            </div>
+          </div>
+          {hasFilters && (
+            <button
+              onClick={resetFiltros}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-text-secondary transition-colors hover:border-danger/40 hover:bg-danger/5 hover:text-danger"
+            >
+              <Filter className="h-3.5 w-3.5" />
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="flex min-w-0 flex-col gap-1">
             <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Tipo</label>
             <input
               type="text"
               value={filtros.tipo ?? ""}
               onChange={(e) => setFiltro("tipo", e.target.value || null)}
               placeholder="Piso, Casa..."
-              className="input h-8 py-0 text-sm"
+              className="input h-9 py-0 text-sm transition-colors hover:border-border-strong"
             />
           </div>
-          <div className="flex min-w-[140px] flex-1 flex-col gap-1">
+          <div className="flex min-w-0 flex-col gap-1">
             <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Modalidad</label>
             <select
               value={filtros.modalidad ?? ""}
               onChange={(e) => setFiltro("modalidad", e.target.value || null)}
-              className="input h-8 py-0 text-sm"
+              className="input h-9 py-0 text-sm transition-colors hover:border-border-strong"
             >
               <option value="">Todas</option>
               {MODALIDADES_PEDIDO.map((m) => <option key={m.value} value={m.value}>{m.label} - {m.title}</option>)}
             </select>
           </div>
-          <div className="flex min-w-[130px] flex-1 flex-col gap-1">
+          <div className="flex min-w-0 flex-col gap-1">
             <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Origen</label>
             <select
               value={filtros.origen ?? ""}
               onChange={(e) => setFiltro("origen", e.target.value || null)}
-              className="input h-8 py-0 text-sm"
+              className="input h-9 py-0 text-sm transition-colors hover:border-border-strong"
             >
               <option value="">Todos</option>
               <option value="oficina">Oficina</option>
               <option value="online">Online</option>
             </select>
           </div>
-          <div className="flex min-w-[130px] flex-1 flex-col gap-1">
+          <div className="flex min-w-0 flex-col gap-1">
             <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Desde</label>
             <input
               type="text"
@@ -373,11 +444,11 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
               value={presupuestoMinValue}
               onChange={(e) => setFiltro("presupuestoMin", e.target.value)}
               placeholder="200.000 €"
-              className={`input h-8 py-0 text-sm ${invalidBudgetRange ? "border-danger focus:border-danger" : ""}`}
+              className={`input h-9 py-0 text-sm transition-colors hover:border-border-strong ${invalidBudgetRange ? "border-danger focus:border-danger" : ""}`}
               aria-invalid={invalidBudgetRange}
             />
           </div>
-          <div className="flex min-w-[130px] flex-1 flex-col gap-1">
+          <div className="flex min-w-0 flex-col gap-1">
             <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Hasta</label>
             <input
               type="text"
@@ -385,16 +456,10 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
               value={presupuestoMaxValue}
               onChange={(e) => setFiltro("presupuestoMax", e.target.value)}
               placeholder="350.000 €"
-              className={`input h-8 py-0 text-sm ${invalidBudgetRange ? "border-danger focus:border-danger" : ""}`}
+              className={`input h-9 py-0 text-sm transition-colors hover:border-border-strong ${invalidBudgetRange ? "border-danger focus:border-danger" : ""}`}
               aria-invalid={invalidBudgetRange}
             />
           </div>
-          {hasFilters && (
-            <button onClick={resetFiltros}
-              className="mb-0.5 shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary hover:border-danger/40 hover:text-danger">
-              Limpiar
-            </button>
-          )}
         </div>
         {invalidBudgetRange && (
           <p className="mt-2 text-xs font-medium text-danger">El presupuesto minimo no puede ser mayor que el maximo.</p>
@@ -403,73 +468,118 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
 
       {/* Tabla */}
       {pedidos.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-surface py-20 text-center">
-          <p className="text-base font-medium text-text-primary">No hay solicitudes todavia</p>
-          <button onClick={openCreate} className="mt-5 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white hover:bg-primary-dark">+ Nueva solicitud</button>
+        <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-16 text-center shadow-sm">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Inbox className="h-6 w-6" />
+          </div>
+          <p className="mt-4 text-base font-semibold text-text-primary">No hay solicitudes todavia</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-text-secondary">Crea la primera solicitud para empezar a organizar oportunidades comerciales.</p>
+          <button onClick={openCreate} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-dark">
+            <Plus className="h-4 w-4" />
+            Nueva solicitud
+          </button>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-surface py-20 text-center">
-          <p className="text-base font-medium text-text-primary">
+        <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-16 text-center shadow-sm">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-background text-text-secondary">
+            <SearchX className="h-6 w-6" />
+          </div>
+          <p className="mt-4 text-base font-semibold text-text-primary">
             {invalidBudgetRange ? "El rango de presupuesto no es valido" : "No hay solicitudes con estos filtros"}
           </p>
-          <button onClick={resetFiltros} className="mt-3 text-sm text-primary hover:underline">Limpiar filtros</button>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-text-secondary">Ajusta los filtros o limpia la busqueda para recuperar el listado completo.</p>
+          <button onClick={resetFiltros} className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-secondary transition-colors hover:bg-background hover:text-primary">Limpiar filtros</button>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border bg-surface shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+            <div>
+              <p className="text-sm font-semibold text-text-primary">Solicitudes activas</p>
+              <p className="mt-0.5 text-xs text-text-secondary">
+                {filtered.length} {filtered.length === 1 ? "resultado" : "resultados"}
+                {hasFilters && pedidos.length !== filtered.length && <span className="ml-1">de {pedidos.length}</span>}
+              </p>
+            </div>
+            <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold text-text-secondary">
+              Ordenado por creacion
+            </span>
+          </div>
+          <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
-            <thead>
-              <tr className="border-b border-border bg-background">
-                <th className="px-5 py-3 text-left font-medium text-text-secondary">Cliente</th>
-                <th className="w-32 px-4 py-3 text-left font-medium text-text-secondary">Telefono</th>
-                <th className="px-4 py-3 text-left font-medium text-text-secondary">Tipo</th>
-                <th className="px-4 py-3 text-left font-medium text-text-secondary">Zona</th>
-                <th className="w-20 px-4 py-3 text-center font-medium text-text-secondary">Modal.</th>
-                <th className="w-28 px-4 py-3 text-right font-medium text-text-secondary">Presupuesto</th>
-                <th className="w-12 px-4 py-3 text-center font-medium text-text-secondary">Hab.</th>
-                <th className="w-12 px-4 py-3 text-center font-medium text-text-secondary">Ban.</th>
-                <th className="w-18 px-4 py-3 text-center font-medium text-text-secondary">Garaje</th>
-                <th className="w-22 px-4 py-3 text-center font-medium text-text-secondary">Origen</th>
-                <th className="w-24 px-4 py-3 text-center font-medium text-text-secondary">Alcance</th>
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-border bg-background/95 backdrop-blur">
+                <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Cliente</th>
+                <th className="w-32 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Telefono</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Tipo</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Zona</th>
+                <th className="w-24 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Modal.</th>
+                <th className="w-32 px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Presupuesto</th>
+                <th className="w-12 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Hab.</th>
+                <th className="w-12 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Ban.</th>
+                <th className="w-18 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Garaje</th>
+                <th className="w-22 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Origen</th>
+                <th className="w-24 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Alcance</th>
                 <th className="w-10 px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filtered.map((pedido) => (
-                <tr key={pedido.id} onClick={() => openEdit(pedido)} className="group cursor-pointer transition-colors hover:bg-background">
-                  <td className="px-5 py-3.5">
-                    <p className="font-medium text-text-primary">{pedido.nombre_cliente}</p>
-                    {pedido.altura_deseada && <p className="text-xs text-text-secondary">Altura: {pedido.altura_deseada}</p>}
+                <tr key={pedido.id} onClick={() => openEdit(pedido)} className="group cursor-pointer transition-colors hover:bg-primary/5">
+                  <td className="px-5 py-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background text-sm font-semibold text-primary ring-1 ring-border">
+                        {pedido.nombre_cliente.slice(0, 1).toUpperCase()}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-text-primary">{pedido.nombre_cliente}</p>
+                        {pedido.altura_deseada && <p className="text-xs text-text-secondary">Altura: {pedido.altura_deseada}</p>}
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-4 py-3.5 text-text-secondary">{pedido.telefono ?? "-"}</td>
-                  <td className="px-4 py-3.5 text-xs text-text-secondary">{pedido.tipo_propiedad ?? "-"}</td>
-                  <td className="max-w-[130px] truncate px-4 py-3.5 text-xs text-text-secondary" title={pedido.zona_busqueda ?? ""}>{pedido.zona_busqueda ?? "-"}</td>
-                  <td className="px-4 py-3.5 text-center">{modalidadBadge(pedido.modalidad)}</td>
-                  <td className="px-4 py-3.5 text-right font-medium text-text-primary">{formatPresupuesto(pedido.presupuesto)}</td>
-                  <td className="px-4 py-3.5 text-center text-text-secondary">{pedido.habitaciones ?? "-"}</td>
-                  <td className="px-4 py-3.5 text-center text-text-secondary">{pedido.banos ?? "-"}</td>
-                  <td className="px-4 py-3.5 text-center">
-                    {pedido.garaje === true ? <span className="text-xs font-medium text-green-600">Si</span>
+                  <td className="px-4 py-4 text-text-secondary">
+                    {pedido.telefono ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5" />
+                        {pedido.telefono}
+                      </span>
+                    ) : "-"}
+                  </td>
+                  <td className="px-4 py-4 text-xs font-medium text-text-secondary">{pedido.tipo_propiedad ?? "-"}</td>
+                  <td className="max-w-[150px] truncate px-4 py-4 text-xs text-text-secondary" title={pedido.zona_busqueda ?? ""}>
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{pedido.zona_busqueda ?? "-"}</span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 text-center">{modalidadBadge(pedido.modalidad)}</td>
+                  <td className="px-4 py-4 text-right">
+                    <span className="font-semibold text-text-primary">{formatPresupuesto(pedido.presupuesto)}</span>
+                  </td>
+                  <td className="px-4 py-4 text-center text-text-secondary">
+                    <span className="inline-flex items-center justify-center gap-1"><BedDouble className="h-3.5 w-3.5" />{pedido.habitaciones ?? "-"}</span>
+                  </td>
+                  <td className="px-4 py-4 text-center text-text-secondary">
+                    <span className="inline-flex items-center justify-center gap-1"><Bath className="h-3.5 w-3.5" />{pedido.banos ?? "-"}</span>
+                  </td>
+                  <td className="px-4 py-4 text-center">
+                    {pedido.garaje === true ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-success"><Car className="h-3.5 w-3.5" />Si</span>
                     : pedido.garaje === false ? <span className="text-xs text-text-secondary">No</span>
                     : <span className="text-text-secondary">-</span>}
                   </td>
-                  <td className="px-4 py-3.5 text-center">
-                    {pedido.origen === "oficina" ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Oficina</span>
-                    : pedido.origen === "online" ? <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">Online</span>
-                    : <span className="text-text-secondary">-</span>}
-                  </td>
-                  <td className="px-4 py-3.5 text-center">{scopeBadge(pedido.visibility)}</td>
-                  <td className="px-4 py-3.5 text-right">
+                  <td className="px-4 py-4 text-center">{origenBadge(pedido.origen)}</td>
+                  <td className="px-4 py-4 text-center">{scopeBadge(pedido.visibility)}</td>
+                  <td className="px-4 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={(e) => { e.stopPropagation(); setTimelinePedido(pedido); }}
-                        className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-primary/10 hover:text-primary group-hover:opacity-100"
+                        className="rounded-lg p-1.5 text-text-secondary opacity-0 transition-all hover:bg-primary/10 hover:text-primary group-hover:opacity-100"
                         title="Timeline"
                       >
                         <History className="h-4 w-4" />
                       </button>
                       {canManagePedido(pedido, currentUserId, currentUserRole) && (
                         <button onClick={(e) => { e.stopPropagation(); setDeleteId(pedido.id); }}
-                          className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100" title="Eliminar">
+                          className="rounded-lg p-1.5 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100" title="Eliminar">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
@@ -481,6 +591,7 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
