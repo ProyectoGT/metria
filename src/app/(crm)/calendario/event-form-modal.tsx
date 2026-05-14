@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n";
 import { DEFAULT_ACTIVITY_TIME, normalizeTime, calcDurationMinutes, formatDuration, REMINDER_OPTIONS } from "@/lib/local-date-time";
 import { isActivityPriority, isActivityType, normalizeActivityPriority, normalizeActivityType } from "@/lib/activity-options";
 import { useCreateAgendaItem, useUpdateAgendaItem } from "@/modules/agenda/hooks/use-agenda-items";
+import { defaultSyncToGoogleCalendar } from "@/modules/agenda/defaults";
 import { saveAgendaGoogleEventIdAction } from "@/app/(crm)/calendario/actions";
 
 // ─── Types (re-declared locally to avoid cross-file coupling) ─────────────────
@@ -191,7 +192,7 @@ export default function EventFormModal({
 
   function buildEmptyForm(): FormState {
     const date = initialDate ? new Date(initialDate + "T12:00:00") : undefined;
-    return { ...emptyForm(date, isConnected), assignedUserIds: [currentUserId] };
+    return { ...emptyForm(date, defaultSyncToGoogleCalendar(isConnected)), assignedUserIds: [currentUserId] };
   }
 
   const [form, setForm]           = useState<FormState>(() =>

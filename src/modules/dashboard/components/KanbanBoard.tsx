@@ -32,6 +32,7 @@ import {
   updateAgendaAction,
   updateTareaAction,
 } from "@/app/(crm)/dashboard/actions";
+import { saveAgendaGoogleEventIdAction } from "@/app/(crm)/calendario/actions";
 import { DEFAULT_ACTIVITY_TIME, localDateKey, splitLocalDateTime } from "@/lib/local-date-time";
 import { useKanbanBoard, useMoveKanbanCard } from "@/modules/kanban/hooks/use-kanban-board";
 import type { KanbanQueryParams } from "@/modules/kanban/types";
@@ -124,7 +125,9 @@ function kanbanModalReducer(state: KanbanModalState, action: KanbanModalAction):
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-type NewKanbanCard = Omit<KanbanCardData, "id" | "source" | "dbId">;
+type NewKanbanCard = Omit<KanbanCardData, "id" | "source" | "dbId"> & {
+  syncToGcal?: boolean;
+};
 
 type KanbanBoardProps = {
   initialData:    KanbanData;
@@ -133,6 +136,7 @@ type KanbanBoardProps = {
   currentUserId:  string;
   empresaId:      number | null;
   agents?:        Array<{ id: string; nombre: string }>;
+  isGoogleCalendarConnected?: boolean;
 };
 
 function KanbanBoard({
@@ -142,6 +146,7 @@ function KanbanBoard({
   currentUserId: _currentUserId,
   empresaId,
   agents = [],
+  isGoogleCalendarConnected = false,
 }: KanbanBoardProps) {
   const router = useRouter();
   const currentUserIdNum = useMemo(() => Number(_currentUserId), [_currentUserId]);
@@ -320,10 +325,11 @@ function KanbanBoard({
   }
 
   const handleAddCard = useCallback(async (columnId: string, newCard: NewKanbanCard) => {
+    const { syncToGcal, ...cardData } = newCard;
     const isAgendaColumn = columnId === "en_progreso";
     const optimisticId   = `optimistic-${Date.now()}`;
     const optimisticCard: KanbanCardData = {
-      ...newCard,
+      ...cardData,
       id:           optimisticId,
       source:       isAgendaColumn ? "agenda" : "tarea",
       dbId:         -Date.now(),
@@ -352,13 +358,41 @@ function KanbanBoard({
             assignedUserIds,
           });
 
+      let gcalEventId: string | null = null;
+      if (isAgendaColumn && isGoogleCalendarConnected && syncToGcal) {
+        try {
+          const gcalRes = await fetch("/api/google/events", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({
+              summary:  newCard.title,
+              date:     date ?? localDateKey(),
+              time:     time ?? DEFAULT_ACTIVITY_TIME,
+              agendaId: created.id,
+            }),
+          });
+          if (gcalRes.ok) {
+            const gcalData = await gcalRes.json();
+            if (gcalData.id) {
+              const syncResult = await saveAgendaGoogleEventIdAction(created.id, gcalData.id);
+              if (syncResult.success) {
+                gcalEventId = syncResult.data.gcal_event_id;
+              }
+            }
+          }
+        } catch {
+          // La actividad ya existe en Metria; un fallo de Google no debe romper el tablero.
+        }
+      }
+
       const finalCard: KanbanCardData = {
-        ...newCard,
+        ...cardData,
         id:           `${isAgendaColumn ? "agenda" : "tarea"}-${created.id}`,
         source:       isAgendaColumn ? "agenda" : "tarea",
         dbId:         created.id,
         isCompleted:  false,
         fromOrdenDia: isAgendaColumn,
+        gcalEventId,
       };
       setColumns((prev) =>
         prev.map((col) =>
@@ -376,7 +410,7 @@ function KanbanBoard({
       );
       router.refresh();
     }
-  }, [router]);
+  }, [isGoogleCalendarConnected, router]);
 
   // Stable — passes to memo(KanbanColumn), must not close over modal
   const handleOpenDetail = useCallback((columnId: string, card: KanbanCardData) => {
@@ -705,6 +739,7 @@ function KanbanBoard({
           role={role}
           agents={agents}
           currentUserId={_currentUserId}
+          isGoogleCalendarConnected={isGoogleCalendarConnected}
           mode={modal.columnId === "en_progreso" ? "actividad" : "tarea"}
           onAdd={(card) => handleAddCard(modal.columnId, card)}
           onClose={() => dispatchModal({ type: "CLOSE" })}

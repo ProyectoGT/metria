@@ -94,6 +94,7 @@ type Props = {
   } | null;
   assignableAgents: Array<{ id: string; nombre: string }>;
   zonasGeograficas: ZonaGeografica[];
+  isGoogleCalendarConnected: boolean;
 };
 
 const METRIC_ACCENT: Record<MetricKey, string> = {
@@ -322,6 +323,7 @@ export default function DashboardWorkspace(props: Props) {
     agenteMesData,
     assignableAgents,
     zonasGeograficas,
+    isGoogleCalendarConnected,
   } = props;
 
   const metricCards = useMemo(() => buildMetricCards(summary), [summary]);
@@ -457,6 +459,7 @@ export default function DashboardWorkspace(props: Props) {
           currentUserId={String(currentUserId)}
           empresaId={empresaId}
           agents={assignableAgents}
+          isGoogleCalendarConnected={isGoogleCalendarConnected}
         />
       </SectionCard>
 

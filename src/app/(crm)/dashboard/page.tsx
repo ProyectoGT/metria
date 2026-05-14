@@ -1,5 +1,6 @@
 ﻿import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { cookies } from "next/headers";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { getPeriodRange, mergeRendimientoRows } from "@/modules/desarrollo/services/desarrollo-metrics";
 import { getNextBestActions } from "@/modules/dashboard/services/next-actions";
@@ -39,6 +40,11 @@ function normalizeNullablePriority(p: string | null): KanbanPriority | null {
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
+  const cookieStore = await cookies();
+  const isGoogleCalendarConnected = !!(
+    cookieStore.get("google_access_token")?.value ||
+    cookieStore.get("google_refresh_token")?.value
+  );
   const supabase = await createClient();
   const yo = await getCurrentUserContext();
 
@@ -587,6 +593,7 @@ export default async function DashboardPage() {
       agenteMesData={agenteMesData}
       assignableAgents={assignableAgents}
       zonasGeograficas={zonasGeograficas}
+      isGoogleCalendarConnected={isGoogleCalendarConnected}
     />
   );
 }

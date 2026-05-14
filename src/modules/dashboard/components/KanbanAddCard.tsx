@@ -6,11 +6,14 @@ import type { KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import type { UserRole } from "@/lib/roles";
 import { DEFAULT_ACTIVITY_TIME, localDateKey } from "@/lib/local-date-time";
 import { type ActivityType } from "@/lib/activity-options";
+import { defaultSyncToGoogleCalendar } from "@/modules/agenda/defaults";
 import Drawer from "@/components/ui/drawer";
 import TaskCardForm from "@/modules/tareas/components/TaskCardForm";
 import type { TaskCardFormValues } from "@/modules/tareas/schemas/task.schema";
 
-type NewCard = Omit<KanbanCardData, "id" | "source" | "dbId">;
+type NewCard = Omit<KanbanCardData, "id" | "source" | "dbId"> & {
+  syncToGcal?: boolean;
+};
 
 type KanbanAddCardProps = {
   onAdd: (card: NewCard) => void;
@@ -19,6 +22,7 @@ type KanbanAddCardProps = {
   agents?: Array<{ id: string; nombre: string }>;
   mode?: "tarea" | "actividad";
   currentUserId: string;
+  isGoogleCalendarConnected?: boolean;
 };
 
 const PRIORITIES: { value: KanbanPriority; label: string; cls: string; activeCls: string }[] = [
@@ -44,6 +48,7 @@ export default function KanbanAddCard({
   agents = [],
   mode = "tarea",
   currentUserId,
+  isGoogleCalendarConnected = false,
 }: KanbanAddCardProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -52,6 +57,7 @@ export default function KanbanAddCard({
   const [date, setDate] = useState(localDateKey());
   const [time, setTime] = useState(DEFAULT_ACTIVITY_TIME);
   const [assignedUserIds, setAssignedUserIds] = useState<string[]>([currentUserId]);
+  const [syncToGcal, setSyncToGcal] = useState(defaultSyncToGoogleCalendar(isGoogleCalendarConnected));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canAssign = role === "Administrador" || role === "Director" || role === "Responsable";
@@ -88,6 +94,7 @@ export default function KanbanAddCard({
       ...(isActivity ? { tipo } : {}),
       dueDate: isActivity ? `${date}T${time}` : undefined,
       time: isActivity ? time : undefined,
+      syncToGcal: isActivity ? syncToGcal : undefined,
       assignedBy: null,
       assignedTo: assignedUserIds[0] ?? null,
       assignedUserIds: assignedUserIds.map(Number),
@@ -267,6 +274,21 @@ export default function KanbanAddCard({
               </select>
             )}
           </div>
+        )}
+
+        {isActivity && isGoogleCalendarConnected && (
+          <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-background p-3">
+            <input
+              type="checkbox"
+              checked={syncToGcal}
+              onChange={(e) => setSyncToGcal(e.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+            <div>
+              <p className="text-sm font-medium text-text-primary">Sincronizar con Google Calendar</p>
+              <p className="text-xs text-text-secondary">Se creara el evento al guardar la actividad.</p>
+            </div>
+          </label>
         )}
       </form>
     </Drawer>
