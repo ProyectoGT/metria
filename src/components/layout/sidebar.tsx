@@ -25,6 +25,7 @@ import {
   Building2,
   Mail,
   Settings,
+  Shield,
   X,
 } from "lucide-react";
 
@@ -209,6 +210,9 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
           )}
           {isAdmin && isNavVisible("configuracion") && (
             <NavItem href="/configuracion/control-acceso" icon={Settings} label={t("navigation.accessControl")} active={isActive("/configuracion/control-acceso")} />
+          )}
+          {isAdmin && (
+            <NavItem href="/seguridad" icon={Shield} label="Auditoria" active={isActive("/seguridad")} />
           )}
         </div>
       </nav>

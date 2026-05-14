@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { recordLoginAudit } from "@/lib/login-audit";
+import { getIp } from "@/lib/rate-limiter";
 
 function sanitizeRedirect(next: string | null): string {
   // Acepta solo rutas relativas internas: deben empezar por "/" y no contener
@@ -69,7 +71,7 @@ export async function GET(request: NextRequest) {
   // Buscar perfil por auth_id
   const { data: byAuthId } = await adminClient
     .from("usuarios")
-    .select("id, auth_id, estado, correo")
+    .select("id, auth_id, estado, correo, nombre, apellidos, rol, empresa_id")
     .eq("auth_id", data.user.id)
     .maybeSingle();
 
@@ -79,7 +81,7 @@ export async function GET(request: NextRequest) {
   if (!profile && data.user.email) {
     const { data: byEmail, error: emailErr } = await adminClient
       .from("usuarios")
-      .select("id, auth_id, estado, correo")
+      .select("id, auth_id, estado, correo, nombre, apellidos, rol, empresa_id")
       .ilike("correo", data.user.email)
       .maybeSingle();
 
@@ -119,6 +121,18 @@ export async function GET(request: NextRequest) {
     const esPendienteVerificacion = !profile.auth_id;
     return redirectToLogin(esPendienteVerificacion ? "pending" : "disabled");
   }
+
+  // Registrar auditoría de login OAuth (non-blocking)
+  const ip = getIp(request.headers);
+  await recordLoginAudit({
+    userId: profile.id,
+    empresaId: (profile as { empresa_id?: number | null }).empresa_id ?? null,
+    userName: (`${(profile as { nombre?: string }).nombre ?? ""} ${(profile as { apellidos?: string }).apellidos ?? ""}`.trim()) || (data.user.email ?? ""),
+    userEmail: data.user.email ?? (profile as { correo?: string }).correo ?? "",
+    userRole: (profile as { rol?: string | null }).rol ?? "Agente",
+    ipAddress: ip !== "unknown" ? ip : null,
+    userAgent: request.headers.get("user-agent"),
+  });
 
   return successResponse;
 }

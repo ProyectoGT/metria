@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 
-import { Search, Bell, ChevronDown, Menu, Calendar, AlertCircle, CheckCircle2, LifeBuoy, Languages, Check, Command } from "lucide-react";
+import { Search, Bell, ChevronDown, Menu, Calendar, AlertCircle, CheckCircle2, LifeBuoy, Languages, Check, Command, Shield } from "lucide-react";
 import { logout } from "@/app/(auth)/actions";
 import Avatar from "@/components/ui/avatar";
 import { useTheme, THEMES } from "@/lib/theme-context";
@@ -166,38 +166,61 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
               ) : (
                 <ul className="max-h-64 divide-y divide-border overflow-y-auto">
                   {notifications.map((n) => {
-                    const isSoporte = n.type === "soporte";
-                    const item = isSoporte ? (
-                      <Link
-                        href={n.href ?? "/soporte"}
-                        onClick={() => setBellOpen(false)}
-                        className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-state-hover"
-                      >
-                        <LifeBuoy className={`mt-0.5 h-4 w-4 shrink-0 text-primary`} />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-text-primary">{n.titulo}</p>
-                          {n.fecha && (
-                            <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary">
-                              <Calendar className="h-3 w-3" />
-                              {formatFecha(n.fecha, localeLabels[locale].region)}
-                            </p>
-                          )}
+                    let item: React.ReactNode;
+                    if (n.type === "soporte") {
+                      item = (
+                        <Link
+                          href={n.href ?? "/soporte"}
+                          onClick={() => setBellOpen(false)}
+                          className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-state-hover"
+                        >
+                          <LifeBuoy className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-text-primary">{n.titulo}</p>
+                            {n.fecha && (
+                              <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary">
+                                <Calendar className="h-3 w-3" />
+                                {formatFecha(n.fecha, localeLabels[locale].region)}
+                              </p>
+                            )}
+                          </div>
+                        </Link>
+                      );
+                    } else if (n.type === "login") {
+                      item = (
+                        <Link
+                          href="/seguridad"
+                          onClick={() => setBellOpen(false)}
+                          className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-state-hover"
+                        >
+                          <Shield className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-text-primary">{n.titulo}</p>
+                            {n.fecha && (
+                              <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary">
+                                <Calendar className="h-3 w-3" />
+                                {formatFecha(n.fecha, localeLabels[locale].region)}
+                              </p>
+                            )}
+                          </div>
+                        </Link>
+                      );
+                    } else {
+                      item = (
+                        <div className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-state-hover">
+                          <AlertCircle className={`mt-0.5 h-4 w-4 shrink-0 ${prioridadColor(n.prioridad)}`} />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-text-primary">{n.titulo}</p>
+                            {n.fecha && (
+                              <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary">
+                                <Calendar className="h-3 w-3" />
+                                {formatFecha(n.fecha, localeLabels[locale].region)}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      </Link>
-                    ) : (
-                      <div className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-state-hover">
-                        <AlertCircle className={`mt-0.5 h-4 w-4 shrink-0 ${prioridadColor(n.prioridad)}`} />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-text-primary">{n.titulo}</p>
-                          {n.fecha && (
-                            <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary">
-                              <Calendar className="h-3 w-3" />
-                              {formatFecha(n.fecha, localeLabels[locale].region)}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    );
+                      );
+                    }
                     return <li key={`${n.type}-${n.id}`}>{item}</li>;
                   })}
                 </ul>

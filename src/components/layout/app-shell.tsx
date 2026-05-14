@@ -14,7 +14,7 @@ export type NotificationItem = {
   titulo: string;
   fecha: string | null;
   prioridad: string | null;
-  type: "tarea" | "soporte";
+  type: "tarea" | "soporte" | "login";
   href?: string;
 };
 
@@ -77,10 +77,12 @@ export default async function AppShell({
     }
   }
 
-  // Notificaciones: tareas pendientes + notificaciones de soporte
+  // Notificaciones: tareas pendientes + notificaciones de soporte + login alerts (solo admin)
   let notifications: NotificationItem[] = [];
   if (userId) {
-    const [{ data: tareas }, { data: soporteNotifs }] = await Promise.all([
+    const isAdminUser = userRole === "Administrador";
+
+    const queries: Promise<{ data: unknown }>[] = [
       supabase
         .from("tareas")
         .select("id, titulo, fecha, prioridad")
@@ -98,7 +100,24 @@ export default async function AppShell({
         .eq("leido", false)
         .order("created_at", { ascending: false })
         .limit(5),
-    ]);
+    ];
+
+    if (isAdminUser) {
+      queries.push(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any)
+          .from("notificaciones")
+          .select("id, titulo, mensaje, created_at, login_audit_id")
+          .eq("usuario_id", userId)
+          .eq("leido", false)
+          .order("created_at", { ascending: false })
+          .limit(5)
+      );
+    }
+
+    const results = await Promise.all(queries);
+    const [{ data: tareas }, { data: soporteNotifs }] = results;
+    const loginNotifs = isAdminUser ? (results[2]?.data ?? []) : [];
 
     const tareaItems: NotificationItem[] = ((tareas ?? []) as { id: number; titulo: string; fecha: string | null; prioridad: string | null }[]).map((t) => ({
       id: t.id,
@@ -117,7 +136,16 @@ export default async function AppShell({
       href: `/soporte?ticket=${n.ticket_id}`,
     }));
 
-    notifications = [...soporteItems, ...tareaItems].slice(0, 8);
+    const loginItems: NotificationItem[] = ((loginNotifs ?? []) as { id: number; titulo: string; mensaje: string; created_at: string; login_audit_id: number | null }[]).map((n) => ({
+      id: n.id,
+      titulo: n.titulo,
+      fecha: n.created_at,
+      prioridad: null,
+      type: "login" as const,
+      href: "/seguridad",
+    }));
+
+    notifications = [...loginItems, ...soporteItems, ...tareaItems].slice(0, 8);
   }
 
   return (
