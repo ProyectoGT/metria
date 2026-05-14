@@ -17,6 +17,11 @@ import ContactoTimeline, { type TimelineEvent } from "@/modules/contactos/compon
 import RelatedEmailsPanel from "@/modules/email/components/RelatedEmailsPanel";
 import type { UserRole } from "@/lib/roles";
 import { useToast, Toaster } from "@/components/ui/toast";
+import {
+  useResetSolicitudesFilters,
+  useSetSolicitudesFilter,
+  useSolicitudesFilters,
+} from "@/hooks/use-filters";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -97,6 +102,19 @@ function formatPresupuesto(value: number | null) {
   return new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value);
 }
 
+function parseBudgetFilter(value: string) {
+  const normalized = value.trim().replace(/\./g, "").replace(",", ".");
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isBudgetRangeInvalid(minValue: string, maxValue: string) {
+  const min = parseBudgetFilter(minValue);
+  const max = parseBudgetFilter(maxValue);
+  return min !== null && max !== null && min > max;
+}
+
 function modalidadBadge(modalidad: string | null) {
   if (!modalidad) return <span className="text-text-secondary">-</span>;
   const m = MODALIDADES.find((x) => x.value === modalidad);
@@ -138,20 +156,36 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const [filterTipo, setFilterTipo] = useState("");
-  const [filterModalidad, setFilterModalidad] = useState("");
-  const [filterOrigen, setFilterOrigen] = useState("");
+  const filtros = useSolicitudesFilters();
+  const setFiltro = useSetSolicitudesFilter();
+  const resetFiltros = useResetSolicitudesFilters();
+
+  const presupuestoMinValue = filtros.presupuestoMin ?? "";
+  const presupuestoMaxValue = filtros.presupuestoMax ?? "";
+  const presupuestoMin = parseBudgetFilter(presupuestoMinValue);
+  const presupuestoMax = parseBudgetFilter(presupuestoMaxValue);
+  const invalidBudgetRange = isBudgetRangeInvalid(presupuestoMinValue, presupuestoMaxValue);
 
   const filtered = useMemo(() => {
+    if (invalidBudgetRange) return [];
+
     return pedidos.filter((p) => {
-      if (filterTipo && !(p.tipo_propiedad ?? "").toLowerCase().includes(filterTipo.toLowerCase())) return false;
-      if (filterModalidad && p.modalidad !== filterModalidad) return false;
-      if (filterOrigen && p.origen !== filterOrigen) return false;
+      if (filtros.tipo && !(p.tipo_propiedad ?? "").toLowerCase().includes(filtros.tipo.toLowerCase())) return false;
+      if (filtros.modalidad && p.modalidad !== filtros.modalidad) return false;
+      if (filtros.origen && p.origen !== filtros.origen) return false;
+      if (presupuestoMin !== null && (p.presupuesto ?? -Infinity) < presupuestoMin) return false;
+      if (presupuestoMax !== null && (p.presupuesto ?? Infinity) > presupuestoMax) return false;
       return true;
     });
-  }, [pedidos, filterTipo, filterModalidad, filterOrigen]);
+  }, [pedidos, filtros.tipo, filtros.modalidad, filtros.origen, presupuestoMin, presupuestoMax, invalidBudgetRange]);
 
-  const hasFilters = filterTipo || filterModalidad || filterOrigen;
+  const hasFilters = Boolean(
+    filtros.tipo ||
+    filtros.modalidad ||
+    filtros.origen ||
+    presupuestoMinValue ||
+    presupuestoMaxValue
+  );
 
   const supabase = useMemo(() => createClient(), []);
   const { toasts, toast } = useToast();
@@ -302,30 +336,71 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex min-w-[130px] flex-1 flex-col gap-1">
             <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Tipo</label>
-            <input type="text" value={filterTipo} onChange={(e) => setFilterTipo(e.target.value)} placeholder="Piso, Casa..." className="input h-8 py-0 text-sm" />
+            <input
+              type="text"
+              value={filtros.tipo ?? ""}
+              onChange={(e) => setFiltro("tipo", e.target.value || null)}
+              placeholder="Piso, Casa..."
+              className="input h-8 py-0 text-sm"
+            />
           </div>
           <div className="flex min-w-[140px] flex-1 flex-col gap-1">
             <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Modalidad</label>
-            <select value={filterModalidad} onChange={(e) => setFilterModalidad(e.target.value)} className="input h-8 py-0 text-sm">
+            <select
+              value={filtros.modalidad ?? ""}
+              onChange={(e) => setFiltro("modalidad", e.target.value || null)}
+              className="input h-8 py-0 text-sm"
+            >
               <option value="">Todas</option>
               {MODALIDADES.map((m) => <option key={m.value} value={m.value}>{m.label} — {m.title}</option>)}
             </select>
           </div>
           <div className="flex min-w-[130px] flex-1 flex-col gap-1">
             <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Origen</label>
-            <select value={filterOrigen} onChange={(e) => setFilterOrigen(e.target.value)} className="input h-8 py-0 text-sm">
+            <select
+              value={filtros.origen ?? ""}
+              onChange={(e) => setFiltro("origen", e.target.value || null)}
+              className="input h-8 py-0 text-sm"
+            >
               <option value="">Todos</option>
               <option value="oficina">Oficina</option>
               <option value="online">Online</option>
             </select>
           </div>
+          <div className="flex min-w-[130px] flex-1 flex-col gap-1">
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Desde</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={presupuestoMinValue}
+              onChange={(e) => setFiltro("presupuestoMin", e.target.value)}
+              placeholder="200.000 €"
+              className={`input h-8 py-0 text-sm ${invalidBudgetRange ? "border-danger focus:border-danger" : ""}`}
+              aria-invalid={invalidBudgetRange}
+            />
+          </div>
+          <div className="flex min-w-[130px] flex-1 flex-col gap-1">
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Hasta</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={presupuestoMaxValue}
+              onChange={(e) => setFiltro("presupuestoMax", e.target.value)}
+              placeholder="350.000 €"
+              className={`input h-8 py-0 text-sm ${invalidBudgetRange ? "border-danger focus:border-danger" : ""}`}
+              aria-invalid={invalidBudgetRange}
+            />
+          </div>
           {hasFilters && (
-            <button onClick={() => { setFilterTipo(""); setFilterModalidad(""); setFilterOrigen(""); }}
+            <button onClick={resetFiltros}
               className="mb-0.5 shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary hover:border-danger/40 hover:text-danger">
               Limpiar
             </button>
           )}
         </div>
+        {invalidBudgetRange && (
+          <p className="mt-2 text-xs font-medium text-danger">El presupuesto minimo no puede ser mayor que el maximo.</p>
+        )}
       </div>
 
       {/* Tabla */}
@@ -336,8 +411,10 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-surface py-20 text-center">
-          <p className="text-base font-medium text-text-primary">No hay solicitudes con estos filtros</p>
-          <button onClick={() => { setFilterTipo(""); setFilterModalidad(""); setFilterOrigen(""); }} className="mt-3 text-sm text-primary hover:underline">Limpiar filtros</button>
+          <p className="text-base font-medium text-text-primary">
+            {invalidBudgetRange ? "El rango de presupuesto no es valido" : "No hay solicitudes con estos filtros"}
+          </p>
+          <button onClick={resetFiltros} className="mt-3 text-sm text-primary hover:underline">Limpiar filtros</button>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-surface shadow-sm">

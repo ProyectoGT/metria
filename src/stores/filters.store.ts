@@ -9,10 +9,14 @@ interface DashboardFilters {
 }
 
 interface SolicitudesFilters {
-  search:   string;
-  status:   string | null;
-  agentId:  number | null;
-  tipo:     string | null;
+  search:         string;
+  status:         string | null;
+  agentId:        number | null;
+  tipo:           string | null;
+  modalidad:      string | null;
+  origen:         string | null;
+  presupuestoMin: string;
+  presupuestoMax: string;
 }
 
 interface PropiedadesFilters {
@@ -77,7 +81,16 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 const defaults = {
   dashboard:   { period: "month" as const, agentId: null },
-  solicitudes: { search: "", status: null, agentId: null, tipo: null },
+  solicitudes: {
+    search: "",
+    status: null,
+    agentId: null,
+    tipo: null,
+    modalidad: null,
+    origen: null,
+    presupuestoMin: "",
+    presupuestoMax: "",
+  },
   propiedades: { search: "", tipo: null, agentId: null, zonaId: null },
   contactos:   { search: "", tipo: null, agentId: null },
   usuarios:    { search: "", rol: null },
