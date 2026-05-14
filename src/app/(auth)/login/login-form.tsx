@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { isRedirectError } from "next/dist/client/components/redirect";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { login, loginWithGoogle } from "./actions";
 import { useI18n } from "@/lib/i18n";
 import { translateVisibleText } from "@/lib/i18n/translate-text";
