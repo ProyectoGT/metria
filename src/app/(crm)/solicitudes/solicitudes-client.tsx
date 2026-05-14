@@ -15,6 +15,7 @@ import {
 import PropertyMatchesPanel from "@/modules/matching/components/PropertyMatchesPanel";
 import ContactoTimeline, { type TimelineEvent } from "@/modules/contactos/components/ContactoTimeline";
 import RelatedEmailsPanel from "@/modules/email/components/RelatedEmailsPanel";
+import SolicitudNotesPanel from "@/modules/solicitudes/components/SolicitudNotesPanel";
 import type { UserRole } from "@/lib/roles";
 import { useToast, Toaster } from "@/components/ui/toast";
 import {
@@ -716,14 +717,36 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
               placeholder="Ref. o descripcion del inmueble" className="input mt-1.5" />
           </div>
 
-          {/* Notas */}
-          <div>
-            <label className="text-xs font-medium text-text-secondary">Notas</label>
-            <textarea value={form.notas ?? ""}
-              onChange={(e) => setForm({ ...form, notas: e.target.value || null })}
-              placeholder="Observaciones del cliente, preferencias detalladas, condiciones especiales..."
-              rows={6} className="input mt-1.5 resize-y" />
-          </div>
+          {editId !== null ? (() => {
+            const pedido = pedidos.find((p) => p.id === editId);
+            return pedido ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-text-secondary">Contexto base</label>
+                  <textarea value={form.notas ?? ""}
+                    onChange={(e) => setForm({ ...form, notas: e.target.value || null })}
+                    placeholder="Resumen estable del cliente, preferencias o condiciones clave..."
+                    rows={4} className="input mt-1.5 resize-y leading-6" />
+                </div>
+                <SolicitudNotesPanel
+                  pedidoId={pedido.id}
+                  currentUserId={currentUserId}
+                  legacyNotes={form.notas}
+                />
+              </div>
+            ) : null;
+          })() : (
+            <div>
+              <label className="text-xs font-medium text-text-secondary">Nota inicial</label>
+              <textarea value={form.notas ?? ""}
+                onChange={(e) => setForm({ ...form, notas: e.target.value || null })}
+                placeholder="Contexto inicial del cliente, preferencias, urgencia o proximo paso..."
+                rows={5} className="input mt-1.5 resize-y leading-6" />
+              <p className="mt-1.5 text-xs text-text-secondary">
+                Al crear la solicitud, el seguimiento completo estara disponible en el historial de notas.
+              </p>
+            </div>
+          )}
 
           {editId !== null && (() => {
             const pedido = pedidos.find((p) => p.id === editId);
