@@ -58,6 +58,8 @@ type Propiedad = {
   puerta: string | null;
   propietario: string | null;
   telefono: string | null;
+  propietario_secundario?: string | null;
+  telefono_secundario?: string | null;
   estado: string | null;
   notas: string | null;
 };
@@ -528,6 +530,11 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
                 </h2>
                 {propiedad.telefono && (
                   <p className="mt-0.5 text-sm text-text-secondary">{propiedad.telefono}</p>
+                )}
+                {(propiedad.propietario_secundario || propiedad.telefono_secundario) && (
+                  <p className="mt-0.5 truncate text-xs text-text-secondary">
+                    2o propietario: {[propiedad.propietario_secundario, propiedad.telefono_secundario].filter(Boolean).join(" - ")}
+                  </p>
                 )}
               </div>
             </div>

@@ -1895,9 +1895,11 @@ export type Database = {
           posicion: number | null
           precio: number | null
           propietario: string | null
+          propietario_secundario: string | null
           publicar_en_web: boolean | null
           puerta: string | null
           telefono: string | null
+          telefono_secundario: string | null
           tipo_operacion: string | null
           titulo: string | null
           updated_at: string | null
@@ -1935,9 +1937,11 @@ export type Database = {
           posicion?: number | null
           precio?: number | null
           propietario?: string | null
+          propietario_secundario?: string | null
           publicar_en_web?: boolean | null
           puerta?: string | null
           telefono?: string | null
+          telefono_secundario?: string | null
           tipo_operacion?: string | null
           titulo?: string | null
           updated_at?: string | null
@@ -1975,9 +1979,11 @@ export type Database = {
           posicion?: number | null
           precio?: number | null
           propietario?: string | null
+          propietario_secundario?: string | null
           publicar_en_web?: boolean | null
           puerta?: string | null
           telefono?: string | null
+          telefono_secundario?: string | null
           tipo_operacion?: string | null
           titulo?: string | null
           updated_at?: string | null

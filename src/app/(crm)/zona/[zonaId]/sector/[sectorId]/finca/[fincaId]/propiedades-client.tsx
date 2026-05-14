@@ -30,6 +30,8 @@ type Propiedad = {
   puerta: string | null;
   propietario: string | null;
   telefono: string | null;
+  propietario_secundario?: string | null;
+  telefono_secundario?: string | null;
   estado: string | null;
   fecha_visita: string | null;
   notas: string | null;
@@ -54,6 +56,8 @@ type FormData = {
   puerta: string;
   propietario: string;
   telefono: string;
+  propietario_secundario: string;
+  telefono_secundario: string;
   estado: string;
   fecha_visita: string;
   notas: string;
@@ -129,11 +133,18 @@ function nowLocalDatetime() {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 }
 
+function isBasicPhone(value: string): boolean {
+  const compact = value.replace(/[\s().-]/g, "");
+  return /^\+?\d{6,15}$/.test(compact);
+}
+
 const EMPTY_FORM: FormData = {
   planta: "",
   puerta: "",
   propietario: "",
   telefono: "",
+  propietario_secundario: "",
+  telefono_secundario: "",
   estado: "neutral",
   fecha_visita: "",
   notas: "",
@@ -175,6 +186,7 @@ export default function PropiedadesClient({
   const [docPropiedad, setDocPropiedad] = useState<Propiedad | null>(null);
   const [colabPropiedad, setColabPropiedad] = useState<Propiedad | null>(null);
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
+  const [showSecondOwner, setShowSecondOwner] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -301,6 +313,7 @@ export default function PropiedadesClient({
 
   function openCreate() {
     setEditTarget(null);
+    setShowSecondOwner(false);
     setForm({
       ...EMPTY_FORM,
       fecha_visita: nowLocalDatetime(),
@@ -313,11 +326,14 @@ export default function PropiedadesClient({
   function openEdit(propiedad: Propiedad) {
     setEditTarget(propiedad);
     setSaveError(null);
+    setShowSecondOwner(Boolean(propiedad.propietario_secundario || propiedad.telefono_secundario));
     setForm({
       planta: propiedad.planta ?? "",
       puerta: propiedad.puerta ?? "",
       propietario: propiedad.propietario ?? "",
       telefono: propiedad.telefono ?? "",
+      propietario_secundario: propiedad.propietario_secundario ?? "",
+      telefono_secundario: propiedad.telefono_secundario ?? "",
       estado: propiedad.estado ?? "neutral",
       fecha_visita: propiedad.fecha_visita ? propiedad.fecha_visita.slice(0, 16) : "",
       notas: propiedad.notas ?? "",
@@ -332,6 +348,7 @@ export default function PropiedadesClient({
   function closeModal() {
     setModalOpen(false);
     setEditTarget(null);
+    setShowSecondOwner(false);
     setSaveError(null);
   }
 
@@ -396,6 +413,13 @@ export default function PropiedadesClient({
       return;
     }
 
+    const telefonoSecundario = form.telefono_secundario.trim();
+    if (telefonoSecundario && !isBasicPhone(telefonoSecundario)) {
+      setSaveError("Introduce un telefono valido para el segundo propietario.");
+      setSaving(false);
+      return;
+    }
+
     const today = new Date();
     const todayDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
@@ -404,6 +428,8 @@ export default function PropiedadesClient({
       puerta: form.puerta || null,
       propietario: form.propietario || null,
       telefono: form.telefono || null,
+      propietario_secundario: form.propietario_secundario || null,
+      telefono_secundario: form.telefono_secundario || null,
       estado: form.estado || null,
       fecha_visita: form.notas ? todayDate : (form.fecha_visita || null),
       notas: form.notas || null,
@@ -1407,6 +1433,59 @@ export default function PropiedadesClient({
               className="input"
             />
           </FormField>
+
+          {!showSecondOwner ? (
+            <button
+              type="button"
+              onClick={() => setShowSecondOwner(true)}
+              className="inline-flex w-fit items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+            >
+              + Anadir segundo propietario
+            </button>
+          ) : (
+            <div className="rounded-xl border border-border bg-surface/70 p-4">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">Segundo propietario opcional</p>
+                  <p className="mt-1 text-xs text-text-secondary">
+                    Util para parejas, herederos o copropietarios. Puedes dejarlo vacio.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setField("propietario_secundario", "");
+                    setField("telefono_secundario", "");
+                    setShowSecondOwner(false);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Quitar
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField label="Nombre segundo propietario">
+                  <input
+                    type="text"
+                    value={form.propietario_secundario}
+                    onChange={(e) => setField("propietario_secundario", e.target.value)}
+                    placeholder="Nombre del segundo propietario"
+                    className="input"
+                  />
+                </FormField>
+                <FormField label="Telefono segundo propietario">
+                  <input
+                    type="tel"
+                    value={form.telefono_secundario}
+                    onChange={(e) => setField("telefono_secundario", e.target.value)}
+                    placeholder="600 000 000"
+                    className="input"
+                  />
+                </FormField>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Estado">

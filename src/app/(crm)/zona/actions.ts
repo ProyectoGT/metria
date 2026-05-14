@@ -12,6 +12,8 @@ type PropiedadPayload = {
   puerta: string | null;
   propietario: string | null;
   telefono: string | null;
+  propietario_secundario: string | null;
+  telefono_secundario: string | null;
   estado: string | null;
   fecha_visita: string | null;
   notas: string | null;
@@ -20,6 +22,19 @@ type PropiedadPayload = {
   latitud: number | null;
   longitud: number | null;
 };
+
+function shouldRetryWithoutSecondOwner(payload: PropiedadPayload, error: { message?: string; code?: string } | null) {
+  if (payload.propietario_secundario || payload.telefono_secundario) return false;
+  const message = error?.message?.toLowerCase() ?? "";
+  return error?.code === "PGRST204" || message.includes("propietario_secundario") || message.includes("telefono_secundario");
+}
+
+function stripSecondOwner<T extends PropiedadPayload>(payload: T) {
+  const rest: Partial<T> = { ...payload };
+  delete rest.propietario_secundario;
+  delete rest.telefono_secundario;
+  return rest;
+}
 
 export async function upsertPropiedadAction(
   payload: PropiedadPayload,
@@ -60,12 +75,23 @@ export async function upsertPropiedadAction(
     if (!existing) return { error: "Propiedad no encontrada o sin acceso." };
     if (yo.role !== "Administrador" && existing.empresa_id !== yo.empresaId) return { error: "Sin acceso a esta propiedad." };
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("propiedades")
       .update(payload as never)
       .eq("id", propiedadId)
       .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol), creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos, rol)")
       .single();
+
+    if (error && shouldRetryWithoutSecondOwner(payload, error)) {
+      const retry = await supabase
+        .from("propiedades")
+        .update(stripSecondOwner(payload) as never)
+        .eq("id", propiedadId)
+        .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol), creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos, rol)")
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) return { error: error.message };
     revalidatePath(`/zona`);
@@ -82,11 +108,21 @@ export async function upsertPropiedadAction(
       equipo_id: yo.equipoId ?? null,
     };
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("propiedades")
       .insert(createPayload as never)
       .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol), creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos, rol)")
       .single();
+
+    if (error && shouldRetryWithoutSecondOwner(payload, error)) {
+      const retry = await supabase
+        .from("propiedades")
+        .insert(stripSecondOwner(createPayload) as never)
+        .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol), creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos, rol)")
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) return { error: error.message };
     revalidatePath(`/zona`);

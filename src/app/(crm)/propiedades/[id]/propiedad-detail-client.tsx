@@ -270,6 +270,16 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, 
                 <Phone className="h-3.5 w-3.5" />{propiedad.telefono}
               </a>
             ) : null} />
+            {(propiedad.propietario_secundario || propiedad.telefono_secundario) && (
+              <>
+                <InfoRow label="Segundo propietario" value={propiedad.propietario_secundario} />
+                <InfoRow label="Telefono secundario" value={propiedad.telefono_secundario ? (
+                  <a href={`tel:${propiedad.telefono_secundario}`} className="flex items-center gap-1 text-primary hover:underline">
+                    <Phone className="h-3.5 w-3.5" />{propiedad.telefono_secundario}
+                  </a>
+                ) : null} />
+              </>
+            )}
             <InfoRow label="Agente asignado" value={propiedad.agente_nombre} />
             <InfoRow label="Fecha de visita" value={formatDate(propiedad.fecha_visita)} />
             <InfoRow label="Contactado" value={propiedad.contactado ? "Si" : "No"} />

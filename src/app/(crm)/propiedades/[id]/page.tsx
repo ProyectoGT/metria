@@ -7,7 +7,7 @@ import PageHeader from "@/components/layout/page-header";
 import PropiedadDetailClient from "./propiedad-detail-client";
 
 const PROPERTY_DETAIL_SELECT = `
-  id, planta, puerta, propietario, telefono, estado, honorarios, precio,
+  id, planta, puerta, propietario, telefono, propietario_secundario, telefono_secundario, estado, honorarios, precio,
   titulo, descripcion, tipo_operacion, latitud, longitud, notas, fecha_visita, contactado,
   publicar_en_web, estado_publicacion_web, web_titulo, web_descripcion,
   web_precio_visible, web_destacada, web_ultima_sincronizacion, web_error_sync,
@@ -68,6 +68,8 @@ export type PropiedadDetail = {
   puerta: string | null;
   propietario: string | null;
   telefono: string | null;
+  propietario_secundario: string | null;
+  telefono_secundario: string | null;
   estado: string | null;
   honorarios: number | null;
   precio: number | null;
@@ -173,6 +175,8 @@ export default async function PropiedadDetailPage({
     } | null;
     agente: { id: number; nombre: string; apellidos: string } | null;
     creador?: { id: number; nombre: string; apellidos: string } | null;
+    propietario_secundario?: string | null;
+    telefono_secundario?: string | null;
   };
 
   const r = raw as unknown as RawDetail;
@@ -183,6 +187,8 @@ export default async function PropiedadDetailPage({
     puerta:                    r.puerta,
     propietario:               r.propietario,
     telefono:                  r.telefono,
+    propietario_secundario:    r.propietario_secundario ?? null,
+    telefono_secundario:       r.telefono_secundario ?? null,
     estado:                    r.estado,
     honorarios:                r.honorarios,
     precio:                    r.precio,
