@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getPersistentAuthCookieOptions } from "@/lib/auth-session";
 
 export async function middleware(request: NextRequest) {
   const start = Date.now();
@@ -61,7 +62,11 @@ export async function middleware(request: NextRequest) {
             request: { headers: request.headers },
           });
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            response.cookies.set(
+              name,
+              value,
+              getPersistentAuthCookieOptions(options)
+            )
           );
         },
       },
