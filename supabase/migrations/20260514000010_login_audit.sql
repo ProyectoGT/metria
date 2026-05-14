@@ -38,6 +38,7 @@ create index if not exists idx_login_audit_new     on public.login_audit(empresa
 
 alter table public.login_audit enable row level security;
 
+drop policy if exists "login_audit_select" on public.login_audit;
 create policy "login_audit_select"
   on public.login_audit for select
   using (
@@ -50,6 +51,7 @@ create policy "login_audit_select"
     )
   );
 
+drop policy if exists "login_audit_insert" on public.login_audit;
 create policy "login_audit_insert"
   on public.login_audit for insert
   with check (true);
@@ -74,6 +76,7 @@ create table if not exists public.device_sessions (
 
 alter table public.device_sessions enable row level security;
 
+drop policy if exists "device_sessions_select_admin" on public.device_sessions;
 create policy "device_sessions_select_admin"
   on public.device_sessions for select
   using (
@@ -85,10 +88,12 @@ create policy "device_sessions_select_admin"
     )
   );
 
+drop policy if exists "device_sessions_insert" on public.device_sessions;
 create policy "device_sessions_insert"
   on public.device_sessions for insert
   with check (true);
 
+drop policy if exists "device_sessions_update" on public.device_sessions;
 create policy "device_sessions_update"
   on public.device_sessions for update
   using (true);
@@ -114,6 +119,7 @@ create index if not exists idx_notificaciones_user on public.notificaciones(usua
 
 alter table public.notificaciones enable row level security;
 
+drop policy if exists "notificaciones_select" on public.notificaciones;
 create policy "notificaciones_select"
   on public.notificaciones for select
   using (
@@ -125,10 +131,12 @@ create policy "notificaciones_select"
     )
   );
 
+drop policy if exists "notificaciones_insert" on public.notificaciones;
 create policy "notificaciones_insert"
   on public.notificaciones for insert
   with check (true);
 
+drop policy if exists "notificaciones_update" on public.notificaciones;
 create policy "notificaciones_update"
   on public.notificaciones for update
   using (

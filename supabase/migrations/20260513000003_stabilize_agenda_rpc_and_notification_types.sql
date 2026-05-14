@@ -6,10 +6,21 @@
 --
 -- Esta migracion alinea tipos y expone update_agenda_activity_v2 con nombre unico.
 
+-- Elimina politicas que dependen de las columnas antes de alterar su tipo.
+-- PostgreSQL no permite cambiar el tipo de una columna referenciada en una politica.
+drop policy if exists agenda_notif_select on public.agenda_notificaciones;
+
 alter table if exists public.agenda_notificaciones
   alter column agenda_id type bigint using agenda_id::bigint,
   alter column usuario_id type bigint using usuario_id::bigint,
   alter column empresa_id type bigint using empresa_id::bigint;
+
+-- Recrea la politica con el tipo correcto (bigint)
+create policy agenda_notif_select on public.agenda_notificaciones
+  for select using (
+    usuario_id = public.current_usuario_id()
+    or public.current_user_role() in ('Administrador', 'Director')
+  );
 
 drop function if exists public.upsert_agenda_reminders(integer, date, text, integer, integer);
 

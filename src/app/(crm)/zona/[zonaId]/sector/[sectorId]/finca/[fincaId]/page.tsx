@@ -14,37 +14,54 @@ export default async function FincaDetailPage({
   const { zonaId, sectorId, fincaId } = await params;
   const supabase = await createClient();
   const user = await getCurrentUserContext();
-  const isAgente = user?.role === "Agente";
 
-  const propQuery = supabase
+  // Construye el filtro de visibilidad segun el rol:
+  //   Administrador / Director: ven todo (RLS lo garantiza, sin filtro adicional)
+  //   Responsable: sus propiedades + las de sus agentes supervisados
+  //   Agente: solo las propiedades donde es el agente asignado o el propietario
+  let propQuery = supabase
     .from("propiedades")
-    .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol), creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos, rol)")
+    .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol)")
     .eq("finca_id", Number(fincaId))
     .order("planta")
     .order("puerta");
+
+  if (user?.role === "Agente") {
+    propQuery = propQuery.or(`agente_asignado.eq.${user.id},owner_user_id.eq.${user.id}`) as typeof propQuery;
+  } else if (user?.role === "Responsable") {
+    // Incluye propiedades propias + las asignadas a sus agentes supervisados
+    const ids = [user.id, ...user.supervisedAgentIds];
+    propQuery = propQuery.or(`owner_user_id.eq.${user.id},agente_asignado.in.(${ids.join(",")})`) as typeof propQuery;
+  }
+  // Administrador y Director: sin filtro adicional; RLS ya garantiza visibilidad total
 
   const [
     { data: zona },
     { data: sector },
     { data: finca },
-    { data: propiedadesRaw },
+    { data: propiedadesRaw, error: propError },
     { data: agentes },
     ordenPropiedades,
   ] = await Promise.all([
     supabase.from("zona").select("id, nombre").eq("id", Number(zonaId)).single(),
     supabase.from("sectores").select("id, numero").eq("id", Number(sectorId)).single(),
     supabase.from("fincas").select("id, numero").eq("id", Number(fincaId)).single(),
-    isAgente
-      ? propQuery.or(`agente_asignado.eq.${user.id},owner_user_id.eq.${user.id}`)
-      : propQuery,
+    propQuery,
     supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
     getUserOrdenAction("propiedades"),
   ]);
+
+  if (propError) {
+    console.error("[FincaDetailPage] Error cargando propiedades:", propError.message, { fincaId });
+  }
 
   if (!zona || !sector || !finca) notFound();
 
   const propiedadIds = (propiedadesRaw ?? []).map((p) => p.id);
   const encargoDataPropiedadIds = new Set<number>();
+
+  type UsuarioBasico = { id: number; nombre: string; apellidos: string; rol: string | null };
+  let creadoresMap: Record<number, UsuarioBasico> = {};
 
   if (propiedadIds.length > 0) {
     const [{ data: archivos }, { data: visitas }, { data: notas }] = await Promise.all([
@@ -55,6 +72,25 @@ export default async function FincaDetailPage({
 
     for (const row of [...(archivos ?? []), ...(visitas ?? []), ...(notas ?? [])]) {
       if (row.propiedad_id != null) encargoDataPropiedadIds.add(row.propiedad_id);
+    }
+
+    // Lookup de creadores usando created_by_user_id.
+    // El campo existe tras la migración 20260514000004; si aún no se aplicó,
+    // el valor es undefined y el array queda vacío sin errores.
+    const creadorIds = [
+      ...new Set(
+        (propiedadesRaw ?? [])
+          .map((p) => (p as typeof p & { created_by_user_id?: number | null }).created_by_user_id)
+          .filter((id): id is number => typeof id === "number")
+      ),
+    ];
+
+    if (creadorIds.length > 0) {
+      const { data: creadores } = await supabase
+        .from("usuarios")
+        .select("id, nombre, apellidos, rol")
+        .in("id", creadorIds);
+      for (const u of creadores ?? []) creadoresMap[u.id] = u;
     }
   }
 
@@ -67,22 +103,24 @@ export default async function FincaDetailPage({
     if (/^(b[aá]j|baj[ao]|b\.?j\.?$|bj$|b$|bajo$|bajos$|baixo$)/.test(s)) return -100;
     if (/^(e\.?n\.?$|en$|entre|entres)/.test(s)) return 0;
     if (/^(at[ií]|[áa]t\.?$|[áa]tico|penthouse|ph$)/.test(s)) return 9000;
-    // número puro o con sufijo (1, 2, 3A, 10...)
     const num = parseFloat(s);
     if (!isNaN(num)) return num * 100;
-    // intenta extraer primer número del string (ej. "3B" → 300)
     const match = s.match(/^(\d+)/);
     if (match) return parseFloat(match[1]) * 100;
-    // fallback alfabético desplazado al final
     return 5000 + s.charCodeAt(0);
   }
 
   const propiedades = (propiedadesRaw ?? [])
-    .map((p) => ({
-      ...p,
-      has_encargo_data: encargoDataPropiedadIds.has(p.id),
-      posicion: ordenPropiedades[p.id] ?? null,
-    }))
+    .map((p) => {
+      const raw = p as typeof p & { created_by_user_id?: number | null };
+      const creadorId = raw.created_by_user_id;
+      return {
+        ...p,
+        creador: creadorId != null ? (creadoresMap[creadorId] ?? null) : null,
+        has_encargo_data: encargoDataPropiedadIds.has(p.id),
+        posicion: ordenPropiedades[p.id] ?? null,
+      };
+    })
     .sort((a, b) => {
       const ap = a.posicion, bp = b.posicion;
       if (ap != null && bp != null) return ap - bp;
