@@ -36,6 +36,7 @@ export const MODALIDAD_BADGE: Record<string, string> = {
   CV: "bg-success/12 text-success",
   CH: "bg-primary/10 text-primary",
   ALQ: "bg-primary/10 text-primary",
+  CONTADO: "bg-success/12 text-success",
 };
 
 export const ORIGEN_BADGE: Record<string, string> = {

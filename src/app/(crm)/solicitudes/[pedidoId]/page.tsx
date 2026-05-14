@@ -4,6 +4,7 @@ import { ArrowLeft, Bath, BedDouble, Car, Euro, Home, MapPin, Phone, UserRound }
 import { createClient } from "@/lib/supabase";
 import Breadcrumb from "@/components/ui/breadcrumb";
 import { ACCESS_SCOPE_LABELS, normalizeAccessScope } from "@/lib/access-scope";
+import { formatModalidadPedido } from "@/modules/solicitudes/services/modalidades";
 
 type PedidoDetail = {
   id: number;
@@ -32,13 +33,6 @@ function formatPresupuesto(value: number | null) {
     currency: "EUR",
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-function modalidadLabel(value: string | null) {
-  if (value === "CV") return "Compra / venta";
-  if (value === "CH") return "Compra con hipoteca";
-  if (value === "ALQ") return "Alquiler";
-  return value ?? "-";
 }
 
 function origenLabel(value: string | null) {
@@ -107,7 +101,7 @@ export default async function PedidoDetailPage({
           </Link>
           <h1 className="text-2xl font-bold text-text-primary">{pedido.nombre_cliente}</h1>
           <p className="mt-1 text-sm text-text-secondary">
-            {[pedido.tipo_propiedad, pedido.zona_busqueda ?? pedido.zona?.nombre, modalidadLabel(pedido.modalidad)]
+            {[pedido.tipo_propiedad, pedido.zona_busqueda ?? pedido.zona?.nombre, formatModalidadPedido(pedido.modalidad)]
               .filter((item) => item && item !== "-")
               .join(" · ") || "Solicitud"}
           </p>
@@ -125,7 +119,7 @@ export default async function PedidoDetailPage({
             <Info label="Telefono" value={pedido.telefono ?? "-"} icon={<Phone className="h-4 w-4" />} />
             <Info label="Tipo de propiedad" value={pedido.tipo_propiedad ?? "-"} icon={<Home className="h-4 w-4" />} />
             <Info label="Presupuesto" value={formatPresupuesto(pedido.presupuesto)} icon={<Euro className="h-4 w-4" />} />
-            <Info label="Modalidad" value={modalidadLabel(pedido.modalidad)} />
+            <Info label="Modalidad" value={formatModalidadPedido(pedido.modalidad)} />
             <Info label="Habitaciones" value={pedido.habitaciones != null ? String(pedido.habitaciones) : "-"} icon={<BedDouble className="h-4 w-4" />} />
             <Info label="Banos" value={pedido.banos != null ? String(pedido.banos) : "-"} icon={<Bath className="h-4 w-4" />} />
             <Info label="Garaje" value={pedido.garaje === true ? "Si" : pedido.garaje === false ? "No" : "-"} icon={<Car className="h-4 w-4" />} />

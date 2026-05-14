@@ -15,7 +15,13 @@ import {
 import PropertyMatchesPanel from "@/modules/matching/components/PropertyMatchesPanel";
 import ContactoTimeline, { type TimelineEvent } from "@/modules/contactos/components/ContactoTimeline";
 import RelatedEmailsPanel from "@/modules/email/components/RelatedEmailsPanel";
+import ModalidadSelector from "@/modules/solicitudes/components/ModalidadSelector";
 import SolicitudNotesPanel from "@/modules/solicitudes/components/SolicitudNotesPanel";
+import {
+  formatModalidadPedido,
+  getModalidadOption,
+  MODALIDADES_PEDIDO,
+} from "@/modules/solicitudes/services/modalidades";
 import type { UserRole } from "@/lib/roles";
 import { useToast, Toaster } from "@/components/ui/toast";
 import {
@@ -60,13 +66,6 @@ type Props = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const TIPOS_PROPIEDAD = ["Piso", "Casa", "Chalet", "Local", "Nave", "Garaje", "Terreno", "Otro"];
-
-type Modalidad = "CV" | "CH" | "ALQ";
-const MODALIDADES: { value: Modalidad; label: string; title: string }[] = [
-  { value: "CV", label: "C/V", title: "Compra y vende" },
-  { value: "CH", label: "C/H", title: "Compra con hipoteca" },
-  { value: "ALQ", label: "ALQ", title: "Alquiler" },
-];
 
 const ALCANCE_ORDEN: AccessScope[] = ["private", "company", "team", "agents", "responsable"];
 
@@ -118,15 +117,13 @@ function isBudgetRangeInvalid(minValue: string, maxValue: string) {
 
 function modalidadBadge(modalidad: string | null) {
   if (!modalidad) return <span className="text-text-secondary">-</span>;
-  const m = MODALIDADES.find((x) => x.value === modalidad);
-  const colors: Record<string, string> = {
-    CV: "bg-green-100 text-green-700",
-    CH: "bg-blue-100 text-blue-700",
-    ALQ: "bg-violet-100 text-violet-700",
-  };
+  const option = getModalidadOption(modalidad);
   return (
-    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${colors[modalidad] ?? "bg-gray-100 text-gray-700"}`} title={m?.title}>
-      {m?.label ?? modalidad}
+    <span
+      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${option?.badgeClassName ?? "bg-gray-100 text-gray-700"}`}
+      title={option?.title}
+    >
+      {option?.label ?? modalidad}
     </span>
   );
 }
@@ -284,7 +281,7 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
       pedido.tipo_propiedad && `Tipo: ${pedido.tipo_propiedad}`,
       pedido.zona_busqueda && `Zona: ${pedido.zona_busqueda}`,
       pedido.presupuesto && `Presupuesto: ${formatPresupuesto(pedido.presupuesto)}`,
-      pedido.modalidad && `Modalidad: ${pedido.modalidad}`,
+      pedido.modalidad && `Modalidad: ${formatModalidadPedido(pedido.modalidad)}`,
       pedido.telefono && `Telefono: ${pedido.telefono}`,
       pedido.origen && `Origen: ${pedido.origen}`,
     ].filter(Boolean);
@@ -353,7 +350,7 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
               className="input h-8 py-0 text-sm"
             >
               <option value="">Todas</option>
-              {MODALIDADES.map((m) => <option key={m.value} value={m.value}>{m.label} — {m.title}</option>)}
+              {MODALIDADES_PEDIDO.map((m) => <option key={m.value} value={m.value}>{m.label} - {m.title}</option>)}
             </select>
           </div>
           <div className="flex min-w-[130px] flex-1 flex-col gap-1">
@@ -586,21 +583,15 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
             )}
           </div>
 
-          {/* Modalidad — 3 pestañas */}
+          {/* Modalidad */}
           <div>
             <label className="text-xs font-medium text-text-secondary">Modalidad</label>
-            <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
-              {MODALIDADES.map((m) => (
-                <TabBtn key={m.value} active={form.modalidad === m.value}
-                  onClick={() => setForm({ ...form, modalidad: form.modalidad === m.value ? null : m.value })}
-                  title={m.title}>
-                  {m.label}
-                </TabBtn>
-              ))}
+            <div className="mt-1.5">
+              <ModalidadSelector
+                value={form.modalidad}
+                onChange={(modalidad) => setForm({ ...form, modalidad })}
+              />
             </div>
-            {form.modalidad && (
-              <p className="mt-1 text-xs text-text-secondary">{MODALIDADES.find((m) => m.value === form.modalidad)?.title}</p>
-            )}
           </div>
 
           {/* Zona búsqueda */}

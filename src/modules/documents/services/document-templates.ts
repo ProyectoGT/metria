@@ -213,7 +213,7 @@ function formatEur(n: number | null): string {
 
 function formatModalidad(m: string | null): string {
   if (!m) return "—";
-  const map: Record<string, string> = { CV: "Compraventa", CH: "Compra con hipoteca", ALQ: "Alquiler" };
+  const map: Record<string, string> = { CV: "Compraventa", CH: "Compra con hipoteca", ALQ: "Alquiler", CONTADO: "Pago al contado" };
   return map[m] ?? m;
 }
 
