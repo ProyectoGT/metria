@@ -43,6 +43,21 @@ export default async function FincaDetailPage({
 
   if (!zona || !sector || !finca) notFound();
 
+  const propiedadIds = (propiedadesRaw ?? []).map((p) => p.id);
+  const encargoDataPropiedadIds = new Set<number>();
+
+  if (propiedadIds.length > 0) {
+    const [{ data: archivos }, { data: visitas }, { data: notas }] = await Promise.all([
+      supabase.from("archivos").select("propiedad_id").in("propiedad_id", propiedadIds),
+      supabase.from("encargo_visitas").select("propiedad_id").in("propiedad_id", propiedadIds),
+      supabase.from("encargo_notas").select("propiedad_id").in("propiedad_id", propiedadIds),
+    ]);
+
+    for (const row of [...(archivos ?? []), ...(visitas ?? []), ...(notas ?? [])]) {
+      if (row.propiedad_id != null) encargoDataPropiedadIds.add(row.propiedad_id);
+    }
+  }
+
   // Convierte el valor de planta en un número de orden semántico para edificios:
   // sótano < bajo < entresuelo < 1 < 2 ... < ático
   function plantaRank(planta: string | null): number {
@@ -63,7 +78,11 @@ export default async function FincaDetailPage({
   }
 
   const propiedades = (propiedadesRaw ?? [])
-    .map((p) => ({ ...p, posicion: ordenPropiedades[p.id] ?? null }))
+    .map((p) => ({
+      ...p,
+      has_encargo_data: encargoDataPropiedadIds.has(p.id),
+      posicion: ordenPropiedades[p.id] ?? null,
+    }))
     .sort((a, b) => {
       const ap = a.posicion, bp = b.posicion;
       if (ap != null && bp != null) return ap - bp;

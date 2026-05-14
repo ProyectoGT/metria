@@ -1,9 +1,66 @@
 import { notFound, redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import PageHeader from "@/components/layout/page-header";
 import PropiedadDetailClient from "./propiedad-detail-client";
+
+const PROPERTY_DETAIL_SELECT = `
+  id, planta, puerta, propietario, telefono, estado, honorarios, precio,
+  titulo, descripcion, tipo_operacion, latitud, longitud, notas, fecha_visita, contactado,
+  publicar_en_web, estado_publicacion_web, web_titulo, web_descripcion,
+  web_precio_visible, web_destacada, web_ultima_sincronizacion, web_error_sync,
+  ficha_completa, calidad_ficha_score, faltantes_ficha,
+  created_at, updated_at, agente_asignado, created_by_user_id, finca_id, empresa_id,
+  fincas(id, numero, sectores(id, numero, zona(id, nombre))),
+  agente:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos),
+  creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos)
+`;
+
+const PROPERTY_DETAIL_SELECT_LEGACY = `
+  id, planta, puerta, propietario, telefono, estado, honorarios, precio,
+  titulo, descripcion, tipo_operacion, latitud, longitud, notas, fecha_visita, contactado,
+  publicar_en_web, estado_publicacion_web, web_titulo, web_descripcion,
+  web_precio_visible, web_destacada, web_ultima_sincronizacion, web_error_sync,
+  ficha_completa, calidad_ficha_score, faltantes_ficha,
+  created_at, updated_at, agente_asignado, finca_id, empresa_id,
+  fincas(id, numero, sectores(id, numero, zona(id, nombre))),
+  agente:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos)
+`;
+
+function shouldRetryWithoutCreator(error: { message?: string; code?: string } | null) {
+  if (!error) return false;
+  const message = error.message?.toLowerCase() ?? "";
+  return (
+    error.code === "PGRST200" ||
+    error.code === "PGRST204" ||
+    message.includes("created_by_user_id") ||
+    message.includes("propiedades_created_by_user_id_fkey") ||
+    message.includes("could not find a relationship") ||
+    message.includes("column")
+  );
+}
+
+function getBackHref(referer: string | null, currentPath: string) {
+  if (!referer) return "/propiedades";
+
+  try {
+    const url = new URL(referer);
+    if (url.pathname === currentPath) return "/propiedades";
+    if (
+      url.pathname.startsWith("/dashboard") ||
+      url.pathname.startsWith("/zona") ||
+      url.pathname.startsWith("/propiedades")
+    ) {
+      return `${url.pathname}${url.search}`;
+    }
+  } catch {
+    return "/propiedades";
+  }
+
+  return "/propiedades";
+}
 
 export type PropiedadDetail = {
   id: number;
@@ -20,6 +77,8 @@ export type PropiedadDetail = {
   latitud: number | null;
   longitud: number | null;
   notas: string | null;
+  fecha_visita: string | null;
+  contactado: boolean | null;
   publicar_en_web: boolean;
   estado_publicacion_web: string;
   web_titulo: string | null;
@@ -46,6 +105,7 @@ export type PropiedadDetail = {
   agente_id: number | null;
   creador_nombre: string | null;
   creador_id: number | null;
+  has_encargo_data: boolean;
 };
 
 export default async function PropiedadDetailPage({
@@ -56,29 +116,50 @@ export default async function PropiedadDetailPage({
   const { id } = await params;
   const propiedadId = Number(id);
   if (isNaN(propiedadId)) notFound();
+  const currentPath = `/propiedades/${id}`;
+  const requestHeaders = await headers();
+  const backHref = getBackHref(requestHeaders.get("referer"), currentPath);
 
   const yo = await getCurrentUserContext();
   if (!yo) redirect("/login");
 
   const supabase = yo.role === "Administrador" ? createAdminClient() : await createClient();
 
-  const { data: raw } = await supabase
+  const result = await supabase
     .from("propiedades")
-    .select(`
-      id, planta, puerta, propietario, telefono, estado, honorarios, precio,
-      titulo, descripcion, tipo_operacion, latitud, longitud, notas,
-      publicar_en_web, estado_publicacion_web, web_titulo, web_descripcion,
-      web_precio_visible, web_destacada, web_ultima_sincronizacion, web_error_sync,
-      ficha_completa, calidad_ficha_score, faltantes_ficha,
-      created_at, updated_at, agente_asignado, created_by_user_id, finca_id, empresa_id,
-      fincas(id, numero, sectores(id, numero, zona(id, nombre))),
-      agente:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos),
-      creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos)
-    `)
+    .select(PROPERTY_DETAIL_SELECT)
     .eq("id", propiedadId)
-    .single();
+    .maybeSingle();
+
+  const legacyResult = !result.data && shouldRetryWithoutCreator(result.error)
+    ? await supabase
+        .from("propiedades")
+        .select(PROPERTY_DETAIL_SELECT_LEGACY)
+        .eq("id", propiedadId)
+        .maybeSingle()
+    : null;
+
+  const raw = result.data ?? legacyResult?.data ?? null;
+  const loadError = legacyResult?.error ?? result.error;
+
+  if (!raw && loadError && process.env.NODE_ENV !== "production") {
+    console.warn("[propiedades/detail] No se pudo cargar la ficha", {
+      propiedadId,
+      message: loadError.message,
+      code: loadError.code,
+    });
+  }
 
   if (!raw) notFound();
+
+  const [{ count: archivosCount }, { count: visitasCount }, { count: notasCount }, { data: agentes }] = await Promise.all([
+    supabase.from("archivos").select("id", { count: "exact", head: true }).eq("propiedad_id", propiedadId),
+    supabase.from("encargo_visitas").select("id", { count: "exact", head: true }).eq("propiedad_id", propiedadId),
+    supabase.from("encargo_notas").select("id", { count: "exact", head: true }).eq("propiedad_id", propiedadId),
+    supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
+  ]);
+
+  const hasEncargoData = Boolean((archivosCount ?? 0) + (visitasCount ?? 0) + (notasCount ?? 0));
 
   type RawDetail = typeof raw & {
     fincas: {
@@ -91,7 +172,7 @@ export default async function PropiedadDetailPage({
       } | null;
     } | null;
     agente: { id: number; nombre: string; apellidos: string } | null;
-    creador: { id: number; nombre: string; apellidos: string } | null;
+    creador?: { id: number; nombre: string; apellidos: string } | null;
   };
 
   const r = raw as unknown as RawDetail;
@@ -111,6 +192,8 @@ export default async function PropiedadDetailPage({
     latitud:                   r.latitud,
     longitud:                  r.longitud,
     notas:                     r.notas,
+    fecha_visita:              r.fecha_visita,
+    contactado:                r.contactado,
     publicar_en_web:           r.publicar_en_web ?? false,
     estado_publicacion_web:    r.estado_publicacion_web ?? "no_preparada",
     web_titulo:                r.web_titulo,
@@ -136,6 +219,7 @@ export default async function PropiedadDetailPage({
     agente_id:                 r.agente?.id ?? null,
     creador_nombre:            r.creador ? `${r.creador.nombre} ${r.creador.apellidos}`.trim() : null,
     creador_id:                r.creador?.id ?? null,
+    has_encargo_data:          hasEncargoData,
   };
 
   const displayTitle = propiedad.titulo
@@ -156,6 +240,9 @@ export default async function PropiedadDetailPage({
         propiedad={propiedad}
         isManager={yo.role === "Administrador" || yo.role === "Director"}
         zonaHref={zonaHref}
+        backHref={backHref}
+        agentes={(agentes ?? []).filter((a) => a.rol !== "Administrador")}
+        currentUserId={yo.id}
       />
     </>
   );

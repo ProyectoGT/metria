@@ -13,6 +13,7 @@ import {
   Loader2,
   CalendarCheck,
   User,
+  Phone,
   UploadCloud,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
@@ -40,6 +41,8 @@ type VisitaEntry = {
   agente_nombre: string;
   fecha_visita: string;
   observaciones: string | null;
+  visitante_nombre: string | null;
+  visitante_telefono: string | null;
   created_at: string;
 };
 
@@ -120,6 +123,11 @@ function toDatetimeLocal(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function isValidPhone(value: string): boolean {
+  const cleaned = value.replace(/[\s().-]/g, "");
+  return /^\+?\d{6,15}$/.test(cleaned);
+}
+
 const BUCKET = "encargo-archivos";
 
 // ─── DropZone ─────────────────────────────────────────────────────────────────
@@ -192,6 +200,8 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
   // Visita form
   const [visitaFecha, setVisitaFecha] = useState(() => toDatetimeLocal(new Date()));
   const [visitaAgenteId, setVisitaAgenteId] = useState<string>(() => String(currentUserId));
+  const [visitaVisitanteNombre, setVisitaVisitanteNombre] = useState("");
+  const [visitaVisitanteTelefono, setVisitaVisitanteTelefono] = useState("");
   const [visitaObs, setVisitaObs] = useState("");
   const [savingVisita, setSavingVisita] = useState(false);
   const [visitaError, setVisitaError] = useState<string | null>(null);
@@ -228,7 +238,7 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
           .order("created_at", { ascending: false }),
         supabase
           .from("encargo_visitas")
-          .select("id, agente_id, agente_nombre, fecha_visita, observaciones, created_at")
+          .select("id, agente_id, agente_nombre, fecha_visita, observaciones, visitante_nombre, visitante_telefono, created_at")
           .eq("propiedad_id", propiedad.id)
           .order("fecha_visita", { ascending: false }),
       ]);
@@ -388,6 +398,19 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
     setSavingVisita(true);
     setVisitaError(null);
 
+    const visitanteNombre = visitaVisitanteNombre.trim();
+    const visitanteTelefono = visitaVisitanteTelefono.trim();
+    if (!visitanteNombre) {
+      setVisitaError("Introduce el nombre del visitante.");
+      setSavingVisita(false);
+      return;
+    }
+    if (!visitanteTelefono || !isValidPhone(visitanteTelefono)) {
+      setVisitaError("Introduce un telefono valido del visitante.");
+      setSavingVisita(false);
+      return;
+    }
+
     const agenteId = visitaAgenteId ? Number(visitaAgenteId) : null;
     const agente = agentes.find((a) => a.id === agenteId);
     const agente_nombre = agente
@@ -401,9 +424,11 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
         agente_id: agenteId,
         agente_nombre,
         fecha_visita: visitaFecha ? new Date(visitaFecha).toISOString() : new Date().toISOString(),
+        visitante_nombre: visitanteNombre,
+        visitante_telefono: visitanteTelefono,
         observaciones: visitaObs.trim() || null,
       })
-      .select("id, agente_id, agente_nombre, fecha_visita, observaciones, created_at")
+      .select("id, agente_id, agente_nombre, fecha_visita, observaciones, visitante_nombre, visitante_telefono, created_at")
       .single();
 
     if (error) {
@@ -412,6 +437,8 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
       setVisitas((prev) => [data as VisitaEntry, ...prev]);
       setVisitaFecha(toDatetimeLocal(new Date()));
       setVisitaAgenteId(String(currentUserId));
+      setVisitaVisitanteNombre("");
+      setVisitaVisitanteTelefono("");
       setVisitaObs("");
     }
     setSavingVisita(false);
@@ -522,6 +549,11 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
               </button>
             </div>
           </div>
+          {propiedad.estado && propiedad.estado !== "encargo" && (
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+              Esta propiedad ya no esta marcada como encargo, pero conserva informacion historica de visitas, documentos, imagenes y notas.
+            </div>
+          )}
         </div>
 
         {/* ── Tabs ── */}
@@ -571,6 +603,34 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
                       Registrar visita
                     </p>
                     <div className="space-y-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-text-secondary">Nombre del visitante</label>
+                          <div className="relative">
+                            <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
+                            <input
+                              type="text"
+                              value={visitaVisitanteNombre}
+                              onChange={(e) => setVisitaVisitanteNombre(e.target.value)}
+                              placeholder="Carlos Martinez"
+                              className="input pl-9 text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-text-secondary">Telefono del visitante</label>
+                          <div className="relative">
+                            <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
+                            <input
+                              type="tel"
+                              value={visitaVisitanteTelefono}
+                              onChange={(e) => setVisitaVisitanteTelefono(e.target.value)}
+                              placeholder="647 22 11 33"
+                              className="input pl-9 text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
                       <div>
                         <label className="mb-1 block text-xs font-medium text-text-secondary">Fecha y hora</label>
                         <input
@@ -599,7 +659,7 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
                         <textarea
                           value={visitaObs}
                           onChange={(e) => setVisitaObs(e.target.value)}
-                          placeholder="Estado del piso, comentarios del propietario..."
+                          placeholder="Interes, financiacion, objeciones o siguiente paso..."
                           rows={3}
                           className="input resize-none text-sm"
                         />
@@ -625,11 +685,12 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
                       {visitas.map((visita) => (
                         <li key={visita.id} className="group relative rounded-xl border border-border bg-background px-4 py-3">
                           <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                              <span className="text-sm font-semibold text-text-primary">
-                                {formatDateTime(visita.fecha_visita)}
-                              </span>
+                            <div>
+                              <p className="text-sm font-semibold text-text-primary">Visita registrada</p>
+                              <div className="mt-1 flex items-center gap-2 text-xs text-text-secondary">
+                                <CalendarCheck className="h-3.5 w-3.5 shrink-0 text-primary" />
+                                <span>{formatDateTime(visita.fecha_visita)}</span>
+                              </div>
                             </div>
                             <button
                               onClick={() => handleDeleteVisita(visita.id)}
@@ -639,14 +700,33 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
-                          <div className="mt-2 flex items-center gap-1.5 text-xs text-text-secondary">
-                            <User className="h-3.5 w-3.5 shrink-0" />
-                            <span>{visita.agente_nombre}</span>
+                          <div className="mt-3 grid grid-cols-1 gap-3 rounded-lg border border-border/70 bg-surface px-3 py-3 sm:grid-cols-2">
+                            <div>
+                              <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                                <User className="h-3.5 w-3.5" />
+                                Visitante
+                              </div>
+                              <p className="text-sm font-medium text-text-primary">{visita.visitante_nombre ?? "Sin nombre"}</p>
+                              <div className="mt-1 flex items-center gap-1.5 text-xs text-text-secondary">
+                                <Phone className="h-3.5 w-3.5" />
+                                <span>{visita.visitante_telefono ?? "Sin telefono"}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                                <User className="h-3.5 w-3.5" />
+                                Agente
+                              </div>
+                              <p className="text-sm font-medium text-text-primary">{visita.agente_nombre}</p>
+                            </div>
                           </div>
                           {visita.observaciones && (
-                            <p className="mt-2 text-sm leading-relaxed text-text-primary whitespace-pre-wrap">
-                              {visita.observaciones}
-                            </p>
+                            <div className="mt-3">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Observaciones</p>
+                              <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-text-primary">
+                                {visita.observaciones}
+                              </p>
+                            </div>
                           )}
                         </li>
                       ))}

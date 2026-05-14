@@ -1361,6 +1361,8 @@ export type Database = {
           id: number
           observaciones: string | null
           propiedad_id: number
+          visitante_nombre: string | null
+          visitante_telefono: string | null
         }
         Insert: {
           agente_id?: number | null
@@ -1370,6 +1372,8 @@ export type Database = {
           id?: number
           observaciones?: string | null
           propiedad_id: number
+          visitante_nombre?: string | null
+          visitante_telefono?: string | null
         }
         Update: {
           agente_id?: number | null
@@ -1379,6 +1383,8 @@ export type Database = {
           id?: number
           observaciones?: string | null
           propiedad_id?: number
+          visitante_nombre?: string | null
+          visitante_telefono?: string | null
         }
         Relationships: [
           {

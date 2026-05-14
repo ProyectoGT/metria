@@ -16,8 +16,10 @@ import {
   User,
   XCircle,
   AlertTriangle,
+  CalendarCheck,
 } from "lucide-react";
 import type { PropiedadDetail } from "./page";
+import EncargoPanel from "@/modules/propiedades/components/EncargoPanel";
 import {
   WEB_SYNC_STATUS_LABEL,
   WEB_SYNC_STATUS_COLOR,
@@ -103,11 +105,15 @@ type Props = {
   propiedad: PropiedadDetail;
   isManager: boolean;
   zonaHref: string | null;
+  backHref: string;
+  agentes: Array<{ id: number; nombre: string; apellidos: string }>;
+  currentUserId: number;
 };
 
-export default function PropiedadDetailClient({ propiedad, isManager, zonaHref }: Props) {
+export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, backHref, agentes, currentUserId }: Props) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
+  const [showEncargoPanel, setShowEncargoPanel] = useState(false);
   const [fichaResult, setFichaResult] = useState<{
     faltantes: string[];
     mensaje: string;
@@ -154,18 +160,43 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref }
   }
 
   const estado = propiedad.estado ?? "neutral";
+  const showEncargoHistory = estado === "encargo" || propiedad.has_encargo_data;
+  const propertyLabel = propiedad.titulo ?? propiedad.propietario ?? `Propiedad #${propiedad.id}`;
 
   return (
     <div className="space-y-5">
       {/* ── Breadcrumb + acciones rápidas ───────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm text-text-secondary">
-          <Link href="/propiedades" className="flex items-center gap-1 hover:text-text-primary">
+        <div className="flex min-w-0 flex-col gap-1">
+          <Link href={backHref} className="flex w-fit items-center gap-1 text-sm font-medium text-text-secondary hover:text-text-primary">
             <ArrowLeft className="h-3.5 w-3.5" />
-            Propiedades
+            Volver
           </Link>
-          <ChevronRight className="h-3.5 w-3.5" />
-          <span className="text-text-primary">{propiedad.propietario ?? `#${propiedad.id}`}</span>
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-text-secondary">
+            {propiedad.zona_id && (
+              <Link href={`/zona/${propiedad.zona_id}`} className="hover:text-text-primary">
+                {propiedad.zona_nombre ?? "Zona"}
+              </Link>
+            )}
+            {propiedad.zona_id && propiedad.sector_id && (
+              <>
+                <ChevronRight className="h-3 w-3" />
+                <Link href={`/zona/${propiedad.zona_id}/sector/${propiedad.sector_id}`} className="hover:text-text-primary">
+                  {propiedad.sector_numero ? `Sector ${propiedad.sector_numero}` : "Sector"}
+                </Link>
+              </>
+            )}
+            {zonaHref && (
+              <>
+                <ChevronRight className="h-3 w-3" />
+                <Link href={zonaHref} className="hover:text-text-primary">
+                  {propiedad.finca_numero ? `Finca ${propiedad.finca_numero}` : "Finca"}
+                </Link>
+              </>
+            )}
+            <ChevronRight className="h-3 w-3" />
+            <span className="max-w-[220px] truncate text-text-primary">{propertyLabel}</span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {propiedad.latitud && propiedad.longitud && (
@@ -205,7 +236,7 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref }
                 <div>
                   <div className="flex items-center gap-2">
                     <h1 className="text-lg font-semibold text-text-primary">
-                      {propiedad.titulo ?? propiedad.propietario ?? `Propiedad #${propiedad.id}`}
+                      {propertyLabel}
                     </h1>
                     {propiedad.web_destacada && <Star className="h-4 w-4 text-amber-500" />}
                   </div>
@@ -239,6 +270,10 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref }
                 <Phone className="h-3.5 w-3.5" />{propiedad.telefono}
               </a>
             ) : null} />
+            <InfoRow label="Agente asignado" value={propiedad.agente_nombre} />
+            <InfoRow label="Fecha de visita" value={formatDate(propiedad.fecha_visita)} />
+            <InfoRow label="Contactado" value={propiedad.contactado ? "Si" : "No"} />
+            <InfoRow label="Estado" value={ESTADOS[estado] ?? estado} />
             <InfoRow label="Honorarios"    value={propiedad.honorarios != null ? `${propiedad.honorarios.toLocaleString("es-ES")} €` : null} />
             <InfoRow label="Precio"        value={propiedad.precio != null ? `${propiedad.precio.toLocaleString("es-ES")} €` : null} />
             <InfoRow label="Operacion"     value={propiedad.tipo_operacion ? OPERACION_LABEL[propiedad.tipo_operacion] : null} />
@@ -291,6 +326,33 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref }
               </div>
             </div>
           </Section>
+
+          {showEncargoHistory && (
+            <Section
+              title={estado === "encargo" ? "Informacion de encargo" : "Historial de encargo"}
+              action={
+                <button
+                  type="button"
+                  onClick={() => setShowEncargoPanel(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-success/30 px-3 py-1.5 text-xs font-semibold text-success transition-colors hover:bg-success/10"
+                >
+                  <CalendarCheck className="h-3.5 w-3.5" />
+                  Abrir
+                </button>
+              }
+            >
+              <div className="space-y-3">
+                {estado !== "encargo" && (
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                    Esta propiedad ya no esta marcada como encargo, pero conserva informacion historica de visitas, documentos, imagenes y notas.
+                  </div>
+                )}
+                <p className="text-sm leading-relaxed text-text-secondary">
+                  Consulta los documentos, imagenes, visitas y notas asociados a la etapa de encargo.
+                </p>
+              </div>
+            </Section>
+          )}
         </div>
 
         {/* Columna derecha (ficha + web) */}
@@ -419,6 +481,17 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref }
           </Section>
         </div>
       </div>
+      {showEncargoPanel && (
+        <EncargoPanel
+          propiedad={propiedad}
+          agentes={agentes}
+          currentUserId={currentUserId}
+          onClose={() => setShowEncargoPanel(false)}
+          onEdit={() => {
+            if (zonaHref) window.location.href = zonaHref;
+          }}
+        />
+      )}
     </div>
   );
 }

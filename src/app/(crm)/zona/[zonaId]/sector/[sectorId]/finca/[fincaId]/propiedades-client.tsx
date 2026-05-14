@@ -43,6 +43,7 @@ type Propiedad = {
   created_at?: string | null;
   contactado?: boolean;
   contactado_hasta?: string | null;
+  has_encargo_data?: boolean;
   usuarios: { id: number; nombre: string; apellidos: string; rol?: string | null } | null;
   creador?: { id: number; nombre: string; apellidos: string; rol?: string | null } | null;
   _order?: number;
@@ -86,8 +87,6 @@ const ESTADOS = [
 ] as const;
 
 // Estados que indican que la propiedad ha sido contactada / está en seguimiento activo
-const ESTADOS_CONTACTADOS = ["seguimiento", "noticia", "encargo", "vendido"];
-
 function estadoClasses(estado: string | null) {
   const found = ESTADOS.find((item) => item.value === estado);
   return found?.classes ?? "bg-gray-500/15 text-gray-500 dark:bg-gray-500/20 dark:text-gray-400";
@@ -122,11 +121,6 @@ function addDays(date: Date, days: number): Date {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
   return d;
-}
-
-function toDatetimeLocal(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function nowLocalDatetime() {
@@ -807,6 +801,7 @@ export default function PropiedadesClient({
           {propiedadesFiltradas.map((propiedad) => {
             const overdue = isOverdue(propiedad.fecha_visita);
             const isEncargo = propiedad.estado === "encargo";
+            const hasEncargoAccess = isEncargo || Boolean(propiedad.has_encargo_data);
             const contactada = isContactada(propiedad);
             const nombre =
               propiedad.propietario ??
@@ -903,12 +898,12 @@ export default function PropiedadesClient({
                     <FileText className="h-3.5 w-3.5" />
                     Documento
                   </button>
-                  {isEncargo && (
+                  {hasEncargoAccess && (
                     <button
                       onClick={() => setEncargoPropiedad(propiedad)}
                       className="rounded-lg border border-success/30 px-3 py-1.5 text-xs font-semibold text-success transition-colors hover:bg-success/10"
                     >
-                      Encargo
+                      {isEncargo ? "Encargo" : "Historial encargo"}
                     </button>
                   )}
                   <button
@@ -974,6 +969,7 @@ export default function PropiedadesClient({
                     {propiedadesFiltradas.map((propiedad, index) => {
                       const overdue = isOverdue(propiedad.fecha_visita);
                       const isEncargo = propiedad.estado === "encargo";
+                      const hasEncargoAccess = isEncargo || Boolean(propiedad.has_encargo_data);
                       const contactada = isContactada(propiedad);
 
                       return (
@@ -1130,12 +1126,12 @@ export default function PropiedadesClient({
                                       />
                                     </svg>
                                   </button>
-                                  {isEncargo && (
+                                  {hasEncargoAccess && (
                                     <button
                                       onClick={() => setEncargoPropiedad(propiedad)}
                                       className="rounded px-2 py-1 text-xs font-semibold text-success transition-colors hover:bg-success/10"
                                     >
-                                      Ver encargo
+                                      {isEncargo ? "Ver encargo" : "Historial encargo"}
                                     </button>
                                   )}
                                   <button
