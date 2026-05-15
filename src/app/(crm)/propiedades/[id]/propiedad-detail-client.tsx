@@ -29,6 +29,8 @@ import { getLabelForField } from "@/modules/propiedades/services/validate-proper
 import { prepareForWebAction, updateWebPublicationAction } from "../actions";
 import { useToast } from "@/components/ui/toast";
 import WhatsAppMessageModal from "@/components/whatsapp/WhatsAppMessageModal";
+import BuyerMatcherModal from "@/components/whatsapp/BuyerMatcherModal";
+import WhatsAppHistory from "@/components/whatsapp/WhatsAppHistory";
 import { buildWhatsAppMessage } from "@/lib/whatsapp";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -209,7 +211,14 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, 
             <span className="max-w-[220px] truncate text-text-primary">{propertyLabel}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <BuyerMatcherModal
+            propiedadId={propiedad.id}
+            propiedadLabel={propiedad.titulo ?? propiedad.propietario ?? `Propiedad #${propiedad.id}`}
+            precio={propiedad.precio}
+            zonaNombre={propiedad.zona_nombre}
+            currentUserName={currentUserName}
+          />
           {propiedad.latitud && propiedad.longitud && (
             <a
               href={`https://www.google.com/maps?q=${propiedad.latitud},${propiedad.longitud}`}
@@ -423,6 +432,8 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, 
               </div>
             </Section>
           )}
+
+          <WhatsAppHistory propiedadId={propiedad.id} />
 
           {hasCommercialHistory && (
             <Section title="Historial comercial">
