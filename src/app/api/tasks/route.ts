@@ -6,7 +6,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
-import { apiSuccess, apiCreated, handleApiError, apiPaginated } from "@/lib/api/response";
+import { apiCreated, handleApiError, apiPaginated } from "@/lib/api/response";
 import { validate, validateQuery } from "@/lib/api/validate";
 import { CreateTaskSchema, TaskListSchema } from "@/lib/api/schemas";
 import { UnauthorizedError } from "@/lib/api/errors";

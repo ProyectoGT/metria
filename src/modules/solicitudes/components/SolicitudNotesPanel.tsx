@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ElementType } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CalendarCheck,
@@ -188,43 +189,59 @@ const NoteItem = memo(function NoteItem({
   );
 });
 
-export default function SolicitudNotesPanel({ pedidoId, currentUserId, legacyNotes }: Props) {
+export default function SolicitudNotesPanel(props: Props) {
+  return <SolicitudNotesPanelInner key={props.pedidoId} {...props} />;
+}
+
+function SolicitudNotesPanelInner({ pedidoId, currentUserId, legacyNotes }: Props) {
   const supabase = useMemo(() => createClient(), []);
-  const [notes, setNotes] = useState<SolicitudNote[]>([]);
+  const [createdNotes, setCreatedNotes] = useState<SolicitudNote[]>([]);
+  const [loadedMoreNotes, setLoadedMoreNotes] = useState<SolicitudNote[]>([]);
+  const [noteOverrides, setNoteOverrides] = useState<Record<number, SolicitudNote>>({});
   const [draft, setDraft] = useState("");
   const [selectedTags, setSelectedTags] = useState<SolicitudNoteTag[]>([]);
   const [pinDraft, setPinDraft] = useState(false);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
+  const [paginationHasMore, setPaginationHasMore] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyNoteId, setBusyNoteId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useAutoResize(draft);
 
-  const loadNotes = useCallback(async (offset = 0) => {
-    const isInitial = offset === 0;
-    if (isInitial) setLoading(true);
-    else setLoadingMore(true);
-    setError(null);
+  const initialNotesQuery = useQuery({
+    queryKey: ["solicitud-notes", pedidoId],
+    queryFn: () => fetchSolicitudNotes(supabase, pedidoId, PAGE_SIZE + 1, 0),
+  });
 
+  const initialRows = useMemo(
+    () => (initialNotesQuery.data ?? []).slice(0, PAGE_SIZE),
+    [initialNotesQuery.data],
+  );
+  const loading = initialNotesQuery.isLoading;
+  const loadError = initialNotesQuery.error;
+  const initialHasMore = (initialNotesQuery.data?.length ?? 0) > PAGE_SIZE;
+  const hasMore = paginationHasMore ?? initialHasMore;
+  const notes = useMemo(() => {
+    const serverNotes = [...initialRows, ...loadedMoreNotes].map((note) => noteOverrides[note.id] ?? note);
+    return [...createdNotes, ...serverNotes];
+  }, [createdNotes, initialRows, loadedMoreNotes, noteOverrides]);
+
+  const loadMoreNotes = useCallback(async () => {
+    setLoadingMore(true);
+    setError(null);
     try {
+      const offset = initialRows.length + loadedMoreNotes.length;
       const rows = await fetchSolicitudNotes(supabase, pedidoId, PAGE_SIZE + 1, offset);
       const visibleRows = rows.slice(0, PAGE_SIZE);
-      setHasMore(rows.length > PAGE_SIZE);
-      setNotes((prev) => isInitial ? visibleRows : [...prev, ...visibleRows]);
+      setPaginationHasMore(rows.length > PAGE_SIZE);
+      setLoadedMoreNotes((prev) => [...prev, ...visibleRows]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudieron cargar las notas.");
     } finally {
-      if (isInitial) setLoading(false);
-      else setLoadingMore(false);
+      setLoadingMore(false);
     }
-  }, [pedidoId, supabase]);
-
-  useEffect(() => {
-    void loadNotes(0);
-  }, [loadNotes]);
+  }, [initialRows.length, loadedMoreNotes.length, pedidoId, supabase]);
 
   const filteredNotes = useMemo(() => {
     const term = normalizeSearch(search);
@@ -267,7 +284,7 @@ export default function SolicitudNotesPanel({ pedidoId, currentUserId, legacyNot
         tags: input?.quickAction?.tags ?? selectedTags,
         quickAction: input?.quickAction?.label,
       });
-      setNotes((prev) => [created, ...prev]);
+      setCreatedNotes((prev) => [created, ...prev]);
       if (!input?.quickAction) {
         setDraft("");
         setSelectedTags([]);
@@ -285,7 +302,7 @@ export default function SolicitudNotesPanel({ pedidoId, currentUserId, legacyNot
     setError(null);
     try {
       const updated = await updateSolicitudNoteMetadata(supabase, note, { pinned: !note.metadata.pinned });
-      setNotes((prev) => prev.map((item) => item.id === updated.id ? updated : item));
+      setNoteOverrides((prev) => ({ ...prev, [updated.id]: updated }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo actualizar la nota.");
     } finally {
@@ -303,7 +320,7 @@ export default function SolicitudNotesPanel({ pedidoId, currentUserId, legacyNot
     setError(null);
     try {
       const updated = await updateSolicitudNoteMetadata(supabase, note, { tags: nextTags });
-      setNotes((prev) => prev.map((item) => item.id === updated.id ? updated : item));
+      setNoteOverrides((prev) => ({ ...prev, [updated.id]: updated }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo actualizar la etiqueta.");
     } finally {
@@ -400,10 +417,10 @@ export default function SolicitudNotesPanel({ pedidoId, currentUserId, legacyNot
             </button>
           </div>
 
-          {error && (
+          {(error || loadError) && (
             <p className="mt-3 flex items-center gap-2 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
               <AlertTriangle className="h-3.5 w-3.5" />
-              {error}
+              {error ?? (loadError instanceof Error ? loadError.message : "No se pudieron cargar las notas.")}
             </p>
           )}
 
@@ -478,7 +495,7 @@ export default function SolicitudNotesPanel({ pedidoId, currentUserId, legacyNot
           <div className="flex justify-center border-t border-border pt-3">
             <button
               type="button"
-              onClick={() => void loadNotes(notes.length)}
+              onClick={() => void loadMoreNotes()}
               disabled={loadingMore}
               className="inline-flex h-8 items-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-text-secondary transition-colors hover:bg-background hover:text-primary disabled:opacity-50"
             >

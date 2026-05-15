@@ -23,8 +23,6 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   for (const [combo, handler] of SHORTCUTS) {
     const [triggerKey, ...rest] = combo.split(" ");
     const isGlobalShortcut = rest.length > 0;
-    const prefix = isGlobalShortcut ? `${triggerKey} ` : "";
-
     if (isGlobalShortcut) {
       const subKey = `${triggerKey} ${key}`;
       if (buildKeyString(e) === subKey.split(" ").pop()) {
@@ -78,7 +76,10 @@ export function useHotkeys(
   deps: unknown[] = []
 ) {
   const handlerRef = useRef(handler);
-  handlerRef.current = handler;
+
+  useEffect(() => {
+    handlerRef.current = handler;
+  }, [handler]);
 
   const stableHandler = useCallback(
     (e: KeyboardEvent) => handlerRef.current(e),

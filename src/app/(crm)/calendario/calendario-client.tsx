@@ -6,6 +6,7 @@ import {
   ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter, Pencil, CheckCircle2, User, Bell, Loader2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useToast, Toaster } from "@/components/ui/toast";
 import type { UserRole } from "@/lib/roles";
 import { normalizeTime, calcDurationMinutes, formatDuration, formatReminderLabel } from "@/lib/local-date-time";
@@ -183,6 +184,52 @@ function normalizeCalendarEvent(ev: AgendaEvent): AgendaEvent {
   };
 }
 
+type LocalOverrides<T extends { id: number }> = Record<number, T | null>;
+
+function applyLocalOverrides<T extends { id: number }>(
+  serverItems: T[],
+  overrides: LocalOverrides<T>,
+): T[] {
+  const next: T[] = [];
+  const seen = new Set<number>();
+
+  for (const item of serverItems) {
+    seen.add(item.id);
+    const override = overrides[item.id];
+    if (override === null) continue;
+    next.push(override ?? item);
+  }
+
+  for (const [rawId, override] of Object.entries(overrides)) {
+    const id = Number(rawId);
+    if (override && !seen.has(id)) next.push(override);
+  }
+
+  return next;
+}
+
+function diffLocalOverrides<T extends { id: number }>(
+  serverItems: T[],
+  nextItems: T[],
+): LocalOverrides<T> {
+  const serverById = new Map(serverItems.map((item) => [item.id, item]));
+  const nextById = new Map(nextItems.map((item) => [item.id, item]));
+  const overrides: LocalOverrides<T> = {};
+
+  for (const [id, item] of nextById) {
+    const serverItem = serverById.get(id);
+    if (!serverItem || JSON.stringify(serverItem) !== JSON.stringify(item)) {
+      overrides[id] = item;
+    }
+  }
+
+  for (const item of serverItems) {
+    if (!nextById.has(item.id)) overrides[item.id] = null;
+  }
+
+  return overrides;
+}
+
 // â"€â"€â"€ Component â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 export default function CalendarioClient({
@@ -242,19 +289,14 @@ export default function CalendarioClient({
   const [weekStart, setWeekStart]     = useState(() => getWeekStart(today));
   const [selectedDate, setSelectedDate] = useState<Date>(today);
 
-  const [events, setEvents]         = useState<AgendaEvent[]>(() => initialEvents.map(normalizeCalendarEvent));
-  const [tareas, setTareas]         = useState<TareaEvent[]>(initialTareas);
-  const eventsRef = useRef(events);
-  useEffect(() => { eventsRef.current = events; }, [events]);
+  const [eventOverrides, setEventOverrides] = useState<LocalOverrides<AgendaEvent>>({});
+  const [tareaOverrides, setTareaOverrides] = useState<LocalOverrides<TareaEvent>>({});
 
   const [modalOpen, setModalOpen]   = useState(false);
   const [editEvent, setEditEvent]   = useState<AgendaEvent | null>(null);
   const [formInitialDate, setFormInitialDate] = useState(() => toDateStr(new Date()));
   const [detailEvent, setDetailEvent] = useState<AgendaEvent | null>(null);
   const [confirmDeleteEvent, setConfirmDeleteEvent] = useState<AgendaEvent | null>(null);
-  // saving: guard used in agendaItemsQuery sync useEffect to avoid overwriting
-  // an in-progress optimistic update. EventFormModal calls onSavingChange.
-  const [saving, setSaving]         = useState(false);
   const [deleteId, setDeleteId]     = useState<number | null>(null);
   const [deleting, setDeleting]     = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -284,18 +326,46 @@ export default function CalendarioClient({
   const completeAgendaItem = useCompleteAgendaItem();
   const completeTask = useCompleteTask();
 
-  // Sync events and tareas when server/query data changes with fresh data
-  useEffect(() => {
-    if (saving) return;
-    setEvents((agendaItemsQuery.data ?? initialEvents).map(normalizeCalendarEvent));
-  }, [agendaItemsQuery.data, initialEvents, saving]);
-  useEffect(() => {
+  const serverEvents = useMemo(
+    () => (agendaItemsQuery.data ?? initialEvents).map(normalizeCalendarEvent),
+    [agendaItemsQuery.data, initialEvents],
+  );
+  const serverTareas = useMemo(() => {
     const queryTareas = tasksQuery.data
       ?.map(toTareaEvent)
       .filter((tarea): tarea is TareaEvent => tarea !== null);
-    setTareas(queryTareas ?? initialTareas);
+    return queryTareas ?? initialTareas;
   }, [initialTareas, tasksQuery.data]);
-  const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
+  const events = useMemo(
+    () => applyLocalOverrides(serverEvents, eventOverrides),
+    [eventOverrides, serverEvents],
+  );
+  const tareas = useMemo(
+    () => applyLocalOverrides(serverTareas, tareaOverrides),
+    [serverTareas, tareaOverrides],
+  );
+  const setEvents = useCallback<React.Dispatch<React.SetStateAction<AgendaEvent[]>>>(
+    (updater) => {
+      setEventOverrides((currentOverrides) => {
+        const currentEvents = applyLocalOverrides(serverEvents, currentOverrides);
+        const nextEvents = typeof updater === "function" ? updater(currentEvents) : updater;
+        return diffLocalOverrides(serverEvents, nextEvents);
+      });
+    },
+    [serverEvents],
+  );
+  const setTareas = useCallback<React.Dispatch<React.SetStateAction<TareaEvent[]>>>(
+    (updater) => {
+      setTareaOverrides((currentOverrides) => {
+        const currentTareas = applyLocalOverrides(serverTareas, currentOverrides);
+        const nextTareas = typeof updater === "function" ? updater(currentTareas) : updater;
+        return diffLocalOverrides(serverTareas, nextTareas);
+      });
+    },
+    [serverTareas],
+  );
+  const eventsRef = useRef(events);
+  useEffect(() => { eventsRef.current = events; }, [events]);
 
   // Filter by user â€" default "all" for managers, currentUserId for agents
   const [filterUserId, setFilterUserId] = useState<number | "all">(() =>
@@ -344,6 +414,97 @@ export default function CalendarioClient({
     [events, currentUserId]
   );
 
+  const tareasByDate = useMemo(() => {
+    const map: Record<string, TareaEvent[]> = {};
+    for (const t of filteredTareas) (map[t.fecha.split("T")[0]] ??= []).push(t);
+    return map;
+  }, [filteredTareas]);
+
+  // â"€â"€ Google Calendar fetch â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+
+  const gcalRange = useMemo(() => {
+    let timeMin: string, timeMax: string;
+    if (viewMode === "week") {
+      timeMin = weekStart.toISOString();
+      const we = new Date(weekStart); we.setDate(we.getDate() + 6); we.setHours(23, 59, 59);
+      timeMax = we.toISOString();
+    } else {
+      const year = currentDate.getFullYear(), month = currentDate.getMonth();
+      timeMin = new Date(year, month, 1).toISOString();
+      timeMax = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+    }
+
+    return { timeMin, timeMax };
+  }, [currentDate, viewMode, weekStart]);
+
+  const gcalEventsQuery = useQuery({
+    queryKey: ["google-calendar-events", gcalRange.timeMin, gcalRange.timeMax, archivedGoogleEventIds],
+    enabled: isConnected,
+    queryFn: async ({ signal }) => {
+      let res: Response;
+      try {
+        res = await fetch(
+          `/api/google/events?timeMin=${encodeURIComponent(gcalRange.timeMin)}&timeMax=${encodeURIComponent(gcalRange.timeMax)}`,
+          { signal },
+        );
+      } catch {
+        return [];
+      }
+      if (!res.ok) return [];
+
+      const d = await res.json();
+      const items = (d.items ?? []) as GCalEvent[];
+      const localAgendaIds = new Set(eventsRef.current.map((ev) => String(ev.id)));
+      const archivedGoogleIds = new Set(archivedGoogleEventIds);
+      const visibleItems: GCalEvent[] = [];
+      const orphanIds: string[] = [];
+
+      for (const item of items) {
+        const props = item.extendedProperties?.private;
+        const isMetriaAgenda = props?.source === "metria" && props?.entity === "agenda" && props.agendaId;
+
+        if (archivedGoogleIds.has(item.id) || (isMetriaAgenda && !localAgendaIds.has(props.agendaId!))) {
+          orphanIds.push(item.id);
+          continue;
+        }
+
+        visibleItems.push(item);
+      }
+
+      await Promise.all(
+        orphanIds.map((eventId) =>
+          fetch("/api/google/events", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ eventId }),
+          }).catch(() => null),
+        ),
+      );
+
+      return visibleItems;
+    },
+  });
+
+  const [hiddenGcalEventIds, setHiddenGcalEventIds] = useState<Set<string>>(new Set());
+  const gcalEvents = useMemo(() => {
+    const hiddenIds = new Set([...hiddenGcalEventIds, ...archivedGoogleEventIds]);
+    return (gcalEventsQuery.data ?? []).filter((ev) => !hiddenIds.has(ev.id));
+  }, [archivedGoogleEventIds, gcalEventsQuery.data, hiddenGcalEventIds]);
+  const setGcalEvents = useCallback<React.Dispatch<React.SetStateAction<GCalEvent[]>>>(
+    (updater) => {
+      const nextEvents = typeof updater === "function" ? updater(gcalEvents) : updater;
+      const nextIds = new Set(nextEvents.map((ev) => ev.id));
+      setHiddenGcalEventIds((current) => {
+        const next = new Set(current);
+        for (const ev of gcalEvents) {
+          if (!nextIds.has(ev.id)) next.add(ev.id);
+        }
+        return next;
+      });
+    },
+    [gcalEvents],
+  );
+
   const gcalByDate = useMemo(() => {
     const map: Record<string, GCalEvent[]> = {};
 
@@ -359,80 +520,6 @@ export default function CalendarioClient({
 
     return map;
   }, [gcalEvents, syncedGcalIds]);
-
-  const tareasByDate = useMemo(() => {
-    const map: Record<string, TareaEvent[]> = {};
-    for (const t of filteredTareas) (map[t.fecha.split("T")[0]] ??= []).push(t);
-    return map;
-  }, [filteredTareas]);
-
-  // â"€â"€ Google Calendar fetch â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-
-  const gcalAbortRef = useRef<AbortController | null>(null);
-
-  const fetchGcalEvents = useCallback(async () => {
-    if (!isConnected) return;
-
-    gcalAbortRef.current?.abort();
-    const controller = new AbortController();
-    gcalAbortRef.current = controller;
-
-    let timeMin: string, timeMax: string;
-    if (viewMode === "week") {
-      timeMin = weekStart.toISOString();
-      const we = new Date(weekStart); we.setDate(we.getDate() + 6); we.setHours(23, 59, 59);
-      timeMax = we.toISOString();
-    } else {
-      const year = currentDate.getFullYear(), month = currentDate.getMonth();
-      timeMin = new Date(year, month, 1).toISOString();
-      timeMax = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
-    }
-
-    let res: Response;
-    try {
-      res = await fetch(
-        `/api/google/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`,
-        { signal: controller.signal },
-      );
-    } catch {
-      return; // abortado o error de red
-    }
-    if (!res.ok) return;
-
-    const d = await res.json();
-    const items = (d.items ?? []) as GCalEvent[];
-    const localAgendaIds = new Set(eventsRef.current.map((ev) => String(ev.id)));
-    const archivedGoogleIds = new Set(archivedGoogleEventIds);
-    const visibleItems: GCalEvent[] = [];
-    const orphanIds: string[] = [];
-
-    for (const item of items) {
-      const props = item.extendedProperties?.private;
-      const isMetriaAgenda = props?.source === "metria" && props?.entity === "agenda" && props.agendaId;
-
-      if (archivedGoogleIds.has(item.id) || (isMetriaAgenda && !localAgendaIds.has(props.agendaId!))) {
-        orphanIds.push(item.id);
-        continue;
-      }
-
-      visibleItems.push(item);
-    }
-
-    if (controller.signal.aborted) return;
-    setGcalEvents(visibleItems);
-
-    await Promise.all(
-      orphanIds.map((eventId) =>
-        fetch("/api/google/events", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ eventId }),
-        }).catch(() => null),
-      ),
-    );
-  }, [isConnected, currentDate, weekStart, viewMode, archivedGoogleEventIds]);
-
-  useEffect(() => { fetchGcalEvents(); }, [fetchGcalEvents]);
 
   // â"€â"€ Navigation â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
@@ -1169,7 +1256,6 @@ export default function CalendarioClient({
         onClose={() => setModalOpen(false)}
         onEventsChange={setEvents}
         onGcalEventsChange={setGcalEvents}
-        onSavingChange={setSaving}
         toast={toast}
       />
 

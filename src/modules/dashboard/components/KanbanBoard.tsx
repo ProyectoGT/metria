@@ -588,21 +588,22 @@ function KanbanBoard({
   );
 
   // Dev-only render tracker: hooks always called, logging only in dev.
-  const _devRc = useRef(0);
-  // eslint-disable-next-line react-hooks/purity
-  const _devLt = useRef(performance.now());
-  _devRc.current += 1;
-  if (process.env.NODE_ENV === "development" && _devRc.current > 1) {
-    // eslint-disable-next-line react-hooks/purity
-    const _now   = performance.now();
-    const _delta = (_now - _devLt.current).toFixed(1);
-    _devLt.current = _now;
-    console.debug(`[PERF] KanbanBoard render #${_devRc.current} +${_delta}ms`, {
+  const devRenderCountRef = useRef(0);
+  const devLastCommitRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    const now = performance.now();
+    const previous = devLastCommitRef.current;
+    devLastCommitRef.current = now;
+    devRenderCountRef.current += 1;
+    if (devRenderCountRef.current <= 1 || previous == null) return;
+    const delta = (now - previous).toFixed(1);
+    console.debug(`[PERF] KanbanBoard commit #${devRenderCountRef.current} +${delta}ms`, {
       modalType: modal.type,
       columnsCount: columns.length,
       totalCards: columns.reduce((s, c) => s + c.cards.length, 0),
     });
-  }
+  });
 
   // Convenience derivations used in the JSX — avoids repeating type checks
   const showDetail = modal.type === "detail" || modal.type === "confirm_delete_from_detail";

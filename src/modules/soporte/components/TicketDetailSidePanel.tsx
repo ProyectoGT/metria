@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useId } from "react";
+import { useState, useId } from "react";
 import {
   Send, Archive, RotateCcw, UserCheck, Loader2,
   ArrowLeft, MessageSquare, Calendar,
@@ -26,11 +26,6 @@ type TicketDetail = {
 type UsuarioItem = { id: string; nombre: string };
 
 const PRIORIDAD_LABELS: Record<string, string> = { alta: "Alta", media: "Media", baja: "Baja" };
-const PRIORIDAD_STYLES: Record<string, string> = {
-  alta: "border-l-red-500 bg-red-500/5",
-  media: "border-l-amber-500 bg-amber-500/5",
-  baja: "border-l-blue-500 bg-blue-500/5",
-};
 const ESTADO_LABELS: Record<string, string> = {
   abierto: "Abierto", en_proceso: "En proceso", resuelto: "Resuelto",
   cerrado: "Cerrado", archivado: "Archivado",
@@ -57,9 +52,13 @@ type Props = {
   onRefresh: () => void;
 };
 
-export default function TicketDetailSidePanel({
+export default function TicketDetailSidePanel(props: Props) {
+  return <TicketDetailSidePanelInner key={props.ticket.id} {...props} />;
+}
+
+function TicketDetailSidePanelInner({
   ticket, messages, isAdmin, isOwner,
-  currentUserNombre, agents, onClose, onRefresh,
+  agents, onClose, onRefresh,
 }: Props) {
   const { toast } = useToast();
   const uid = useId();
@@ -70,12 +69,6 @@ export default function TicketDetailSidePanel({
   const [asignadoA, setAsignadoA] = useState(ticket.asignadoA ? String(ticket.asignadoA) : "");
   const [updating, setUpdating] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(isAdmin);
-
-  useEffect(() => {
-    setEstado(ticket.estado);
-    setPrioridad(ticket.prioridad);
-    setAsignadoA(ticket.asignadoA ? String(ticket.asignadoA) : "");
-  }, [ticket.id, ticket.estado, ticket.prioridad, ticket.asignadoA]);
 
   const isArchived = ticket.archivedAt !== null;
   const canReply = !isArchived && (isAdmin || isOwner);

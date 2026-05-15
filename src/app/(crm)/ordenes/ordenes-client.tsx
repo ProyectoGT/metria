@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo, useState, useId, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useState, useId, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Calendar, CheckCircle2, ChevronDown, Circle, Clock, Loader2, Pencil, Plus, Trash2, User } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
@@ -244,20 +244,25 @@ export default function OrdenesClient({
   );
 
   // ── Dev-only render tracker (hooks always called, log only in dev) ─────────
-  const _devRc = useRef(0);
-  // eslint-disable-next-line react-hooks/purity
-  const _devLt = useRef(performance.now());
-  _devRc.current += 1;
-  if (process.env.NODE_ENV === "development" && _devRc.current > 1) {
-    // eslint-disable-next-line react-hooks/purity
-    const _now = performance.now();
-    const _delta = (_now - _devLt.current).toFixed(1);
-    _devLt.current = _now;
-    console.debug(`[PERF] OrdenesClient render #${_devRc.current} +${_delta}ms`, {
-      showModal, editing: !!editing, detailActividad: !!detailActividad,
-      filterUserId, actividadesCount: actividades.length, filteredCount: filteredActividades.length,
+  const devRenderCountRef = useRef(0);
+  const devLastCommitRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    const now = performance.now();
+    const previous = devLastCommitRef.current;
+    devLastCommitRef.current = now;
+    devRenderCountRef.current += 1;
+    if (devRenderCountRef.current <= 1 || previous == null) return;
+    const delta = (now - previous).toFixed(1);
+    console.debug(`[PERF] OrdenesClient commit #${devRenderCountRef.current} +${delta}ms`, {
+      showModal,
+      editing: !!editing,
+      detailActividad: !!detailActividad,
+      filterUserId,
+      actividadesCount: actividades.length,
+      filteredCount: filteredActividades.length,
     });
-  }
+  });
 
   // Stable callbacks for ActividadRow — must not close over frequently-changing
   // state so that memo(ActividadRow) can bail out on unrelated renders.

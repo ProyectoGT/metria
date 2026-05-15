@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { ChevronDown, CheckCircle2, Circle, Loader2, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { OrdenDiaAgente, OrdenDiaTarea, KanbanPriority } from "@/lib/mock/dashboard";
@@ -31,34 +31,32 @@ export default function OrdenDiaPanel({ agentes: initialAgentes }: OrdenDiaPanel
   const [openIds, setOpenIds] = useState<Set<number>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<{ id: string | number; isAgenda: boolean } | null>(null);
   const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
-  const [localAgentes, setLocalAgentes] = useState<OrdenDiaAgente[]>(initialAgentes);
+  const [taskEstadoOverrides, setTaskEstadoOverrides] = useState<Record<number, OrdenDiaTarea["estado"]>>({});
   const router = useRouter();
   const { toast, toasts } = useToast();
 
-  useEffect(() => {
-    setLocalAgentes(initialAgentes);
-  }, [initialAgentes]);
+  const localAgentes = useMemo(
+    () =>
+      initialAgentes.map((agente) => ({
+        ...agente,
+        tareas: agente.tareas.map((tarea) => {
+          const estado = taskEstadoOverrides[tarea.id];
+          return estado ? { ...tarea, estado } : tarea;
+        }),
+      })),
+    [initialAgentes, taskEstadoOverrides],
+  );
 
   async function handleCompleteTarea(tareaId: number, currentEstado: string) {
     const nuevoEstado = currentEstado === "completado" ? "pendiente" : "completado";
     setCompletingTaskId(tareaId);
-    setLocalAgentes((prev) =>
-      prev.map((ag) => ({
-        ...ag,
-        tareas: ag.tareas.map((t) => t.id === tareaId ? { ...t, estado: nuevoEstado as OrdenDiaTarea["estado"] } : t),
-      })),
-    );
+    setTaskEstadoOverrides((prev) => ({ ...prev, [tareaId]: nuevoEstado as OrdenDiaTarea["estado"] }));
     try {
       await completeTareaAction(tareaId);
       router.refresh();
       toast(nuevoEstado === "completado" ? "Tarea completada" : "Tarea pendiente");
     } catch {
-      setLocalAgentes((prev) =>
-        prev.map((ag) => ({
-          ...ag,
-          tareas: ag.tareas.map((t) => t.id === tareaId ? { ...t, estado: currentEstado as OrdenDiaTarea["estado"] } : t),
-        })),
-      );
+      setTaskEstadoOverrides((prev) => ({ ...prev, [tareaId]: currentEstado as OrdenDiaTarea["estado"] }));
       toast("Error al completar la tarea", "error");
     } finally {
       setCompletingTaskId(null);
@@ -85,7 +83,7 @@ export default function OrdenDiaPanel({ agentes: initialAgentes }: OrdenDiaPanel
 
   function handleConfirmDelete() {
     if (!deleteTarget) return;
-    const { id, isAgenda } = deleteTarget;
+    const { id } = deleteTarget;
     // Assuming the ID from Dashboard represents the DB ID directly or has a prefix
     // For now, try deleting as Tarea (if it fails, it might be an Agenda item, but Dashboard workspace only passes Tareas to OrdenDiaPanel? Let's check).
     // Actually, DashboardWorkspace maps both to KanbanCardData, but OrdenDiaPanel receives OrdenDiaAgente[].

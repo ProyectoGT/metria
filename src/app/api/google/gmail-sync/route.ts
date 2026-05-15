@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
 
@@ -196,7 +196,7 @@ interface GmailMessage {
 
 // ─── POST /api/google/gmail-sync ─────────────────────────────────────────────
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   const auth = await getGmailToken();
   if (!auth) {
     return NextResponse.json({ error: "gmail_not_connected" }, { status: 401 });

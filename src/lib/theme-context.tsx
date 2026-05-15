@@ -19,16 +19,36 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
+function isTheme(value: string | null | undefined): value is Theme {
+  return value === "light" || value === "dark" || value === "dark-black";
+}
+
+function getInitialTheme(): Theme {
+  if (typeof document !== "undefined") {
+    const activeTheme = document.documentElement.dataset.theme;
+    if (isTheme(activeTheme)) return activeTheme;
+  }
+
+  if (typeof window !== "undefined") {
+    const saved = window.localStorage.getItem("metria-theme");
+    if (isTheme(saved)) return saved;
+  }
+
+  return "dark";
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  const [theme, setThemeState] = useState<Theme>(() => getInitialTheme());
 
   const applyTheme = useCallback((t: Theme, persist = true) => {
+    if (typeof document === "undefined") return;
+
     const el = document.documentElement;
     el.classList.remove("dark", "dark-black");
     el.dataset.theme = t;
     if (t === "dark")       el.classList.add("dark");
     if (t === "dark-black") el.classList.add("dark", "dark-black");
-    localStorage.setItem("metria-theme", t);
+    window.localStorage.setItem("metria-theme", t);
     document.cookie = `metria-theme=${t}; path=/; max-age=31536000; samesite=lax`;
     setThemeState(t);
     if (persist) {
@@ -45,13 +65,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [applyTheme]);
 
   useEffect(() => {
-    const activeTheme = document.documentElement.dataset.theme as Theme | undefined;
-    if (activeTheme === "light" || activeTheme === "dark" || activeTheme === "dark-black") {
-      setThemeState(activeTheme);
-    }
-
-    const saved = localStorage.getItem("metria-theme") as Theme | null;
-    if (saved === "light" || saved === "dark" || saved === "dark-black") {
+    const saved = window.localStorage.getItem("metria-theme");
+    if (isTheme(saved)) {
       window.setTimeout(() => applyTheme(saved, false), 0);
       return;
     }

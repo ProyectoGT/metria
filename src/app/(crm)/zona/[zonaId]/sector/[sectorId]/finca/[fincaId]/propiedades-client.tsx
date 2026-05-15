@@ -160,6 +160,10 @@ const EMPTY_REMINDER: ReminderForm = {
   nota: "",
 };
 
+function formatNowDisplay() {
+  return new Date().toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" });
+}
+
 export default function PropiedadesClient({
   fincaId,
   initialPropiedades,
@@ -229,12 +233,11 @@ export default function PropiedadesClient({
   const [reminderForm, setReminderForm] = useState<ReminderForm>(EMPTY_REMINDER);
   const [reminderSaving, setReminderSaving] = useState(false);
 
-  const [nowDisplay, setNowDisplay] = useState("");
+  const [nowDisplay, setNowDisplay] = useState(() => formatNowDisplay());
   useEffect(() => {
     if (!modalOpen || editTarget) return;
-    setNowDisplay(new Date().toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }));
     const interval = setInterval(() => {
-      setNowDisplay(new Date().toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }));
+      setNowDisplay(formatNowDisplay());
     }, 1000);
     return () => clearInterval(interval);
   }, [modalOpen, editTarget]);

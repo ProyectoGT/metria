@@ -36,13 +36,6 @@ export function useFocusTrap(open: boolean) {
       }
     }
 
-    function focusLast() {
-      const elements = getFocusableElements();
-      if (elements.length > 0) {
-        elements[elements.length - 1].focus();
-      }
-    }
-
     focusFirst();
 
     function handleKeyDown(e: KeyboardEvent) {

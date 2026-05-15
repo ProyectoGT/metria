@@ -100,7 +100,6 @@ export async function detectLostOpportunities(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = await createClient() as any;
   const allowedIds = allowedAgentIds(user);
-  const now = Date.now();
   const opportunities: LostOpportunity[] = [];
 
   // ── Carga de datos en paralelo ─────────────────────────────────────────────

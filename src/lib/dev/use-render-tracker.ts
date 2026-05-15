@@ -3,41 +3,34 @@
 import { useEffect, useRef } from "react";
 
 /**
- * Dev-only render tracker. Logs render count and time between renders.
- * Produces zero overhead in production (the entire module is excluded
- * from production builds because all callers guard with NODE_ENV).
- *
- * Usage:
- *   if (process.env.NODE_ENV === "development") {
- *     // eslint-disable-next-line react-hooks/rules-of-hooks
- *     useRenderTracker("KanbanBoard");
- *   }
+ * Dev-only render tracker. Logs commit count and time between commits.
+ * It keeps render pure: timers and ref updates happen after commit.
  */
 export function useRenderTracker(componentName: string) {
   const renderCount = useRef(0);
-  const lastRenderTime = useRef(performance.now());
-
-  renderCount.current += 1;
-
-  const now = performance.now();
-  const sinceLastRender = (now - lastRenderTime.current).toFixed(1);
-  lastRenderTime.current = now;
-
-  const count = renderCount.current;
+  const lastCommitTime = useRef<number | null>(null);
 
   useEffect(() => {
-    if (count === 1) {
+    if (process.env.NODE_ENV !== "development") return;
+
+    const now = performance.now();
+    const previous = lastCommitTime.current;
+    lastCommitTime.current = now;
+    renderCount.current += 1;
+
+    const count = renderCount.current;
+    if (count === 1 || previous == null) {
       console.debug(
-        `%c[PERF] ${componentName} — mount`,
+        `%c[PERF] ${componentName} mount`,
         "color: #6366f1; font-weight: bold",
       );
-    } else {
-      const marker = sinceLastRender < "50" ? "🟡" : "🔴";
-      console.debug(
-        `%c[PERF] ${componentName} — render #${count} (+${sinceLastRender}ms since last)`,
-        `color: ${Number(sinceLastRender) > 50 ? "#ef4444" : "#f59e0b"}; font-weight: bold`,
-        marker,
-      );
+      return;
     }
+
+    const sinceLastCommit = (now - previous).toFixed(1);
+    console.debug(
+      `%c[PERF] ${componentName} commit #${count} (+${sinceLastCommit}ms since last)`,
+      `color: ${Number(sinceLastCommit) > 50 ? "#ef4444" : "#f59e0b"}; font-weight: bold`,
+    );
   });
 }

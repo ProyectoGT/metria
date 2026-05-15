@@ -1,13 +1,11 @@
 ﻿"use client";
 
-import { useState, useEffect } from "react";
 import {
   MapPin,
   Trash2,
   Archive,
   Pencil,
   Save,
-  X,
   Clock,
   User,
 } from "lucide-react";

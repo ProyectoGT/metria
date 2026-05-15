@@ -38,12 +38,6 @@ function allowedAgentIds(user: CurrentUserContext): number[] | null {
   return [user.id];
 }
 
-function daysAgo(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d;
-}
-
 function toTime(v: string | null | undefined) {
   if (!v) return 0;
   const t = new Date(v).getTime();

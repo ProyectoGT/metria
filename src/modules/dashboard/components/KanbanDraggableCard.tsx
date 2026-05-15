@@ -40,7 +40,7 @@ function KanbanDraggableCard({
   // Callbacks estables — solo se recrean si cambian sus dependencias,
   // que son referencias estables pasadas desde KanbanBoard.
   // Keep (id: string) signature to match KanbanCard's prop type
-  const handleClick = useCallback((_id: string) => {
+  const handleClick = useCallback(() => {
     onDetail(columnId, card);
   }, [columnId, card, onDetail]);
 

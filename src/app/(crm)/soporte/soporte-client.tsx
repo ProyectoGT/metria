@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LifeBuoy, Search, X, Filter, Plus, Pencil, Trash2,
@@ -15,7 +15,6 @@ import { useToast, Toaster } from "@/components/ui/toast";
 import Drawer from "@/components/ui/drawer";
 import Avatar from "@/components/ui/avatar";
 import TicketDetailSidePanel from "@/modules/soporte/components/TicketDetailSidePanel";
-import { TipoIcon } from "@/modules/soporte/components/TicketMessage";
 import type { UserRole } from "@/lib/roles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -70,11 +69,6 @@ const PRIORIDAD_CARD_BORDER: Record<string, string> = {
   baja: "border-l-blue-500/60",
 };
 
-const ESTADO_CARD_BG: Record<string, string> = {
-  abierto: "bg-blue-500/5", en_proceso: "bg-amber-500/5", resuelto: "bg-green-500/5",
-  cerrado: "bg-surface", archivado: "bg-surface",
-};
-
 const ESTADO_DOT: Record<string, string> = {
   abierto: "bg-blue-500", en_proceso: "bg-amber-500", resuelto: "bg-green-500",
   cerrado: "bg-gray-400", archivado: "bg-gray-400",
@@ -99,12 +93,6 @@ function tipoIcon(t: string) {
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatDate(iso: string) {
-  return new Intl.DateTimeFormat("es-ES", {
-    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-  }).format(new Date(iso));
-}
 
 function formatShort(iso: string) {
   return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short" }).format(new Date(iso));
@@ -191,7 +179,6 @@ export default function SoporteClient({
   const [detailTicketId, setDetailTicketId] = useState<number | null>(
     ticketParam ? Number(ticketParam) : null
   );
-  const [refreshKey, setRefreshKey] = useState(0);
 
   // Contactos CRUD
   const [contactoModalOpen, setContactoModalOpen] = useState(false);
@@ -337,11 +324,6 @@ export default function SoporteClient({
   function openTicket(ticketId: number) {
     setDetailTicketId(ticketId);
   }
-
-  const _handleRefresh = useCallback(() => {
-    setRefreshKey((k) => k + 1);
-    window.location.reload();
-  }, []);
 
   function toggleGroup(estado: string) {
     setCollapsedGroups((prev) => ({ ...prev, [estado]: !prev[estado] }));
@@ -952,7 +934,7 @@ export default function SoporteClient({
       ═══════════════════════════════════════════════════════════════ */}
       {detailTicket && (
         <TicketDetailSidePanel
-          key={`${detailTicket.id}-${refreshKey}`}
+          key={detailTicket.id}
           ticket={{
             id: detailTicket.id, asunto: detailTicket.asunto, tipo: detailTicket.tipo,
             prioridad: detailTicket.prioridad, estado: detailTicket.estado,

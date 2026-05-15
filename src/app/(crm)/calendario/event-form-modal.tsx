@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useId } from "react";
+import { useState, useMemo, useId } from "react";
 import { useRouter } from "next/navigation";
 import { Phone, Users, Home, Clock, BookOpen, Star, Activity, Loader2 } from "lucide-react";
 import Drawer from "@/components/ui/drawer";
@@ -127,8 +127,7 @@ export type EventFormModalProps = {
   onClose:            () => void;
   onEventsChange:     React.Dispatch<React.SetStateAction<AgendaEvent[]>>;
   onGcalEventsChange: React.Dispatch<React.SetStateAction<GCalEvent[]>>;
-  /** Mirrors internal saving state so CalendarioClient can guard event-sync */
-  onSavingChange:     (saving: boolean) => void;
+  onSavingChange?:    (saving: boolean) => void;
   toast:              (message: string, type?: "success" | "error" | "info") => void;
 };
 
@@ -137,7 +136,17 @@ export type EventFormModalProps = {
 // isolated here.  Typing in the form only re-renders EventFormModal, not the
 // calendar grid.
 
-export default function EventFormModal({
+export default function EventFormModal(props: EventFormModalProps) {
+  if (!props.open) return null;
+
+  const instanceKey = props.editEvent
+    ? `edit-${props.editEvent.id}`
+    : `create-${props.initialDate}`;
+
+  return <EventFormModalInner key={instanceKey} {...props} />;
+}
+
+function EventFormModalInner({
   open,
   editEvent,
   initialDate,
@@ -203,16 +212,8 @@ export default function EventFormModal({
 
   function setSaving(value: boolean) {
     setSavingLocal(value);
-    onSavingChange(value);
+    onSavingChange?.(value);
   }
-
-  // Reset form whenever the modal opens or the target event changes.
-  useEffect(() => {
-    if (!open) return;
-    setSaveError(null);
-    setForm(editEvent ? buildFormFromEvent(editEvent) : buildEmptyForm());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editEvent?.id, initialDate]);
 
   function toggleAssignedUser(userId: number) {
     setForm((prev) => {

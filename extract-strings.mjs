@@ -142,15 +142,15 @@ function groupByModule(filePath, strings) {
     'dashboard/': 'dashboard',
   };
 
-  let module = 'comun';
+  let moduleName = 'comun';
   for (const [pattern, mod] of Object.entries(moduleMap)) {
     if (rel.includes(pattern)) {
-      module = mod;
+      moduleName = mod;
       break;
     }
   }
 
-  return { module, strings };
+  return { module: moduleName, strings };
 }
 
 // ── Main ─────────────────────────────────────────────────────
@@ -165,20 +165,20 @@ for (const file of files) {
   const strings = extractFromFile(file);
   if (strings.length === 0) continue;
 
-  const { module } = groupByModule(file, strings);
-  if (!result[module]) result[module] = {};
+  const { module: moduleName } = groupByModule(file, strings);
+  if (!result[moduleName]) result[moduleName] = {};
 
   for (const str of strings) {
     if (duplicates.has(str)) continue; // no duplicar entre módulos
     const key = toKey(str);
-    if (!result[module][key]) {
-      result[module][key] = str;
+    if (!result[moduleName][key]) {
+      result[moduleName][key] = str;
       duplicates.add(str);
     }
   }
 
   const rel = relative(ROOT, file);
-  console.log(`  ✓ [${module}]  ${rel}  (${strings.length} strings)`);
+  console.log(`  ✓ [${moduleName}]  ${rel}  (${strings.length} strings)`);
 }
 
 // Añadir metadatos al principio

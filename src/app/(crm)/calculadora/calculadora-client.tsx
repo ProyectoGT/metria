@@ -115,7 +115,6 @@ function evalExpr(expr: string): number {
     .replace(/π/g, String(Math.PI))
     .replace(/\be\b/g, String(Math.E));
   try {
-    // eslint-disable-next-line no-new-func
     return Function(`"use strict"; return (${e})`)();
   } catch {
     return NaN;

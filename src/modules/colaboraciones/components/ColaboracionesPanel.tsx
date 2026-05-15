@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Users, X, Plus, Check, Loader2, Ban, ChevronDown } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 import Drawer from "@/components/ui/drawer";
@@ -64,8 +65,6 @@ export default function ColaboracionesPanel({
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
 
-  const [colaboraciones, setColaboraciones] = useState<Colaboracion[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | string | null>(null);
 
@@ -78,8 +77,7 @@ export default function ColaboracionesPanel({
 
   // ── Carga ────────────────────────────────────────────────────────────────────
 
-  async function loadColaboraciones() {
-    setLoading(true);
+  async function fetchColaboraciones(): Promise<Colaboracion[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error: err } = await (supabase as any)
       .from("colaboraciones")
@@ -94,32 +92,38 @@ export default function ColaboracionesPanel({
       .order("created_at", { ascending: false });
 
     if (err) {
-      setError("Error al cargar colaboraciones");
-    } else {
-      type Row = {
-        id: number; estado: string; porcentaje_comision: number | null; notas: string | null;
-        created_at: string; agente_owner_id: number; agente_colaborador_id: number;
-        owner: { nombre: string; apellidos: string } | null;
-        colaborador: { nombre: string; apellidos: string } | null;
-      };
-      setColaboraciones(
-        ((data ?? []) as Row[]).map((r) => ({
-          id: r.id,
-          estado: r.estado as EstadoColaboracion,
-          porcentaje_comision: r.porcentaje_comision,
-          notas: r.notas,
-          created_at: r.created_at,
-          agente_owner_id: r.agente_owner_id,
-          agente_colaborador_id: r.agente_colaborador_id,
-          owner_nombre: r.owner ? `${r.owner.nombre} ${r.owner.apellidos}`.trim() : `#${r.agente_owner_id}`,
-          colaborador_nombre: r.colaborador ? `${r.colaborador.nombre} ${r.colaborador.apellidos}`.trim() : `#${r.agente_colaborador_id}`,
-        }))
-      );
+      throw new Error("Error al cargar colaboraciones");
     }
-    setLoading(false);
+
+    type Row = {
+      id: number; estado: string; porcentaje_comision: number | null; notas: string | null;
+      created_at: string; agente_owner_id: number; agente_colaborador_id: number;
+      owner: { nombre: string; apellidos: string } | null;
+      colaborador: { nombre: string; apellidos: string } | null;
+    };
+    return ((data ?? []) as Row[]).map((r) => ({
+      id: r.id,
+      estado: r.estado as EstadoColaboracion,
+      porcentaje_comision: r.porcentaje_comision,
+      notas: r.notas,
+      created_at: r.created_at,
+      agente_owner_id: r.agente_owner_id,
+      agente_colaborador_id: r.agente_colaborador_id,
+      owner_nombre: r.owner ? `${r.owner.nombre} ${r.owner.apellidos}`.trim() : `#${r.agente_owner_id}`,
+      colaborador_nombre: r.colaborador ? `${r.colaborador.nombre} ${r.colaborador.apellidos}`.trim() : `#${r.agente_colaborador_id}`,
+    }));
   }
 
-  useEffect(() => { loadColaboraciones(); }, [entidad_id, entidad_tipo]); // eslint-disable-line react-hooks/exhaustive-deps
+  const {
+    data: colaboraciones = [],
+    isLoading: loading,
+    error: loadError,
+    refetch: refetchColaboraciones,
+  } = useQuery({
+    queryKey: ["colaboraciones", entidad_tipo, entidad_id],
+    queryFn: fetchColaboraciones,
+    enabled: Boolean(entidad_tipo && entidad_id),
+  });
 
   // ── Invitar ───────────────────────────────────────────────────────────────────
 
@@ -143,7 +147,7 @@ export default function ColaboracionesPanel({
       setInviteColaboradorId("");
       setInviteComision("");
       setInviteNotas("");
-      await loadColaboraciones();
+      await refetchColaboraciones();
     }
     setBusyId(null);
   }
@@ -158,7 +162,7 @@ export default function ColaboracionesPanel({
     setError(null);
     const result = await fn(id);
     if (!result.ok) setError(result.error ?? "Error");
-    await loadColaboraciones();
+    await refetchColaboraciones();
     setBusyId(null);
   }
 
@@ -193,8 +197,8 @@ export default function ColaboracionesPanel({
     >
       <div className="space-y-4 px-6 py-5">
 
-        {error && (
-          <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>
+        {(error || loadError) && (
+          <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error ?? (loadError instanceof Error ? loadError.message : "Error al cargar colaboraciones")}</p>
         )}
 
         {/* Botón invitar */}

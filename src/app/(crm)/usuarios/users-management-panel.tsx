@@ -7,10 +7,8 @@ import Drawer from "@/components/ui/drawer";
 import { useToast, Toaster } from "@/components/ui/toast";
 import {
   deleteUserAction,
-  updateUserRoleAction,
   updateUserInfoAction,
   toggleUserStatusAction,
-  updateUserSupervisorAction,
   resendVerificationAction,
 } from "./actions";
 import CreateUserForm from "./create-user-form";
@@ -41,8 +39,6 @@ type Props = {
   currentUserRole: UserRole;
   currentUserId: number;
 };
-
-const DIRECTOR_ALLOWED_ROLES = ["Responsable", "Agente"];
 
 export default function UsersManagementPanel({
   users: initialUsers,

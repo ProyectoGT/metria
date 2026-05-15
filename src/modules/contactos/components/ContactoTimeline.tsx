@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   CalendarDays,
   ClipboardList,
@@ -117,16 +118,12 @@ function sortEvents(rows: TimelineEvent[]) {
 
 export default function ContactoTimeline({ subject, currentUserId, initialEvents = [] }: Props) {
   const supabase = useMemo(() => createClient(), []);
-  const [events, setEvents] = useState<TimelineEvent[]>(initialEvents);
-  const [loading, setLoading] = useState(true);
+  const [localEvents, setLocalEvents] = useState<TimelineEvent[]>([]);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadEvents() {
-    setLoading(true);
-    setError(null);
-
+  async function fetchEvents() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query = (supabase as any)
       .from("contacto_timeline_events")
@@ -140,18 +137,21 @@ export default function ContactoTimeline({ subject, currentUserId, initialEvents
 
     const { data, error: loadError } = await filtered;
     if (loadError) {
-      setError(loadError.message);
-      setEvents(sortEvents(initialEvents));
-    } else {
-      setEvents(sortEvents([...(data ?? []), ...initialEvents] as TimelineEvent[]));
+      throw new Error(loadError.message);
     }
-    setLoading(false);
+
+    return sortEvents([...(data ?? []), ...initialEvents] as TimelineEvent[]);
   }
 
-  useEffect(() => {
-    loadEvents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject.type, subject.id]);
+  const { data: remoteEvents = initialEvents, isLoading: loading, error: loadError } = useQuery({
+    queryKey: ["contacto-timeline", subject.type, subject.id],
+    queryFn: fetchEvents,
+  });
+
+  const events = useMemo(
+    () => sortEvents([...localEvents, ...remoteEvents]),
+    [localEvents, remoteEvents],
+  );
 
   async function handleAddNote(e: React.FormEvent) {
     e.preventDefault();
@@ -185,7 +185,7 @@ export default function ContactoTimeline({ subject, currentUserId, initialEvents
     }
 
     setNote("");
-    if (data) setEvents((prev) => [data as TimelineEvent, ...prev]);
+    if (data) setLocalEvents((prev) => [data as TimelineEvent, ...prev]);
   }
 
   return (
@@ -206,7 +206,11 @@ export default function ContactoTimeline({ subject, currentUserId, initialEvents
           placeholder="Registra una llamada, comentario o siguiente paso..."
           className="input resize-none text-sm"
         />
-        {error && <p className="mt-2 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
+        {(error || loadError) && (
+          <p className="mt-2 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
+            {error ?? (loadError instanceof Error ? loadError.message : "No se pudo cargar el timeline.")}
+          </p>
+        )}
         <div className="mt-3 flex justify-end">
           <button
             type="submit"

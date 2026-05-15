@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, ClipboardPlus, Home, Loader2, MessageSquarePlus, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 import {
@@ -37,16 +38,11 @@ function scoreColor(score: number) {
 
 export default function PropertyMatchesPanel({ pedido, currentUserId }: Props) {
   const supabase = useMemo(() => createClient(), []);
-  const [matches, setMatches] = useState<PropertyMatch[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [done, setDone] = useState<Record<string, boolean>>({});
 
-  async function loadMatches() {
-    setLoading(true);
-    setError(null);
-
+  async function fetchMatches() {
     // RLS limita las propiedades segun empresa/equipo/agente.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error: loadError } = await (supabase as any)
@@ -57,18 +53,22 @@ export default function PropertyMatchesPanel({ pedido, currentUserId }: Props) {
       .limit(250);
 
     if (loadError) {
-      setError(loadError.message);
-      setMatches([]);
-    } else {
-      setMatches(calculatePropertyMatches(pedido, (data ?? []) as MatchPropiedad[], { minScore: 25, limit: 12 }));
+      throw new Error(loadError.message);
     }
-    setLoading(false);
+
+    return calculatePropertyMatches(pedido, (data ?? []) as MatchPropiedad[], { minScore: 25, limit: 12 });
   }
 
-  useEffect(() => {
-    loadMatches();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pedido.id]);
+  const {
+    data: matches = [],
+    isLoading: loading,
+    error: loadError,
+    refetch: refetchMatches,
+  } = useQuery({
+    queryKey: ["property-matches", pedido.id],
+    queryFn: fetchMatches,
+    enabled: Boolean(pedido.id),
+  });
 
   async function createFollowUpTask(match: PropertyMatch) {
     setBusyId(match.propiedad.id);
@@ -131,7 +131,10 @@ export default function PropertyMatchesPanel({ pedido, currentUserId }: Props) {
         </div>
         <button
           type="button"
-          onClick={loadMatches}
+          onClick={() => {
+            setError(null);
+            void refetchMatches();
+          }}
           disabled={loading}
           className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface hover:text-primary disabled:opacity-50"
           title="Recalcular"
@@ -140,7 +143,11 @@ export default function PropertyMatchesPanel({ pedido, currentUserId }: Props) {
         </button>
       </div>
 
-      {error && <p className="mx-4 mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
+      {(error || loadError) && (
+        <p className="mx-4 mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
+          {error ?? (loadError instanceof Error ? loadError.message : "No se pudieron calcular los matches.")}
+        </p>
+      )}
 
       <div className="max-h-[360px] overflow-y-auto p-3">
         {loading ? (

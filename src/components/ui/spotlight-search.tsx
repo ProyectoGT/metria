@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
   Search,
@@ -63,69 +64,63 @@ type SpotlightSearchProps = {
 };
 
 export default function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
+  if (!open) return null;
+  return <SpotlightSearchInner open={open} onOpenChange={onOpenChange} />;
+}
+
+function SpotlightSearchInner({ onOpenChange }: SpotlightSearchProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Reset on open/close
+  // Focus on mount.
   useEffect(() => {
-    if (open) {
-      setQuery("");
-      setResults([]);
-      setSelectedIndex(-1);
-      const id = setTimeout(() => inputRef.current?.focus(), 50);
-      return () => clearTimeout(id);
-    }
-  }, [open]);
+    const id = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(id);
+  }, []);
 
   // Debounced search
   useEffect(() => {
-    if (query.trim().length < 2) {
-      setResults([]);
-      setSelectedIndex(-1);
-      return;
-    }
-
-    setLoading(true);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}&ctx=general`);
-        const json = await res.json();
-        setResults((json.results ?? []).slice(0, RESULT_LIMIT));
-        setSelectedIndex(-1);
-      } catch {
-        setResults([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 280);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    const trimmed = query.trim();
+    if (trimmed.length < 2) return;
+    const id = setTimeout(() => setDebouncedQuery(trimmed), 280);
+    return () => clearTimeout(id);
   }, [query]);
+
+  const searchQuery = useQuery({
+    queryKey: ["spotlight-search", debouncedQuery],
+    enabled: debouncedQuery.length >= 2,
+    queryFn: async () => {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(debouncedQuery)}&ctx=general`);
+      const json = await res.json();
+      return ((json.results ?? []) as SearchResult[]).slice(0, RESULT_LIMIT);
+    },
+  });
+
+  const trimmedQuery = query.trim();
+  const visibleResults = useMemo(
+    () => (trimmedQuery.length < 2 ? [] : (searchQuery.data ?? [])),
+    [searchQuery.data, trimmedQuery.length],
+  );
+  const loading = trimmedQuery.length >= 2 && (searchQuery.isLoading || debouncedQuery !== trimmedQuery);
 
   // Group results by type
   const grouped = useMemo(() => {
     const map: Record<string, SearchResult[]> = {};
-    for (const r of results) {
+    for (const r of visibleResults) {
       const key = r.type;
       if (!map[key]) map[key] = [];
       map[key].push(r);
     }
     return map;
-  }, [results]);
+  }, [visibleResults]);
 
   // Flatten for keyboard navigation
-  const flatResults = useMemo(() => results, [results]);
+  const flatResults = useMemo(() => visibleResults, [visibleResults]);
 
   // Scroll selected into view
   useEffect(() => {
@@ -140,6 +135,12 @@ export default function SpotlightSearch({ open, onOpenChange }: SpotlightSearchP
     close();
     router.push(href);
   }, [close, router]);
+
+  const handleQueryChange = useCallback((value: string) => {
+    setQuery(value);
+    setSelectedIndex(-1);
+    if (value.trim().length < 2) setDebouncedQuery("");
+  }, []);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
@@ -200,8 +201,6 @@ export default function SpotlightSearch({ open, onOpenChange }: SpotlightSearchP
     },
   ], [close, router]);
 
-  if (!open) return null;
-
   const totalGroups = Object.keys(grouped).length;
 
   return (
@@ -229,7 +228,7 @@ export default function SpotlightSearch({ open, onOpenChange }: SpotlightSearchP
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => handleQueryChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Busca en todo Metria (tareas, contactos, propiedades...)"
             className="min-w-0 flex-1 bg-transparent text-base text-text-primary outline-none placeholder:text-text-secondary/50"
@@ -309,7 +308,7 @@ export default function SpotlightSearch({ open, onOpenChange }: SpotlightSearchP
                 const config = TYPE_CONFIG[type as ResultType];
                 const Icon = config.icon;
                 let resultIdx = 0;
-                const startIdx = results.findIndex((r) => r.id === items[0]?.id);
+                const startIdx = visibleResults.findIndex((r) => r.id === items[0]?.id);
                 return (
                   <div key={type} className="mb-3 last:mb-0">
                     <div className="flex items-center gap-2 px-2 py-1.5">

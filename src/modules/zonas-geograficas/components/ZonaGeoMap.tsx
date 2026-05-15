@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { APIProvider, Map, Polygon, useMap, useMapsLibrary } from "@vis.gl/react-google-maps";
 import type { ZonaGeografica } from "@/modules/zonas-geograficas/services/types";
 

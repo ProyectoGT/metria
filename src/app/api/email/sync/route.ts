@@ -1,7 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { createClient } from "@/lib/supabase";
-import { type EmailAccount, getGmailHistoryId } from "@/modules/email/services/gmail";
+import { type EmailAccount } from "@/modules/email/services/gmail";
 import { linkEmailMessageToEntities } from "@/modules/email/services/linking";
 import { createClientNoReplyAlerts, enrichCommercialEmail } from "@/modules/email/services/commercial";
 import { getEmailProviderAdapter } from "@/modules/email/services/providers";

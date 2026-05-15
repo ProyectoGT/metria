@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Camera, Loader2 } from "lucide-react";
 import Avatar from "@/components/ui/avatar";
@@ -88,9 +89,12 @@ export default function AvatarUpload({
     <div className="flex items-center gap-5">
       <div className="relative">
         {previewUrl ? (
-          <img
+          <Image
             src={previewUrl}
             alt={userName}
+            width={80}
+            height={80}
+            unoptimized
             className="h-20 w-20 rounded-full object-cover border border-border"
           />
         ) : (

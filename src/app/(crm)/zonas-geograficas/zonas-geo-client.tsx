@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { Plus, X, AlertTriangle, MapPin } from "lucide-react";
 import PageHeader from "@/components/layout/page-header";
@@ -42,7 +42,6 @@ interface PendingDraw {
 
 export default function ZonasGeoClient({
   initialZonas,
-  currentUserId,
   currentUserRole,
 }: {
   initialZonas: ZonaGeografica[];
@@ -59,7 +58,6 @@ export default function ZonasGeoClient({
   const [pendingDraw, setPendingDraw] = useState<PendingDraw | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [mapReady, setMapReady] = useState(false);
-  const initialLoadDone = useRef(false);
 
   const [formData, setFormData] = useState<ZonaGeoFormData>({
     nombre: "",

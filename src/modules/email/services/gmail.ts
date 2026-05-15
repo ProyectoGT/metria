@@ -341,7 +341,7 @@ export async function syncGmailMessages(
     // ── Full sync: paginated list ──────────────────────────────────────
     const query = folder === "sent" ? "in:sent newer_than:90d" : "in:inbox newer_than:90d";
     let nextPageToken: string | undefined;
-    let allIds: string[] = [];
+    const allIds: string[] = [];
     let pagesFetched = 0;
 
     do {
@@ -383,7 +383,7 @@ export async function syncGmailMessages(
   try {
     const historyUrl = `/users/me/history?startHistoryId=${account.last_history_id}&historyTypes=messageAdded&maxResults=100`;
     let nextPageToken: string | undefined;
-    let allIds: string[] = [];
+    const allIds: string[] = [];
     let pagesFetched = 0;
 
     do {
@@ -437,7 +437,7 @@ export async function syncGmailMessages(
     const query = `${folder === "sent" ? "in:sent" : "in:inbox"} after:${since}`;
 
     let nextPageToken: string | undefined;
-    let allIds: string[] = [];
+    const allIds: string[] = [];
     let pagesFetched = 0;
 
     do {

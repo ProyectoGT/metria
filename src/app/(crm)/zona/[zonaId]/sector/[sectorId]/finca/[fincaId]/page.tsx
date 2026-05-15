@@ -61,7 +61,7 @@ export default async function FincaDetailPage({
   const encargoDataPropiedadIds = new Set<number>();
 
   type UsuarioBasico = { id: number; nombre: string; apellidos: string; rol: string | null };
-  let creadoresMap: Record<number, UsuarioBasico> = {};
+  const creadoresMap: Record<number, UsuarioBasico> = {};
 
   if (propiedadIds.length > 0) {
     const [{ data: archivos }, { data: visitas }, { data: notas }] = await Promise.all([

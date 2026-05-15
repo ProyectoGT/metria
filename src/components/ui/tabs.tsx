@@ -76,9 +76,7 @@ export function Tab({
   _onChange,
   _variant = "underline",
 }: TabProps) {
-  const underlineActive = "border-b-2 border-primary text-primary";
   const underlineInactive = "border-b-2 border-transparent text-text-secondary hover:text-text-primary hover:border-border";
-  const pillActive = "bg-surface text-text-primary shadow-sm";
   const pillInactive = "text-text-secondary hover:text-text-primary";
 
   return (

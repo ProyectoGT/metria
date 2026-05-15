@@ -1,11 +1,8 @@
-import Script from "next/script";
-
 // Runs before hydration so the saved theme is applied without a visual flash.
 export default function ThemeScript() {
   return (
-    <Script
+    <script
       id="metria-theme-script"
-      strategy="beforeInteractive"
       dangerouslySetInnerHTML={{
         __html: `(function(){
   try {

@@ -28,8 +28,6 @@ export type OrgTree = {
 
 // Construye el árbol a partir de la lista plana de usuarios
 export function buildOrgTree(users: OrgUser[]): OrgTree {
-  const byId = new Map(users.map((u) => [u.id, u]));
-
   const admins: OrgUser[] = [];
   const directores: OrgUser[] = [];
   const responsableMap = new Map<number, OrgNode>();

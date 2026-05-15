@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, type ComponentProps, forwardRef, type HTMLAttributes } from "react";
+import { type ReactNode, forwardRef } from "react";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import {
   fadeInUp,

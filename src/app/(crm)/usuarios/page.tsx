@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Network } from "lucide-react";
-import PageHeader from "@/components/layout/page-header";
 import { getCurrentUserContext } from "@/lib/current-user";
-import { canManageUsers, canCreateUsers, USER_ROLES } from "@/lib/roles";
+import { canCreateUsers, USER_ROLES } from "@/lib/roles";
 import { createClient } from "@/lib/supabase";
 import UsersManagementPanel from "./users-management-panel";
 

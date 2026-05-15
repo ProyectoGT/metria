@@ -348,7 +348,7 @@ const searchCa: Messages = {
 
 // ─── Dictionaries ─────────────────────────────────────────────────────────────
 
-function makeDict(
+export function makeDict(
   common: Messages,
   nav: Messages,
   search: Messages,

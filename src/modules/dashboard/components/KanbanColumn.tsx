@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Droppable } from "@hello-pangea/dnd";
 import { CheckCircle2, Plus, X } from "lucide-react";
@@ -22,8 +22,6 @@ function KanbanColumn({
   onCompleteCard,
   onDetailCard,
 }: KanbanColumnProps) {
-  const [hovered, setHovered] = useState(false);
-
   const activeCount = useMemo(() => column.cards.filter((c) => !c.isCompleted).length, [column.cards]);
   const totalCount  = column.cards.length;
   const countLabel  = activeCount === totalCount ? String(activeCount) : `${activeCount}/${totalCount}`;
@@ -44,8 +42,6 @@ function KanbanColumn({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
       className="group flex w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col overflow-hidden rounded-ds-lg border border-border bg-surface shadow-layer-1 interactive-surface"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       {/* ── Cabecera (sticky) ─────────────────────────────────────── */}
       <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-surface-elevated px-4 py-3.5 shadow-layer-1">
