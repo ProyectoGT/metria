@@ -2,9 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Bath, BedDouble, Car, Euro, Home, MapPin, Phone, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase";
+import { getCurrentUserContext } from "@/lib/current-user";
 import Breadcrumb from "@/components/ui/breadcrumb";
 import { ACCESS_SCOPE_LABELS, normalizeAccessScope } from "@/lib/access-scope";
 import { formatModalidadPedido } from "@/modules/solicitudes/services/modalidades";
+import WhatsAppMessageModal from "@/components/whatsapp/WhatsAppMessageModal";
+import { buildWhatsAppMessage } from "@/lib/whatsapp";
 
 type PedidoDetail = {
   id: number;
@@ -48,6 +51,7 @@ export default async function PedidoDetailPage({
 }) {
   const { pedidoId } = await params;
   const supabase = await createClient();
+  const yo = await getCurrentUserContext();
 
   const { data } = await supabase
     .from("pedidos")
@@ -80,6 +84,7 @@ export default async function PedidoDetailPage({
     ? `${pedido.usuarios.nombre ?? ""} ${pedido.usuarios.apellidos ?? ""}`.trim()
     : "";
   const scope = normalizeAccessScope(pedido.visibility);
+  const agenteActual = yo ? `${yo.nombre} ${yo.apellidos}`.trim() : agente;
 
   return (
     <div className="space-y-6">
@@ -116,7 +121,33 @@ export default async function PedidoDetailPage({
           <h2 className="mb-4 text-base font-semibold text-text-primary">Datos de la solicitud</h2>
           <dl className="grid gap-4 sm:grid-cols-2">
             <Info label="Cliente" value={pedido.nombre_cliente} icon={<UserRound className="h-4 w-4" />} />
-            <Info label="Telefono" value={pedido.telefono ?? "-"} icon={<Phone className="h-4 w-4" />} />
+            {pedido.telefono ? (
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Telefono</dt>
+                <dd className="mt-1 flex flex-wrap items-center gap-2 text-sm font-medium text-text-primary">
+                  <span className="flex items-center gap-2 text-text-secondary"><Phone className="h-4 w-4" /></span>
+                  <span>{pedido.telefono}</span>
+                  <WhatsAppMessageModal
+                    phone={pedido.telefono}
+                    recipientName={pedido.nombre_cliente}
+                    initialMessage={buildWhatsAppMessage("cliente_solicitud", {
+                      nombre: pedido.nombre_cliente,
+                      agente: agenteActual,
+                      tipo: pedido.tipo_propiedad ?? undefined,
+                      zona: pedido.zona_busqueda ?? pedido.zona?.nombre ?? undefined,
+                    })}
+                    templateName="cliente_solicitud"
+                    relatedType="solicitud"
+                    relatedId={pedido.id}
+                    pedidoId={pedido.id}
+                    buttonLabel="WhatsApp"
+                    buttonVariant="compact"
+                  />
+                </dd>
+              </div>
+            ) : (
+              <Info label="Telefono" value="-" icon={<Phone className="h-4 w-4" />} />
+            )}
             <Info label="Tipo de propiedad" value={pedido.tipo_propiedad ?? "-"} icon={<Home className="h-4 w-4" />} />
             <Info label="Presupuesto" value={formatPresupuesto(pedido.presupuesto)} icon={<Euro className="h-4 w-4" />} />
             <Info label="Modalidad" value={formatModalidadPedido(pedido.modalidad)} />

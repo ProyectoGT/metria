@@ -28,6 +28,8 @@ import {
 import { getLabelForField } from "@/modules/propiedades/services/validate-property-for-web";
 import { prepareForWebAction, updateWebPublicationAction } from "../actions";
 import { useToast } from "@/components/ui/toast";
+import WhatsAppMessageModal from "@/components/whatsapp/WhatsAppMessageModal";
+import { buildWhatsAppMessage } from "@/lib/whatsapp";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -113,9 +115,10 @@ type Props = {
   backHref: string;
   agentes: Array<{ id: number; nombre: string; apellidos: string }>;
   currentUserId: number;
+  currentUserName: string;
 };
 
-export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, backHref, agentes, currentUserId }: Props) {
+export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, backHref, agentes, currentUserId, currentUserName }: Props) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [showEncargoPanel, setShowEncargoPanel] = useState(false);
@@ -284,18 +287,52 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, 
             <InfoRow label="Planta"        value={propiedad.planta} />
             <InfoRow label="Puerta"        value={propiedad.puerta} />
             <InfoRow label="Propietario"   value={propiedad.propietario} />
-            <InfoRow label="Telefono"      value={propiedad.telefono ? (
-              <a href={`tel:${propiedad.telefono}`} className="flex items-center gap-1 text-primary hover:underline">
-                <Phone className="h-3.5 w-3.5" />{propiedad.telefono}
-              </a>
+            <InfoRow label="Telefono" value={propiedad.telefono ? (
+              <span className="flex flex-wrap items-center gap-2">
+                <a href={`tel:${propiedad.telefono}`} className="flex items-center gap-1 text-primary hover:underline">
+                  <Phone className="h-3.5 w-3.5" />{propiedad.telefono}
+                </a>
+                <WhatsAppMessageModal
+                  phone={propiedad.telefono}
+                  recipientName={propiedad.propietario ?? "Propietario"}
+                  initialMessage={buildWhatsAppMessage("propietario_seguimiento", {
+                    nombre: propiedad.propietario ?? "Propietario",
+                    agente: currentUserName,
+                    zona: propiedad.zona_nombre ?? undefined,
+                  })}
+                  templateName="propietario_seguimiento"
+                  relatedType="propiedad"
+                  relatedId={propiedad.id}
+                  propiedadId={propiedad.id}
+                  buttonLabel="WhatsApp"
+                  buttonVariant="compact"
+                />
+              </span>
             ) : null} />
             {(propiedad.propietario_secundario || propiedad.telefono_secundario) && (
               <>
                 <InfoRow label="Segundo propietario" value={propiedad.propietario_secundario} />
                 <InfoRow label="Telefono secundario" value={propiedad.telefono_secundario ? (
-                  <a href={`tel:${propiedad.telefono_secundario}`} className="flex items-center gap-1 text-primary hover:underline">
-                    <Phone className="h-3.5 w-3.5" />{propiedad.telefono_secundario}
-                  </a>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <a href={`tel:${propiedad.telefono_secundario}`} className="flex items-center gap-1 text-primary hover:underline">
+                      <Phone className="h-3.5 w-3.5" />{propiedad.telefono_secundario}
+                    </a>
+                    <WhatsAppMessageModal
+                      phone={propiedad.telefono_secundario}
+                      recipientName={propiedad.propietario_secundario ?? "Segundo propietario"}
+                      initialMessage={buildWhatsAppMessage("propietario_seguimiento", {
+                        nombre: propiedad.propietario_secundario ?? "Segundo propietario",
+                        agente: currentUserName,
+                        zona: propiedad.zona_nombre ?? undefined,
+                      })}
+                      templateName="propietario_seguimiento"
+                      relatedType="propiedad"
+                      relatedId={propiedad.id}
+                      propiedadId={propiedad.id}
+                      buttonLabel="WhatsApp"
+                      buttonVariant="compact"
+                    />
+                  </span>
                 ) : null} />
               </>
             )}

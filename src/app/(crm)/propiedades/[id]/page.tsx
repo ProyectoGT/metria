@@ -381,6 +381,7 @@ export default async function PropiedadDetailPage({
         backHref={backHref}
         agentes={(agentes ?? []).filter((a) => a.rol !== "Administrador")}
         currentUserId={yo.id}
+        currentUserName={`${yo.nombre} ${yo.apellidos}`.trim()}
       />
     </>
   );
