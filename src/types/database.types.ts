@@ -434,6 +434,7 @@ export type Database = {
       }
       archivos: {
         Row: {
+          ciclo_comercial_id: number | null
           created_at: string
           empresa_id: number | null
           id: number
@@ -445,6 +446,7 @@ export type Database = {
           url: string | null
         }
         Insert: {
+          ciclo_comercial_id?: number | null
           created_at?: string
           empresa_id?: number | null
           id?: number
@@ -456,6 +458,7 @@ export type Database = {
           url?: string | null
         }
         Update: {
+          ciclo_comercial_id?: number | null
           created_at?: string
           empresa_id?: number | null
           id?: number
@@ -467,6 +470,13 @@ export type Database = {
           url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "archivos_ciclo_comercial_id_fkey"
+            columns: ["ciclo_comercial_id"]
+            isOneToOne: false
+            referencedRelation: "propiedad_ciclos_comerciales"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "archivos_empresa_id_fkey"
             columns: ["empresa_id"]
@@ -586,6 +596,7 @@ export type Database = {
       contacto_timeline_events: {
         Row: {
           agente_id: number | null
+          ciclo_comercial_id: number | null
           contacto_id: number | null
           created_at: string
           descripcion: string | null
@@ -599,6 +610,7 @@ export type Database = {
         }
         Insert: {
           agente_id?: number | null
+          ciclo_comercial_id?: number | null
           contacto_id?: number | null
           created_at?: string
           descripcion?: string | null
@@ -612,6 +624,7 @@ export type Database = {
         }
         Update: {
           agente_id?: number | null
+          ciclo_comercial_id?: number | null
           contacto_id?: number | null
           created_at?: string
           descripcion?: string | null
@@ -636,6 +649,13 @@ export type Database = {
             columns: ["contacto_id"]
             isOneToOne: false
             referencedRelation: "contactos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacto_timeline_events_ciclo_comercial_id_fkey"
+            columns: ["ciclo_comercial_id"]
+            isOneToOne: false
+            referencedRelation: "propiedad_ciclos_comerciales"
             referencedColumns: ["id"]
           },
           {
@@ -796,6 +816,7 @@ export type Database = {
       }
       documentos_generados: {
         Row: {
+          ciclo_comercial_id: number | null
           contacto_id: number | null
           created_at: string
           empresa_id: number | null
@@ -806,6 +827,7 @@ export type Database = {
           tipo_documento: string
         }
         Insert: {
+          ciclo_comercial_id?: number | null
           contacto_id?: number | null
           created_at?: string
           empresa_id?: number | null
@@ -816,6 +838,7 @@ export type Database = {
           tipo_documento: string
         }
         Update: {
+          ciclo_comercial_id?: number | null
           contacto_id?: number | null
           created_at?: string
           empresa_id?: number | null
@@ -826,6 +849,13 @@ export type Database = {
           tipo_documento?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "documentos_generados_ciclo_comercial_id_fkey"
+            columns: ["ciclo_comercial_id"]
+            isOneToOne: false
+            referencedRelation: "propiedad_ciclos_comerciales"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "documentos_generados_contacto_id_fkey"
             columns: ["contacto_id"]
@@ -1325,24 +1355,34 @@ export type Database = {
       }
       encargo_notas: {
         Row: {
+          ciclo_comercial_id: number | null
           contenido: string
           created_at: string
           id: number
           propiedad_id: number
         }
         Insert: {
+          ciclo_comercial_id?: number | null
           contenido: string
           created_at?: string
           id?: never
           propiedad_id: number
         }
         Update: {
+          ciclo_comercial_id?: number | null
           contenido?: string
           created_at?: string
           id?: never
           propiedad_id?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "encargo_notas_ciclo_comercial_id_fkey"
+            columns: ["ciclo_comercial_id"]
+            isOneToOne: false
+            referencedRelation: "propiedad_ciclos_comerciales"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "encargo_notas_propiedad_id_fkey"
             columns: ["propiedad_id"]
@@ -1356,6 +1396,7 @@ export type Database = {
         Row: {
           agente_id: number | null
           agente_nombre: string
+          ciclo_comercial_id: number | null
           created_at: string
           fecha_visita: string
           id: number
@@ -1367,6 +1408,7 @@ export type Database = {
         Insert: {
           agente_id?: number | null
           agente_nombre: string
+          ciclo_comercial_id?: number | null
           created_at?: string
           fecha_visita?: string
           id?: number
@@ -1378,6 +1420,7 @@ export type Database = {
         Update: {
           agente_id?: number | null
           agente_nombre?: string
+          ciclo_comercial_id?: number | null
           created_at?: string
           fecha_visita?: string
           id?: number
@@ -1392,6 +1435,13 @@ export type Database = {
             columns: ["agente_id"]
             isOneToOne: false
             referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encargo_visitas_ciclo_comercial_id_fkey"
+            columns: ["ciclo_comercial_id"]
+            isOneToOne: false
+            referencedRelation: "propiedad_ciclos_comerciales"
             referencedColumns: ["id"]
           },
           {
@@ -1832,6 +1882,141 @@ export type Database = {
           },
         ]
       }
+      propiedad_ciclos_comerciales: {
+        Row: {
+          closed_at: string | null
+          closed_by_user_id: number | null
+          closed_reason: string | null
+          created_at: string
+          empresa_id: number | null
+          final_status: string | null
+          id: number
+          initial_status: string | null
+          opened_by_user_id: number | null
+          propiedad_id: number
+          started_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by_user_id?: number | null
+          closed_reason?: string | null
+          created_at?: string
+          empresa_id?: number | null
+          final_status?: string | null
+          id?: number
+          initial_status?: string | null
+          opened_by_user_id?: number | null
+          propiedad_id: number
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by_user_id?: number | null
+          closed_reason?: string | null
+          created_at?: string
+          empresa_id?: number | null
+          final_status?: string | null
+          id?: number
+          initial_status?: string | null
+          opened_by_user_id?: number | null
+          propiedad_id?: number
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      propiedad_estado_historial: {
+        Row: {
+          changed_at: string
+          changed_by_user_id: number | null
+          created_at: string
+          ciclo_comercial_id: number | null
+          empresa_id: number | null
+          from_status: string | null
+          id: number
+          notes: string | null
+          propiedad_id: number
+          to_status: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by_user_id?: number | null
+          created_at?: string
+          ciclo_comercial_id?: number | null
+          empresa_id?: number | null
+          from_status?: string | null
+          id?: number
+          notes?: string | null
+          propiedad_id: number
+          to_status: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by_user_id?: number | null
+          created_at?: string
+          ciclo_comercial_id?: number | null
+          empresa_id?: number | null
+          from_status?: string | null
+          id?: number
+          notes?: string | null
+          propiedad_id?: number
+          to_status?: string
+        }
+        Relationships: []
+      }
+      propiedad_registros_venta: {
+        Row: {
+          buyer_name: string | null
+          buyer_phone: string | null
+          commission_amount: number | null
+          created_at: string
+          ciclo_comercial_id: number | null
+          empresa_id: number | null
+          id: number
+          notes: string | null
+          propiedad_id: number
+          sale_price: number | null
+          sold_at: string | null
+          sold_by_user_id: number | null
+          updated_at: string
+        }
+        Insert: {
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          commission_amount?: number | null
+          created_at?: string
+          ciclo_comercial_id?: number | null
+          empresa_id?: number | null
+          id?: number
+          notes?: string | null
+          propiedad_id: number
+          sale_price?: number | null
+          sold_at?: string | null
+          sold_by_user_id?: number | null
+          updated_at?: string
+        }
+        Update: {
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          commission_amount?: number | null
+          created_at?: string
+          ciclo_comercial_id?: number | null
+          empresa_id?: number | null
+          id?: number
+          notes?: string | null
+          propiedad_id?: number
+          sale_price?: number | null
+          sold_at?: string | null
+          sold_by_user_id?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       propiedad_usuarios: {
         Row: {
           created_at: string
@@ -1876,6 +2061,7 @@ export type Database = {
           contactado_hasta: string | null
           created_at: string
           created_by_user_id: number | null
+          current_commercial_cycle_id: number | null
           descripcion: string | null
           empresa_id: number | null
           equipo_id: number | null
@@ -1885,8 +2071,10 @@ export type Database = {
           fecha_visita: string | null
           ficha_completa: boolean | null
           finca_id: number | null
+          has_sale_history: boolean
           honorarios: number | null
           id: number
+          last_sold_at: string | null
           latitud: number | null
           longitud: number | null
           notas: string | null
@@ -1918,6 +2106,7 @@ export type Database = {
           contactado_hasta?: string | null
           created_at?: string
           created_by_user_id?: number | null
+          current_commercial_cycle_id?: number | null
           descripcion?: string | null
           empresa_id?: number | null
           equipo_id?: number | null
@@ -1927,8 +2116,10 @@ export type Database = {
           fecha_visita?: string | null
           ficha_completa?: boolean | null
           finca_id?: number | null
+          has_sale_history?: boolean
           honorarios?: number | null
           id?: number
+          last_sold_at?: string | null
           latitud?: number | null
           longitud?: number | null
           notas?: string | null
@@ -1960,6 +2151,7 @@ export type Database = {
           contactado_hasta?: string | null
           created_at?: string
           created_by_user_id?: number | null
+          current_commercial_cycle_id?: number | null
           descripcion?: string | null
           empresa_id?: number | null
           equipo_id?: number | null
@@ -1969,8 +2161,10 @@ export type Database = {
           fecha_visita?: string | null
           ficha_completa?: boolean | null
           finca_id?: number | null
+          has_sale_history?: boolean
           honorarios?: number | null
           id?: number
+          last_sold_at?: string | null
           latitud?: number | null
           longitud?: number | null
           notas?: string | null
@@ -2001,6 +2195,13 @@ export type Database = {
             columns: ["agente_asignado"]
             isOneToOne: false
             referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propiedades_current_commercial_cycle_id_fkey"
+            columns: ["current_commercial_cycle_id"]
+            isOneToOne: false
+            referencedRelation: "propiedad_ciclos_comerciales"
             referencedColumns: ["id"]
           },
           {

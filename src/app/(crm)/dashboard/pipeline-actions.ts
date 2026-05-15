@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext, type CurrentUserContext } from "@/lib/current-user";
+import { changePropertyStatusAction } from "@/modules/propiedades/services/commercial-cycles";
 import { revalidatePath } from "next/cache";
 
 export type ResolveSuggestionResult = { ok: true } | { ok: false; error: string };
@@ -99,12 +100,15 @@ export async function acceptPipelineSuggestionAction(
   // ── 1. Actualizar estado de propiedad (solo si el sujeto es una propiedad y el estado es válido) ──
   const VALID_ESTADOS = ["neutral", "investigacion", "seguimiento", "noticia", "encargo", "vendido"];
   if (suggestion.propiedad_id && VALID_ESTADOS.includes(suggestion.estado_sugerido)) {
-    const { error: propErr } = await supabase
-      .from("propiedades")
-      .update({ estado: suggestion.estado_sugerido })
-      .eq("id", suggestion.propiedad_id);
+    if (suggestion.estado_sugerido === "vendido") {
+      return { ok: false, error: "Marca la propiedad como vendida desde la ficha para registrar los datos de venta." };
+    }
 
-    if (propErr) return { ok: false, error: `Error actualizando propiedad: ${propErr.message}` };
+    const transition = await changePropertyStatusAction(suggestion.propiedad_id, suggestion.estado_sugerido, {
+      notes: suggestion.razon,
+    });
+
+    if (transition.error) return { ok: false, error: `Error actualizando propiedad: ${transition.error}` };
   }
 
   // ── 2. Registrar evento en timeline ────────────────────────────────────────

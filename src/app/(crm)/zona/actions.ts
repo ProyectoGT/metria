@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { requirePermission } from "@/lib/access-control";
 import { canBeAssignedProperty, canSetVendido } from "@/lib/roles";
+import { changePropertyStatusAction, type PropertySaleInput } from "@/modules/propiedades/services/commercial-cycles";
 import { revalidatePath } from "next/cache";
 
 type PropiedadPayload = {
@@ -23,6 +24,11 @@ type PropiedadPayload = {
   longitud: number | null;
 };
 
+type UpsertPropiedadOptions = {
+  sale?: PropertySaleInput;
+  reopenNotes?: string | null;
+};
+
 function shouldRetryWithoutSecondOwner(payload: PropiedadPayload, error: { message?: string; code?: string } | null) {
   if (payload.propietario_secundario || payload.telefono_secundario) return false;
   const message = error?.message?.toLowerCase() ?? "";
@@ -39,7 +45,8 @@ function stripSecondOwner<T extends PropiedadPayload>(payload: T) {
 export async function upsertPropiedadAction(
   payload: PropiedadPayload,
   fincaId: number,
-  propiedadId?: number
+  propiedadId?: number,
+  options?: UpsertPropiedadOptions
 ): Promise<{ data?: Record<string, unknown>; error?: string }> {
   const yo = await getCurrentUserContext();
   if (!yo) return { error: "No autenticado" };
@@ -49,14 +56,6 @@ export async function upsertPropiedadAction(
 
   const assignedAgentError = await validateAssignablePropertyAgent(payload.agente_asignado, yo.empresaId, yo.role);
   if (assignedAgentError) return { error: assignedAgentError };
-
-  // Validar permiso para marcar como vendido
-  if (payload.estado === "vendido") {
-    const agenteAsignado = payload.agente_asignado;
-    if (!canSetVendido(yo.role, agenteAsignado, yo.id, yo.supervisedAgentIds)) {
-      return { error: "No tienes permiso para marcar esta propiedad como vendida." };
-    }
-  }
 
   // Usar cliente con RLS — las policies de propiedades gestionan el acceso.
   // Para updates: RLS propiedades_update_scoped ya valida ownership + empresa.
@@ -68,16 +67,33 @@ export async function upsertPropiedadAction(
     // como segunda capa defensiva (RLS también lo hace).
     const { data: existing } = await supabase
       .from("propiedades")
-      .select("empresa_id, created_by_user_id")
+      .select("empresa_id, created_by_user_id, estado, agente_asignado")
       .eq("id", propiedadId)
       .single();
 
     if (!existing) return { error: "Propiedad no encontrada o sin acceso." };
     if (yo.role !== "Administrador" && existing.empresa_id !== yo.empresaId) return { error: "Sin acceso a esta propiedad." };
 
+    const previousStatus = existing.estado ?? null;
+    const nextStatus = payload.estado ?? null;
+    const statusChanged = nextStatus !== null && nextStatus !== previousStatus;
+
+    if (statusChanged && nextStatus === "vendido") {
+      const agenteAsignado = payload.agente_asignado ?? existing.agente_asignado;
+      if (!canSetVendido(yo.role, agenteAsignado, yo.id, yo.supervisedAgentIds)) {
+        return { error: "No tienes permiso para marcar esta propiedad como vendida." };
+      }
+      if (!options?.sale) {
+        return { error: "Completa los datos de venta antes de marcar esta propiedad como vendida." };
+      }
+    }
+
+    const propertyPatch = { ...payload };
+    if (statusChanged) propertyPatch.estado = previousStatus;
+
     let { data, error } = await supabase
       .from("propiedades")
-      .update(payload as never)
+      .update(propertyPatch as never)
       .eq("id", propiedadId)
       .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol), creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos, rol)")
       .single();
@@ -85,7 +101,7 @@ export async function upsertPropiedadAction(
     if (error && shouldRetryWithoutSecondOwner(payload, error)) {
       const retry = await supabase
         .from("propiedades")
-        .update(stripSecondOwner(payload) as never)
+        .update(stripSecondOwner(propertyPatch) as never)
         .eq("id", propiedadId)
         .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol), creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos, rol)")
         .single();
@@ -94,6 +110,21 @@ export async function upsertPropiedadAction(
     }
 
     if (error) return { error: error.message };
+    if (statusChanged && nextStatus) {
+      const transition = await changePropertyStatusAction(propiedadId, nextStatus, {
+        sale: options?.sale,
+        notes: previousStatus === "vendido" ? options?.reopenNotes : null,
+      });
+      if (transition.error) return { error: transition.error };
+
+      const finalRow = await supabase
+        .from("propiedades")
+        .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol), creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos, rol)")
+        .eq("id", propiedadId)
+        .single();
+      if (finalRow.error) return { error: finalRow.error.message };
+      data = finalRow.data;
+    }
     revalidatePath(`/zona`);
     revalidatePath(`/dashboard`);
     return { data: data as Record<string, unknown> };
@@ -108,16 +139,29 @@ export async function upsertPropiedadAction(
       equipo_id: yo.equipoId ?? null,
     };
 
+    if (payload.estado === "vendido") {
+      if (!canSetVendido(yo.role, payload.agente_asignado, yo.id, yo.supervisedAgentIds)) {
+        return { error: "No tienes permiso para marcar esta propiedad como vendida." };
+      }
+      if (!options?.sale) {
+        return { error: "Completa los datos de venta antes de marcar esta propiedad como vendida." };
+      }
+    }
+
+    const insertPayload = payload.estado === "vendido"
+      ? { ...createPayload, estado: "neutral", honorarios: null }
+      : createPayload;
+
     let { data, error } = await supabase
       .from("propiedades")
-      .insert(createPayload as never)
+      .insert(insertPayload as never)
       .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol), creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos, rol)")
       .single();
 
     if (error && shouldRetryWithoutSecondOwner(payload, error)) {
       const retry = await supabase
         .from("propiedades")
-        .insert(stripSecondOwner(createPayload) as never)
+        .insert(stripSecondOwner(insertPayload) as never)
         .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol), creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos, rol)")
         .single();
       data = retry.data;
@@ -125,6 +169,17 @@ export async function upsertPropiedadAction(
     }
 
     if (error) return { error: error.message };
+    if (payload.estado === "vendido" && data?.id) {
+      const transition = await changePropertyStatusAction(Number(data.id), "vendido", { sale: options?.sale });
+      if (transition.error) return { error: transition.error };
+      const finalRow = await supabase
+        .from("propiedades")
+        .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol), creador:usuarios!propiedades_created_by_user_id_fkey(id, nombre, apellidos, rol)")
+        .eq("id", Number(data.id))
+        .single();
+      if (finalRow.error) return { error: finalRow.error.message };
+      data = finalRow.data;
+    }
     revalidatePath(`/zona`);
     revalidatePath(`/dashboard`);
     return { data: data as Record<string, unknown> };

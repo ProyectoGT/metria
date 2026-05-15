@@ -27,6 +27,7 @@ type ArchivoEntry = {
   storage_path: string | null;
   tipo: string;
   created_at: string;
+  ciclo_comercial_id?: number | null;
 };
 
 type NotaEntry = {
@@ -62,6 +63,7 @@ type Propiedad = {
   telefono_secundario?: string | null;
   estado: string | null;
   notas: string | null;
+  current_commercial_cycle_id?: number | null;
 };
 
 // Upload progress per file
@@ -79,6 +81,8 @@ type EncargoPanelProps = {
   currentUserId: number;
   onClose: () => void;
   onEdit: () => void;
+  cycleId?: number | null;
+  readOnly?: boolean;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -192,7 +196,15 @@ function DropZone({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function EncargoPanel({ propiedad, agentes, currentUserId, onClose, onEdit }: EncargoPanelProps) {
+export default function EncargoPanel({
+  propiedad,
+  agentes,
+  currentUserId,
+  onClose,
+  onEdit,
+  cycleId,
+  readOnly = false,
+}: EncargoPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("visitas");
   const [archivos, setArchivos] = useState<ArchivoEntry[]>([]);
   const [notas, setNotas] = useState<NotaEntry[]>([]);
@@ -222,27 +234,38 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
   const [notaError, setNotaError] = useState<string | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
+  const effectiveCycleId = cycleId ?? propiedad.current_commercial_cycle_id ?? null;
 
   // ── Load data ─────────────────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
       setLoading(true);
+      const archivoQuery = supabase
+        .from("archivos")
+        .select("id, nombre, url, storage_path, tipo, created_at, ciclo_comercial_id")
+        .eq("propiedad_id", propiedad.id)
+        .order("created_at", { ascending: false });
+      const notaQuery = supabase
+        .from("encargo_notas")
+        .select("id, contenido, created_at")
+        .eq("propiedad_id", propiedad.id)
+        .order("created_at", { ascending: false });
+      const visitaQuery = supabase
+        .from("encargo_visitas")
+        .select("id, agente_id, agente_nombre, fecha_visita, observaciones, visitante_nombre, visitante_telefono, created_at")
+        .eq("propiedad_id", propiedad.id)
+        .order("fecha_visita", { ascending: false });
+
+      if (effectiveCycleId) {
+        archivoQuery.eq("ciclo_comercial_id", effectiveCycleId);
+        notaQuery.eq("ciclo_comercial_id", effectiveCycleId);
+        visitaQuery.eq("ciclo_comercial_id", effectiveCycleId);
+      }
+
       const [{ data: archivoData }, { data: notaData }, { data: visitaData }] = await Promise.all([
-        supabase
-          .from("archivos")
-          .select("id, nombre, url, storage_path, tipo, created_at")
-          .eq("propiedad_id", propiedad.id)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("encargo_notas")
-          .select("id, contenido, created_at")
-          .eq("propiedad_id", propiedad.id)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("encargo_visitas")
-          .select("id, agente_id, agente_nombre, fecha_visita, observaciones, visitante_nombre, visitante_telefono, created_at")
-          .eq("propiedad_id", propiedad.id)
-          .order("fecha_visita", { ascending: false }),
+        archivoQuery,
+        notaQuery,
+        visitaQuery,
       ]);
       setArchivos((archivoData as ArchivoEntry[]) ?? []);
       setNotas((notaData as NotaEntry[]) ?? []);
@@ -250,7 +273,7 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
       setLoading(false);
     }
     load();
-  }, [propiedad.id, supabase]);
+  }, [effectiveCycleId, propiedad.id, supabase]);
 
   // Close on Escape
   useEffect(() => {
@@ -296,6 +319,7 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
   }
 
   async function handleUploadDocs() {
+    if (readOnly) return;
     if (docQueue.length === 0) return;
     setUploadingDocs(true);
 
@@ -319,6 +343,7 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
           storage_path,
           tipo: "documento",
           propiedad_id: propiedad.id,
+          ciclo_comercial_id: effectiveCycleId,
         })
         .select("id, nombre, url, storage_path, tipo, created_at")
         .single();
@@ -354,6 +379,7 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
   }
 
   async function handleUploadImgs() {
+    if (readOnly) return;
     if (imgQueue.length === 0) return;
     setUploadingImgs(true);
 
@@ -377,6 +403,7 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
           storage_path,
           tipo: "imagen",
           propiedad_id: propiedad.id,
+          ciclo_comercial_id: effectiveCycleId,
         })
         .select("id, nombre, url, storage_path, tipo, created_at")
         .single();
@@ -397,6 +424,7 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
   // ── Visita handlers ───────────────────────────────────────────────────────
 
   async function handleAddVisita() {
+    if (readOnly) return;
     setSavingVisita(true);
     setVisitaError(null);
 
@@ -423,6 +451,7 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
       .from("encargo_visitas")
       .insert({
         propiedad_id: propiedad.id,
+        ciclo_comercial_id: effectiveCycleId,
         agente_id: agenteId,
         agente_nombre,
         fecha_visita: visitaFecha ? new Date(visitaFecha).toISOString() : new Date().toISOString(),
@@ -447,11 +476,13 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
   }
 
   async function handleDeleteVisita(id: number) {
+    if (readOnly) return;
     await supabase.from("encargo_visitas").delete().eq("id", id);
     setVisitas((prev) => prev.filter((v) => v.id !== id));
   }
 
   async function handleDeleteArchivo(archivo: ArchivoEntry) {
+    if (readOnly) return;
     if (archivo.storage_path) {
       await supabase.storage.from(BUCKET).remove([archivo.storage_path]);
     }
@@ -460,12 +491,13 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
   }
 
   async function handleAddNota() {
+    if (readOnly) return;
     if (!notaTexto.trim()) return;
     setSavingNota(true);
     setNotaError(null);
     const { data, error } = await supabase
       .from("encargo_notas")
-      .insert({ contenido: notaTexto.trim(), propiedad_id: propiedad.id })
+      .insert({ contenido: notaTexto.trim(), propiedad_id: propiedad.id, ciclo_comercial_id: effectiveCycleId })
       .select("id, contenido, created_at")
       .single();
     if (error) {
@@ -478,6 +510,7 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
   }
 
   async function handleDeleteNota(id: number) {
+    if (readOnly) return;
     await supabase.from("encargo_notas").delete().eq("id", id);
     setNotas((prev) => prev.filter((n) => n.id !== id));
   }
@@ -541,12 +574,14 @@ export default function EncargoPanel({ propiedad, agentes, currentUserId, onClos
 
             {/* Acciones */}
             <div className="flex shrink-0 items-center gap-1.5">
-              <button
-                onClick={onEdit}
-                className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
-              >
-                Editar
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={onEdit}
+                  className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+                >
+                  Editar
+                </button>
+              )}
               <button
                 onClick={onClose}
                 className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"

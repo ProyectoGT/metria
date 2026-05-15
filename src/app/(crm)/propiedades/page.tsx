@@ -18,6 +18,9 @@ export type PropiedadRow = {
   estado: string | null;
   honorarios: number | null;
   precio: number | null;
+  current_commercial_cycle_id: number | null;
+  has_sale_history: boolean;
+  last_sold_at: string | null;
   titulo: string | null;
   descripcion: string | null;
   tipo_operacion: string | null;
@@ -92,6 +95,7 @@ export default async function PropiedadesPage() {
     .from("propiedades")
     .select(`
       id, planta, puerta, propietario, telefono, estado, honorarios, precio,
+      current_commercial_cycle_id, has_sale_history, last_sold_at,
       titulo, descripcion, tipo_operacion, latitud, longitud,
       publicar_en_web, estado_publicacion_web, web_destacada,
       ficha_completa, calidad_ficha_score, created_at, updated_at,
@@ -125,6 +129,9 @@ export default async function PropiedadesPage() {
     estado: string | null;
     honorarios: number | null;
     precio: number | null;
+    current_commercial_cycle_id: number | null;
+    has_sale_history: boolean | null;
+    last_sold_at: string | null;
     titulo: string | null;
     descripcion: string | null;
     tipo_operacion: string | null;
@@ -161,6 +168,9 @@ export default async function PropiedadesPage() {
     estado:                 r.estado,
     honorarios:             r.honorarios,
     precio:                 r.precio,
+    current_commercial_cycle_id: r.current_commercial_cycle_id ?? null,
+    has_sale_history:       r.has_sale_history ?? false,
+    last_sold_at:           r.last_sold_at,
     titulo:                 r.titulo,
     descripcion:            r.descripcion,
     tipo_operacion:         r.tipo_operacion,

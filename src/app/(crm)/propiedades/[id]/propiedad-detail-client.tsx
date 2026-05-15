@@ -53,6 +53,11 @@ function formatPrecio(p: PropiedadDetail): string {
   return new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
 }
 
+function formatCurrency(value: number | null): string {
+  if (value == null) return "—";
+  return new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value);
+}
+
 function formatDate(d: string | null): string {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
@@ -114,6 +119,8 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, 
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [showEncargoPanel, setShowEncargoPanel] = useState(false);
+  const [encargoCycleId, setEncargoCycleId] = useState<number | null>(null);
+  const [encargoReadOnly, setEncargoReadOnly] = useState(false);
   const [fichaResult, setFichaResult] = useState<{
     faltantes: string[];
     mensaje: string;
@@ -162,6 +169,7 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, 
   const estado = propiedad.estado ?? "neutral";
   const showEncargoHistory = estado === "encargo" || propiedad.has_encargo_data;
   const propertyLabel = propiedad.titulo ?? propiedad.propietario ?? `Propiedad #${propiedad.id}`;
+  const hasCommercialHistory = propiedad.commercial_cycles.length > 0;
 
   return (
     <div className="space-y-5">
@@ -252,6 +260,11 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, 
                 <span className={`rounded-full px-3 py-1 text-xs font-semibold ${ESTADO_COLOR[estado] ?? ESTADO_COLOR.neutral}`}>
                   {ESTADOS[estado] ?? estado}
                 </span>
+                {propiedad.has_sale_history && (
+                  <span className="rounded-full border border-emerald-500/25 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                    Vendida anteriormente{propiedad.last_sold_at ? ` · ${formatDate(propiedad.last_sold_at)}` : ""}
+                  </span>
+                )}
                 <span className="text-xl font-bold text-text-primary">{formatPrecio(propiedad)}</span>
                 {propiedad.tipo_operacion && (
                   <span className="text-xs text-text-secondary">{OPERACION_LABEL[propiedad.tipo_operacion] ?? propiedad.tipo_operacion}</span>
@@ -259,6 +272,12 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, 
               </div>
             </div>
           </div>
+
+          {propiedad.has_sale_history && estado !== "vendido" && (
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-5 py-4 text-sm leading-relaxed text-emerald-800 dark:text-emerald-300">
+              Esta propiedad tiene un historial de venta anterior. Los datos archivados siguen disponibles en Historial comercial.
+            </div>
+          )}
 
           {/* Datos básicos */}
           <Section title="Datos basicos">
@@ -343,7 +362,11 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, 
               action={
                 <button
                   type="button"
-                  onClick={() => setShowEncargoPanel(true)}
+                  onClick={() => {
+                    setEncargoCycleId(propiedad.current_commercial_cycle_id);
+                    setEncargoReadOnly(false);
+                    setShowEncargoPanel(true);
+                  }}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-success/30 px-3 py-1.5 text-xs font-semibold text-success transition-colors hover:bg-success/10"
                 >
                   <CalendarCheck className="h-3.5 w-3.5" />
@@ -360,6 +383,80 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, 
                 <p className="text-sm leading-relaxed text-text-secondary">
                   Consulta los documentos, imagenes, visitas y notas asociados a la etapa de encargo.
                 </p>
+              </div>
+            </Section>
+          )}
+
+          {hasCommercialHistory && (
+            <Section title="Historial comercial">
+              <div className="space-y-3">
+                {propiedad.commercial_cycles.map((cycle) => {
+                  const isClosed = cycle.status === "closed";
+                  return (
+                    <div key={cycle.id} className="rounded-xl border border-border bg-background px-4 py-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${isClosed ? "bg-surface-raised text-text-secondary" : "bg-success/10 text-success"}`}>
+                              {isClosed ? "Ciclo cerrado" : "Ciclo activo"}
+                            </span>
+                            {cycle.closed_reason && (
+                              <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                                {cycle.closed_reason === "sold" ? "Vendida" : cycle.closed_reason}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-2 text-sm text-text-secondary">
+                            Inicio: {formatDate(cycle.started_at)} · Cierre: {formatDate(cycle.closed_at)}
+                          </p>
+                          <p className="mt-1 text-sm text-text-secondary">
+                            Estado: {cycle.initial_status ?? "—"} → {cycle.final_status ?? (isClosed ? "—" : estado)}
+                          </p>
+                          {(cycle.opened_by_name || cycle.closed_by_name) && (
+                            <p className="mt-1 text-xs text-text-secondary">
+                              Abierto por {cycle.opened_by_name ?? "—"} · Cerrado por {cycle.closed_by_name ?? "—"}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEncargoCycleId(cycle.id);
+                            setEncargoReadOnly(isClosed);
+                            setShowEncargoPanel(true);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+                        >
+                          Ver datos archivados
+                        </button>
+                      </div>
+                      {cycle.sale && (
+                        <div className="mt-3 grid grid-cols-1 gap-2 rounded-lg border border-emerald-500/15 bg-emerald-500/5 p-3 text-sm sm:grid-cols-2">
+                          <InfoRow label="Fecha venta" value={formatDate(cycle.sale.sold_at)} />
+                          <InfoRow label="Precio venta" value={formatCurrency(cycle.sale.sale_price)} />
+                          <InfoRow label="Comision" value={formatCurrency(cycle.sale.commission_amount)} />
+                          <InfoRow label="Comprador" value={cycle.sale.buyer_name} />
+                        </div>
+                      )}
+                      {cycle.status_changes.length > 0 && (
+                        <div className="mt-3 border-t border-border pt-3">
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Cambios de estado</p>
+                          <div className="space-y-1.5">
+                            {cycle.status_changes.map((change) => (
+                              <p key={`${cycle.id}-${change.changed_at}-${change.to_status}`} className="text-xs text-text-secondary">
+                                {formatDate(change.changed_at)} · {change.from_status ?? "Inicio"} → {change.to_status}
+                                {change.changed_by_name ? ` · ${change.changed_by_name}` : ""}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <p className="mt-3 text-xs text-text-secondary">
+                        Datos archivados: {cycle.counts.archivos} archivos · {cycle.counts.visitas} visitas · {cycle.counts.notas} notas
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </Section>
           )}
@@ -496,7 +593,13 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, 
           propiedad={propiedad}
           agentes={agentes}
           currentUserId={currentUserId}
-          onClose={() => setShowEncargoPanel(false)}
+          cycleId={encargoCycleId}
+          readOnly={encargoReadOnly}
+          onClose={() => {
+            setShowEncargoPanel(false);
+            setEncargoCycleId(null);
+            setEncargoReadOnly(false);
+          }}
           onEdit={() => {
             if (zonaHref) window.location.href = zonaHref;
           }}

@@ -264,9 +264,16 @@ export default function PropiedadesClient({ propiedades, zonas, agentes, isManag
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${ESTADO_COLOR[p.estado ?? "neutral"] ?? ESTADO_COLOR.neutral}`}>
-                        {ESTADOS[p.estado ?? "neutral"] ?? p.estado}
-                      </span>
+                      <div className="flex flex-col items-start gap-1">
+                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${ESTADO_COLOR[p.estado ?? "neutral"] ?? ESTADO_COLOR.neutral}`}>
+                          {ESTADOS[p.estado ?? "neutral"] ?? p.estado}
+                        </span>
+                        {p.has_sale_history && (
+                          <span className="inline-flex rounded-full border border-emerald-500/25 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                            Historico venta
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-text-secondary">
                       {p.tipo_operacion ? OPERACION_LABEL[p.tipo_operacion] ?? p.tipo_operacion : "—"}
@@ -334,9 +341,16 @@ export default function PropiedadesClient({ propiedades, zonas, agentes, isManag
                         <span className="truncate">{getUbicacion(p)}</span>
                       </div>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${ESTADO_COLOR[p.estado ?? "neutral"] ?? ESTADO_COLOR.neutral}`}>
-                      {ESTADOS[p.estado ?? "neutral"] ?? p.estado}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${ESTADO_COLOR[p.estado ?? "neutral"] ?? ESTADO_COLOR.neutral}`}>
+                        {ESTADOS[p.estado ?? "neutral"] ?? p.estado}
+                      </span>
+                      {p.has_sale_history && (
+                        <span className="rounded-full border border-emerald-500/25 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                          Historico venta
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs text-text-secondary">

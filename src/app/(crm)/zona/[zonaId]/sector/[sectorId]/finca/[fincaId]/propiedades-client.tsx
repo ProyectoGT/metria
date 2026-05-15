@@ -45,6 +45,10 @@ type Propiedad = {
   created_at?: string | null;
   contactado?: boolean;
   contactado_hasta?: string | null;
+  precio?: number | null;
+  current_commercial_cycle_id?: number | null;
+  has_sale_history?: boolean;
+  last_sold_at?: string | null;
   has_encargo_data?: boolean;
   usuarios: { id: number; nombre: string; apellidos: string; rol?: string | null } | null;
   creador?: { id: number; nombre: string; apellidos: string; rol?: string | null } | null;
@@ -71,6 +75,37 @@ type ReminderForm = {
   fecha: string;
   hora: string;
   nota: string;
+};
+
+type SaleForm = {
+  soldAt: string;
+  salePrice: string;
+  commissionAmount: string;
+  buyerName: string;
+  buyerPhone: string;
+  notes: string;
+};
+
+type PropiedadMutationPayload = {
+  planta: string | null;
+  puerta: string | null;
+  propietario: string | null;
+  telefono: string | null;
+  propietario_secundario: string | null;
+  telefono_secundario: string | null;
+  estado: string | null;
+  fecha_visita: string | null;
+  notas: string | null;
+  honorarios: number | null;
+  agente_asignado: number | null;
+  latitud: number | null;
+  longitud: number | null;
+};
+
+type PendingPropiedadSave = {
+  payload: PropiedadMutationPayload;
+  propiedadId?: number;
+  editing: boolean;
 };
 
 const ESTADOS = [
@@ -160,6 +195,15 @@ const EMPTY_REMINDER: ReminderForm = {
   nota: "",
 };
 
+const EMPTY_SALE_FORM: SaleForm = {
+  soldAt: "",
+  salePrice: "",
+  commissionAmount: "",
+  buyerName: "",
+  buyerPhone: "",
+  notes: "",
+};
+
 function formatNowDisplay() {
   return new Date().toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" });
 }
@@ -232,6 +276,11 @@ export default function PropiedadesClient({
   const [reminderPropiedad, setReminderPropiedad] = useState<Propiedad | null>(null);
   const [reminderForm, setReminderForm] = useState<ReminderForm>(EMPTY_REMINDER);
   const [reminderSaving, setReminderSaving] = useState(false);
+  const [pendingSave, setPendingSave] = useState<PendingPropiedadSave | null>(null);
+  const [saleForm, setSaleForm] = useState<SaleForm>(EMPTY_SALE_FORM);
+  const [saleModalOpen, setSaleModalOpen] = useState(false);
+  const [reopenModalOpen, setReopenModalOpen] = useState(false);
+  const [reopenNotes, setReopenNotes] = useState("");
 
   const [nowDisplay, setNowDisplay] = useState(() => formatNowDisplay());
   useEffect(() => {
@@ -257,6 +306,12 @@ export default function PropiedadesClient({
 
   function userName(user: { nombre: string | null; apellidos: string | null } | null | undefined) {
     return user ? `${user.nombre ?? ""} ${user.apellidos ?? ""}`.trim() : "";
+  }
+
+  function parseOptionalNumber(value: string): number | null {
+    if (!value.trim()) return null;
+    const parsed = Number(value.replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   // IDs ya procesados para no disparar el mismo RPC más de una vez
@@ -353,6 +408,9 @@ export default function PropiedadesClient({
     setEditTarget(null);
     setShowSecondOwner(false);
     setSaveError(null);
+    setPendingSave(null);
+    setSaleModalOpen(false);
+    setReopenModalOpen(false);
   }
 
   function setField(key: keyof FormData, value: string) {
@@ -426,7 +484,7 @@ export default function PropiedadesClient({
     const today = new Date();
     const todayDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
-    const payload = {
+    const payload: PropiedadMutationPayload = {
       planta: form.planta || null,
       puerta: form.puerta || null,
       propietario: form.propietario || null,
@@ -442,10 +500,53 @@ export default function PropiedadesClient({
       longitud: form.longitud ? parseFloat(form.longitud) : null,
     };
 
+    const previousStatus = editTarget?.estado ?? null;
+    const nextStatus = payload.estado ?? null;
+    if (nextStatus === "vendido" && previousStatus !== "vendido") {
+      setPendingSave({ payload, propiedadId: editTarget?.id, editing: Boolean(editTarget) });
+      setSaleForm({
+        ...EMPTY_SALE_FORM,
+        soldAt: nowLocalDatetime(),
+        salePrice: editTarget?.precio != null ? String(editTarget.precio) : "",
+        commissionAmount: form.honorarios,
+      });
+      setSaleModalOpen(true);
+      setSaving(false);
+      return;
+    }
+
+    if (previousStatus === "vendido" && nextStatus !== "vendido") {
+      setPendingSave({ payload, propiedadId: editTarget?.id, editing: true });
+      setReopenNotes("");
+      setReopenModalOpen(true);
+      setSaving(false);
+      return;
+    }
+
+    await submitPropiedadSave({ payload, propiedadId: editTarget?.id, editing: Boolean(editTarget) });
+  }
+
+  async function submitPropiedadSave(
+    save: PendingPropiedadSave,
+    options?: {
+      sale?: {
+        soldAt: string;
+        salePrice: number | null;
+        commissionAmount: number | null;
+        buyerName: string | null;
+        buyerPhone: string | null;
+        notes: string | null;
+      };
+      reopenNotes?: string | null;
+    }
+  ) {
+    setSaving(true);
+    setSaveError(null);
     const { data, error } = await upsertPropiedadAction(
-      payload,
+      save.payload,
       fincaId,
-      editTarget?.id
+      save.propiedadId,
+      options
     );
 
     if (error) {
@@ -455,10 +556,10 @@ export default function PropiedadesClient({
     }
 
     if (data) {
-      if (editTarget) {
+      if (save.editing && save.propiedadId) {
         setPropiedades((prev) =>
           prev.map((p) =>
-            p.id === editTarget.id ? { ...(data as unknown as Propiedad), _order: p._order } : p
+            p.id === save.propiedadId ? { ...(data as unknown as Propiedad), _order: p._order } : p
           )
         );
         toast("Propiedad actualizada correctamente");
@@ -471,6 +572,33 @@ export default function PropiedadesClient({
 
     setSaving(false);
     closeModal();
+    setPendingSave(null);
+    setSaleModalOpen(false);
+    setReopenModalOpen(false);
+  }
+
+  async function confirmSale() {
+    if (!pendingSave) return;
+    if (!saleForm.soldAt) {
+      setSaveError("Indica la fecha de venta.");
+      return;
+    }
+
+    await submitPropiedadSave(pendingSave, {
+      sale: {
+        soldAt: new Date(saleForm.soldAt).toISOString(),
+        salePrice: parseOptionalNumber(saleForm.salePrice),
+        commissionAmount: parseOptionalNumber(saleForm.commissionAmount),
+        buyerName: saleForm.buyerName.trim() || null,
+        buyerPhone: saleForm.buyerPhone.trim() || null,
+        notes: saleForm.notes.trim() || null,
+      },
+    });
+  }
+
+  async function confirmReopen() {
+    if (!pendingSave) return;
+    await submitPropiedadSave(pendingSave, { reopenNotes: reopenNotes.trim() || null });
   }
 
   async function handleDelete() {
@@ -875,11 +1003,18 @@ export default function PropiedadesClient({
                     </div>
                   </div>
                   {propiedad.estado ? (
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${estadoClasses(propiedad.estado)}`}
-                    >
-                      {estadoLabel(propiedad.estado)}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${estadoClasses(propiedad.estado)}`}
+                      >
+                        {estadoLabel(propiedad.estado)}
+                      </span>
+                      {propiedad.has_sale_history && (
+                        <span className="rounded-full border border-emerald-500/25 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                          Historico venta
+                        </span>
+                      )}
+                    </div>
                   ) : null}
                 </div>
 
@@ -1072,7 +1207,14 @@ export default function PropiedadesClient({
                                 {propiedad.puerta ?? "-"}
                               </td>
                               <td className="px-2 py-3 font-medium text-text-primary">
-                                {propiedad.propietario ?? "-"}
+                                <div className="space-y-1">
+                                  <p>{propiedad.propietario ?? "-"}</p>
+                                  {propiedad.has_sale_history && (
+                                    <span className="inline-flex rounded-full border border-emerald-500/25 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                                      Historico venta
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-2 py-3">
                                 {propiedad.estado ? (
@@ -1608,6 +1750,144 @@ export default function PropiedadesClient({
               replyTo={null}
             />
           )}
+        </div>
+      </Drawer>
+
+      <Drawer
+        open={saleModalOpen}
+        onClose={() => {
+          setSaleModalOpen(false);
+          setPendingSave(null);
+        }}
+        title="Marcar propiedad como vendida"
+        width="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setSaleModalOpen(false);
+                setPendingSave(null);
+              }}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={confirmSale}
+              disabled={saving || !saleForm.soldAt}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
+            >
+              {saving ? "Guardando..." : "Confirmar venta"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 px-6 py-5">
+          <p className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-secondary">
+            Esta accion cerrara el ciclo comercial actual y conservara todos los datos asociados en el historial.
+            Podras reabrir la propiedad mas adelante sin perder la informacion anterior.
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField label="Fecha de venta">
+              <input
+                type="datetime-local"
+                value={saleForm.soldAt}
+                onChange={(e) => setSaleForm((prev) => ({ ...prev, soldAt: e.target.value }))}
+                className="input"
+              />
+            </FormField>
+            <FormField label="Precio de venta">
+              <input
+                type="number"
+                value={saleForm.salePrice}
+                onChange={(e) => setSaleForm((prev) => ({ ...prev, salePrice: e.target.value }))}
+                className="input"
+                min="0"
+                step="0.01"
+              />
+            </FormField>
+            <FormField label="Honorarios / comision">
+              <input
+                type="number"
+                value={saleForm.commissionAmount}
+                onChange={(e) => setSaleForm((prev) => ({ ...prev, commissionAmount: e.target.value }))}
+                className="input"
+                min="0"
+                step="0.01"
+              />
+            </FormField>
+            <FormField label="Telefono comprador">
+              <input
+                type="tel"
+                value={saleForm.buyerPhone}
+                onChange={(e) => setSaleForm((prev) => ({ ...prev, buyerPhone: e.target.value }))}
+                className="input"
+              />
+            </FormField>
+          </div>
+          <FormField label="Comprador">
+            <input
+              type="text"
+              value={saleForm.buyerName}
+              onChange={(e) => setSaleForm((prev) => ({ ...prev, buyerName: e.target.value }))}
+              className="input"
+            />
+          </FormField>
+          <FormField label="Observaciones">
+            <textarea
+              value={saleForm.notes}
+              onChange={(e) => setSaleForm((prev) => ({ ...prev, notes: e.target.value }))}
+              rows={3}
+              className="input resize-none"
+            />
+          </FormField>
+          {saveError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{saveError}</p>}
+        </div>
+      </Drawer>
+
+      <Drawer
+        open={reopenModalOpen}
+        onClose={() => {
+          setReopenModalOpen(false);
+          setPendingSave(null);
+        }}
+        title="Reabrir ciclo comercial"
+        width="md"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setReopenModalOpen(false);
+                setPendingSave(null);
+              }}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={confirmReopen}
+              disabled={saving}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
+            >
+              {saving ? "Guardando..." : "Crear nuevo ciclo"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 px-6 py-5">
+          <p className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-secondary">
+            Esta propiedad ya fue vendida anteriormente. Al reabrirla, se creara un nuevo ciclo comercial.
+            Los datos anteriores quedaran archivados en el historial, pero seguiran accesibles.
+          </p>
+          <FormField label="Nota de reapertura">
+            <textarea
+              value={reopenNotes}
+              onChange={(e) => setReopenNotes(e.target.value)}
+              rows={3}
+              className="input resize-none"
+            />
+          </FormField>
+          {saveError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{saveError}</p>}
         </div>
       </Drawer>
 
