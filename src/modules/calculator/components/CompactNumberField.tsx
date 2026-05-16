@@ -16,14 +16,24 @@ type CompactNumberFieldProps = {
 export default function CompactNumberField({ label, value, onChange, hint, step = 1, error }: CompactNumberFieldProps) {
   const decimals = step < 1 ? 2 : 0;
   const safeValue = Number.isFinite(value) ? value : 0;
-  const [editing, setEditing] = useState(false);
-  const [draftValue, setDraftValue] = useState("");
-  const textValue = editing ? draftValue : numberInputText(safeValue, decimals);
 
-  function updateValue(next: string) {
-    setDraftValue(next);
+  // draft === null  → input sincronizado con safeValue
+  // draft === string → usuario editando
+  const [draft, setDraft] = useState<string | null>(null);
+  const display = draft !== null ? draft : numberInputText(safeValue, decimals);
+
+  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const next = event.target.value;
+    setDraft(next);
     if (isEmptyNumberInput(next)) return;
-    onChange(Math.max(parseNumberInput(next, safeValue), 0));
+    const parsed = parseNumberInput(next, safeValue);
+    if (!Number.isFinite(parsed)) return;
+    const clamped = Math.max(parsed, 0);
+    if (clamped !== safeValue) onChange(clamped);
+  }
+
+  function handleBlur() {
+    setDraft(null);
   }
 
   return (
@@ -32,13 +42,9 @@ export default function CompactNumberField({ label, value, onChange, hint, step 
         className="input"
         type="text"
         inputMode="decimal"
-        value={textValue}
-        onFocus={() => {
-          setEditing(true);
-          setDraftValue(numberInputText(safeValue, decimals));
-        }}
-        onChange={(event) => updateValue(event.target.value)}
-        onBlur={() => setEditing(false)}
+        value={display}
+        onChange={handleChange}
+        onBlur={handleBlur}
       />
     </FormField>
   );

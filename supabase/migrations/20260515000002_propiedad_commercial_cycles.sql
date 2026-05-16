@@ -294,6 +294,10 @@ create policy propiedad_registros_venta_delete
 on public.propiedad_registros_venta for delete
 using (public.can_manage_propiedad_for_cycles(propiedad_id));
 
+-- Backfill: desactivar triggers en propiedades durante las actualizaciones masivas
+-- para no disparar validaciones de negocio (agente_asignado, etc.)
+set session_replication_role = 'replica';
+
 -- Backfill one commercial cycle per existing property.
 insert into public.propiedad_ciclos_comerciales (
   propiedad_id,
@@ -422,6 +426,9 @@ set ciclo_comercial_id = p.current_commercial_cycle_id
 from public.propiedades p
 where e.propiedad_id = p.id
   and e.ciclo_comercial_id is null;
+
+-- Restaurar comportamiento normal de triggers
+set session_replication_role = 'origin';
 
 create or replace function public.default_ciclo_comercial_id()
 returns trigger

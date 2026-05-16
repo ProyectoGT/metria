@@ -184,19 +184,17 @@ export default async function PedidoDetailPage({
             <p className="text-sm text-text-secondary">{ACCESS_SCOPE_LABELS[scope]}</p>
           </div>
 
-          {pedido.telefono && (
-            <div className="rounded-lg border border-border bg-surface p-5">
-              <h2 className="mb-3 text-base font-semibold text-text-primary">Acciones</h2>
-              <div className="flex flex-col gap-2">
-                <PropertyMatcherModal
-                  pedidoId={pedido.id}
-                  clienteNombre={pedido.nombre_cliente}
-                  clienteTelefono={pedido.telefono}
-                  currentUserName={agenteActual}
-                />
-              </div>
+          <div className="rounded-lg border border-border bg-surface p-5">
+            <h2 className="mb-3 text-base font-semibold text-text-primary">Acciones</h2>
+            <div className="flex flex-col gap-2">
+              <PropertyMatcherModal
+                pedidoId={pedido.id}
+                clienteNombre={pedido.nombre_cliente}
+                clienteTelefono={pedido.telefono}
+                currentUserName={agenteActual}
+              />
             </div>
-          )}
+          </div>
 
           <WhatsAppHistory pedidoId={pedido.id} />
         </aside>

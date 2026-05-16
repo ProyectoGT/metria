@@ -26,6 +26,7 @@ import {
   Mail,
   Settings,
   Shield,
+  MessageCircle,
   X,
 } from "lucide-react";
 
@@ -37,8 +38,9 @@ const MAIN_NAV = [
   { labelKey: "navigation.zone",       href: "/zona",          resourceKey: "zona",         icon: MapPin },
   { labelKey: "navigation.mapZones",   href: "/zonas-geograficas", resourceKey: "zonas-geograficas", icon: MapPin },
   { labelKey: "navigation.properties", href: "/propiedades",   resourceKey: "propiedades",  icon: Building2 },
-  { labelKey: "navigation.requests",   href: "/solicitudes",   resourceKey: "solicitudes",  icon: ClipboardList },
-  { labelKey: "navigation.contacts",   href: "/contactos",     resourceKey: "contactos",    icon: BookUser },
+  { labelKey: "navigation.requests",        href: "/solicitudes",    resourceKey: "solicitudes",    icon: ClipboardList },
+  { labelKey: "navigation.communications", href: "/comunicaciones", resourceKey: "comunicaciones", icon: MessageCircle },
+  { labelKey: "navigation.contacts",       href: "/contactos",      resourceKey: "contactos",      icon: BookUser },
   { labelKey: "navigation.email",      href: "/email",         resourceKey: "email",        icon: Mail },
 ];
 

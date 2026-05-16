@@ -20,6 +20,7 @@ export type BuyerMatch = {
   modalidad: string | null;
   habitaciones: number | null;
   garaje: boolean | null;
+  whatsapp_consent: boolean | null;
   score: number;
   score_presupuesto: boolean;
   score_zona: boolean;
@@ -89,7 +90,7 @@ export async function findCompatibleBuyersAction(propiedadId: number): Promise<B
   const { data: pedidos } = await supabase
     .from("pedidos")
     .select(
-      "id, nombre_cliente, telefono, presupuesto, zona_deseada, zona_busqueda, tipo_propiedad, modalidad, habitaciones, garaje, zona:zona_deseada(id, nombre)"
+      "id, nombre_cliente, telefono, presupuesto, zona_deseada, zona_busqueda, tipo_propiedad, modalidad, habitaciones, garaje, whatsapp_consent, zona:zona_deseada(id, nombre)"
     )
     .eq("empresa_id", yo.empresaId)
     .not("telefono", "is", null)
@@ -106,6 +107,7 @@ export async function findCompatibleBuyersAction(propiedadId: number): Promise<B
     modalidad: string | null;
     habitaciones: number | null;
     garaje: boolean | null;
+    whatsapp_consent: boolean | null;
     zona: { id: number; nombre: string | null } | null;
   };
 
@@ -151,6 +153,7 @@ export async function findCompatibleBuyersAction(propiedadId: number): Promise<B
       modalidad: p.modalidad,
       habitaciones: p.habitaciones,
       garaje: p.garaje,
+      whatsapp_consent: p.whatsapp_consent,
       score,
       score_presupuesto,
       score_zona,

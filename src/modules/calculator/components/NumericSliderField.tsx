@@ -33,29 +33,44 @@ export default function NumericSliderField({
 }: NumericSliderFieldProps) {
   const decimals = step < 1 ? 2 : 0;
   const safeValue = clamp(value, min, max);
-  const [editing, setEditing] = useState(false);
-  const [draftValue, setDraftValue] = useState("");
-  const textValue = editing ? draftValue : numberInputText(safeValue, decimals);
 
-  function commitText(next: string) {
-    setDraftValue(next);
+  // draft === null  → input sincronizado con safeValue (muestra valor formateado)
+  // draft === string → usuario editando (muestra exactamente lo que escribió)
+  const [draft, setDraft] = useState<string | null>(null);
+  const display = draft !== null ? draft : numberInputText(safeValue, decimals);
+
+  function emitParsed(next: string) {
     if (isEmptyNumberInput(next)) return;
-    onChange(clamp(parseNumberInput(next, safeValue), min, max));
+    const parsed = parseNumberInput(next, safeValue);
+    if (!Number.isFinite(parsed)) return;
+    const clamped = clamp(parsed, min, max);
+    if (clamped !== safeValue) onChange(clamped);
   }
 
-  function commitBlur() {
-    if (!isEmptyNumberInput(draftValue)) {
-      const nextValue = clamp(parseNumberInput(draftValue, safeValue), min, max);
-      onChange(nextValue);
-      setDraftValue(numberInputText(nextValue, decimals));
-    } else {
-      setDraftValue(numberInputText(safeValue, decimals));
-    }
-    setEditing(false);
+  function handleTextChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const next = event.target.value;
+    setDraft(next);
+    emitParsed(next);
+  }
+
+  function handleBlur() {
+    setDraft(null);
+  }
+
+  function handleSliderChange(event: React.ChangeEvent<HTMLInputElement>) {
+    // El slider siempre fuerza salir del modo edición de texto.
+    setDraft(null);
+    const next = clamp(parseNumberInput(event.target.value, safeValue), min, max);
+    if (next !== safeValue) onChange(next);
   }
 
   return (
-    <div className={cn("rounded-ds-md border bg-surface-elevated p-4 shadow-layer-1", error ? "border-danger/50" : "border-border")}>
+    <div
+      className={cn(
+        "rounded-ds-md border bg-surface-elevated p-4 shadow-layer-1",
+        error ? "border-danger/50" : "border-border",
+      )}
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <label className="text-sm font-semibold text-text-primary">{label}</label>
@@ -67,13 +82,9 @@ export default function NumericSliderField({
           <input
             type="text"
             inputMode="decimal"
-            value={textValue}
-            onFocus={() => {
-              setEditing(true);
-              setDraftValue(numberInputText(safeValue, decimals));
-            }}
-            onChange={(event) => commitText(event.target.value)}
-            onBlur={commitBlur}
+            value={display}
+            onChange={handleTextChange}
+            onBlur={handleBlur}
             className="w-full bg-transparent text-right text-sm font-semibold text-text-primary outline-none"
           />
           {(unit || suffix) && <span className="ml-1 text-sm font-medium text-text-secondary">{unit ?? suffix}</span>}
@@ -81,20 +92,24 @@ export default function NumericSliderField({
       </div>
       <input
         type="range"
-        value={Math.min(Math.max(safeValue, min), max)}
+        value={safeValue}
         min={min}
         max={max}
         step={step}
-        onChange={(event) => {
-          const nextValue = clamp(parseNumberInput(event.target.value, safeValue), min, max);
-          setDraftValue(numberInputText(nextValue, decimals));
-          onChange(nextValue);
-        }}
+        onChange={handleSliderChange}
         className={cn("mt-4 h-2 w-full cursor-pointer accent-primary")}
       />
       <div className="mt-2 flex justify-between text-[11px] font-medium text-text-secondary">
-        <span>{prefix}{min.toLocaleString("es-ES")}{unit ? ` ${unit}` : suffix ?? ""}</span>
-        <span>{prefix}{max.toLocaleString("es-ES")}{unit ? ` ${unit}` : suffix ?? ""}</span>
+        <span>
+          {prefix}
+          {min.toLocaleString("es-ES")}
+          {unit ? ` ${unit}` : suffix ?? ""}
+        </span>
+        <span>
+          {prefix}
+          {max.toLocaleString("es-ES")}
+          {unit ? ` ${unit}` : suffix ?? ""}
+        </span>
       </div>
     </div>
   );

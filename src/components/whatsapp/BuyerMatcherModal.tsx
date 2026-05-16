@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Users, X, MessageCircle, Euro, MapPin, Home, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import {
+  Users, X, MessageCircle, Euro, MapPin, Home,
+  CheckCircle2, XCircle, AlertCircle, ShieldOff,
+} from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { buildWhatsAppUrl, buildWhatsAppMessage } from "@/lib/whatsapp";
-import { logWhatsAppContactAction } from "@/app/(crm)/whatsapp/actions";
+import { sendOrPrepareWhatsAppAction } from "@/app/(crm)/whatsapp/actions";
 import {
   findCompatibleBuyersAction,
   formatModalidadPedido,
@@ -21,35 +24,27 @@ type Props = {
 
 function ScoreBadge({ score }: { score: number }) {
   if (score >= 80)
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-        <CheckCircle2 className="h-3 w-3" /> {score}%
-      </span>
-    );
+    return <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success"><CheckCircle2 className="h-3 w-3" />{score}%</span>;
   if (score >= 50)
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
-        <AlertCircle className="h-3 w-3" /> {score}%
-      </span>
-    );
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-surface-raised px-2 py-0.5 text-xs font-semibold text-text-secondary">
-      {score}%
-    </span>
-  );
+    return <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400"><AlertCircle className="h-3 w-3" />{score}%</span>;
+  return <span className="inline-flex items-center gap-1 rounded-full bg-surface-raised px-2 py-0.5 text-xs font-semibold text-text-secondary">{score}%</span>;
 }
 
 function MatchCriteria({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs ${
-        ok ? "text-success" : "text-text-secondary line-through"
-      }`}
-    >
+    <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs ${ok ? "text-success" : "text-text-secondary line-through"}`}>
       {ok ? <CheckCircle2 className="h-3 w-3 shrink-0" /> : <XCircle className="h-3 w-3 shrink-0" />}
       {label}
     </span>
   );
+}
+
+function ConsentBadge({ consent }: { consent: boolean | null }) {
+  if (consent === false)
+    return <span className="inline-flex items-center gap-1 rounded-full bg-danger/10 px-2 py-0.5 text-xs font-medium text-danger"><ShieldOff className="h-3 w-3" />Opt-out</span>;
+  if (consent === null)
+    return <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-text-secondary">Sin consentimiento</span>;
+  return null;
 }
 
 function formatCurrency(v: number | null) {
@@ -57,13 +52,7 @@ function formatCurrency(v: number | null) {
   return new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
 }
 
-export default function BuyerMatcherModal({
-  propiedadId,
-  propiedadLabel,
-  precio,
-  zonaNombre,
-  currentUserName,
-}: Props) {
+export default function BuyerMatcherModal({ propiedadId, propiedadLabel, precio, zonaNombre, currentUserName }: Props) {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [matches, setMatches] = useState<BuyerMatch[]>([]);
@@ -76,8 +65,7 @@ export default function BuyerMatcherModal({
     setIsOpen(true);
     setIsLoading(true);
     try {
-      const result = await findCompatibleBuyersAction(propiedadId);
-      setMatches(result);
+      setMatches(await findCompatibleBuyersAction(propiedadId));
     } catch {
       toast("Error al buscar compradores", "error");
     } finally {
@@ -99,28 +87,34 @@ export default function BuyerMatcherModal({
     startTransition(async () => {
       try {
         const message = buildMessage(buyer);
-        await logWhatsAppContactAction({
-          phone: buyer.telefono,
+        const result = await sendOrPrepareWhatsAppAction({
+          phone:         buyer.telefono,
           recipientName: buyer.nombre_cliente,
-          messageBody: message,
-          templateName: "cliente_propiedad_compatible",
-          relatedType: "propiedad",
-          relatedId: propiedadId,
+          messageBody:   message,
+          templateName:  "cliente_propiedad_compatible",
+          relatedType:   "propiedad",
+          relatedId:     propiedadId,
           propiedadId,
         });
-        window.open(buildWhatsAppUrl(buyer.telefono, message), "_blank", "noopener,noreferrer");
+
+        if (result.sent) {
+          toast(`Mensaje enviado a ${buyer.nombre_cliente}`);
+        } else {
+          window.open(buildWhatsAppUrl(buyer.telefono, message), "_blank", "noopener,noreferrer");
+          toast(`WhatsApp abierto para ${buyer.nombre_cliente}`);
+        }
         setSentIds((prev) => new Set(prev).add(buyer.id));
-        toast(`WhatsApp abierto para ${buyer.nombre_cliente}`);
       } catch {
-        toast("Error al abrir WhatsApp", "error");
+        toast("Error al enviar WhatsApp", "error");
       } finally {
         setSendingId(null);
       }
     });
   }
 
-  const total = matches.length;
+  const total     = matches.length;
   const highMatch = matches.filter((m) => m.score >= 70).length;
+  const optOuts   = matches.filter((m) => m.whatsapp_consent === false).length;
 
   return (
     <>
@@ -134,10 +128,7 @@ export default function BuyerMatcherModal({
       </button>
 
       {isOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) setIsOpen(false); }}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) setIsOpen(false); }}>
           <div className="flex h-[85vh] w-full max-w-2xl flex-col rounded-2xl bg-surface shadow-xl">
             {/* Header */}
             <div className="flex shrink-0 items-start justify-between border-b border-border px-5 py-4">
@@ -149,15 +140,10 @@ export default function BuyerMatcherModal({
                   <h2 className="text-base font-semibold text-text-primary">Compradores compatibles</h2>
                 </div>
                 <p className="mt-1 text-xs text-text-secondary">
-                  {propiedadLabel} · {formatCurrency(precio)}
-                  {zonaNombre ? ` · ${zonaNombre}` : ""}
+                  {propiedadLabel} · {formatCurrency(precio)}{zonaNombre ? ` · ${zonaNombre}` : ""}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="ml-4 shrink-0 rounded-lg p-1 text-text-secondary hover:bg-surface-raised hover:text-text-primary"
-              >
+              <button type="button" onClick={() => setIsOpen(false)} className="ml-4 shrink-0 rounded-lg p-1 text-text-secondary hover:bg-surface-raised hover:text-text-primary">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -166,15 +152,9 @@ export default function BuyerMatcherModal({
             {!isLoading && total > 0 && (
               <div className="shrink-0 border-b border-border bg-background px-5 py-3">
                 <div className="flex flex-wrap gap-4 text-xs text-text-secondary">
-                  <span>
-                    <strong className="text-text-primary">{total}</strong> compradores con presupuesto suficiente
-                  </span>
-                  <span>
-                    <strong className="text-success">{highMatch}</strong> con alta compatibilidad (≥70%)
-                  </span>
-                  <span className="text-xs text-text-secondary">
-                    Ordenados por compatibilidad · Envio individual revisado
-                  </span>
+                  <span><strong className="text-text-primary">{total}</strong> con presupuesto suficiente</span>
+                  <span><strong className="text-success">{highMatch}</strong> alta compatibilidad</span>
+                  {optOuts > 0 && <span className="text-danger"><strong>{optOuts}</strong> opt-out (desactivados)</span>}
                 </div>
               </div>
             )}
@@ -182,29 +162,26 @@ export default function BuyerMatcherModal({
             {/* Lista */}
             <div className="min-h-0 flex-1 overflow-y-auto">
               {isLoading ? (
-                <div className="flex h-32 items-center justify-center text-sm text-text-secondary">
-                  Buscando compradores...
-                </div>
+                <div className="flex h-32 items-center justify-center text-sm text-text-secondary">Buscando compradores...</div>
               ) : total === 0 ? (
                 <div className="flex h-32 flex-col items-center justify-center gap-2 text-sm text-text-secondary">
                   <Users className="h-8 w-8 opacity-30" />
-                  <p>No hay compradores con presupuesto suficiente en esta zona</p>
+                  <p>No hay compradores con presupuesto suficiente</p>
                 </div>
               ) : (
                 <ul className="divide-y divide-border">
                   {matches.map((buyer) => {
                     const alreadySent = sentIds.has(buyer.id);
-                    const isSending = sendingId === buyer.id && isPending;
+                    const isSending   = sendingId === buyer.id && isPending;
+                    const optOut      = buyer.whatsapp_consent === false;
                     return (
-                      <li
-                        key={buyer.id}
-                        className={`px-5 py-4 transition-colors ${alreadySent ? "bg-success/5" : "hover:bg-background"}`}
-                      >
+                      <li key={buyer.id} className={`px-5 py-4 transition-colors ${alreadySent ? "bg-success/5" : optOut ? "bg-danger/5 opacity-75" : "hover:bg-background"}`}>
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-semibold text-text-primary">{buyer.nombre_cliente}</p>
                               <ScoreBadge score={buyer.score} />
+                              <ConsentBadge consent={buyer.whatsapp_consent} />
                               {alreadySent && (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
                                   <MessageCircle className="h-3 w-3" /> Enviado
@@ -212,25 +189,12 @@ export default function BuyerMatcherModal({
                               )}
                             </div>
                             <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
-                              <span className="flex items-center gap-1">
-                                <Euro className="h-3 w-3" />
-                                {formatCurrency(buyer.presupuesto)}
-                              </span>
+                              <span className="flex items-center gap-1"><Euro className="h-3 w-3" />{formatCurrency(buyer.presupuesto)}</span>
                               {(buyer.zona_nombre || buyer.zona_busqueda) && (
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3" />
-                                  {buyer.zona_nombre ?? buyer.zona_busqueda}
-                                </span>
+                                <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{buyer.zona_nombre ?? buyer.zona_busqueda}</span>
                               )}
-                              {buyer.tipo_propiedad && (
-                                <span className="flex items-center gap-1">
-                                  <Home className="h-3 w-3" />
-                                  {buyer.tipo_propiedad}
-                                </span>
-                              )}
-                              {buyer.modalidad && (
-                                <span>{formatModalidadPedido(buyer.modalidad)}</span>
-                              )}
+                              {buyer.tipo_propiedad && <span className="flex items-center gap-1"><Home className="h-3 w-3" />{buyer.tipo_propiedad}</span>}
+                              {buyer.modalidad && <span>{formatModalidadPedido(buyer.modalidad)}</span>}
                             </div>
                             <div className="mt-1.5 flex flex-wrap gap-1">
                               <MatchCriteria ok={buyer.score_presupuesto} label="Presupuesto" />
@@ -241,11 +205,12 @@ export default function BuyerMatcherModal({
                           <button
                             type="button"
                             onClick={() => handleSendOne(buyer)}
-                            disabled={isSending || alreadySent}
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-400"
+                            disabled={isSending || alreadySent || optOut}
+                            title={optOut ? "El cliente ha solicitado no ser contactado por WhatsApp" : undefined}
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-500/20 disabled:opacity-40 dark:text-emerald-400"
                           >
                             <MessageCircle className="h-3.5 w-3.5" />
-                            {isSending ? "Abriendo..." : alreadySent ? "Enviado" : "WhatsApp"}
+                            {isSending ? "Enviando..." : alreadySent ? "Enviado" : optOut ? "Opt-out" : "WhatsApp"}
                           </button>
                         </div>
                       </li>
@@ -255,10 +220,9 @@ export default function BuyerMatcherModal({
               )}
             </div>
 
-            {/* Footer */}
             <div className="shrink-0 border-t border-border px-5 py-3">
               <p className="text-xs text-text-secondary">
-                Cada mensaje se revisa antes de enviar. Los contactos se registran en el historial.
+                Los mensajes se revisan antes de enviar · Opt-out: cliente ha pedido no ser contactado
               </p>
             </div>
           </div>

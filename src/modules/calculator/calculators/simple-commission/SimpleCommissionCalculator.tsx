@@ -17,6 +17,7 @@ export default function SimpleCommissionCalculator({ onSummaryChange }: Calculat
   const [mode, setMode] = useState<CommissionMode>("base_to_final");
   const [amount, setAmount] = useState(DEFAULT_AMOUNT);
   const [commissionPercent, setCommissionPercent] = useState(5);
+  const [commissionDraft, setCommissionDraft] = useState<string | null>(null);
   const [includeVat, setIncludeVat] = useState(true);
 
   const result = useMemo(
@@ -34,10 +35,20 @@ export default function SimpleCommissionCalculator({ onSummaryChange }: Calculat
 
   function handleCommissionChange(nextCommissionPercent: number) {
     setCommissionPercent(clamp(nextCommissionPercent, 0, 99.99));
+    setCommissionDraft(null);
   }
 
   function handleManualCommissionChange(nextValue: string) {
-    handleCommissionChange(parseNumberInput(nextValue, commissionPercent));
+    setCommissionDraft(nextValue);
+    if (nextValue.trim() === "") return;
+    const parsed = parseNumberInput(nextValue, commissionPercent);
+    if (!Number.isFinite(parsed)) return;
+    const clamped = clamp(parsed, 0, 99.99);
+    if (clamped !== commissionPercent) setCommissionPercent(clamped);
+  }
+
+  function handleCommissionBlur() {
+    setCommissionDraft(null);
   }
 
   function handleVatToggle() {
@@ -107,8 +118,9 @@ export default function SimpleCommissionCalculator({ onSummaryChange }: Calculat
               <input
                 type="text"
                 inputMode="decimal"
-                value={commissionPercent}
+                value={commissionDraft !== null ? commissionDraft : String(commissionPercent).replace(".", ",")}
                 onChange={(event) => handleManualCommissionChange(event.target.value)}
+                onBlur={handleCommissionBlur}
                 className="w-full bg-transparent text-right text-sm font-semibold text-text-primary outline-none"
               />
               <span className="ml-1 text-sm text-text-secondary">%</span>

@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { MessageCircle, X, Send, ChevronDown } from "lucide-react";
+import { MessageCircle, X, Send, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import {
-  buildWhatsAppUrl,
   WHATSAPP_TEMPLATE_LABELS,
   type WhatsAppTemplateKey,
 } from "@/lib/whatsapp";
-import { logWhatsAppContactAction } from "@/app/(crm)/whatsapp/actions";
+import { sendOrPrepareWhatsAppAction } from "@/app/(crm)/whatsapp/actions";
 
 type TemplateOption = {
   key: WhatsAppTemplateKey;
@@ -20,7 +19,6 @@ type Props = {
   recipientName: string;
   initialMessage: string;
   templateName?: WhatsAppTemplateKey;
-  // Plantillas adicionales disponibles en el selector
   extraTemplates?: TemplateOption[];
   relatedType: "solicitud" | "propiedad";
   relatedId: number;
@@ -47,11 +45,13 @@ export default function WhatsAppMessageModal({
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState(initialMessage);
   const [activeTemplate, setActiveTemplate] = useState<WhatsAppTemplateKey | undefined>(templateName);
+  const [wasSent, setWasSent] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function handleOpen() {
     setMessage(initialMessage);
     setActiveTemplate(templateName);
+    setWasSent(false);
     setIsOpen(true);
   }
 
@@ -64,7 +64,7 @@ export default function WhatsAppMessageModal({
     if (!message.trim()) return;
     startTransition(async () => {
       try {
-        await logWhatsAppContactAction({
+        const result = await sendOrPrepareWhatsAppAction({
           phone,
           recipientName,
           messageBody: message,
@@ -74,12 +74,20 @@ export default function WhatsAppMessageModal({
           pedidoId,
           propiedadId,
         });
-        const url = buildWhatsAppUrl(phone, message);
-        window.open(url, "_blank", "noopener,noreferrer");
-        setIsOpen(false);
-        toast("WhatsApp abierto");
+
+        if (result.sent) {
+          // API activa: mensaje enviado directamente
+          setWasSent(true);
+          toast("Mensaje enviado por WhatsApp");
+          setTimeout(() => setIsOpen(false), 1500);
+        } else {
+          // Modo manual: abrir wa.me
+          window.open(result.fallbackUrl, "_blank", "noopener,noreferrer");
+          setIsOpen(false);
+          toast("WhatsApp abierto");
+        }
       } catch {
-        toast("Error al abrir WhatsApp", "error");
+        toast("Error al enviar WhatsApp", "error");
       }
     });
   }
@@ -125,94 +133,102 @@ export default function WhatsAppMessageModal({
               </button>
             </div>
 
-            <div className="space-y-4 p-5">
-              {/* Destinatario */}
-              <div className="rounded-xl border border-border bg-background px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Destinatario</p>
-                <p className="mt-0.5 text-sm font-medium text-text-primary">{recipientName}</p>
-                <p className="text-xs text-text-secondary">{phone}</p>
+            {wasSent ? (
+              <div className="flex flex-col items-center gap-3 px-5 py-10 text-center">
+                <CheckCircle2 className="h-12 w-12 text-success" />
+                <p className="text-base font-semibold text-text-primary">Mensaje enviado</p>
+                <p className="text-sm text-text-secondary">
+                  El mensaje se ha enviado a {recipientName} via WhatsApp Cloud API.
+                </p>
               </div>
-
-              {/* Selector de plantilla */}
-              {hasTemplates && (
-                <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Plantilla</p>
-                  <div className="flex flex-wrap gap-2">
-                    {templateName && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveTemplate(templateName);
-                          setMessage(initialMessage);
-                        }}
-                        className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                          activeTemplate === templateName
-                            ? "border-primary/40 bg-primary/10 text-primary"
-                            : "border-border text-text-secondary hover:bg-surface-raised"
-                        }`}
-                      >
-                        {WHATSAPP_TEMPLATE_LABELS[templateName]}
-                      </button>
-                    )}
-                    {extraTemplates?.map((opt) => (
-                      <button
-                        key={opt.key}
-                        type="button"
-                        onClick={() => handleSelectTemplate(opt)}
-                        className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                          activeTemplate === opt.key
-                            ? "border-primary/40 bg-primary/10 text-primary"
-                            : "border-border text-text-secondary hover:bg-surface-raised"
-                        }`}
-                      >
-                        {WHATSAPP_TEMPLATE_LABELS[opt.key]}
-                        <ChevronDown className="h-3 w-3" />
-                      </button>
-                    ))}
-                  </div>
+            ) : (
+              <div className="space-y-4 p-5">
+                {/* Destinatario */}
+                <div className="rounded-xl border border-border bg-background px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Destinatario</p>
+                  <p className="mt-0.5 text-sm font-medium text-text-primary">{recipientName}</p>
+                  <p className="text-xs text-text-secondary">{phone}</p>
                 </div>
-              )}
 
-              {/* Mensaje editable */}
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                  Mensaje
-                </label>
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  rows={6}
-                  className="input mt-1.5 w-full resize-y text-sm"
-                  placeholder="Escribe el mensaje..."
-                />
-                <p className="mt-1 text-xs text-text-secondary">{message.length} caracteres</p>
+                {/* Selector de plantilla */}
+                {hasTemplates && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Plantilla</p>
+                    <div className="flex flex-wrap gap-2">
+                      {templateName && (
+                        <button
+                          type="button"
+                          onClick={() => { setActiveTemplate(templateName); setMessage(initialMessage); }}
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                            activeTemplate === templateName
+                              ? "border-primary/40 bg-primary/10 text-primary"
+                              : "border-border text-text-secondary hover:bg-surface-raised"
+                          }`}
+                        >
+                          {WHATSAPP_TEMPLATE_LABELS[templateName]}
+                        </button>
+                      )}
+                      {extraTemplates?.map((opt) => (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => handleSelectTemplate(opt)}
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                            activeTemplate === opt.key
+                              ? "border-primary/40 bg-primary/10 text-primary"
+                              : "border-border text-text-secondary hover:bg-surface-raised"
+                          }`}
+                        >
+                          {WHATSAPP_TEMPLATE_LABELS[opt.key]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Mensaje editable */}
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                    Mensaje
+                  </label>
+                  <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={6}
+                    className="input mt-1.5 w-full resize-y text-sm"
+                    placeholder="Escribe el mensaje..."
+                  />
+                  <p className="mt-1 text-xs text-text-secondary">{message.length} caracteres</p>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Acciones */}
-            <div className="flex items-center justify-between border-t border-border px-5 py-4">
-              <p className="text-xs text-text-secondary">
-                El mensaje se abrira en WhatsApp Web o la app
-              </p>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSend}
-                  disabled={isPending || !message.trim()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  <Send className="h-4 w-4" />
-                  {isPending ? "Abriendo..." : "Abrir WhatsApp"}
-                </button>
+            {!wasSent && (
+              <div className="flex items-center justify-between border-t border-border px-5 py-4">
+                <p className="text-xs text-text-secondary">
+                  Se abrira WhatsApp o se enviara automaticamente
+                </p>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsOpen(false)}
+                    className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSend}
+                    disabled={isPending || !message.trim()}
+                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    <Send className="h-4 w-4" />
+                    {isPending ? "Enviando..." : "Enviar"}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
