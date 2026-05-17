@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { translateVisibleText } from "@/lib/i18n/translate-text";
 
@@ -62,6 +63,23 @@ export default function AuthShell({
           </div>
 
           {children}
+
+          {/* Legal links */}
+          <p className="mt-8 text-center text-[11px] text-[#b1aba3] dark:text-text-secondary/60">
+            <Link
+              href="/legal/privacidad"
+              className="underline-offset-2 transition-colors hover:text-[#8d867c] hover:underline dark:hover:text-text-secondary"
+            >
+              Politica de privacidad
+            </Link>
+            {" · "}
+            <Link
+              href="/legal/condiciones"
+              className="underline-offset-2 transition-colors hover:text-[#8d867c] hover:underline dark:hover:text-text-secondary"
+            >
+              Condiciones del servicio
+            </Link>
+          </p>
         </div>
       </section>
     </main>

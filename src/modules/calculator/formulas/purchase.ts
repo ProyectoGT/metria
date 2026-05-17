@@ -92,3 +92,7 @@ export function calculatePurchaseSimulation(input: PurchaseInput): PurchaseResul
 export function calculatePurchaseViability(input: PurchaseInput): PurchaseResult {
   return calculatePurchaseSimulation(input);
 }
+
+export function calculateHomePurchase(input: PurchaseInput): PurchaseResult {
+  return calculatePurchaseSimulation(input);
+}

@@ -9,6 +9,15 @@ export type MortgageInput = {
   monthlyDebt?: number;
 };
 
+export type AdvancedMortgageInput = {
+  propertyPrice: number;
+  downPayment: number;
+  annualInterestRate: number;
+  years: number;
+  monthlyIncome?: number;
+  monthlyDebt?: number;
+};
+
 export type MortgageResult = {
   principal: number;
   monthlyPayment: number;
@@ -17,6 +26,12 @@ export type MortgageResult = {
   debtRatio: number;
   months: number;
   viability: ViabilityStatus;
+};
+
+export type AdvancedMortgageResult = MortgageResult & {
+  propertyPrice: number;
+  downPayment: number;
+  financedAmount: number;
 };
 
 export function calculateMortgagePayment(principal: number, annualInterestRate: number, years: number): number {
@@ -77,6 +92,26 @@ export function calculateMortgage(input: MortgageInput): MortgageResult {
     debtRatio,
     months: Math.round(years * 12),
     viability: getViabilityByDebtRatio(debtRatio),
+  };
+}
+
+export function calculateAdvancedMortgage(input: AdvancedMortgageInput): AdvancedMortgageResult {
+  const propertyPrice = Math.max(toSafeNumber(input.propertyPrice), 0);
+  const downPayment = Math.min(Math.max(toSafeNumber(input.downPayment), 0), propertyPrice);
+  const financedAmount = roundMoney(Math.max(propertyPrice - downPayment, 0));
+  const mortgage = calculateMortgage({
+    principal: financedAmount,
+    annualInterestRate: input.annualInterestRate,
+    years: input.years,
+    monthlyIncome: input.monthlyIncome,
+    monthlyDebt: input.monthlyDebt,
+  });
+
+  return {
+    ...mortgage,
+    propertyPrice,
+    downPayment,
+    financedAmount,
   };
 }
 

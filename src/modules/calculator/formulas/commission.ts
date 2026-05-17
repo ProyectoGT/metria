@@ -9,6 +9,20 @@ export type CommissionInput = {
   includeVat: boolean;
 };
 
+export type SimplifiedCalculatorInput = {
+  netSeller: number;
+  commissionPercent: number;
+  ivaPercent?: number;
+  ivaEnabled: boolean;
+};
+
+export type SimplifiedCalculatorOutput = {
+  buyerPrice: number;
+  sellerNet: number;
+  agencyCommission: number;
+  commissionVat: number;
+};
+
 export type CommissionResult = {
   buyerPrice: number;
   netSeller: number;
@@ -64,4 +78,20 @@ export function calculateCommission(input: CommissionInput): CommissionResult {
   return input.mode === "base_to_final"
     ? calculateCommissionFromBase(input.price, input.commissionPercent, input.includeVat)
     : calculateCommissionFromFinal(input.price, input.commissionPercent, input.includeVat);
+}
+
+export function calculateSimplifiedCalculator(input: SimplifiedCalculatorInput): SimplifiedCalculatorOutput {
+  const sellerNet = Math.max(toSafeNumber(input.netSeller), 0);
+  const commissionPercent = Math.min(Math.max(toSafeNumber(input.commissionPercent), 0), 99.99);
+  const ivaPercent = Math.min(Math.max(toSafeNumber(input.ivaPercent, 21), 0), 100);
+  const agencyCommission = sellerNet * (commissionPercent / 100);
+  const commissionVat = input.ivaEnabled ? agencyCommission * (ivaPercent / 100) : 0;
+  const buyerPrice = sellerNet + agencyCommission + commissionVat;
+
+  return {
+    buyerPrice: roundMoney(buyerPrice),
+    sellerNet: roundMoney(sellerNet),
+    agencyCommission: roundMoney(agencyCommission),
+    commissionVat: roundMoney(commissionVat),
+  };
 }

@@ -36,7 +36,8 @@ export async function middleware(request: NextRequest) {
   const isAlwaysAllowedPage =
     pathname === "/sin-acceso" ||
     pathname === "/nueva-contrasena" ||
-    pathname === "/offline";
+    pathname === "/offline" ||
+    pathname.startsWith("/legal/");
 
   const isPublicPage = isAuthPage || isAlwaysAllowedPage;
 

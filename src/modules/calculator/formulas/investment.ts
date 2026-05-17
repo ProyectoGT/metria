@@ -17,6 +17,8 @@ export type InvestmentInput = {
 };
 
 export type InvestmentResult = {
+  annualRent: number;
+  totalInvestment: number;
   grossYield: number;
   netYield: number;
   monthlyCashflow: number;
@@ -38,7 +40,7 @@ export function calculateInvestmentYield(input: InvestmentInput): InvestmentResu
   const initialInvestment = roundMoney(
     purchasePrice + Math.max(toSafeNumber(input.purchaseCosts), 0) + Math.max(toSafeNumber(input.renovation), 0) + Math.max(toSafeNumber(input.furniture), 0),
   );
-  const grossIncome = Math.max(toSafeNumber(input.monthlyRent), 0) * 12;
+  const grossIncome = roundMoney(Math.max(toSafeNumber(input.monthlyRent), 0) * 12);
   const vacancyCost = grossIncome * (Math.max(toSafeNumber(input.vacancyPercent), 0) / 100);
   const annualOperatingCosts =
     Math.max(toSafeNumber(input.annualIbi), 0) +
@@ -55,6 +57,8 @@ export function calculateInvestmentYield(input: InvestmentInput): InvestmentResu
   const targetYield = Math.max(toSafeNumber(input.targetYield, 5), 0);
 
   return {
+    annualRent: grossIncome,
+    totalInvestment: initialInvestment,
     grossYield,
     netYield,
     monthlyCashflow,

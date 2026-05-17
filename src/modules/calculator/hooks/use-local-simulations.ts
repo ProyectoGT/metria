@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 const STORAGE_KEY = "metria_calc_simulations_v1";
 const MAX_SIMULATIONS = 30;
@@ -13,16 +13,18 @@ export type LocalSimulation = {
   savedAt: string;
 };
 
+function readLocalSimulations(): LocalSimulation[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as LocalSimulation[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function useLocalSimulations() {
-  const [simulations, setSimulations] = useState<LocalSimulation[]>([]);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setSimulations(JSON.parse(raw) as LocalSimulation[]);
-    } catch {}
-  }, []);
-
+  const [simulations, setSimulations] = useState<LocalSimulation[]>(readLocalSimulations);
   const save = useCallback((input: Omit<LocalSimulation, "id" | "savedAt">): LocalSimulation => {
     const next: LocalSimulation = {
       ...input,

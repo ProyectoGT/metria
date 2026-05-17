@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/design-system";
 import { clamp, isEmptyNumberInput, numberInputText, parseNumberInput } from "../formulas/number";
 
@@ -36,10 +36,6 @@ export default function NumericSliderField({
 
   const [draft, setDraft] = useState<string | null>(null);
   const display = draft !== null ? draft : numberInputText(safeValue, decimals);
-
-  useEffect(() => {
-    setDraft(null);
-  }, [value]);
 
   function emitParsed(next: string) {
     if (isEmptyNumberInput(next)) return;

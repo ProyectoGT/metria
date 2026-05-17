@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import CompactNumberField from "../../components/CompactNumberField";
 import NumericSliderField from "../../components/NumericSliderField";
@@ -35,21 +35,22 @@ export default function InvestmentCalculator({ onSummaryChange }: CalculatorScre
     mode: "onChange",
   });
   const values = useWatch({ control });
-  const result = useMemo(
-    () => calculateInvestmentYield({ ...DEFAULTS, ...values, monthlyMortgagePayment: values.hasFinancing ? values.monthlyMortgagePayment : 0 }),
-    [values],
-  );
+  const input: InvestmentFormValues = { ...DEFAULTS, ...values };
+  const result = calculateInvestmentYield({
+    ...input,
+    monthlyMortgagePayment: input.hasFinancing ? input.monthlyMortgagePayment : 0,
+  });
 
   useEffect(() => {
     onSummaryChange?.([
       "Simulación de inversión",
-      `Precio compra: ${formatCurrency(values.purchasePrice ?? 0)}`,
-      `Alquiler mensual: ${formatCurrency(values.monthlyRent ?? 0)}`,
+      `Precio compra: ${formatCurrency(input.purchasePrice)}`,
+      `Alquiler mensual: ${formatCurrency(input.monthlyRent)}`,
       `Rentabilidad bruta: ${formatPercent(result.grossYield)}`,
       `Rentabilidad neta: ${formatPercent(result.netYield)}`,
       `Cashflow mensual: ${formatCurrency(result.monthlyCashflow)}`,
     ].join("\n"));
-  }, [onSummaryChange, result.grossYield, result.monthlyCashflow, result.netYield, values.monthlyRent, values.purchasePrice]);
+  }, [input.monthlyRent, input.purchasePrice, onSummaryChange, result.grossYield, result.monthlyCashflow, result.netYield]);
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">

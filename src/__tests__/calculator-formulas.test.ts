@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { calculateMortgagePayment, calculateMortgage, calculateDebtRatio } from "@/modules/calculator/formulas/mortgage";
+import { calculateMortgagePayment, calculateMortgage, calculateDebtRatio, calculateAdvancedMortgage } from "@/modules/calculator/formulas/mortgage";
 import { calculatePurchaseCosts } from "@/modules/calculator/formulas/purchaseCosts";
-import { calculatePurchaseViability } from "@/modules/calculator/formulas/purchase";
+import { calculateHomePurchase, calculatePurchaseViability } from "@/modules/calculator/formulas/purchase";
 import { calculateInvestmentYield } from "@/modules/calculator/formulas/investment";
 import { calculatePlusvaliaEstimate } from "@/modules/calculator/formulas/plusvalia";
 import { calculateSellerNet } from "@/modules/calculator/formulas/sellerNet";
-import { calculateCommission } from "@/modules/calculator/formulas/commission";
+import { calculateCommission, calculateSimplifiedCalculator } from "@/modules/calculator/formulas/commission";
 import { isValidNumberInput, parseNumberInput } from "@/modules/calculator/formulas/number";
 
 describe("calculator formulas", () => {
@@ -94,6 +94,101 @@ describe("calculator formulas", () => {
     expect(final.buyerPrice).toBe(318150);
     expect(withoutVat.buyerPrice).toBe(315000);
     expect(net.netSeller).toBeCloseTo(300000, 0);
+  });
+
+  it("recalculates simplified commission from current seller net, commission and VAT", () => {
+    const result = calculateSimplifiedCalculator({
+      netSeller: 650000,
+      commissionPercent: 6,
+      ivaPercent: 21,
+      ivaEnabled: true,
+    });
+
+    expect(result.sellerNet).toBe(650000);
+    expect(result.agencyCommission).toBe(39000);
+    expect(result.commissionVat).toBe(8190);
+    expect(result.buyerPrice).toBe(697190);
+  });
+
+  it("derives advanced mortgage financing from current price and down payment", () => {
+    const base = calculateAdvancedMortgage({
+      propertyPrice: 519000,
+      downPayment: 348000,
+      annualInterestRate: 3.6,
+      years: 30,
+      monthlyIncome: 3500,
+      monthlyDebt: 150,
+    });
+    const higherRate = calculateAdvancedMortgage({
+      propertyPrice: 519000,
+      downPayment: 348000,
+      annualInterestRate: 4.6,
+      years: 30,
+      monthlyIncome: 3500,
+      monthlyDebt: 150,
+    });
+
+    expect(base.financedAmount).toBe(171000);
+    expect(base.principal).toBe(171000);
+    expect(higherRate.monthlyPayment).toBeGreaterThan(base.monthlyPayment);
+    expect(higherRate.totalInterest).toBeGreaterThan(base.totalInterest);
+  });
+
+  it("recalculates investment yield from current rent and investment", () => {
+    const result = calculateInvestmentYield({
+      purchasePrice: 180000,
+      purchaseCosts: 18000,
+      renovation: 17000,
+      furniture: 0,
+      monthlyRent: 3650,
+      annualIbi: 0,
+      monthlyCommunity: 0,
+      annualInsurance: 0,
+      annualMaintenance: 0,
+      vacancyPercent: 0,
+      monthlyMortgagePayment: 0,
+    });
+
+    expect(result.annualRent).toBe(43800);
+    expect(result.totalInvestment).toBe(215000);
+    expect(result.grossYield).toBeCloseTo(20.37, 2);
+  });
+
+  it("recalculates home purchase financing and handles cash mode without stale mortgage", () => {
+    const mortgage = calculateHomePurchase({
+      price: 387000,
+      savings: 300000,
+      propertyKind: "used",
+      autonomousCommunity: "Madrid",
+      financingPercent: 33,
+      annualInterestRate: 3.5,
+      years: 30,
+      monthlyIncome: 5000,
+      monthlyDebt: 0,
+      paymentMode: "mortgage",
+      firstHome: false,
+      buyerAge: 40,
+    });
+    const cash = calculateHomePurchase({
+      price: 387000,
+      savings: 300000,
+      propertyKind: "used",
+      autonomousCommunity: "Madrid",
+      financingPercent: 80,
+      annualInterestRate: 3.5,
+      years: 30,
+      monthlyIncome: 5000,
+      monthlyDebt: 0,
+      paymentMode: "cash",
+      firstHome: false,
+      buyerAge: 40,
+    });
+
+    expect(mortgage.mortgagePrincipal).toBeCloseTo(127710, 0);
+    expect(mortgage.requiredDownPayment).toBeCloseTo(259290, 0);
+    expect(cash.mortgagePrincipal).toBe(0);
+    expect(cash.monthlyPayment).toBe(0);
+    expect(cash.requiredDownPayment).toBe(387000);
   });
 
   it("recalculates quick commission from the current amount instead of the default", () => {
