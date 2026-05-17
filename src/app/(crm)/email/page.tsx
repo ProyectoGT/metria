@@ -1,11 +1,10 @@
 import PageHeader from "@/components/layout/page-header";
-import { getCurrentUserContext } from "@/lib/current-user";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import { createClient } from "@/lib/supabase";
 import EmailInboxClient from "./email-inbox-client";
 
 export default async function EmailPage() {
-  const currentUser = await getCurrentUserContext();
-  if (!currentUser) return null;
+  const currentUser = await requirePageAccess("email");
 
   const supabase = await createClient();
   const [{ data: accounts }, { data: messages }, { data: links }, { data: templates }, { data: alerts }, { data: attachments }] = await Promise.all([

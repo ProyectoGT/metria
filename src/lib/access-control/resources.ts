@@ -125,6 +125,13 @@ export const ACCESS_RESOURCES: AccessResource[] = [
     defaultRoles: ALL_ROLES,
   },
   {
+    key: "comunicaciones",
+    type: "page",
+    label: "Comunicaciones",
+    description: "Centro de WhatsApp y mensajería",
+    defaultRoles: ALL_ROLES,
+  },
+  {
     key: "configuracion",
     type: "page",
     label: "Configuración",

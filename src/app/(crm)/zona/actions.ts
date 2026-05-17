@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { requirePermission } from "@/lib/access-control";
+import { canUseFeature } from "@/lib/access-control/can-access";
 import { canBeAssignedProperty, canSetVendido } from "@/lib/roles";
 import { changePropertyStatusAction, type PropertySaleInput } from "@/modules/propiedades/services/commercial-cycles";
 import { revalidatePath } from "next/cache";
@@ -53,6 +54,9 @@ export async function upsertPropiedadAction(
 
   const permError = await requirePermission("update", "propiedades").then(() => null).catch((e: Error) => e.message);
   if (permError) return { error: permError };
+
+  const featureKey = propiedadId ? "properties.edit" : "properties.create";
+  if (!(await canUseFeature(yo, featureKey))) return { error: "Accion deshabilitada por control de acceso" };
 
   const assignedAgentError = await validateAssignablePropertyAgent(payload.agente_asignado, yo.empresaId, yo.role);
   if (assignedAgentError) return { error: assignedAgentError };

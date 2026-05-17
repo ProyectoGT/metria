@@ -2,12 +2,12 @@ export const dynamic = "force-dynamic";
 
 import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { getCurrentUserContext } from "@/lib/current-user";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import SoporteClient from "./soporte-client";
 import type { UserRole } from "@/lib/roles";
 
 export default async function SoportePage() {
-  const yo = await getCurrentUserContext();
+  const yo = await requirePageAccess("soporte");
 
   const supabase = await createClient();
 

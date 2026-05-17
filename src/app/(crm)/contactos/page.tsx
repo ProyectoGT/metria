@@ -1,12 +1,12 @@
-import { getCurrentUserContext } from "@/lib/current-user";
 import PageHeader from "@/components/layout/page-header";
 import ContactosClient from "./contactos-client";
 import { createClient } from "@/lib/supabase";
 import type { Contacto } from "@/types";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 
 export default async function ContactosPage() {
   const supabase = await createClient();
-  const yo = await getCurrentUserContext();
+  const yo = await requirePageAccess("contactos");
 
   const role = yo?.role ?? "Agente";
   const userId = yo?.id ?? 0;

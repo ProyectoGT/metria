@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
-import { getCurrentUserContext } from "@/lib/current-user";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import PedidosClient from "./solicitudes-client";
 import IdealistaClient from "./idealista-client";
 import SolicitudesTabs from "./solicitudes-tabs";
@@ -22,7 +22,7 @@ export default async function PedidosPage({
   );
 
   const [user, { data: pedidos }, { data: agentes }, { data: leads }] = await Promise.all([
-    getCurrentUserContext(),
+    requirePageAccess("solicitudes"),
     supabase.from("pedidos").select("*").order("id", { ascending: false }),
     supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
     supabase

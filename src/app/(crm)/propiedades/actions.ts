@@ -31,6 +31,7 @@ export async function updatePropiedadMetaAction(data: {
   const supabase = await createClient();
   const yo = await getAuthContext();
   await requirePermission("update", "propiedades");
+  if (!(await canUseFeature(yo, "properties.edit"))) throw new Error("Accion deshabilitada por control de acceso");
 
   const { error } = await supabase
     .from("propiedades")

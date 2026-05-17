@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Plus, X, AlertTriangle, MapPin, Circle, Pentagon, Square, RectangleHorizontal, MousePointer2, Save, Trash2, Crosshair, Layers } from "lucide-react";
 import { useToast, Toaster } from "@/components/ui/toast";
@@ -18,6 +18,7 @@ import ZonaGeoListPanel from "@/modules/zonas-geograficas/components/ZonaGeoList
 import type { ZonaGeografica } from "@/modules/zonas-geograficas/services/types";
 import type { ZonaGeoFormData } from "@/modules/zonas-geograficas/services/types";
 import type { UserRole } from "@/lib/roles";
+import type { DraftInfo, PolygonGeoJson, LatLngBoundsLiteral, LatLngLiteral } from "@/modules/zonas-geograficas/components/ZonaGeoMap";
 
 const ZonaGeoMap = dynamic(
   () => import("@/modules/zonas-geograficas/components/ZonaGeoMap"),
@@ -36,10 +37,6 @@ const ZonaGeoMap = dynamic(
 
 type PageMode = "idle" | "drawing" | "editing-geometry";
 type ZoneShapeType = "manual" | "rectangle" | "circle" | "square" | "polygon";
-
-interface PendingDraw {
-  geojson: { type: "Polygon"; coordinates: number[][][] };
-}
 
 const SHAPE_OPTIONS: Array<{ value: ZoneShapeType; label: string; icon: React.ElementType }> = [
   { value: "manual", label: "Manual", icon: MousePointer2 },
@@ -65,10 +62,16 @@ function polygonGeojson(points: Array<{ lat: number; lng: number }>) {
   return { type: "Polygon" as const, coordinates: [coords] };
 }
 
-function buildPresetShapeGeojson(shape: Exclude<ZoneShapeType, "manual">, center = DEFAULT_SHAPE_CENTER) {
+function getZoomScale(zoom: number): number {
+  return Math.pow(2, 14 - zoom);
+}
+
+function buildPresetShapeGeojson(shape: Exclude<ZoneShapeType, "manual">, center = DEFAULT_SHAPE_CENTER, zoom = 14) {
+  const scale = getZoomScale(zoom);
+
   if (shape === "rectangle" || shape === "square") {
-    const halfWidth = shape === "square" ? 240 : 360;
-    const halfHeight = shape === "square" ? 240 : 220;
+    const halfWidth = (shape === "square" ? 240 : 360) * scale;
+    const halfHeight = (shape === "square" ? 240 : 220) * scale;
     const dLat = metersToLat(halfHeight);
     const dLng = metersToLng(halfWidth, center.lat);
     return polygonGeojson([
@@ -79,8 +82,8 @@ function buildPresetShapeGeojson(shape: Exclude<ZoneShapeType, "manual">, center
     ]);
   }
 
-  const sides = shape === "circle" ? 48 : 6;
-  const radius = shape === "circle" ? 320 : 300;
+  const sides = shape === "circle" ? 32 : 5;
+  const radius = (shape === "circle" ? 320 : 300) * scale;
   const points = Array.from({ length: sides }, (_, index) => {
     const angle = (Math.PI * 2 * index) / sides - Math.PI / 2;
     return {
@@ -89,6 +92,32 @@ function buildPresetShapeGeojson(shape: Exclude<ZoneShapeType, "manual">, center
     };
   });
   return polygonGeojson(points);
+}
+
+function boundsToGeoJson(bounds: LatLngBoundsLiteral): PolygonGeoJson {
+  return {
+    type: "Polygon",
+    coordinates: [[
+      [bounds.west, bounds.south],
+      [bounds.east, bounds.south],
+      [bounds.east, bounds.north],
+      [bounds.west, bounds.north],
+      [bounds.west, bounds.south],
+    ]],
+  };
+}
+
+function circleToGeoJson(center: LatLngLiteral, radius: number): PolygonGeoJson {
+  const sides = 32;
+  const points: number[][] = [];
+  for (let i = 0; i < sides; i++) {
+    const angle = (Math.PI * 2 * i) / sides - Math.PI / 2;
+    const lat = center.lat + (Math.sin(angle) * radius) / 111320;
+    const lng = center.lng + (Math.cos(angle) * radius) / (111320 * Math.cos(center.lat * Math.PI / 180));
+    points.push([lng, lat]);
+  }
+  points.push(points[0]);
+  return { type: "Polygon", coordinates: [points] };
 }
 
 export default function ZonasGeoClient({
@@ -106,11 +135,12 @@ export default function ZonasGeoClient({
   const [selectedZonaId, setSelectedZonaId] = useState<number | null>(null);
   const [editableZonaId, setEditableZonaId] = useState<number | null>(null);
   const [drawerMode, setDrawerMode] = useState<"create" | "detail" | "edit" | null>(null);
-  const [pendingDraw, setPendingDraw] = useState<PendingDraw | null>(null);
-  const [geometryDraft, setGeometryDraft] = useState<PendingDraw["geojson"] | null>(null);
+  const [draftGeometry, setDraftGeometry] = useState<DraftInfo | null>(null);
+  const [geometryDraft, setGeometryDraft] = useState<PolygonGeoJson | null>(null);
   const [selectedShape, setSelectedShape] = useState<ZoneShapeType>("manual");
   const [focusSignal, setFocusSignal] = useState(0);
   const [mapCenter, setMapCenter] = useState(DEFAULT_SHAPE_CENTER);
+  const [viewportZoom, setViewportZoom] = useState(14);
   const [isSaving, setIsSaving] = useState(false);
   const [mapReady, setMapReady] = useState(false);
 
@@ -126,12 +156,16 @@ export default function ZonasGeoClient({
   const userCanArchive = canDeleteZonasGeograficas(currentUserRole);
 
   const selectedZona = zonas.find((z) => z.id === selectedZonaId) ?? null;
-  const focusGeojson =
-    pendingDraw
-      ? geometryDraft
-      : selectedZona?.geojson.type === "Polygon"
-        ? selectedZona.geojson
-        : null;
+  const hasValidGeometry = !!draftGeometry || (pageMode === "editing-geometry" && !!geometryDraft);
+  const focusGeojson = useMemo(() => {
+    if (draftGeometry) {
+      if (draftGeometry.kind === "polygon") return draftGeometry.geojson;
+      if (draftGeometry.kind === "rectangle" || draftGeometry.kind === "square") return boundsToGeoJson(draftGeometry.bounds);
+      if (draftGeometry.kind === "circle") return circleToGeoJson(draftGeometry.center, draftGeometry.radius);
+    }
+    if (selectedZona?.geojson.type === "Polygon") return selectedZona.geojson;
+    return null;
+  }, [draftGeometry, selectedZona]);
 
   const refreshZonas = useCallback(async () => {
     setLoading(true);
@@ -146,9 +180,9 @@ export default function ZonasGeoClient({
   }, [toast]);
 
   const handleDrawingComplete = useCallback(
-    (geojson: { type: "Polygon"; coordinates: number[][][] }) => {
-      setPendingDraw({ geojson });
-      setGeometryDraft(geojson);
+    (geojson: PolygonGeoJson) => {
+      setSelectedShape("manual");
+      setDraftGeometry({ kind: "polygon", geojson });
       setPageMode("idle");
       setFormData({
         nombre: "",
@@ -183,19 +217,28 @@ export default function ZonasGeoClient({
   );
 
   const handleSaveNew = useCallback(async () => {
-    const draft = geometryDraft ?? pendingDraw?.geojson;
-    if (!draft) return;
+    if (!draftGeometry) return;
     if (!formData.nombre.trim()) {
       toast("El nombre es obligatorio.", "error");
       return;
     }
+
+    let geojson: PolygonGeoJson;
+    if (draftGeometry.kind === "polygon") {
+      geojson = draftGeometry.geojson;
+    } else if (draftGeometry.kind === "rectangle" || draftGeometry.kind === "square") {
+      geojson = boundsToGeoJson(draftGeometry.bounds);
+    } else {
+      geojson = circleToGeoJson(draftGeometry.center, draftGeometry.radius);
+    }
+
     setIsSaving(true);
     const result = await createZonaGeografica({
       nombre: formData.nombre.trim(),
       descripcion: formData.descripcion.trim() || undefined,
       color: formData.color,
       tipo: formData.tipo,
-      geojson: draft,
+      geojson,
     });
     if (!result.ok) {
       toast(result.error ?? "Error al crear zona.", "error");
@@ -204,10 +247,10 @@ export default function ZonasGeoClient({
     }
     toast("Zona creada correctamente.");
     setDrawerMode(null);
-    setPendingDraw(null);
+    setDraftGeometry(null);
     setIsSaving(false);
     await refreshZonas();
-  }, [pendingDraw, geometryDraft, formData, toast, refreshZonas]);
+  }, [draftGeometry, formData, toast, refreshZonas]);
 
   const handleSaveEdit = useCallback(async () => {
     if (!selectedZona) return;
@@ -308,8 +351,7 @@ export default function ZonasGeoClient({
 
   const handleCloseDrawer = useCallback(() => {
     setDrawerMode(null);
-    setPendingDraw(null);
-    setGeometryDraft(null);
+    setDraftGeometry(null);
   }, []);
 
   const handleStartDrawing = useCallback(() => {
@@ -318,15 +360,34 @@ export default function ZonasGeoClient({
     setDrawerMode(null);
     setSelectedZonaId(null);
     setEditableZonaId(null);
-    setPendingDraw(null);
-    setGeometryDraft(null);
+    setDraftGeometry(null);
   }, []);
 
   const handleCreatePresetShape = useCallback((shape: Exclude<ZoneShapeType, "manual">) => {
-    const geojson = buildPresetShapeGeojson(shape, mapCenter);
+    const scale = getZoomScale(viewportZoom);
+
+    let draft: DraftInfo;
+
+    if (shape === "rectangle" || shape === "square") {
+      const halfW = (shape === "square" ? 240 : 360) * scale;
+      const halfH = (shape === "square" ? 240 : 220) * scale;
+      const dLat = metersToLat(halfH);
+      const dLng = metersToLng(halfW, mapCenter.lat);
+      draft = {
+        kind: shape === "square" ? "square" : "rectangle",
+        bounds: {
+          north: mapCenter.lat + dLat, south: mapCenter.lat - dLat,
+          east: mapCenter.lng + dLng, west: mapCenter.lng - dLng,
+        },
+      };
+    } else if (shape === "circle") {
+      draft = { kind: "circle", center: mapCenter, radius: 320 * scale };
+    } else {
+      draft = { kind: "polygon", geojson: buildPresetShapeGeojson(shape, mapCenter, viewportZoom) };
+    }
+
     setSelectedShape(shape);
-    setPendingDraw({ geojson });
-    setGeometryDraft(geojson);
+    setDraftGeometry(draft);
     setPageMode("idle");
     setDrawerMode("create");
     setSelectedZonaId(null);
@@ -337,19 +398,17 @@ export default function ZonasGeoClient({
       color: "#2563eb",
       tipo: "personalizada",
     });
-    toast("Forma insertada. Arrastra vertices o mueve la figura para ajustarla.");
+    toast("Forma insertada en el mapa. Arrastra y redimensiona para ajustarla.");
     setFocusSignal((value) => value + 1);
-  }, [mapCenter, toast]);
+  }, [mapCenter, viewportZoom, toast]);
 
   const handleCancelDrawing = useCallback(() => {
     setPageMode("idle");
-    setPendingDraw(null);
-    setGeometryDraft(null);
+    setDraftGeometry(null);
   }, []);
 
   const handleRemoveDraft = useCallback(() => {
-    setPendingDraw(null);
-    setGeometryDraft(null);
+    setDraftGeometry(null);
     setDrawerMode(null);
     setPageMode("idle");
   }, []);
@@ -384,7 +443,7 @@ export default function ZonasGeoClient({
                 {zonas.length} zona{zonas.length !== 1 ? "s" : ""}
               </span>
             )}
-            {userCanDraw && pageMode === "idle" && !pendingDraw && (
+            {userCanDraw && pageMode === "idle" && !draftGeometry && (
               <button
                 onClick={handleStartDrawing}
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/20 transition-all hover:shadow-xl hover:brightness-110 active:scale-[0.97]"
@@ -401,7 +460,7 @@ export default function ZonasGeoClient({
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <div className="inline-flex items-center gap-0.5 rounded-xl bg-muted p-0.5">
               {SHAPE_OPTIONS.map(({ value, label, icon: Icon }) => {
-                const isActive = selectedShape === value && (pageMode === "drawing" || pendingDraw);
+                const isActive = selectedShape === value && (pageMode === "drawing" || !!draftGeometry);
                 return (
                   <button
                     key={value}
@@ -430,7 +489,7 @@ export default function ZonasGeoClient({
                   Centrar
                 </button>
               )}
-              {pendingDraw && (
+              {draftGeometry && (
                 <button
                   onClick={handleRemoveDraft}
                   className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-danger/70 transition-colors hover:bg-danger/10 hover:text-danger"
@@ -489,11 +548,12 @@ export default function ZonasGeoClient({
           </div>
         )}
 
-        {pendingDraw && drawerMode === "create" && (
+        {draftGeometry && drawerMode === "create" && (
           <div className="mt-3 flex items-center gap-3 rounded-xl border border-success/20 bg-success/5 px-4 py-2.5">
             <Crosshair className="h-4 w-4 shrink-0 text-success" />
             <span className="flex-1 text-sm leading-snug text-text-primary">
-              Forma lista. Puedes ajustar los vértices en el mapa y guardar la zona desde el panel lateral.
+              <span className="font-medium capitalize">{selectedShape}</span> lista.
+              Arrastra y redimensiona la forma en el mapa para ajustarla, luego completa los datos en el panel lateral.
             </span>
             <button
               onClick={handleRemoveDraft}
@@ -515,16 +575,18 @@ export default function ZonasGeoClient({
             selectedZonaId={selectedZonaId}
             editableZonaId={editableZonaId}
             drawingMode={pageMode === "drawing"}
-            draftGeojson={pendingDraw ? geometryDraft : null}
+            draftInfo={draftGeometry}
             draftColor={formData.color}
             focusGeojson={focusGeojson}
             focusSignal={focusSignal}
             onZonaClick={handleZonaClick}
             onDrawingComplete={handleDrawingComplete}
-            onDraftGeometryChange={setGeometryDraft}
+            onDraftChange={(d) => setDraftGeometry(d)}
             onEditableGeometryChange={setGeometryDraft}
             onViewportCenterChange={setMapCenter}
+            onViewportZoomChange={setViewportZoom}
             onMapReady={() => setMapReady(true)}
+            hasActiveDraft={!!draftGeometry || pageMode === "editing-geometry"}
           />
         </div>
 
@@ -564,6 +626,7 @@ export default function ZonasGeoClient({
         formData={formData}
         onFormChange={setFormData}
         onSave={drawerMode === "create" ? handleSaveNew : handleSaveEdit}
+        onCancel={drawerMode === "create" ? handleRemoveDraft : undefined}
         onEditGeometry={handleEditGeometry}
         onArchive={handleArchive}
         onDelete={handleDelete}
@@ -571,6 +634,7 @@ export default function ZonasGeoClient({
         isSaving={isSaving}
         canEdit={userCanEdit}
         canArchive={userCanArchive}
+        hasValidGeometry={hasValidGeometry}
       />
     </div>
   );

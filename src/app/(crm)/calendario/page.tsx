@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { getCurrentUserContext } from "@/lib/current-user";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import CalendarioClient from "./calendario-client";
 
 export default async function CalendarioPage() {
@@ -12,11 +12,11 @@ export default async function CalendarioPage() {
   );
 
   const supabase = await createClient();
-  const yo = await getCurrentUserContext();
-  const userId = yo?.id ?? 0;
-  const role = yo?.role ?? "Agente";
-  const empresaId = yo?.empresaId ?? null;
-  const supervisedIds = yo?.supervisedAgentIds ?? [];
+  const yo = await requirePageAccess("calendario");
+  const userId = yo.id;
+  const role = yo.role;
+  const empresaId = yo.empresaId ?? null;
+  const supervisedIds = yo.supervisedAgentIds ?? [];
 
   let eventsQuery;
 

@@ -4,6 +4,16 @@ import { useEffect, useRef } from "react";
 import { APIProvider, Map, Polygon, useMap, useMapsLibrary } from "@vis.gl/react-google-maps";
 import type { ZonaGeografica } from "@/modules/zonas-geograficas/services/types";
 
+export type PolygonGeoJson = { type: "Polygon"; coordinates: number[][][] };
+export type LatLngBoundsLiteral = { north: number; south: number; east: number; west: number };
+export type LatLngLiteral = { lat: number; lng: number };
+
+export type DraftInfo =
+  | { kind: "polygon"; geojson: PolygonGeoJson }
+  | { kind: "rectangle"; bounds: LatLngBoundsLiteral }
+  | { kind: "square"; bounds: LatLngBoundsLiteral }
+  | { kind: "circle"; center: LatLngLiteral; radius: number };
+
 const MAP_ID = "metria-zonageo-map";
 const DEFAULT_CENTER = { lat: 41.365795, lng: 2.053508 };
 
@@ -22,10 +32,7 @@ export function zonaToPaths(z: ZonaGeografica): { lat: number; lng: number }[] {
   return [];
 }
 
-export function pathsToGeoJson(paths: { lat: number; lng: number }[]): {
-  type: "Polygon";
-  coordinates: number[][][];
-} {
+export function pathsToGeoJson(paths: { lat: number; lng: number }[]): PolygonGeoJson {
   const coords = paths.map((p) => [p.lng, p.lat]);
   if (coords.length > 0) coords.push(coords[0]);
   return { type: "Polygon", coordinates: [coords] };
@@ -135,14 +142,14 @@ function EditablePolygonOverlay({
         lng: coord[0],
       })),
       fillColor: color,
-      fillOpacity: 0.2,
+      fillOpacity: 0.28,
       strokeColor: color,
-      strokeOpacity: 0.9,
-      strokeWeight: 2,
+      strokeOpacity: 0.95,
+      strokeWeight: 3,
       editable: true,
       draggable: true,
       clickable: false,
-      zIndex: 30,
+      zIndex: 40,
     });
 
     polygon.setMap(map);
@@ -181,11 +188,152 @@ function EditablePolygonOverlay({
   return null;
 }
 
+function EditableRectangleOverlay({
+  kind,
+  bounds,
+  color,
+  onChange,
+}: {
+  kind: "rectangle" | "square";
+  bounds: LatLngBoundsLiteral;
+  color: string;
+  onChange: (bounds: LatLngBoundsLiteral) => void;
+}) {
+  const map = useMap();
+  const rectRef = useRef<google.maps.Rectangle | null>(null);
+  const listenersRef = useRef<google.maps.MapsEventListener[]>([]);
+  const onChangeRef = useRef(onChange);
+  const isRestoringRef = useRef(false);
+
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+
+  useEffect(() => {
+    if (!map) return;
+    const rect = new google.maps.Rectangle({
+      bounds,
+      fillColor: color,
+      fillOpacity: 0.28,
+      strokeColor: color,
+      strokeOpacity: 0.95,
+      strokeWeight: 3,
+      draggable: true,
+      editable: true,
+      clickable: false,
+      zIndex: 40,
+    });
+    rect.setMap(map);
+    rectRef.current = rect;
+
+    const emitChange = () => {
+      if (isRestoringRef.current) return;
+      const b = rect.getBounds();
+      if (!b) return;
+      const ne = b.getNorthEast();
+      const sw = b.getSouthWest();
+
+      let resultBounds: LatLngBoundsLiteral;
+
+      if (kind === "square") {
+        isRestoringRef.current = true;
+        const center = { lat: (ne.lat() + sw.lat()) / 2, lng: (ne.lng() + sw.lng()) / 2 };
+        const latSpan = Math.abs(ne.lat() - sw.lat());
+        const lngSpan = Math.abs(ne.lng() - sw.lng());
+        const maxSpan = Math.max(latSpan, lngSpan);
+        const half = maxSpan / 2;
+        resultBounds = {
+          north: center.lat + half, south: center.lat - half,
+          east: center.lng + half, west: center.lng - half,
+        };
+        rect.setBounds(resultBounds);
+        isRestoringRef.current = false;
+      } else {
+        resultBounds = { north: ne.lat(), south: sw.lat(), east: ne.lng(), west: sw.lng() };
+      }
+
+      onChangeRef.current(resultBounds);
+    };
+
+    listenersRef.current = [
+      google.maps.event.addListener(rect, "bounds_changed", emitChange),
+    ];
+
+    return () => {
+      for (const l of listenersRef.current) google.maps.event.removeListener(l);
+      listenersRef.current = [];
+      rect.setMap(null);
+      rectRef.current = null;
+    };
+  }, [map]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (rectRef.current) rectRef.current.setOptions({ fillColor: color, strokeColor: color });
+  }, [color]);
+
+  return null;
+}
+
+function EditableCircleOverlay({
+  center,
+  radius,
+  color,
+  onChange,
+}: {
+  center: LatLngLiteral;
+  radius: number;
+  color: string;
+  onChange: (data: { center: LatLngLiteral; radius: number }) => void;
+}) {
+  const map = useMap();
+  const circleRef = useRef<google.maps.Circle | null>(null);
+  const listenersRef = useRef<google.maps.MapsEventListener[]>([]);
+  const onChangeRef = useRef(onChange);
+
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+
+  useEffect(() => {
+    if (!map) return;
+    const circle = new google.maps.Circle({
+      center, radius,
+      fillColor: color, fillOpacity: 0.28,
+      strokeColor: color, strokeOpacity: 0.95,
+      strokeWeight: 3, draggable: true, editable: true,
+      clickable: false, zIndex: 40,
+    });
+    circle.setMap(map);
+    circleRef.current = circle;
+
+    const emitChange = () => {
+      const c = circle.getCenter();
+      const r = circle.getRadius();
+      if (!c) return;
+      onChangeRef.current({ center: { lat: c.lat(), lng: c.lng() }, radius: r });
+    };
+
+    listenersRef.current = [
+      google.maps.event.addListener(circle, "center_changed", emitChange),
+      google.maps.event.addListener(circle, "radius_changed", emitChange),
+    ];
+
+    return () => {
+      for (const l of listenersRef.current) google.maps.event.removeListener(l);
+      listenersRef.current = [];
+      circle.setMap(null);
+      circleRef.current = null;
+    };
+  }, [map]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (circleRef.current) circleRef.current.setOptions({ fillColor: color, strokeColor: color });
+  }, [color]);
+
+  return null;
+}
+
 function FitBoundsHandler({
   geojson,
   signal,
 }: {
-  geojson: { type: "Polygon"; coordinates: number[][][] } | null;
+  geojson: PolygonGeoJson | null;
   signal: number;
 }) {
   const map = useMap();
@@ -205,7 +353,7 @@ function FitBoundsHandler({
 function MapCenterReporter({
   onCenterChange,
 }: {
-  onCenterChange?: (center: { lat: number; lng: number }) => void;
+  onCenterChange?: (center: LatLngLiteral) => void;
 }) {
   const map = useMap();
   const onCenterChangeRef = useRef(onCenterChange);
@@ -234,21 +382,55 @@ function MapCenterReporter({
   return null;
 }
 
+function MapZoomReporter({
+  onZoomChange,
+}: {
+  onZoomChange?: (zoom: number) => void;
+}) {
+  const map = useMap();
+  const onZoomChangeRef = useRef(onZoomChange);
+
+  useEffect(() => {
+    onZoomChangeRef.current = onZoomChange;
+  }, [onZoomChange]);
+
+  useEffect(() => {
+    if (!map || !onZoomChange) return;
+
+    const report = () => {
+      const zoom = map.getZoom();
+      if (zoom == null) return;
+      onZoomChangeRef.current?.(zoom);
+    };
+
+    report();
+    const listener = google.maps.event.addListener(map, "idle", report);
+
+    return () => {
+      google.maps.event.removeListener(listener);
+    };
+  }, [map, onZoomChange]);
+
+  return null;
+}
+
 interface ZonaGeoMapProps {
   zonas: ZonaGeografica[];
   selectedZonaId: number | null;
   editableZonaId: number | null;
   drawingMode: boolean;
-  draftGeojson: { type: "Polygon"; coordinates: number[][][] } | null;
+  draftInfo: DraftInfo | null;
   draftColor: string;
-  focusGeojson: { type: "Polygon"; coordinates: number[][][] } | null;
+  focusGeojson: PolygonGeoJson | null;
   focusSignal: number;
   onZonaClick: (zona: ZonaGeografica) => void;
-  onDrawingComplete: (geojson: { type: "Polygon"; coordinates: number[][][] }) => void;
-  onDraftGeometryChange: (geojson: { type: "Polygon"; coordinates: number[][][] }) => void;
-  onEditableGeometryChange: (geojson: { type: "Polygon"; coordinates: number[][][] }) => void;
-  onViewportCenterChange?: (center: { lat: number; lng: number }) => void;
+  onDrawingComplete: (geojson: PolygonGeoJson) => void;
+  onDraftChange: (draft: DraftInfo) => void;
+  onEditableGeometryChange: (geojson: PolygonGeoJson) => void;
+  onViewportCenterChange?: (center: LatLngLiteral) => void;
+  onViewportZoomChange?: (zoom: number) => void;
   onMapReady?: () => void;
+  hasActiveDraft?: boolean;
 }
 
 export default function ZonaGeoMap({
@@ -256,16 +438,18 @@ export default function ZonaGeoMap({
   selectedZonaId,
   editableZonaId,
   drawingMode,
-  draftGeojson,
+  draftInfo,
   draftColor,
   focusGeojson,
   focusSignal,
   onZonaClick,
   onDrawingComplete,
-  onDraftGeometryChange,
+  onDraftChange,
   onEditableGeometryChange,
   onViewportCenterChange,
+  onViewportZoomChange,
   onMapReady,
+  hasActiveDraft,
 }: ZonaGeoMapProps) {
   const selectedStroke = themeColor("--color-warning", "#f59e0b");
 
@@ -289,10 +473,10 @@ export default function ZonaGeoMap({
               key={z.id}
               paths={zonaToPaths(z)}
               strokeColor={z.id === selectedZonaId ? selectedStroke : z.color}
-              strokeOpacity={0.85}
-              strokeWeight={z.id === selectedZonaId ? 3 : 2}
+              strokeOpacity={hasActiveDraft ? 0.4 : 0.85}
+              strokeWeight={z.id === selectedZonaId ? 3 : hasActiveDraft ? 1.5 : 2}
               fillColor={z.color}
-              fillOpacity={z.id === selectedZonaId ? 0.25 : 0.12}
+              fillOpacity={hasActiveDraft ? 0.06 : z.id === selectedZonaId ? 0.25 : 0.12}
               editable={z.id === editableZonaId}
               draggable={z.id === editableZonaId}
               clickable={true}
@@ -302,15 +486,34 @@ export default function ZonaGeoMap({
           ))}
 
           <MapCenterReporter onCenterChange={onViewportCenterChange} />
+          <MapZoomReporter onZoomChange={onViewportZoomChange} />
           <DrawingHandler active={drawingMode} onPolygonComplete={onDrawingComplete} />
           <FitBoundsHandler geojson={focusGeojson} signal={focusSignal} />
-          {draftGeojson && (
+
+          {draftInfo?.kind === "polygon" && (
             <EditablePolygonOverlay
-              geojson={draftGeojson}
+              geojson={draftInfo.geojson}
               color={draftColor}
-              onChange={onDraftGeometryChange}
+              onChange={(geojson) => onDraftChange({ kind: "polygon", geojson })}
             />
           )}
+          {(draftInfo?.kind === "rectangle" || draftInfo?.kind === "square") && (
+            <EditableRectangleOverlay
+              kind={draftInfo.kind}
+              bounds={draftInfo.bounds}
+              color={draftColor}
+              onChange={(bounds) => onDraftChange({ kind: draftInfo.kind, bounds })}
+            />
+          )}
+          {draftInfo?.kind === "circle" && (
+            <EditableCircleOverlay
+              center={draftInfo.center}
+              radius={draftInfo.radius}
+              color={draftColor}
+              onChange={(data) => onDraftChange({ kind: "circle", center: data.center, radius: data.radius })}
+            />
+          )}
+
           {editableZonaId && (
             (() => {
               const zona = zonas.find((z) => z.id === editableZonaId);

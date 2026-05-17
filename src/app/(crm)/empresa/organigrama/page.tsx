@@ -1,18 +1,12 @@
-﻿import { redirect } from "next/navigation";
-import { getCurrentUserContext } from "@/lib/current-user";
-import { createClient } from "@/lib/supabase";
-import { canViewOrgChart } from "@/lib/roles";
+﻿import { createClient } from "@/lib/supabase";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import PageHeader from "@/components/layout/page-header";
 import OrganigramaClient from "./organigrama-client";
 import type { OrgUser } from "@/modules/empresa/services/org-chart";
 
 export default async function OrganigramaPage() {
-  const yo = await getCurrentUserContext();
-
-  if (!yo) redirect("/login");
-
-  // Solo Administrador, Director y Responsable pueden ver el organigrama
-  if (!canViewOrgChart(yo.role)) redirect("/dashboard");
+  // requirePageAccess checks both the base role restriction (SUPERVISOR_ROLES) and configurable rules
+  const yo = await requirePageAccess("organigrama");
 
   const supabase = await createClient();
 

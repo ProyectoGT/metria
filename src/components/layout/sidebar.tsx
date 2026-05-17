@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useUIStore } from "@/stores/ui.store";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -29,6 +29,8 @@ import {
   Shield,
   MessageCircle,
   X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
 // ─── Grupos de navegación ─────────────────────────────────────────────────────
@@ -114,6 +116,7 @@ function NavItem({
   active,
   priority,
   actions = [],
+  collapsed = false,
 }: {
   href: string;
   icon: React.ElementType;
@@ -121,6 +124,7 @@ function NavItem({
   active: boolean;
   priority?: "core";
   actions?: Array<NavAction & { label: string; active: boolean }>;
+  collapsed?: boolean;
 }) {
   const isCore = priority === "core";
 
@@ -131,10 +135,12 @@ function NavItem({
           className={[
             "pressable group/link flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
             isCore ? "py-2.5 font-semibold" : "py-2 font-medium",
+            collapsed && "justify-center px-0",
             active
               ? "bg-sidebar-active text-primary shadow-[inset_0_0_0_1px_rgba(37,99,235,0.16)]"
               : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary hover:shadow-[inset_0_0_0_1px_rgba(148,163,184,0.18)]",
           ].join(" ")}
+          title={collapsed ? label : undefined}
         >
           <Link
             href={href}
@@ -152,9 +158,9 @@ function NavItem({
             >
               <Icon className="h-[17px] w-[17px]" aria-hidden="true" />
             </span>
-            <span className="min-w-0 flex-1 truncate">{label}</span>
+            {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
           </Link>
-          {actions.some((action) => action.display !== "subitem") && (
+          {!collapsed && actions.some((action) => action.display !== "subitem") && (
             <span
               className={[
                 "ml-auto flex shrink-0 items-center gap-1 opacity-100 md:opacity-0 md:transition-opacity md:duration-150 md:group-hover/item:opacity-100 md:group-focus-within/item:opacity-100",
@@ -178,7 +184,7 @@ function NavItem({
               ))}
             </span>
           )}
-          {active && !actions.some((action) => action.display !== "subitem") && !actions.some((action) => action.display === "subitem") && (
+          {!collapsed && active && !actions.some((action) => action.display !== "subitem") && !actions.some((action) => action.display === "subitem") && (
             <motion.span
               layoutId="sidebar-active"
               className="complete-pop ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
@@ -186,7 +192,7 @@ function NavItem({
             />
           )}
         </div>
-        {actions.some((action) => action.display === "subitem") && active && (
+        {!collapsed && actions.some((action) => action.display === "subitem") && active && (
           <div className="ml-10 mt-1 space-y-1 border-l border-border pl-2">
             {actions.filter((action) => action.display === "subitem").map((action) => (
               <Link
@@ -210,10 +216,10 @@ function NavItem({
   );
 }
 
-function NavGroup({ label, children }: { label?: string; children: React.ReactNode }) {
+function NavGroup({ label, collapsed, children }: { label?: string; collapsed?: boolean; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      {label && (
+      {label && !collapsed && (
         <p className="mb-1.5 mt-5 px-3 text-[10px] font-semibold uppercase tracking-widest text-text-secondary/55 first:mt-0">
           {label}
         </p>
@@ -245,6 +251,28 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
   const canSeeInsights = canViewInsights(role);
   const isAdmin = role === "Administrador";
   const deniedSet = new Set(deniedResourceKeys);
+
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Sync sidebar collapsed state from localStorage after hydration.
+  // Intentionally setState in effect — required for SSR-safe localStorage persistence.
+  useEffect(() => {
+    const stored = localStorage.getItem("metria-sidebar-collapsed");
+    if (stored === "true") setIsCollapsed(true); // eslint-disable-line react-hooks/set-state-in-effect
+  }, []);
+
+  const toggleCollapsed = useCallback(() => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("metria-sidebar-collapsed", String(next));
+      document.documentElement.style.setProperty("--sidebar-width", next ? "72px" : "260px");
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--sidebar-width", isCollapsed ? "72px" : "260px");
+  }, [isCollapsed]);
 
   function isNavVisible(key: string): boolean {
     return !deniedSet.has(key);
@@ -292,95 +320,126 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
       .map((action) => ({ ...action, label: t(action.labelKey), active: isActive(action.href) })) ?? [];
   }
 
-  const navContent = (
-    <div className="flex h-full min-h-0 flex-col">
-      {/* ── Logo ─────────────────────────────────────────────────── */}
-      <div className="relative flex h-16 shrink-0 items-center justify-center border-b border-border bg-sidebar-logo px-4">
-        <Image
-          src="/logo-bg-master-iberica.png"
-          alt="Master Ibérica"
-          width={190}
-          height={48}
-          className="max-h-10 w-auto object-contain"
-          priority
-        />
-        <button
-          onClick={() => closeSidebar()}
-          className="touch-target absolute right-2 rounded-lg p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white md:hidden"
-          aria-label={t("navigation.closeMenu")}
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
+  function getNavContent(collapsed: boolean) {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        {/* ── Logo ─────────────────────────────────────────────────── */}
+        <div className={`flex h-16 shrink-0 items-center border-b border-border bg-sidebar-logo ${collapsed ? 'justify-center px-0' : 'justify-center px-4'}`}>
+          {collapsed ? (
+            <Image
+              src="/favicon-32x32.png"
+              alt="Master Ibérica"
+              width={28}
+              height={28}
+              className="object-contain"
+              priority
+            />
+          ) : (
+            <Image
+              src="/logo-bg-master-iberica.png"
+              alt="Master Ibérica"
+              width={240}
+              height={56}
+              className="max-h-20 w-auto object-contain"
+              priority
+            />
+          )}
+          {!collapsed && (
+            <button
+              onClick={() => closeSidebar()}
+              className="touch-target absolute right-2 rounded-lg p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white md:hidden"
+              aria-label={t("navigation.closeMenu")}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
 
-      {/* ── Navegación ───────────────────────────────────────────── */}
-      <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4" aria-label={t("navigation.mainNavigation") || "Navegación principal"} style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}>
+        {/* ── Navegación ───────────────────────────────────────────── */}
+        <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4" aria-label={t("navigation.mainNavigation") || "Navegación principal"} style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}>
 
-        {NAV_SECTIONS.map((section) => (
-          <motion.div key={section.labelKey} variants={staggerContainer} initial="initial" animate="animate">
-            <NavGroup label={t(section.labelKey)}>
-              {section.items.filter(itemIsVisible).map((item) => (
+          {NAV_SECTIONS.map((section) => (
+            <motion.div key={section.labelKey} variants={staggerContainer} initial="initial" animate="animate">
+              <NavGroup label={collapsed ? undefined : t(section.labelKey)} collapsed={collapsed}>
+                {section.items.filter(itemIsVisible).map((item) => (
+                  <NavItem
+                    key={item.href}
+                    href={item.href}
+                    icon={item.icon}
+                    label={t(item.labelKey)}
+                    active={isActive(item.href)}
+                    priority={item.priority}
+                    actions={getVisibleActions(item)}
+                    collapsed={collapsed}
+                  />
+                ))}
+              </NavGroup>
+            </motion.div>
+          ))}
+
+          {/* Gestión: base permission + configurable layer */}
+          {(canSeeUsers || canSeeOrganigrama) && (
+            <NavGroup label={collapsed ? undefined : t("navigation.sectionCompany")} collapsed={collapsed}>
+              {canSeeUsers && isNavVisible("usuarios") && (
                 <NavItem
-                  key={item.href}
-                  href={item.href}
-                  icon={item.icon}
-                  label={t(item.labelKey)}
-                  active={isActive(item.href)}
-                  priority={item.priority}
-                  actions={getVisibleActions(item)}
+                  href="/usuarios"
+                  icon={Users}
+                  label={t("navigation.users")}
+                  active={isActive("/usuarios")}
+                  collapsed={collapsed}
+                  actions={[
+                    { labelKey: "navigation.userList", href: "/usuarios", resourceKey: "usuarios", icon: Users, display: "subitem", label: t("navigation.userList"), active: pathname.startsWith("/usuarios") },
+                    ...(canSeeOrganigrama && isNavVisible("organigrama")
+                      ? [{ labelKey: "navigation.orgChart", href: "/empresa/organigrama", resourceKey: "organigrama", icon: Network, display: "subitem" as const, label: t("navigation.orgChart"), active: pathname.startsWith("/empresa/organigrama") }]
+                      : []),
+                  ]}
                 />
-              ))}
-            </NavGroup>
-          </motion.div>
-        ))}
-
-        {/* Gestión: base permission + configurable layer */}
-        {(canSeeUsers || canSeeOrganigrama) && (
-          <NavGroup label={t("navigation.sectionCompany")}>
-            {canSeeUsers && isNavVisible("usuarios") && (
-              <NavItem
-                href="/usuarios"
-                icon={Users}
-                label={t("navigation.users")}
-                active={isActive("/usuarios")}
-                actions={[
-                  { labelKey: "navigation.userList", href: "/usuarios", resourceKey: "usuarios", icon: Users, display: "subitem", label: t("navigation.userList"), active: pathname.startsWith("/usuarios") },
-                  ...(canSeeOrganigrama && isNavVisible("organigrama")
-                    ? [{ labelKey: "navigation.orgChart", href: "/empresa/organigrama", resourceKey: "organigrama", icon: Network, display: "subitem" as const, label: t("navigation.orgChart"), active: pathname.startsWith("/empresa/organigrama") }]
-                    : []),
-                ]}
-              />
-            )}
-          </NavGroup>
-        )}
-
-        <div className="mt-5 border-t border-border pt-4">
-          {(isNavVisible("soporte") || isAdmin) && (
-            <NavGroup label={t("navigation.sectionSystem")}>
-              {isNavVisible("soporte") && (
-                <NavItem href="/soporte" icon={LifeBuoy} label={t("navigation.support")} active={isActive("/soporte")} />
-              )}
-              {isAdmin && isNavVisible("configuracion") && (
-                <NavItem href="/configuracion/control-acceso" icon={Settings} label={t("navigation.accessControl")} active={isActive("/configuracion/control-acceso")} />
-              )}
-              {isAdmin && (
-                <NavItem href="/seguridad" icon={Shield} label={t("navigation.audit")} active={isActive("/seguridad")} />
               )}
             </NavGroup>
           )}
+
+          <div className="mt-5 border-t border-border pt-4">
+            {(isNavVisible("soporte") || isAdmin) && (
+              <NavGroup label={collapsed ? undefined : t("navigation.sectionSystem")} collapsed={collapsed}>
+                {isNavVisible("soporte") && (
+                  <NavItem href="/soporte" icon={LifeBuoy} label={t("navigation.support")} active={isActive("/soporte")} collapsed={collapsed} />
+                )}
+                {isAdmin && isNavVisible("configuracion") && (
+                  <NavItem href="/configuracion/control-acceso" icon={Settings} label={t("navigation.accessControl")} active={isActive("/configuracion/control-acceso")} collapsed={collapsed} />
+                )}
+                {isAdmin && (
+                  <NavItem href="/seguridad" icon={Shield} label={t("navigation.audit")} active={isActive("/seguridad")} collapsed={collapsed} />
+                )}
+              </NavGroup>
+            )}
+          </div>
+        </nav>
+
+        {/* ── Toggle button ─────────────────────────────────────────── */}
+        <div className="border-t border-border p-3">
+          <button
+            onClick={toggleCollapsed}
+            className={`flex w-full items-center gap-3 rounded-xl py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-sidebar-hover ${collapsed ? 'justify-center px-0' : 'px-3'}`}
+            title={collapsed ? 'Expandir menú' : 'Minimizar menú'}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="h-5 w-5" />
+            ) : (
+              <>
+                <PanelLeftClose className="h-5 w-5" />
+                <span>Minimizar menú</span>
+              </>
+            )}
+          </button>
         </div>
-      </nav>
-
-    </div>
-  );
-
-  const sidebarClass = "fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col bg-sidebar";
-  const borderClass  = "border-r border-border";
+      </div>
+    );
+  }
 
   return (
     <>
-      <aside className={`${sidebarClass} ${borderClass} hidden md:flex`} aria-label={t("navigation.sidebar") || "Menú lateral"}>
-        {navContent}
+      <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-sidebar border-r border-border transition-all duration-300 hidden md:flex ${isCollapsed ? 'w-[72px]' : 'w-[260px]'}`} aria-label={t("navigation.sidebar") || "Menú lateral"}>
+        {getNavContent(isCollapsed)}
       </aside>
 
       <div
@@ -393,12 +452,12 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
       />
       <aside
         className={[
-          `${sidebarClass} ${borderClass} transition-transform duration-300 ease-out md:hidden`,
+          `fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col bg-sidebar border-r border-border transition-transform duration-300 ease-out md:hidden`,
           sidebarOpen ? "translate-x-0 shadow-xl" : "-translate-x-full",
         ].join(" ")}
         aria-label={t("navigation.sidebar") || "Menú lateral"}
       >
-        {navContent}
+        {getNavContent(false)}
       </aside>
     </>
   );

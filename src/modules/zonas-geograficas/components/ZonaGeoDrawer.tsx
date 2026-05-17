@@ -8,6 +8,8 @@ import {
   Save,
   Clock,
   User,
+  X,
+  Crosshair,
 } from "lucide-react";
 import Drawer from "@/components/ui/drawer";
 import { DEFAULT_ZONA_COLORS, ZONA_TIPOS } from "@/modules/zonas-geograficas/services/types";
@@ -22,6 +24,7 @@ interface ZonaGeoDrawerProps {
   formData: ZonaGeoFormData;
   onFormChange: (data: ZonaGeoFormData) => void;
   onSave: () => void;
+  onCancel?: () => void;
   onEditGeometry: () => void;
   onArchive: () => void;
   onDelete: () => void;
@@ -29,6 +32,7 @@ interface ZonaGeoDrawerProps {
   isSaving: boolean;
   canEdit: boolean;
   canArchive: boolean;
+  hasValidGeometry?: boolean;
 }
 
 export default function ZonaGeoDrawer({
@@ -39,6 +43,7 @@ export default function ZonaGeoDrawer({
   formData,
   onFormChange,
   onSave,
+  onCancel,
   onEditGeometry,
   onArchive,
   onDelete,
@@ -46,6 +51,7 @@ export default function ZonaGeoDrawer({
   isSaving,
   canEdit,
   canArchive,
+  hasValidGeometry,
 }: ZonaGeoDrawerProps) {
   const title =
     mode === "create"
@@ -62,8 +68,10 @@ export default function ZonaGeoDrawer({
             formData={formData}
             onChange={onFormChange}
             onSave={onSave}
+            onCancel={onCancel}
             isSaving={isSaving}
             mode={mode}
+            hasValidGeometry={hasValidGeometry}
           />
         )}
 
@@ -87,17 +95,35 @@ function CreateEditForm({
   formData,
   onChange,
   onSave,
+  onCancel,
   isSaving,
   mode,
+  hasValidGeometry,
 }: {
   formData: ZonaGeoFormData;
   onChange: (d: ZonaGeoFormData) => void;
   onSave: () => void;
+  onCancel?: () => void;
   isSaving: boolean;
   mode: "create" | "edit";
+  hasValidGeometry?: boolean;
 }) {
+  const saveDisabled = isSaving || !formData.nombre.trim() || (mode === "create" && !hasValidGeometry);
+
   return (
     <>
+      {mode === "create" && (
+        <div className="flex items-center gap-3 rounded-xl border border-success/20 bg-success/5 px-3 py-2.5">
+          <Crosshair className="h-4 w-4 shrink-0 text-success" />
+          <div className="min-w-0 flex-1 text-xs leading-snug text-text-primary">
+            <span className="font-medium text-text-primary">Forma lista</span>
+            <span className="ml-1.5 text-text-secondary">
+              — Arrastra y redimensiona la forma en el mapa
+            </span>
+          </div>
+        </div>
+      )}
+
       <div>
         <label className="mb-1 block text-xs font-medium text-text-secondary">
           Nombre <span className="text-danger">*</span>
@@ -164,18 +190,29 @@ function CreateEditForm({
         </select>
       </div>
 
-      <button
-        onClick={onSave}
-        disabled={isSaving || !formData.nombre.trim()}
-        className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-      >
-        <Save className="h-4 w-4" />
-        {isSaving
-          ? "Guardando..."
-          : mode === "create"
-            ? "Guardar zona"
-            : "Actualizar zona"}
-      </button>
+      <div className="flex items-center gap-3 pt-2">
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-muted"
+          >
+            <X className="h-4 w-4" />
+            Cancelar
+          </button>
+        )}
+        <button
+          onClick={onSave}
+          disabled={saveDisabled}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+        >
+          <Save className="h-4 w-4" />
+          {isSaving
+            ? "Guardando..."
+            : mode === "create"
+              ? "Guardar zona"
+              : "Actualizar zona"}
+        </button>
+      </div>
     </>
   );
 }

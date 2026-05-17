@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getCurrentUserContext } from "@/lib/current-user";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import { fetchInsights } from "@/lib/insights";
 import PageHeader from "@/components/layout/page-header";
 import InsightsClient from "./insights-client";
@@ -15,11 +14,8 @@ export default async function InsightsPage({
     hasta?: string;
   }>;
 }) {
-  const yo = await getCurrentUserContext();
-
-  // Guard de rol: solo Responsable, Director y Administrador
-  if (!yo) redirect("/login");
-  if (yo.role === "Agente") redirect("/desarrollo");
+  // requirePageAccess enforces SUPERVISOR_ROLES base restriction + configurable rules
+  const yo = await requirePageAccess("insights");
 
   const params = await searchParams;
   const anio = params.anio ? Number(params.anio) : new Date().getFullYear();

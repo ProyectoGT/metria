@@ -1,21 +1,13 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Network } from "lucide-react";
-import { getCurrentUserContext } from "@/lib/current-user";
-import { canCreateUsers, USER_ROLES } from "@/lib/roles";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
+import { USER_ROLES } from "@/lib/roles";
 import { createClient } from "@/lib/supabase";
 import UsersManagementPanel from "./users-management-panel";
 
 export default async function UsuariosPage() {
-  const currentUser = await getCurrentUserContext();
-
-  if (!currentUser) {
-    redirect("/login");
-  }
-
-  if (!canCreateUsers(currentUser.role)) {
-    redirect("/dashboard");
-  }
+  // Checks both the base MANAGER_ROLES restriction and any configurable rules
+  const currentUser = await requirePageAccess("usuarios");
 
   const supabase = await createClient();
   const baseQuery = currentUser.empresaId !== null

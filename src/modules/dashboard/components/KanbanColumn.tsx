@@ -41,10 +41,10 @@ function KanbanColumn({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-      className="group flex w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col overflow-hidden rounded-ds-lg border border-border bg-surface shadow-layer-1 interactive-surface"
+      className="group flex min-w-0 flex-col overflow-hidden rounded-ds-lg border border-border bg-surface shadow-layer-1 interactive-surface"
     >
       {/* ── Cabecera (sticky) ─────────────────────────────────────── */}
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-surface-elevated px-4 py-3.5 shadow-layer-1">
+      <div className="sticky top-0 z-10 grid h-14 grid-cols-[minmax(0,1fr)_2rem] items-center gap-3 border-b border-border bg-surface-elevated px-4 shadow-layer-1">
         <div className="flex min-w-0 items-center gap-2.5">
           <h3 className="truncate text-sm font-semibold text-text-primary">{column.title}</h3>
           <div className="flex items-center gap-1">
@@ -56,15 +56,17 @@ function KanbanColumn({
             )}
           </div>
         </div>
-        {!column.fixed && (
+        <div className="flex h-8 w-8 items-center justify-center">
+          {!column.fixed && (
           <button
             onClick={handleDelete}
-            className="touch-target rounded-lg p-2 text-text-secondary transition-all hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/30 md:p-1 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-danger transition-colors hover:bg-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/30 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
             aria-label="Eliminar columna"
           >
             <X className="h-4 w-4" />
           </button>
-        )}
+          )}
+        </div>
       </div>
 
       {/* ── Área droppable ───────────────────────────────────────── */}

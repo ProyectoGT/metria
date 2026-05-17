@@ -1,14 +1,12 @@
 import { createClient } from "@/lib/supabase";
-import { getCurrentUserContext } from "@/lib/current-user";
-import { redirect } from "next/navigation";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import PageHeader from "@/components/layout/page-header";
 import ComunicacionesClient from "./comunicaciones-client";
 import { getComunicacionesMetricsAction } from "@/app/(crm)/whatsapp/actions";
 import { isApiEnabled } from "@/lib/whatsapp-api";
 
 export default async function ComunicacionesPage() {
-  const yo = await getCurrentUserContext();
-  if (!yo) redirect("/login");
+  const yo = await requirePageAccess("comunicaciones");
 
   const supabase = await createClient();
 

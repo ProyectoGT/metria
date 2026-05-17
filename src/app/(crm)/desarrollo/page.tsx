@@ -1,5 +1,5 @@
 ﻿import { createClient } from "@/lib/supabase";
-import { getCurrentUserContext } from "@/lib/current-user";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import { getPeriodRange, mergeRendimientoRows } from "@/modules/desarrollo/services/desarrollo-metrics";
 import PageHeader from "@/components/layout/page-header";
 import DesarrolloClient from "./desarrollo-client";
@@ -10,9 +10,9 @@ export default async function DesarrolloPage() {
   const mesActual = new Date().getMonth() + 1;
   const periodRange = getPeriodRange(anioActual, mesActual);
 
-  const yo = await getCurrentUserContext();
-  const role = yo?.role ?? "Agente";
-  const userId = yo?.id ?? 0;
+  const yo = await requirePageAccess("desarrollo");
+  const role = yo.role;
+  const userId = yo.id;
   const isManager = role === "Administrador" || role === "Director";
 
   // Resolver fincas accesibles para filtrar noticias por zona (igual que dashboard)

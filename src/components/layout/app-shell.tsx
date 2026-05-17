@@ -154,7 +154,7 @@ export default async function AppShell({
       <RoutePreloader />
       <div className="h-dvh overflow-hidden bg-background">
         <Sidebar userRole={userRole} deniedResourceKeys={deniedKeys} />
-        <div className="flex h-full min-w-0 flex-col md:pl-[260px]">
+        <div className="flex h-full min-w-0 flex-col transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 260px)' }}>
           <Header userName={userName} userEmail={userEmail} avatarUrl={userAvatarUrl} notifications={notifications} />
           <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background px-4 py-5 pb-20 md:px-6 md:py-6 md:pb-6 lg:px-7 lg:py-7" aria-label="Contenido principal">
             <div className="w-full min-w-0">

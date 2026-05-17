@@ -1,9 +1,8 @@
 export const dynamic = "force-dynamic";
 
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { getCurrentUserContext } from "@/lib/current-user";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import PageHeader from "@/components/layout/page-header";
 import PropiedadesClient from "./propiedades-client";
 
@@ -49,8 +48,7 @@ export type ZonaOption = { id: number; nombre: string };
 export type AgenteOption = { id: number; nombre: string };
 
 export default async function PropiedadesPage() {
-  const yo = await getCurrentUserContext();
-  if (!yo) redirect("/login");
+  const yo = await requirePageAccess("propiedades");
 
   const supabase = await createClient();
   const isAdmin = yo.role === "Administrador";

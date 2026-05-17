@@ -658,8 +658,8 @@ export default function CalendarioClient({
     : (() => {
         const we = new Date(weekStart); we.setDate(we.getDate() + 6);
         const sameMonth = weekStart.getMonth() === we.getMonth();
-        if (sameMonth) return `${weekStart.getDate()} â€" ${we.getDate()} ${getMonthName(we.getMonth(), we.getFullYear())} ${we.getFullYear()}`;
-        return `${weekStart.getDate()} ${getMonthName(weekStart.getMonth(), weekStart.getFullYear())} â€" ${we.getDate()} ${getMonthName(we.getMonth(), we.getFullYear())} ${we.getFullYear()}`;
+        if (sameMonth) return `${weekStart.getDate()} - ${we.getDate()} ${getMonthName(we.getMonth(), we.getFullYear())} ${we.getFullYear()}`;
+        return `${weekStart.getDate()} ${getMonthName(weekStart.getMonth(), weekStart.getFullYear())} - ${we.getDate()} ${getMonthName(we.getMonth(), we.getFullYear())} ${we.getFullYear()}`;
       })();
 
   // â"€â"€ Render helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -796,7 +796,7 @@ export default function CalendarioClient({
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {ev.time && (
                       <span className="text-xs font-medium text-text-secondary">
-                        {ev.time}{ev.time_end ? ` â€" ${ev.time_end}` : ""}
+                        {ev.time}{ev.time_end ? ` - ${ev.time_end}` : ""}
                         {(() => { const d = calcDurationMinutes(ev.time, ev.time_end); return d ? ` (${formatDuration(d)})` : ""; })()}
                       </span>
                     )}
@@ -1356,7 +1356,7 @@ export default function CalendarioClient({
                   <Clock className="h-4 w-4 shrink-0" />
                   <span>
                     {normalizeTime(detailEvent.time, "")}
-                    {detailEvent.time_end && ` â€" ${normalizeTime(detailEvent.time_end, "")}`}
+                    {detailEvent.time_end && ` - ${normalizeTime(detailEvent.time_end, "")}`}
                     {(() => {
                       const d = calcDurationMinutes(detailEvent.time, detailEvent.time_end);
                       return d ? <span className="ml-1 rounded-full bg-surface-raised px-2 py-0.5 text-xs font-medium">{formatDuration(d)}</span> : null;
@@ -1404,7 +1404,7 @@ export default function CalendarioClient({
             />
 
             <div className="rounded-xl bg-surface-raised px-4 py-3 text-xs text-text-secondary">
-              <p>Actividad de calendario Â· ID: {detailEvent.id}</p>
+              <p>Actividad de calendario · ID: {detailEvent.id}</p>
             </div>
           </div>
         )}

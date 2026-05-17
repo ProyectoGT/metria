@@ -1,6 +1,6 @@
 ﻿import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { getCurrentUserContext } from "@/lib/current-user";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import { formatLocalDateEs, localDateKey } from "@/lib/local-date-time";
 import { normalizeAgendaEvent } from "@/modules/calendario/services/normalize-agenda-event";
 import PageHeader from "@/components/layout/page-header";
@@ -8,11 +8,7 @@ import OrdenesClient from "./ordenes-client";
 
 export default async function OrdenesPage() {
   const supabase = await createClient();
-  const yo = await getCurrentUserContext();
-
-  if (!yo) {
-    return <div className="p-6 text-text-secondary">No autenticado.</div>;
-  }
+  const yo = await requirePageAccess("ordenes");
 
   const today = localDateKey();
   // Orden del día es una vista personal: cada usuario ve solo sus propias

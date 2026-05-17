@@ -635,7 +635,10 @@ function KanbanBoard({
 
       <DragDropContext onDragEnd={handleDragEnd}>
         {/* Desktop columns */}
-        <div className="@container hidden flex-row gap-3 overflow-x-auto overscroll-x-contain pb-2 md:flex">
+        <div
+          className="hidden grid-flow-col gap-3 overflow-x-auto overscroll-x-contain pb-2 md:grid"
+          style={{ gridAutoColumns: "minmax(260px, 1fr)" }}
+        >
           {columns.map((column) => (
             <KanbanColumn
               key={column.id}
@@ -648,7 +651,7 @@ function KanbanBoard({
           ))}
 
           {addingColumn ? (
-            <div className="mt-0 hidden h-fit w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 flex-col gap-2 rounded-2xl border border-dashed border-border bg-surface p-3 md:flex">
+            <div className="mt-0 hidden h-fit min-w-0 flex-col gap-2 rounded-2xl border border-dashed border-border bg-surface p-3 md:flex">
               <input
                 ref={newColInputRef}
                 type="text"
@@ -682,7 +685,7 @@ function KanbanBoard({
             <button
               type="button"
               onClick={handleStartAddColumn}
-              className="pressable mt-0 hidden h-fit w-[calc((100cqi-3rem)/4)] min-w-[260px] shrink-0 items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface/50 px-4 py-6 text-sm font-medium text-text-secondary hover:border-primary/40 hover:bg-surface hover:text-primary md:flex"
+              className="pressable mt-0 hidden h-fit min-w-0 items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface/50 px-4 py-6 text-sm font-medium text-text-secondary hover:border-primary/40 hover:bg-surface hover:text-primary md:flex"
             >
               <Plus className="h-4 w-4" />
               Nueva columna
