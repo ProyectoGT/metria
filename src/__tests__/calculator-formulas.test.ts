@@ -6,6 +6,7 @@ import { calculateInvestmentYield } from "@/modules/calculator/formulas/investme
 import { calculatePlusvaliaEstimate } from "@/modules/calculator/formulas/plusvalia";
 import { calculateSellerNet } from "@/modules/calculator/formulas/sellerNet";
 import { calculateCommission } from "@/modules/calculator/formulas/commission";
+import { isValidNumberInput, parseNumberInput } from "@/modules/calculator/formulas/number";
 
 describe("calculator formulas", () => {
   it("handles empty or zero mortgage values without NaN", () => {
@@ -105,5 +106,56 @@ describe("calculator formulas", () => {
     expect(final.netSeller).toBe(473000);
     expect(final.verification).toBe("473000 + 23650 + 4966.5 = 501616.5");
     expect(net.netSeller).toBeCloseTo(473000, 0);
+  });
+
+  it("validates number input correctly", () => {
+    expect(isValidNumberInput("123")).toBe(true);
+    expect(isValidNumberInput("123,45")).toBe(true);
+    expect(isValidNumberInput("1.000")).toBe(true);
+    expect(isValidNumberInput("1.000,50")).toBe(true);
+    expect(isValidNumberInput("")).toBe(true);
+    expect(isValidNumberInput("abc")).toBe(false);
+    expect(isValidNumberInput("12%")).toBe(false);
+    expect(isValidNumberInput("1,2,3")).toBe(false);
+    expect(isValidNumberInput("12.34.56")).toBe(true); // multiple dots OK (thousands separators)
+    expect(isValidNumberInput("   ")).toBe(true); // whitespace
+  });
+
+  it("handles parseNumberInput edge cases", () => {
+    expect(parseNumberInput("", 100)).toBe(100); // returns fallback for empty
+    expect(Number.isNaN(parseNumberInput("abc", NaN))).toBe(true); // NaN fallback preserves NaN
+    expect(parseNumberInput("123", NaN)).toBe(123); // valid parse with NaN fallback
+    expect(parseNumberInput("1.500,75", 0)).toBe(1500.75); // Spanish format
+    expect(parseNumberInput("1500.75", 0)).toBe(1500.75); // English format
+  });
+
+  it("calculates commission scenarios correctly", () => {
+    // Caso 1: 300.000 €, 5%, IVA activo
+    const c1 = calculateCommission({ mode: "base_to_final", price: 300000, commissionPercent: 5, includeVat: true });
+    expect(c1.commission).toBe(15000);
+    expect(c1.commissionVat).toBe(3150);
+    expect(c1.buyerPrice).toBe(318150);
+    expect(c1.netSeller).toBe(300000);
+
+    // Caso 2: 400.000 €, 3%, IVA activo
+    const c2 = calculateCommission({ mode: "base_to_final", price: 400000, commissionPercent: 3, includeVat: true });
+    expect(c2.commission).toBe(12000);
+    expect(c2.commissionVat).toBe(2520);
+    expect(c2.buyerPrice).toBe(414520);
+    expect(c2.netSeller).toBe(400000);
+
+    // Caso 3: 500.000 €, 10%, IVA desactivado
+    const c3 = calculateCommission({ mode: "base_to_final", price: 500000, commissionPercent: 10, includeVat: false });
+    expect(c3.commission).toBe(50000);
+    expect(c3.commissionVat).toBe(0);
+    expect(c3.buyerPrice).toBe(550000);
+    expect(c3.netSeller).toBe(500000);
+
+    // Caso 4: final_to_net — 400.000 € final, 3%, IVA activo
+    const c4 = calculateCommission({ mode: "final_to_net", price: 400000, commissionPercent: 3, includeVat: true });
+    expect(c4.buyerPrice).toBe(400000);
+    expect(c4.netSeller).toBeCloseTo(385988.61, 1); // Redondeo a 1 decimal por precisión
+    expect(c4.commission).toBeCloseTo(11579.66, 1);
+    expect(c4.commissionVat).toBeCloseTo(2431.73, 1);
   });
 });

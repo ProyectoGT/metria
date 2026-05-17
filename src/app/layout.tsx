@@ -3,7 +3,6 @@ import Script from "next/script";
 import ThemeScript from "@/components/layout/theme-script";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import { I18nProvider } from "@/lib/i18n";
-import DomLocalizer from "@/lib/i18n/dom-localizer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -51,7 +50,6 @@ export default function RootLayout({
       </head>
       <body className="h-full bg-background text-text-primary font-sans">
         <I18nProvider>
-          <DomLocalizer />
           <ErrorBoundary context="root">
             {children}
           </ErrorBoundary>

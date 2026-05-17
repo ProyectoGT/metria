@@ -1,158 +1,682 @@
-# Metria CRM — Guía para Claude
+# Metria CRM — Guía Técnica Completa para Claude / Codex
 
-CRM inmobiliario para **Master Iberica**. Todo el código vive en `metria/`. Trabaja siempre desde esa carpeta.
+> **Instrucción de mantenimiento:** Este archivo es la fuente de verdad técnica del proyecto.
+> - Consúltalo al inicio de **toda** sesión de trabajo en este repositorio.
+> - **Actualízalo** cada vez que añadas, elimines o modifiques: rutas, tablas, componentes, patrones, dependencias, variables de entorno o reglas de permisos.
+> - Usa el formato existente. Añade una entrada en el [Changelog](#17-changelog) con fecha y descripción del cambio.
 
-## Stack
+---
 
-- **Next.js 16** (App Router, Server Components por defecto)
-- **React 19** + **Tailwind CSS 4** (sin CSS modules ni CSS-in-JS)
-- **TypeScript 5** estricto
-- **Supabase** (PostgreSQL + Auth + RLS + `@supabase/ssr`)
-- **lucide-react** para iconos
-- **@hello-pangea/dnd** para drag & drop (Kanban)
+## Tabla de contenidos
 
-## Comandos
+1. [Qué es Metria](#1-qué-es-metria)
+2. [Stack tecnológico](#2-stack-tecnológico)
+3. [Estructura de directorios](#3-estructura-de-directorios)
+4. [Arquitectura y flujo de datos](#4-arquitectura-y-flujo-de-datos)
+5. [Autenticación y sesión](#5-autenticación-y-sesión)
+6. [Modelo de datos (Supabase / PostgreSQL)](#6-modelo-de-datos-supabase--postgresql)
+7. [Roles y permisos](#7-roles-y-permisos)
+8. [Módulos de la aplicación](#8-módulos-de-la-aplicación)
+9. [Clientes de Supabase — reglas de uso](#9-clientes-de-supabase--reglas-de-uso)
+10. [Patrones UI establecidos](#10-patrones-ui-establecidos)
+11. [Convenciones de código](#11-convenciones-de-código)
+12. [Integración Google Calendar](#12-integración-google-calendar)
+13. [Seguridad](#13-seguridad)
+14. [Variables de entorno](#14-variables-de-entorno)
+15. [Comandos de desarrollo](#15-comandos-de-desarrollo)
+16. [Gotchas y trampas frecuentes](#16-gotchas-y-trampas-frecuentes)
+17. [Changelog](#17-changelog)
 
-```bash
-cd metria
-npm run dev              # dev server en http://localhost:3000
-npm run build            # build producción
-npm run lint             # eslint
-npx tsc --noEmit         # type-check (usado con frecuencia)
-supabase db push         # aplicar migraciones
-```
+---
 
-No hay tests. No añadas ninguno salvo petición explícita.
+## 1. Qué es Metria
 
-## Estructura
+**Metria** es un CRM inmobiliario SaaS en español desarrollado para **Master Iberica** (`masteriberica.digital`). Centraliza la operativa completa de una agencia inmobiliaria:
+
+- Organización jerárquica del territorio: **Zonas → Sectores → Fincas → Propiedades**
+- Ciclo de vida de propiedades: **Noticia → Investigación → Encargo → Venta**
+- Gestión de pedidos (solicitudes) de clientes
+- Kanban personal de tareas por agente (drag & drop)
+- Control de rendimiento mensual/anual por agente vs. objetivos
+- Agenda integrada con Google Calendar (OAuth 2.0)
+- Control de acceso multi-rol con Row-Level Security en base de datos
+- Módulo de soporte interno (tickets)
+- Calculadoras inmobiliarias (comisiones, rentabilidades)
+
+**Repositorio:** `https://github.com/ProyectoGT/metria`
+**Rama principal:** `main`
+**Idioma de la UI:** Español
+
+---
+
+## 2. Stack tecnológico
+
+| Capa | Tecnología | Versión | Notas |
+|------|-----------|---------|-------|
+| Framework | Next.js (App Router) | 16 | Server Components por defecto |
+| UI | React | 19 | `"use client"` solo cuando necesario |
+| Estilos | Tailwind CSS | 4 | Sin CSS Modules ni CSS-in-JS |
+| Lenguaje | TypeScript | 5 | Modo estricto. Cero `any` injustificados |
+| Base de datos | Supabase (PostgreSQL) | — | RLS habilitado en todas las tablas críticas |
+| Auth | Supabase Auth + JWT | — | Cookies HTTP-only via `@supabase/ssr` |
+| Drag & drop | @hello-pangea/dnd | — | Kanban del dashboard |
+| Iconos | lucide-react | — | Tamaño estándar `h-4 w-4` |
+| Integración | Google Calendar API | v3 | OAuth 2.0, solo lectura/escritura de agenda |
+| Linter | ESLint | — | Config en `eslint.config.mjs` |
+| Testing | Vitest | 4 | Solo tests de fórmulas de calculadora (`src/__tests__/`) |
+
+**No introduzcas dependencias nuevas** sin consultar. El stack es deliberadamente pequeño.
+
+---
+
+## 3. Estructura de directorios
 
 ```
 metria/
-├── middleware.ts                  # redirige a /login si no hay sesión
+├── middleware.ts                  # Guards de autenticación de rutas
+├── next.config.ts                 # Config de Next.js
+├── postcss.config.mjs             # Necesario para Tailwind 4
+├── eslint.config.mjs
+├── tsconfig.json                  # paths: @/* → src/*
+├── .env.local.example             # Plantilla de variables de entorno
+│
+├── public/                        # Assets estáticos
+├── scripts/                       # Scripts de utilidad (migraciones, etc.)
+│
 ├── src/
+│   ├── __tests__/
+│   │   └── calculator-formulas.test.ts  # Tests unitarios del módulo calculadora (vitest)
+│   │
 │   ├── app/
-│   │   ├── (auth)/                # login, recuperar, nueva-contrasena, sin-acceso
-│   │   ├── (crm)/                 # rutas protegidas (todas usan AppShell)
-│   │   │   ├── layout.tsx         # AppShell + InactivityGuard
-│   │   │   ├── dashboard/         # Kanban + resumen + rendimiento
-│   │   │   ├── zona/              # Zonas → Sectores → Fincas → Propiedades
-│   │   │   ├── solicitudes/       # Pedidos de clientes (ruta interna: "pedidos" en DB)
-│   │   │   ├── ordenes/           # Órdenes del día
-│   │   │   ├── calendario/        # Google Calendar sync
-│   │   │   ├── desarrollo/        # Métricas por agente
-│   │   │   ├── usuarios/          # Admin de usuarios
-│   │   │   ├── cuenta/            # Perfil + seguridad
-│   │   │   ├── soporte/           # Tickets
-│   │   │   └── calculadora/
-│   │   ├── actions/               # Server actions compartidas (perfil, security)
-│   │   ├── api/google/            # OAuth + sync Google Calendar
-│   │   └── globals.css            # Tema (--color-*) + clase `.input`
+│   │   ├── globals.css            # Tema CSS (tokens --color-*) + clase base .input
+│   │   ├── layout.tsx             # Root layout (html, body, fuente)
+│   │   │
+│   │   ├── (auth)/                # Rutas públicas sin AppShell
+│   │   │   ├── login/             # Página de inicio de sesión
+│   │   │   ├── recuperar/         # Solicitud de recuperación de contraseña
+│   │   │   ├── nueva-contrasena/  # Restablecimiento tras enlace de email
+│   │   │   └── sin-acceso/        # Página de error de permisos
+│   │   │
+│   │   ├── (crm)/                 # Rutas protegidas — requieren sesión activa
+│   │   │   ├── layout.tsx         # AppShell + InactivityGuard (cierre automático)
+│   │   │   ├── dashboard/         # Pantalla principal: KanbanBoard + resumen + rendimiento
+│   │   │   ├── zona/              # Navegación jerárquica Zona→Sector→Finca→Propiedad
+│   │   │   ├── propiedades/       # Listado global de propiedades + EncargoPanel
+│   │   │   ├── solicitudes/       # Pedidos de clientes (tabla `pedidos` en DB)
+│   │   │   ├── ordenes/           # Órdenes del día con prioridades
+│   │   │   ├── calendario/        # Vista de agenda + sync Google Calendar
+│   │   │   ├── desarrollo/        # Métricas y objetivos por agente
+│   │   │   ├── calculadora/       # Herramientas de cálculo inmobiliario
+│   │   │   ├── usuarios/          # Gestión de usuarios (solo Administrador)
+│   │   │   ├── cuenta/            # Perfil, avatar, seguridad, vinculación Google
+│   │   │   └── soporte/           # Sistema de tickets de soporte interno
+│   │   │
+│   │   ├── actions/               # Server Actions compartidas entre rutas
+│   │   │   ├── perfil.ts          # Actualizar perfil, avatar
+│   │   │   └── security.ts        # Contraseña de confirmación, seguridad de cuenta
+│   │   │
+│   │   └── api/
+│   │       └── google/            # Endpoints OAuth 2.0 + sync Google Calendar
+│   │           ├── auth/          # Inicio del flujo OAuth
+│   │           ├── callback/      # Callback de Google tras autorización
+│   │           └── sync/          # Sincronización eventos ↔ tabla `agenda`
+│   │
 │   ├── components/
-│   │   ├── layout/                # app-shell, sidebar, header, page-header
-│   │   ├── ui/                    # avatar, toast, breadcrumb, delete-confirmation-dialog
-│   │   ├── dashboard/             # Kanban*, AgentOfMonth, SummaryCard, etc.
-│   │   ├── propiedades/           # EncargoPanel
+│   │   ├── layout/
+│   │   │   ├── app-shell.tsx      # Layout raíz del CRM: sidebar + header + main
+│   │   │   ├── sidebar.tsx        # Navegación lateral con roles
+│   │   │   ├── header.tsx         # Barra superior: breadcrumb + avatar + acciones
+│   │   │   └── page-header.tsx    # Título + descripción de cada página
+│   │   │
+│   │   ├── ui/                    # Componentes reutilizables genéricos
+│   │   │   ├── avatar.tsx         # Iniciales coloreadas deterministas o foto
+│   │   │   ├── toast.tsx          # Sistema de notificaciones (useToast + Toaster)
+│   │   │   ├── breadcrumb.tsx     # Navegación jerárquica
+│   │   │   └── delete-confirmation-dialog.tsx  # Modal de borrado con contraseña
+│   │   │
+│   │   ├── dashboard/
+│   │   │   ├── kanban-board.tsx   # Tablero drag & drop (@hello-pangea/dnd)
+│   │   │   ├── summary-card.tsx   # Tarjetas de resumen (Noticias, Encargos, etc.)
+│   │   │   ├── agent-of-month.tsx # Componente agente del mes
+│   │   │   └── performance-table.tsx  # Tabla de rendimiento del equipo
+│   │   │
+│   │   ├── propiedades/
+│   │   │   └── encargo-panel.tsx  # Panel lateral de detalle/encargo de propiedad
+│   │   │
 │   │   └── cuenta/
-│   ├── lib/                       # Ver "Helpers" abajo
+│   │       └── profile-form.tsx   # Formulario de edición de perfil
+│   │
+│   ├── modules/                   # Módulos verticales autocontenidos
+│   │   └── calculator/            # Calculadora inmobiliaria modular
+│   │       ├── types.ts           # CalculatorType, CommissionResult, etc.
+│   │       ├── components/
+│   │       │   ├── CalculatorDashboard.tsx   # Hub de herramientas (orquestador)
+│   │       │   ├── CalculatorShell.tsx       # Wrapper con breadcrumb + acciones
+│   │       │   ├── CalculatorActions.tsx     # Barra de acciones comerciales
+│   │       │   ├── CalculatorCard.tsx        # Card del grid de calculadoras
+│   │       │   ├── ResultSummary.tsx         # Panel de resultados (ResultRow, AdvisoryNote)
+│   │       │   ├── NumericSliderField.tsx    # Input numérico + slider dual
+│   │       │   ├── CompactNumberField.tsx    # Input numérico compacto
+│   │       │   ├── FormField.tsx             # Wrapper de label + hint + error
+│   │       │   └── format.ts                 # formatCurrency, formatDecimal, formatPercent
+│   │       ├── calculators/        # 8 calculadoras individuales
+│   │       │   ├── simple-commission/       # "Calculadora simplificada" — comisión rápida
+│   │       │   ├── purchase/                # "Comprar vivienda" — viabilidad
+│   │       │   ├── mortgage/                # "Hipoteca avanzada"
+│   │       │   ├── purchase-costs/          # "Gastos de compraventa"
+│   │       │   ├── plusvalia/               # "Plusvalía municipal"
+│   │       │   ├── seller-net/              # "Venta de vivienda" — neto vendedor
+│   │       │   ├── investment/              # "Rentabilidad inversión"
+│   │       │   └── max-budget/              # "Precio máximo comprador"
+│   │       ├── formulas/           # Lógica de negocio pura (sin React)
+│   │       │   ├── number.ts       # parseNumberInput, clamp, roundMoney, isValidNumberInput
+│   │       │   ├── commission.ts   # calculateCommission (base_to_final / final_to_net)
+│   │       │   ├── mortgage.ts
+│   │       │   ├── purchaseCosts.ts
+│   │       │   ├── purchase.ts
+│   │       │   ├── investment.ts
+│   │       │   ├── plusvalia.ts
+│   │       │   ├── sellerNet.ts
+│   │       │   └── maxBudget.ts
+│   │       ├── schemas/            # Zod: validación de formularios (8 esquemas)
+│   │       │   ├── common.ts, resolver.ts
+│   │       │   ├── mortgage.schema.ts, purchase.schema.ts, ...
+│   │       │   └── max-budget.schema.ts
+│   │       └── services/
+│   │           └── simulations.service.ts   # CRUD de simulaciones guardadas (stubs Fase 2)
+│   │
+│   ├── lib/
+│   │   ├── supabase.ts            # createClient() para Server Components/Actions
+│   │   ├── supabase-browser.ts    # createClient() para Client Components
+│   │   ├── supabase-admin.ts      # createAdminClient() — bypass RLS
+│   │   ├── current-user.ts        # getCurrentUserContext() — contexto completo del usuario
+│   │   ├── roles.ts               # USER_ROLES + helpers de permisos
+│   │   ├── delete-confirmation-password.ts  # verifyConfirmationPassword()
+│   │   └── utils.ts               # Utilidades genéricas (fechas, formato, etc.)
+│   │
 │   └── types/
-│       ├── database.types.ts      # Tipos generados de Supabase
-│       └── index.ts               # Aliases: Zona, Sector, Finca, Propiedad, Usuario, Pedido, Tarea, Agenda
-└── supabase/migrations/           # SQL migrations
+│       ├── database.types.ts      # Tipos autogenerados por Supabase CLI
+│       └── index.ts               # Aliases: Zona, Sector, Finca, Propiedad, Usuario,
+│                                  #          Pedido, Tarea, Agenda, Rendimiento
+│
+└── supabase/
+    └── migrations/                # Archivos SQL en formato YYYYMMDD_descripcion.sql
 ```
 
-Alias TypeScript: `@/*` → `src/*`.
+**Alias TypeScript:** `@/*` → `src/*`
 
-## Tres clientes de Supabase — no los mezcles
+---
 
-| Archivo | Cuándo | Notas |
-|---|---|---|
-| `@/lib/supabase` → `createClient()` | **Server Components / Server Actions** | `async`, usa cookies del usuario. RLS aplicado |
-| `@/lib/supabase-browser` → `createClient()` | **Client Components** | Síncrono. Úsalo con `useMemo` para no recrear en cada render |
-| `@/lib/supabase-admin` → `createAdminClient()` | **Server Actions privilegiadas** | Bypass RLS con `SUPABASE_SERVICE_ROLE_KEY`. Solo para operaciones de admin (crear usuarios, etc.) |
+## 4. Arquitectura y flujo de datos
 
-Patrón típico en un cliente:
+### Patrón Server Component + Client Component
+
+Toda página del CRM sigue este patrón:
+
 ```tsx
+// app/(crm)/modulo/page.tsx  ← Server Component
+const currentUser = await getCurrentUserContext();
+const { data } = await supabase.from("tabla").select("*").eq("empresa_id", currentUser.empresaId);
+
+return (
+  <>
+    <PageHeader title="Módulo" description="Descripción" />
+    <ModuloClient
+      initialData={data}
+      currentUserId={currentUser.id}
+      currentUserRole={currentUser.role}
+    />
+  </>
+);
+```
+
+```tsx
+// app/(crm)/modulo/modulo-client.tsx  ← Client Component ("use client")
+// Gestiona estado local, interacciones, formularios
+// Llama a Server Actions para mutaciones
+```
+
+### Flujo de mutaciones (Server Actions)
+
+```
+Client Component
+  → llama Server Action (app/actions/ o inline en page)
+    → createAdminClient() si privilegiada, createClient() si normal
+    → mutación en Supabase
+    → revalidatePath("/ruta-afectada")
+    → retorna { success, error? }
+  → Client muestra toast y actualiza UI local
+```
+
+### Middleware de autenticación (`middleware.ts`)
+
+El middleware ejecuta en el Edge en cada request (excepto assets estáticos):
+1. Lee el JWT de la cookie sin llamada HTTP (`getSession()`)
+2. Valida contra Supabase Auth (`getUser()`)
+3. Sin sesión + ruta protegida → `/login` (borra cookies `sb-*`)
+4. Con sesión + ruta pública → `/dashboard`
+5. `/sin-acceso` siempre accesible
+
+```
+matcher: "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"
+```
+
+---
+
+## 5. Autenticación y sesión
+
+### Función principal: `getCurrentUserContext()`
+
+**Archivo:** `@/lib/current-user`
+**Uso:** En **todo** Server Component que necesite saber quién es el usuario activo.
+
+**Devuelve:**
+```typescript
+{
+  id: string;
+  email: string;
+  fullName: string;
+  role: "Administrador" | "Director" | "Responsable" | "Agente";
+  empresaId: string;
+  equipoId: string | null;
+  avatarUrl: string | null;
+  supervisorId: string | null;
+  canDeleteZonas: boolean;
+  canDeleteSectores: boolean;
+  canDeleteFincas: boolean;
+  canManageUsers: boolean;
+  canViewAllAgents: boolean;
+  canViewSupervisedAgents: boolean;
+  supervisedAgentIds: string[];
+}
+```
+
+### InactivityGuard
+
+Componente en el layout `(crm)` que cierra la sesión automáticamente tras un período de inactividad configurable.
+
+### Recuperación de contraseña
+
+Flujo: `/recuperar` → email con enlace → `/nueva-contrasena?token=...` → actualización via Supabase Auth.
+
+---
+
+## 6. Modelo de datos (Supabase / PostgreSQL)
+
+### Tablas principales
+
+| Tabla | Descripción | Relaciones clave |
+|-------|-------------|-----------------|
+| `empresas` | Organización raíz (tenant) | Raíz del multi-tenant |
+| `equipos` | Equipos dentro de una empresa | `empresa_id` → `empresas` |
+| `usuarios` | Usuarios con rol, estado, supervisor | `empresa_id`, `equipo_id`, `supervisor_id` → `usuarios` |
+| `zona` | Zonas geográficas | `empresa_id` |
+| `sectores` | Sectores dentro de una zona | `zona_id` |
+| `fincas` | Fincas dentro de un sector | `sector_id` |
+| `propiedades` | Unidades inmobiliarias con estado y agente | `finca_id`, `agente_id` → `usuarios` |
+| `pedidos` | Solicitudes/pedidos de clientes | `empresa_id`, `propietario_id` → `usuarios` |
+| `tareas` | Tareas del Kanban personal | `usuario_id`, columnas: `pendiente/orden_dia/realizado` |
+| `agenda` | Eventos de calendario | `usuario_id`, sync con Google Calendar |
+| `rendimiento` | Métricas mensuales por agente | `usuario_id`, `mes`, `año`, objetivos vs. real |
+| `archivos` | Adjuntos y documentos | polimórfico: `entidad_tipo` + `entidad_id` |
+| `configuracion_seguridad` | Contraseña de confirmación para borrados | `empresa_id` |
+| `soporte_*` | Tickets de soporte interno | Múltiples tablas |
+
+### Estados de propiedades
+
+```
+Noticia → Investigación → Encargo → Venta
+```
+
+### Multi-tenancy
+
+Todas las queries deben filtrar por `empresa_id` del usuario actual. RLS en Supabase refuerza esto a nivel de base de datos.
+
+### Tipos TypeScript
+
+Importar siempre desde `@/types`:
+```typescript
+import type { Zona, Sector, Finca, Propiedad, Usuario, Pedido, Tarea, Agenda } from "@/types";
+```
+
+Los tipos de base están en `@/types/database.types.ts` (autogenerados con Supabase CLI — no editar manualmente).
+
+### Regenerar tipos tras cambio de esquema
+
+```bash
+supabase gen types typescript --project-id TU_PROJECT_ID > src/types/database.types.ts
+```
+
+---
+
+## 7. Roles y permisos
+
+### Jerarquía
+
+```
+Administrador > Director > Responsable > Agente
+```
+
+| Rol | Capacidades |
+|-----|------------|
+| **Administrador** | Acceso total. Crea/elimina usuarios, gestiona zonas y configuración de seguridad. No puede ser eliminado ni cambiar de rol desde la UI. |
+| **Director** | Ve todos los agentes de la empresa. Gestiona propiedades, rendimiento y pedidos. No gestiona usuarios. |
+| **Responsable** | Gestiona sus agentes supervisados. Crea órdenes del día para ellos. Ve su propio rendimiento y el de supervisados. |
+| **Agente** | Solo ve sus propias tareas, propiedades asignadas y su rendimiento individual. |
+
+### Constante y helpers
+
+```typescript
+// @/lib/roles
+export const USER_ROLES = ["Administrador", "Director", "Responsable", "Agente"] as const;
+canManageUsers(role)          // solo Administrador
+canDeleteZonas(role)          // Administrador + Director
+canViewAllAgents(role)        // Administrador + Director
+canViewSupervisedAgents(role) // Responsable
+```
+
+### Regla crítica: el Administrador es intocable
+
+No se puede eliminar ni cambiar el rol de un Administrador desde la UI. Los helpers y las Server Actions ya lo protegen. **No romper esta invariante.**
+
+---
+
+## 8. Módulos de la aplicación
+
+### Dashboard (`/dashboard`)
+
+Pantalla principal con 4 secciones:
+1. **SummaryCards** — Contadores: Noticias, Investigaciones, Encargos activos, Pedidos activos
+2. **KanbanBoard** — Tablero personal drag & drop con `@hello-pangea/dnd`
+3. **Orden del día** — Panel visible para Responsable y superiores
+4. **Rendimiento del equipo** — Tabla comparativa de agentes + Agente del mes
+
+### Zonas / Sectores / Fincas / Propiedades (`/zona`)
+
+Navegación jerárquica con drill-down. CRUD completo con confirmación de contraseña para borrados.
+
+### Solicitudes / Pedidos (`/solicitudes`)
+
+CRUD de pedidos de clientes. Internamente la tabla se llama `pedidos`. **No mezclar los nombres en textos visibles.**
+
+### Órdenes del día (`/ordenes`)
+
+Tareas diarias con prioridad (Alta/Media/Baja) y estado. Responsables pueden crear órdenes para sus agentes supervisados.
+
+### Calendario (`/calendario`)
+
+Vista de agenda mensual/semanal con sincronización bidireccional Google Calendar (OAuth 2.0).
+
+### Desarrollo / Rendimiento (`/desarrollo`)
+
+Métricas por agente: facturado, encargos, ventas vs. objetivo. Editable por Directores y Responsables.
+
+### Calculadora (`/calculadora`)
+
+**Arquitectura modular** en `@/modules/calculator/`. 8 calculadoras + hub de herramientas.
+
+Punto de entrada: `CalculatorDashboard` (orquestador, renderiza grid o calculadora activa).
+Cada calculadora recibe `onSummaryChange?: (summary: string) => void` para notificar al padre.
+La calculadora "simplificada" (`SimpleCommissionCalculator`) es la calculadora de comisión rápida.
+
+Reglas del módulo:
+- Las fórmulas viven en `formulas/` y son funciones puras sin React.
+- Los componentes UI están en `components/`.
+- La validación de forms usa Zod en `schemas/`.
+- `number.ts` contiene `parseNumberInput` (formato español), `clamp`, `roundMoney`, `isValidNumberInput`, `isEmptyNumberInput`.
+- Los resultados se muestran con `ResultSummary` + `ResultRow`.
+- Acciones comerciales: solo "Copiar resumen" funciona (clipboard API). Las demás (Guardar, Duplicar, Vincular, WhatsApp, PDF, Crear tarea) están marcadas "Próximamente".
+- Los tests de fórmulas están en `src/__tests__/calculator-formulas.test.ts` (vitest).
+
+### Usuarios (`/usuarios`)
+
+Solo visible para Administrador: CRUD de usuarios, asignación de roles, relación supervisor→agente.
+
+### Cuenta (`/cuenta`)
+
+Perfil, avatar (upload a Supabase Storage), cambio de contraseña, confirmación para operaciones destructivas, vinculación Google Calendar.
+
+### Soporte (`/soporte`)
+
+Sistema de tickets internos. Tablas: `soporte_tickets`, `soporte_mensajes`.
+
+---
+
+## 9. Clientes de Supabase — reglas de uso
+
+**NUNCA mezcles los tres clientes. Usa el correcto según el contexto.**
+
+| Archivo | Función exportada | Cuándo usar | Notas |
+|---------|------------------|-------------|-------|
+| `@/lib/supabase` | `createClient()` | **Server Components y Server Actions** | `async`. Lee cookies del request. RLS del usuario aplicado. |
+| `@/lib/supabase-browser` | `createClient()` | **Client Components** | Síncrono. Envuelve en `useMemo` para no recrear. |
+| `@/lib/supabase-admin` | `createAdminClient()` | **Server Actions privilegiadas** | Bypass RLS con `SUPABASE_SERVICE_ROLE_KEY`. Solo para: crear usuarios, leer datos de otras empresas, operaciones de admin. |
+
+**Patrón cliente:**
+```typescript
 const supabase = useMemo(() => createClient(), []);
 ```
 
-## Auth y permisos
+---
 
-- **`getCurrentUserContext()`** en `@/lib/current-user` — úsalo en TODO Server Component que necesite saber quién es el usuario. Devuelve rol normalizado, empresaId, equipoId, flags (`canDeleteZonas`, etc.) y agentes supervisados.
-- **`USER_ROLES`** = `["Administrador", "Director", "Responsable", "Agente"]` (`@/lib/roles`).
-- Helpers de permisos: `canManageUsers`, `canDeleteZonas`, `canViewAllAgents`, `canViewSupervisedAgents`, etc. Úsalos en lugar de hardcodear strings.
-- Multi-tenant: filtra siempre por `empresa_id` del usuario actual si aplica (`currentUser.empresaId`).
-- El middleware (`middleware.ts`) ya redirige a `/login` para rutas no públicas. Las rutas `(crm)/*` asumen usuario autenticado.
+## 10. Patrones UI establecidos
 
-## Patrones UI establecidos
+### Estructura de página CRM estándar
 
-**Página CRM estándar:**
 ```tsx
 // page.tsx (Server Component)
-return (
-  <>
-    <PageHeader title="..." description="..." />
-    <ClientComponent initialData={...} currentUserId={...} currentUserRole={...} />
-  </>
-)
+<>
+  <PageHeader title="Título" description="Descripción" />
+  <ComponenteClient initialData={data} currentUserId={id} currentUserRole={role} />
+</>
 ```
-No envuelvas la página en más cards. El `<main>` ya tiene `p-4 md:p-6` y fondo.
 
-**Card/section base:** `rounded-2xl border border-border bg-surface shadow-sm`. **No anides cards dentro de cards.**
+No envuelvas en cards adicionales. El `<main>` del AppShell ya tiene `p-4 md:p-6` y fondo.
 
-**Tablas:** usa `<table className="w-full text-sm">` con `<thead>` en `bg-background` y `<tbody className="divide-y divide-border">`. Filas con `hover:bg-background cursor-pointer` si son clicables.
+### Card / sección base
 
-**Input base:** clase `.input` definida en `globals.css`. Aplica también a `<select>` y `<textarea>`.
+```tsx
+<div className="rounded-2xl border border-border bg-surface shadow-sm p-4">...</div>
+```
 
-**Modales:** overlay con `fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4`, caja con `rounded-2xl bg-surface shadow-xl`. Ver ejemplos en `solicitudes-client.tsx`, `usuarios/users-management-panel.tsx`.
+**No anidar cards dentro de cards.**
 
-**Toasts:** `useToast` + `<Toaster>` en `@/components/ui/toast`. `toast("mensaje")` → success, `toast("msg", "error")`.
+### Tablas
 
-**Confirmación destructiva con contraseña:** usa `DeleteConfirmationDialog` (`@/components/ui/delete-confirmation-dialog`) para borrar zonas, sectores, fincas. Verifica con `verifyConfirmationPassword` del lado servidor (`@/lib/delete-confirmation-password`).
+```tsx
+<table className="w-full text-sm">
+  <thead className="bg-background">
+    <tr><th className="text-left px-4 py-3 font-medium text-text-secondary">Columna</th></tr>
+  </thead>
+  <tbody className="divide-y divide-border">
+    <tr className="hover:bg-background cursor-pointer">
+      <td className="px-4 py-3">Dato</td>
+    </tr>
+  </tbody>
+</table>
+```
 
-**Confirmación destructiva sin contraseña:** modal propio con botones. **Nunca uses `window.confirm`.**
+### Inputs
 
-**Avatares:** componente `<Avatar name={fullName} src={avatarUrl} size="md" />` en `@/components/ui/avatar`. Genera iniciales coloreadas deterministas cuando no hay `src`.
+Usa la clase `.input` definida en `globals.css`. Aplica también a `<select>` y `<textarea>`.
 
-**Iconos:** `lucide-react` (ej. `import { Plus, Search, MoreVertical } from "lucide-react"`). Tamaño típico `h-4 w-4`.
+### Modales
 
-**Colores semánticos (Tailwind tokens):**
-`primary`, `primary-dark`, `primary-light`, `accent` (ámbar), `success` (verde), `danger` (rojo), `warning`, `text-primary`, `text-secondary`, `background`, `surface`, `border`, `muted`. Funcionan en light y dark mode. **No uses `bg-white`, `text-gray-500`, etc.** — rompen el dark mode.
+```tsx
+<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+  <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl p-6">...</div>
+</div>
+```
 
-**Dark mode:** activado con `html.dark`. Los tokens ya están definidos. Evita colores hardcoded.
+### Toasts
 
-## Convenciones de código
+```typescript
+import { useToast } from "@/components/ui/toast";
+const { toast } = useToast();
+toast("Operación completada");           // success
+toast("Ha ocurrido un error", "error");  // error
+```
 
-- **Server Components por defecto.** `"use client"` solo cuando haga falta (state, efectos, listeners, drag & drop).
-- Tipado estricto. Nada de `any` salvo casos justificados.
-- Naming: archivos en `kebab-case.tsx`, componentes en `PascalCase`, helpers en `camelCase`.
-- Sin comentarios salvo casos no obvios (la memoria y el README explican el porqué).
-- Imports agrupados: externos, luego `@/*`, luego relativos.
-- Respeta la estructura `page.tsx` (Server) + `*-client.tsx` (Client). La página carga datos y pasa props.
-- Mensajes de UI en español. Sin tildes en strings que se muestran (legado) — revisa el contexto del archivo antes de introducir `ó/á/é/í/ú/ñ`.
+### Confirmación destructiva
 
-## Gotchas frecuentes
+- **Con contraseña:** `DeleteConfirmationDialog` + `verifyConfirmationPassword()`
+- **Sin contraseña:** modal propio con botones. **Nunca uses `window.confirm`.**
 
-- **Renombrar carpetas ≠ actualizar contenido.** Si renombras `pedidos/` → `solicitudes/`, cambia también los textos visibles (`<h1>`, toasts, botones, sidebar).
-- **Administrador es intocable.** No se puede eliminar ni cambiar de rol desde la UI. Los helpers y las actions ya lo protegen; respétalo.
-- **`revalidatePath("/ruta")`** tras toda mutación en server actions.
-- **Migraciones Supabase:** archivos en `supabase/migrations/` con formato `YYYYMMDD_descripcion.sql`. Si modificas el esquema, regenera `src/types/database.types.ts`.
-- **No introduzcas dependencias nuevas** sin consultar. El stack es deliberadamente pequeño.
+### Avatares
+
+```tsx
+import Avatar from "@/components/ui/avatar";
+<Avatar name={fullName} src={avatarUrl ?? undefined} size="md" />
+```
+
+### Iconos
+
+```tsx
+import { Plus, Search, MoreVertical, Trash2, Edit } from "lucide-react";
+<Plus className="h-4 w-4" />
+```
+
+### Tokens de color (Tailwind)
+
+**Usar siempre tokens semánticos. Nunca `bg-white`, `text-gray-*`, etc.**
+
+| Token | Uso |
+|-------|-----|
+| `primary` | Color principal de la marca |
+| `primary-dark` | Variante oscura del primario |
+| `primary-light` | Variante clara del primario |
+| `accent` | Ámbar — acciones secundarias |
+| `success` | Verde — confirmaciones |
+| `danger` | Rojo — errores y destructivos |
+| `warning` | Amarillo — advertencias |
+| `text-primary` | Texto principal |
+| `text-secondary` | Texto secundario/muted |
+| `background` | Fondo de página |
+| `surface` | Fondo de cards/modales |
+| `border` | Bordes |
+| `muted` | Fondos sutiles |
+
+**Dark mode:** activado con `html.dark`. Los tokens funcionan en ambos modos automáticamente.
+
+---
+
+## 11. Convenciones de código
+
+- **Server Components por defecto.** `"use client"` solo cuando necesites estado, efectos, event listeners, drag & drop.
+- **TypeScript estricto.** Cero `any` no justificados. Usa los tipos de `@/types`.
+- **Naming:** archivos `kebab-case.tsx`, componentes `PascalCase`, helpers `camelCase`, constantes globales `UPPER_SNAKE_CASE`.
+- **Sin comentarios** salvo casos genuinamente no obvios.
+- **Imports agrupados:** 1. Externos, 2. `@/*`, 3. Relativos `./`.
+- **Estructura página:** `page.tsx` (Server) + `*-client.tsx` (Client).
+- **Mensajes de UI en español.** Precaución con tildes — revisar el contexto del archivo antes de introducir `á/é/í/ó/ú/ñ`.
+- **`revalidatePath("/ruta")`** obligatorio tras toda mutación en Server Actions.
 - **Commits:** Conventional Commits (`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`). Incluye `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` cuando Claude hace el trabajo.
 
-## Variables de entorno (.env.local)
+---
 
+## 12. Integración Google Calendar
+
+**Flujo OAuth 2.0:**
 ```
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-NEXT_PUBLIC_BASE_URL=http://localhost:3000
-DELETE_CONFIRMATION_PASSWORD=   # fallback si no hay configuracion_seguridad en DB
+/cuenta → "Vincular Google" → GET /api/google/auth → redirect a Google
+→ Google → GET /api/google/callback?code=... → tokens guardados en tabla `usuarios`
+→ redirige a /calendario
 ```
 
-## Modelo de datos (tablas principales)
+**Sincronización:** `GET /api/google/sync` — sincroniza Google Calendar con tabla `agenda` (campo `google_event_id`).
 
-`usuarios` · `empresas` · `equipos` · `zona` · `sectores` · `fincas` · `propiedades` · `pedidos` · `tareas` · `agenda` · `rendimiento` · `archivos` · `configuracion_seguridad` · `soporte_*`
+**Scopes:** `https://www.googleapis.com/auth/calendar`
+**Variables:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXT_PUBLIC_BASE_URL`
 
-Tipos importados desde `@/types`: `Zona`, `Sector`, `Finca`, `Propiedad`, `Usuario`, `Pedido`, `Tarea`, `Agenda`.
+---
+
+## 13. Seguridad
+
+- JWT en cookies HTTP-only (`@supabase/ssr`)
+- RLS en todas las tablas críticas
+- Multi-tenant: filtrar siempre por `empresa_id`
+- Cierre automático por inactividad (`InactivityGuard`)
+- Contraseña de confirmación para operaciones destructivas (fallback `DELETE_CONFIRMATION_PASSWORD`)
+- El Administrador es intocable
+- OAuth 2.0 para Google — tokens en DB, no en cliente
+- Middleware borra cookies `sb-*` al redirigir por falta de sesión
+
+---
+
+## 14. Variables de entorno
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key
+SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key        # Solo servidor. Nunca exponer al cliente.
+GOOGLE_CLIENT_ID=tu-google-client-id
+GOOGLE_CLIENT_SECRET=tu-google-client-secret
+NEXT_PUBLIC_BASE_URL=http://localhost:3000            # URL base para callbacks OAuth
+DELETE_CONFIRMATION_PASSWORD=password-fallback        # Fallback si no hay configuracion_seguridad
+```
+
+---
+
+## 15. Comandos de desarrollo
+
+```bash
+cd metria
+npm run dev              # Dev server en http://localhost:3000
+npm run lint             # ESLint
+npx tsc --noEmit         # Type-check (ejecutar con frecuencia)
+npm run build            # Build de producción
+npm start                # Iniciar servidor de producción
+
+npx vitest run src/__tests__/calculator-formulas.test.ts  # Tests de fórmulas
+npx vitest run          # Todos los tests
+
+supabase db push                                                          # Aplicar migraciones
+supabase gen types typescript --project-id PROJECT_ID > src/types/database.types.ts  # Regenerar tipos
+```
+
+---
+
+## 16. Gotchas y trampas frecuentes
+
+1. **Renombrar carpetas ≠ actualizar contenido.** Si renombras `pedidos/` → `solicitudes/`, cambia también los textos visibles (`<h1>`, toasts, botones, sidebar, breadcrumbs).
+
+2. **El Administrador es intocable.** No implementes UI que permita eliminar o cambiar el rol de un Administrador.
+
+3. **`revalidatePath` obligatorio.** Toda Server Action que mute datos debe llamar `revalidatePath("/ruta-afectada")`.
+
+4. **Migraciones con formato correcto.** `supabase/migrations/YYYYMMDD_descripcion.sql`. Si modificas el esquema, regenera `src/types/database.types.ts`.
+
+5. **No introduzcas dependencias nuevas** sin consenso.
+
+6. **Tres clientes de Supabase — no los mezcles.** Ver sección 9.
+
+7. **Tokens de color, nunca hardcoded.** No uses `bg-white`, `text-gray-500`, `border-gray-200`, etc. Rompen el dark mode.
+
+8. **`useMemo` para el cliente browser.** En Client Components: `const supabase = useMemo(() => createClient(), [])`.
+
+9. **`window.confirm` prohibido.** Usa modales propios o `DeleteConfirmationDialog`.
+
+10. **La ruta interna de solicitudes es `pedidos` en DB.** La URL de la UI es `/solicitudes` pero la tabla se llama `pedidos`. No confundir.
+
+11. **Sidebar y permisos de navegación.** Si añades una nueva ruta protegida, actualiza el sidebar (`@/components/layout/sidebar.tsx`) con la restricción de rol correspondiente.
+
+12. **Avatar determinista.** El componente `Avatar` genera un color de fondo basado en el nombre del usuario. No pases colores manuales.
+
+13. **Calculadora: `NumericSliderField` sincroniza `draft` con `value`.** El estado `draft` interno se resetea automáticamente cuando la prop `value` cambia externamente (via `useEffect`). Al refactorizar, mantener esta sincronización.
+
+14. **Calculadora: fuente de verdad única.** `SimpleCommissionCalculator` usa un único estado `commissionText` para el input de comisión. No duplicar con `commissionDraft`. La validación se hace con `isValidNumberInput()` y errores se muestran con `commissionError` + borde `border-danger`.
+
+---
+
+## 17. Changelog
+
+> Actualiza esta sección cada vez que hagas cambios significativos al proyecto.
+> Formato: `YYYY-MM-DD — [tipo] descripción breve`
+
+| Fecha | Tipo | Descripción |
+|-------|------|-------------|
+| 2026-05-17 | `fix` | Calculadora simplificada: corregido draft atascado en NumericSliderField, eliminado commissionDraft duplicado, añadida validación isValidNumberInput con feedback visual de error |
+| 2026-05-17 | `test` | Añadidos tests de isValidNumberInput, parseNumberInput edge cases y 4 escenarios de comisión (300k/3%/IVA, 400k/5%/IVA, 500k/10%/noIVA, final→neto) |
+| 2026-05-17 | `docs` | Creación del CLAUDE.md técnico completo con análisis profundo del proyecto |
+| 2026-05-17 | `docs` | Ampliada documentación del módulo calculadora (arquitectura, patrones, gotchas) |
+| 2026-05-17 | `feat` | Rediseño premium de la toolbar de zonas geográficas: glassmorphism, segmented control, microinteracciones, responsive |

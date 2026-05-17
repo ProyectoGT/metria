@@ -9,7 +9,7 @@ import { logout } from "@/app/(auth)/actions";
 import Avatar from "@/components/ui/avatar";
 import { useTheme, THEMES } from "@/lib/theme-context";
 import { PRIORITY_TONE, normalizePriority } from "@/lib/design-system";
-import { localeLabels, useI18n, type Locale } from "@/lib/i18n";
+import { localeConfig, locales, useI18n, type Locale } from "@/lib/i18n";
 import type { NotificationItem } from "./app-shell";
 import SpotlightSearch from "@/components/ui/spotlight-search";
 import { useSetSpotlightOpen, useSpotlightOpen } from "@/hooks/use-ui";
@@ -24,13 +24,6 @@ function formatFecha(fecha: string | null, locale = "es-ES"): string {
   if (!fecha) return "";
   return new Date(fecha).toLocaleDateString(locale, { day: "numeric", month: "short" });
 }
-
-const LANGUAGE_OPTIONS: Array<{ label: string; value: Locale; flag: string }> = [
-  { label: "Español",  value: "es", flag: "🇪🇸" },
-  { label: "Català",   value: "ca", flag: "🏴" },
-  { label: "English",  value: "en", flag: "🇬🇧" },
-  { label: "Italiano", value: "it", flag: "🇮🇹" },
-];
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
@@ -180,7 +173,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                             {n.fecha && (
                               <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary">
                                 <Calendar className="h-3 w-3" />
-                                {formatFecha(n.fecha, localeLabels[locale].region)}
+                                {formatFecha(n.fecha, localeConfig[locale].region)}
                               </p>
                             )}
                           </div>
@@ -199,7 +192,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                             {n.fecha && (
                               <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary">
                                 <Calendar className="h-3 w-3" />
-                                {formatFecha(n.fecha, localeLabels[locale].region)}
+                                {formatFecha(n.fecha, localeConfig[locale].region)}
                               </p>
                             )}
                           </div>
@@ -214,7 +207,7 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                             {n.fecha && (
                               <p className="mt-0.5 flex items-center gap-1 text-xs text-text-secondary">
                                 <Calendar className="h-3 w-3" />
-                                {formatFecha(n.fecha, localeLabels[locale].region)}
+                                {formatFecha(n.fecha, localeConfig[locale].region)}
                               </p>
                             )}
                           </div>
@@ -310,27 +303,31 @@ export default function Header({ userName, userEmail, avatarUrl, notifications =
                   ))}
                 </div>
               </div>
+              {/* Selector de idioma */}
               <div className="border-b border-border px-4 py-2">
                 <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-secondary/50">
                   <Languages className="h-3 w-3" />
                   {t("common.language")}
                 </p>
                 <div className="space-y-0.5">
-                  {LANGUAGE_OPTIONS.map((option) => (
+                  {(locales as readonly Locale[]).map((loc) => (
                     <button
-                      key={option.value}
+                      key={loc}
                       type="button"
-                      onClick={() => setLocale(option.value)}
+                      onClick={() => setLocale(loc)}
                       className={[
                         "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors",
-                        locale === option.value
+                        locale === loc
                           ? "bg-primary/10 text-primary"
                           : "text-text-secondary hover:bg-state-hover hover:text-text-primary",
                       ].join(" ")}
-                      aria-label={`${t("common.language")}: ${option.label}`}
+                      aria-label={`${t("common.language")}: ${localeConfig[loc].name}`}
                     >
-                      <span className="flex items-center gap-2"><span aria-hidden="true">{option.flag}</span>{option.label}</span>
-                      {locale === option.value && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
+                      <span className="flex items-center gap-2">
+                        <span aria-hidden="true">{localeConfig[loc].flag}</span>
+                        {localeConfig[loc].name}
+                      </span>
+                      {locale === loc && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
                     </button>
                   ))}
                 </div>

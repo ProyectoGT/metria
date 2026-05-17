@@ -1,5 +1,5 @@
 export function formatCurrency(value: number): string {
-  if (!Number.isFinite(value)) return "-";
+  if (!Number.isFinite(value) || value < 0) return "0 €";
   return value.toLocaleString("es-ES", {
     style: "currency",
     currency: "EUR",

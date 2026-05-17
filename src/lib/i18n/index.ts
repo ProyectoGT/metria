@@ -1,3 +1,1 @@
-export * from "./config";
-export * from "./context";
-export * from "./dictionaries";
+export * from "@/i18n";

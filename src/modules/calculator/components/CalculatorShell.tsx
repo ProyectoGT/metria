@@ -2,26 +2,37 @@
 
 import type { ReactNode } from "react";
 import Button from "@/components/ui/button";
-import { Toaster, useToast } from "@/components/ui/toast";
 import { ArrowLeft } from "lucide-react";
 import CalculatorActions from "./CalculatorActions";
+import type { CalculatorType } from "../types";
 
 type CalculatorShellProps = {
   title: string;
   description: string;
   onBack: () => void;
   summary: string;
+  calculatorType?: CalculatorType;
   children: ReactNode;
 };
 
-export default function CalculatorShell({ title, description, onBack, summary, children }: CalculatorShellProps) {
-  const { toasts, toast } = useToast();
-
+export default function CalculatorShell({
+  title,
+  description,
+  onBack,
+  summary,
+  calculatorType,
+  children,
+}: CalculatorShellProps) {
   return (
     <div className="space-y-4">
       <div className="rounded-ds-lg border border-border bg-surface p-5 shadow-layer-1">
         <div className="flex min-w-0 items-start gap-3">
-          <Button variant="secondary" size="sm" icon={<ArrowLeft className="h-4 w-4" />} onClick={onBack}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<ArrowLeft className="h-4 w-4" />}
+            onClick={onBack}
+          >
             Volver a calculadoras
           </Button>
           <div className="min-w-0">
@@ -33,10 +44,9 @@ export default function CalculatorShell({ title, description, onBack, summary, c
       {children}
       <CalculatorActions
         summary={summary}
-        onCopied={() => toast("Resumen copiado")}
-        onCopyError={() => toast("No se pudo copiar el resumen", "error")}
+        calculatorType={calculatorType}
+        calculatorTitle={title}
       />
-      <Toaster toasts={toasts} />
     </div>
   );
 }

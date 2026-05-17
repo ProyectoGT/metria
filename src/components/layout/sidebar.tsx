@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { canManageUsers, canViewOrgChart, normalizeUserRole } from "@/lib/roles";
+import { canManageUsers, canViewInsights, canViewOrgChart, normalizeUserRole } from "@/lib/roles";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -22,6 +22,7 @@ import {
   Network,
   Users,
   BookUser,
+  BarChart3,
   Building2,
   Mail,
   Settings,
@@ -37,6 +38,7 @@ type NavAction = {
   href: string;
   resourceKey: string;
   icon: React.ElementType;
+  display?: "icon" | "subitem";
 };
 
 type NavItemConfig = NavAction & {
@@ -65,7 +67,7 @@ const NAV_SECTIONS: NavSectionConfig[] = [
         priority: "core",
         favoriteSlot: true,
         actions: [
-          { labelKey: "navigation.zoneMapAction", href: "/zonas-geograficas", resourceKey: "zonas-geograficas", icon: Map },
+          { labelKey: "navigation.zoneMapAction", href: "/zonas-geograficas", resourceKey: "zonas-geograficas", icon: Map, display: "icon" },
         ],
       },
       { labelKey: "navigation.properties", href: "/propiedades", resourceKey: "propiedades", icon: Building2 },
@@ -90,7 +92,15 @@ const NAV_SECTIONS: NavSectionConfig[] = [
     labelKey: "navigation.sectionTools",
     items: [
       { labelKey: "navigation.calculator", href: "/calculadora", resourceKey: "calculadora", icon: Calculator },
-      { labelKey: "navigation.development", href: "/desarrollo", resourceKey: "desarrollo", icon: TrendingUp },
+      {
+        labelKey: "navigation.development",
+        href: "/desarrollo",
+        resourceKey: "desarrollo",
+        icon: TrendingUp,
+        actions: [
+          { labelKey: "navigation.businessIntelligence", href: "/desarrollo/insights", resourceKey: "desarrollo-insights", icon: BarChart3, display: "subitem" },
+        ],
+      },
     ],
   },
 ];
@@ -144,13 +154,13 @@ function NavItem({
             </span>
             <span className="min-w-0 flex-1 truncate">{label}</span>
           </Link>
-          {actions.length > 0 && (
+          {actions.some((action) => action.display !== "subitem") && (
             <span
               className={[
                 "ml-auto flex shrink-0 items-center gap-1 opacity-100 md:opacity-0 md:transition-opacity md:duration-150 md:group-hover/item:opacity-100 md:group-focus-within/item:opacity-100",
               ].join(" ")}
             >
-              {actions.map((action) => (
+              {actions.filter((action) => action.display !== "subitem").map((action) => (
                 <Link
                   key={action.href}
                   href={action.href}
@@ -168,7 +178,7 @@ function NavItem({
               ))}
             </span>
           )}
-          {active && actions.length === 0 && (
+          {active && !actions.some((action) => action.display !== "subitem") && !actions.some((action) => action.display === "subitem") && (
             <motion.span
               layoutId="sidebar-active"
               className="complete-pop ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
@@ -176,6 +186,25 @@ function NavItem({
             />
           )}
         </div>
+        {actions.some((action) => action.display === "subitem") && active && (
+          <div className="ml-10 mt-1 space-y-1 border-l border-border pl-2">
+            {actions.filter((action) => action.display === "subitem").map((action) => (
+              <Link
+                key={action.href}
+                href={action.href}
+                className={[
+                  "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                  action.active
+                    ? "bg-primary/10 text-primary"
+                    : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary",
+                ].join(" ")}
+              >
+                <action.icon className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="truncate">{action.label}</span>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -213,6 +242,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
   const role = userRole ?? "Agente";
   const canSeeUsers = canManageUsers(role);
   const canSeeOrganigrama = canViewOrgChart(role);
+  const canSeeInsights = canViewInsights(role);
   const isAdmin = role === "Administrador";
   const deniedSet = new Set(deniedResourceKeys);
 
@@ -237,16 +267,28 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
     if (href === "/zona") {
       return pathname === "/zona" || pathname.startsWith("/zona/") || pathname.startsWith("/zonas-geograficas");
     }
+    if (href === "/usuarios") {
+      return pathname.startsWith("/usuarios") || pathname.startsWith("/empresa/organigrama");
+    }
+    if (href === "/desarrollo") {
+      return pathname.startsWith("/desarrollo");
+    }
     return pathname.startsWith(href);
   }
 
+  function actionIsVisible(action: NavAction): boolean {
+    if (action.resourceKey === "organigrama") return canSeeOrganigrama && isNavVisible(action.resourceKey);
+    if (action.resourceKey === "desarrollo-insights") return canSeeInsights;
+    return isNavVisible(action.resourceKey);
+  }
+
   function itemIsVisible(item: NavItemConfig): boolean {
-    return isNavVisible(item.resourceKey) || Boolean(item.actions?.some((action) => isNavVisible(action.resourceKey)));
+    return isNavVisible(item.resourceKey) || Boolean(item.actions?.some(actionIsVisible));
   }
 
   function getVisibleActions(item: NavItemConfig) {
     return item.actions
-      ?.filter((action) => isNavVisible(action.resourceKey))
+      ?.filter(actionIsVisible)
       .map((action) => ({ ...action, label: t(action.labelKey), active: isActive(action.href) })) ?? [];
   }
 
@@ -293,27 +335,37 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
         ))}
 
         {/* Gestión: base permission + configurable layer */}
-        {(canSeeUsers || canSeeOrganigrama || isAdmin) && (
+        {(canSeeUsers || canSeeOrganigrama) && (
           <NavGroup label={t("navigation.sectionCompany")}>
             {canSeeUsers && isNavVisible("usuarios") && (
-              <NavItem href="/usuarios" icon={Users} label={t("navigation.users")} active={isActive("/usuarios")} />
-            )}
-            {canSeeOrganigrama && isNavVisible("organigrama") && (
-              <NavItem href="/empresa/organigrama" icon={Network} label={t("navigation.orgChart")} active={isActive("/empresa/organigrama")} />
-            )}
-            {isAdmin && isNavVisible("configuracion") && (
-              <NavItem href="/configuracion/control-acceso" icon={Settings} label={t("navigation.accessControl")} active={isActive("/configuracion/control-acceso")} />
-            )}
-            {isAdmin && (
-              <NavItem href="/seguridad" icon={Shield} label={t("navigation.audit")} active={isActive("/seguridad")} />
+              <NavItem
+                href="/usuarios"
+                icon={Users}
+                label={t("navigation.users")}
+                active={isActive("/usuarios")}
+                actions={[
+                  { labelKey: "navigation.userList", href: "/usuarios", resourceKey: "usuarios", icon: Users, display: "subitem", label: t("navigation.userList"), active: pathname.startsWith("/usuarios") },
+                  ...(canSeeOrganigrama && isNavVisible("organigrama")
+                    ? [{ labelKey: "navigation.orgChart", href: "/empresa/organigrama", resourceKey: "organigrama", icon: Network, display: "subitem" as const, label: t("navigation.orgChart"), active: pathname.startsWith("/empresa/organigrama") }]
+                    : []),
+                ]}
+              />
             )}
           </NavGroup>
         )}
 
         <div className="mt-5 border-t border-border pt-4">
-          {isNavVisible("soporte") && (
+          {(isNavVisible("soporte") || isAdmin) && (
             <NavGroup label={t("navigation.sectionSystem")}>
-              <NavItem href="/soporte" icon={LifeBuoy} label={t("navigation.support")} active={isActive("/soporte")} />
+              {isNavVisible("soporte") && (
+                <NavItem href="/soporte" icon={LifeBuoy} label={t("navigation.support")} active={isActive("/soporte")} />
+              )}
+              {isAdmin && isNavVisible("configuracion") && (
+                <NavItem href="/configuracion/control-acceso" icon={Settings} label={t("navigation.accessControl")} active={isActive("/configuracion/control-acceso")} />
+              )}
+              {isAdmin && (
+                <NavItem href="/seguridad" icon={Shield} label={t("navigation.audit")} active={isActive("/seguridad")} />
+              )}
             </NavGroup>
           )}
         </div>

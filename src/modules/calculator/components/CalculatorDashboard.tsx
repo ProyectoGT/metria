@@ -101,7 +101,13 @@ export default function CalculatorDashboard() {
           />
         </div>
       ) : ActiveComponent && activeMeta ? (
-        <CalculatorShell title={activeMeta.title} description={activeMeta.description} onBack={() => selectCalculator(null)} summary={summary}>
+        <CalculatorShell
+          title={activeMeta.title}
+          description={activeMeta.description}
+          onBack={() => selectCalculator(null)}
+          summary={summary}
+          calculatorType={active ?? undefined}
+        >
           <ActiveComponent onSummaryChange={setSummary} />
         </CalculatorShell>
       ) : null}

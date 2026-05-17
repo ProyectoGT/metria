@@ -16,7 +16,6 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api/google/gmail-callback") ||
     pathname.startsWith("/api/email/gmail/callback") ||
     pathname === "/api/observability/log" ||
-    pathname === "/api/set-locale" ||
     pathname === "/api/jobs/process";
 
   if (isPublicApiRoute) {

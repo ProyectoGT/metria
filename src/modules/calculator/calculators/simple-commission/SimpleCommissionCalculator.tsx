@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Button from "@/components/ui/button";
 import type { CalculatorScreenProps } from "../../types";
 import { calculateCommission, type CommissionMode } from "../../formulas/commission";
-import { clamp, parseNumberInput } from "../../formulas/number";
+import { clamp, isValidNumberInput, parseNumberInput } from "../../formulas/number";
 import NumericSliderField from "../../components/NumericSliderField";
 import { ResultRow, ResultSummary } from "../../components/ResultSummary";
 import { formatCurrency } from "../../components/format";
@@ -17,7 +17,8 @@ export default function SimpleCommissionCalculator({ onSummaryChange }: Calculat
   const [mode, setMode] = useState<CommissionMode>("base_to_final");
   const [amount, setAmount] = useState(DEFAULT_AMOUNT);
   const [commissionPercent, setCommissionPercent] = useState(5);
-  const [commissionDraft, setCommissionDraft] = useState<string | null>(null);
+  const [commissionText, setCommissionText] = useState("5");
+  const [commissionError, setCommissionError] = useState(false);
   const [includeVat, setIncludeVat] = useState(true);
 
   const result = useMemo(
@@ -35,20 +36,29 @@ export default function SimpleCommissionCalculator({ onSummaryChange }: Calculat
 
   function handleCommissionChange(nextCommissionPercent: number) {
     setCommissionPercent(clamp(nextCommissionPercent, 0, 99.99));
-    setCommissionDraft(null);
+    setCommissionText(String(nextCommissionPercent).replace(".", ","));
+    setCommissionError(false);
   }
 
   function handleManualCommissionChange(nextValue: string) {
-    setCommissionDraft(nextValue);
-    if (nextValue.trim() === "") return;
-    const parsed = parseNumberInput(nextValue, commissionPercent);
-    if (!Number.isFinite(parsed)) return;
+    setCommissionText(nextValue);
+    setCommissionError(false);
+    if (nextValue.trim() === "" || !isValidNumberInput(nextValue)) {
+      setCommissionError(true);
+      return;
+    }
+    const parsed = parseNumberInput(nextValue, NaN);
+    if (!Number.isFinite(parsed)) {
+      setCommissionError(true);
+      return;
+    }
     const clamped = clamp(parsed, 0, 99.99);
     if (clamped !== commissionPercent) setCommissionPercent(clamped);
   }
 
   function handleCommissionBlur() {
-    setCommissionDraft(null);
+    setCommissionText(String(commissionPercent).replace(".", ","));
+    setCommissionError(false);
   }
 
   function handleVatToggle() {
@@ -114,11 +124,11 @@ export default function SimpleCommissionCalculator({ onSummaryChange }: Calculat
                 {option}%
               </button>
             ))}
-            <div className="flex h-10 w-28 items-center rounded-ds-sm border border-border bg-surface px-3">
+            <div className={`flex h-10 w-28 items-center rounded-ds-sm border bg-surface px-3 ${commissionError ? "border-danger" : "border-border"}`}>
               <input
                 type="text"
                 inputMode="decimal"
-                value={commissionDraft !== null ? commissionDraft : String(commissionPercent).replace(".", ",")}
+                value={commissionText}
                 onChange={(event) => handleManualCommissionChange(event.target.value)}
                 onBlur={handleCommissionBlur}
                 className="w-full bg-transparent text-right text-sm font-semibold text-text-primary outline-none"

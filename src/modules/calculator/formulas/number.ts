@@ -1,3 +1,14 @@
+const VALID_INPUT_PATTERN = /^[0-9.,]*$/;
+
+export function isValidNumberInput(value: string): boolean {
+  if (typeof value !== "string") return false;
+  if (value.trim() === "") return true;
+  if (!VALID_INPUT_PATTERN.test(value)) return false;
+  const commaCount = (value.match(/,/g) || []).length;
+  if (commaCount > 1) return false;
+  return true;
+}
+
 export function parseNumberInput(value: unknown, fallback = 0): number {
   if (typeof value === "number") return safeNumber(value, fallback);
   if (typeof value !== "string") return fallback;
