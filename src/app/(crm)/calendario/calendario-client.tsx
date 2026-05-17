@@ -991,11 +991,19 @@ export default function CalendarioClient({
                 const isToday    = dateStr === todayStr;
                 const isSelected = dateStr === selectedDateStr;
                 return (
-                  <button
+                  <div
                     key={i}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setSelectedDate(new Date(date))}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedDate(new Date(date));
+                      }
+                    }}
                     className={[
-                      "flex min-h-[80px] flex-col gap-1 p-2 text-left transition-colors",
+                      "flex min-h-[80px] cursor-pointer flex-col gap-1 p-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
                       !currentMonth ? "opacity-30" : "",
                       isSelected ? "bg-primary/5 ring-1 ring-inset ring-primary" : "hover:bg-background",
                     ].join(" ")}
@@ -1007,30 +1015,11 @@ export default function CalendarioClient({
                       {date.getDate()}
                     </span>
                     {renderDayEventDots(dateStr)}
-                  </button>
+                  </div>
                 );
               })}
             </div>
 
-            {/* Legend */}
-            <div className="flex flex-wrap items-center gap-3 border-t border-border px-6 py-3">
-              {TIPOS.map((tp) => (
-                <div key={tp.value} className="flex items-center gap-1.5">
-                  <span className={`h-2 w-2 rounded-full ${tp.dot}`} />
-                  <span className="text-xs text-text-secondary">{tp.label}</span>
-                </div>
-              ))}
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-violet-500" />
-                <span className="text-xs text-text-secondary">{t("calendar.tarea")}</span>
-              </div>
-              {isConnected && (
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-blue-500" />
-                  <span className="text-xs text-text-secondary">Google Calendar</span>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Day panel */}
@@ -1059,7 +1048,9 @@ export default function CalendarioClient({
 
       {/* â"€â"€â"€ WEEK VIEW â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
       {viewMode === "week" && (
-        <div className="overflow-hidden rounded-ds-lg border border-border bg-surface shadow-layer-1">
+        <div className="flex flex-col gap-5 lg:flex-row">
+          {/* Calendar grid */}
+          <div className="flex-1 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
           {/* Nav */}
           <div className="flex items-center justify-between border-b border-border bg-surface-elevated px-6 py-4">
             <h2 className="text-base font-semibold text-text-primary">{periodLabel}</h2>
@@ -1222,21 +1213,26 @@ export default function CalendarioClient({
           </div>
 
           </div>{/* end overflow-x-auto */}
+          </div>{/* end calendar grid */}
 
-          {/* Week day detail panel */}
-          <div className="border-t border-border">
-            <div className="flex items-center justify-between px-5 py-3">
-              <p className="text-sm font-semibold text-text-primary capitalize">
-                {selectedDate.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
-              </p>
+          {/* Day panel — right sidebar, identical to month view */}
+          <div className="w-full shrink-0 rounded-2xl border border-border bg-surface shadow-sm lg:w-80">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary">{t("calendar.actividadesDelDia")}</h3>
+                <p className="mt-0.5 text-xs text-text-secondary capitalize">
+                  {selectedDate.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
+                </p>
+              </div>
               <button
                 onClick={() => openCreate(selectedDate)}
                 className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-dark"
+                aria-label={t("calendar.nuevaActividadLabel")}
               >
-                {t("calendar.nuevaActividad")}
+                {t("calendar.nuevaPlus")}
               </button>
             </div>
-            <div className="px-5 pb-5">
+            <div className="flex-1 overflow-y-auto p-4">
               {renderDayActivitiesList(selectedDateStr, selectedDate)}
             </div>
           </div>
