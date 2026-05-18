@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { MoreVertical, Plus, Search, UserCheck, UserX, Mail } from "lucide-react";
+import { MoreVertical, Plus, UserCheck, UserX, Mail } from "lucide-react";
+import FilterSearch from "@/components/ui/filters/FilterSearch";
+import FilterSelect from "@/components/ui/filters/FilterSelect";
 import Avatar from "@/components/ui/avatar";
 import Drawer from "@/components/ui/drawer";
 import { useToast, Toaster } from "@/components/ui/toast";
@@ -91,26 +93,22 @@ export default function UsersManagementPanel({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[140px] flex-1 md:flex-none">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar"
-                className="input h-9 w-full pl-9 pr-3 md:w-64"
-              />
-            </div>
-            <select
+            <FilterSearch
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar"
+              className="w-48"
+            />
+            <FilterSelect
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="input h-9 py-0 text-sm md:w-40"
+              label="Rol"
             >
               <option value="">Todos los rangos</option>
               {roles.map((role) => (
                 <option key={role} value={role}>{role}</option>
               ))}
-            </select>
+            </FilterSelect>
             <button
               type="button"
               onClick={() => setCreateOpen(true)}

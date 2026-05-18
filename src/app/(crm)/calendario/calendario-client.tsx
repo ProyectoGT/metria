@@ -1,9 +1,9 @@
-﻿﻿﻿"use client";
+﻿"use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   Phone, Users, Home, Clock, BookOpen, Star, Activity, Calendar,
-  ChevronLeft, ChevronRight, X, Trash2, Check, Circle, Filter, Pencil, CheckCircle2, User, Bell, Loader2,
+  ChevronLeft, ChevronRight, Trash2, Check, Circle, Pencil, CheckCircle2, User, Bell, Loader2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -23,6 +23,7 @@ import {
 import { useCompleteTask, useTasks } from "@/modules/tareas/hooks/use-tasks";
 import type { TareaRow } from "@/modules/tareas/services/tareas.service";
 import EventFormModal from "./event-form-modal";
+import FilterSelect from "@/components/ui/filters/FilterSelect";
 
 // â"€â"€â"€ Types â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
@@ -299,7 +300,6 @@ export default function CalendarioClient({
   const [confirmDeleteEvent, setConfirmDeleteEvent] = useState<AgendaEvent | null>(null);
   const [deleteId, setDeleteId]     = useState<number | null>(null);
   const [deleting, setDeleting]     = useState(false);
-  const [filterOpen, setFilterOpen] = useState(false);
   const [completingAgendaIds, setCompletingAgendaIds] = useState<Set<number>>(new Set());
   const [completingTaskIds, setCompletingTaskIds] = useState<Set<number>>(new Set());
 
@@ -873,62 +873,18 @@ export default function CalendarioClient({
 
           {/* User filter (managers only) */}
           {canSeeOthers(role) && filterableUsers.length > 1 && (
-            <div className="relative" onKeyDown={(e) => { if (e.key === "Escape") setFilterOpen(false); }}>
-              <button
-                onClick={() => setFilterOpen((v) => !v)}
-                className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                  filterUserId !== "all"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border text-text-secondary hover:bg-background"
-                }`}
-                aria-label={t("calendar.filtroPorUsuario")}
-                aria-expanded={filterOpen}
-                aria-haspopup="listbox"
-              >
-                <Filter className="h-4 w-4" />
-                {filterUserId === "all" ? t("calendar.todos") : (usersMap[filterUserId as number] ?? t("common.user"))}
-                {filterUserId !== "all" && (
-                  <span
-                    role="button"
-                    tabIndex={-1}
-                    onClick={(e) => { e.stopPropagation(); setFilterUserId("all"); }}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setFilterUserId("all"); } }}
-                    className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary/20 text-primary hover:bg-primary/30"
-                    aria-label={t("calendar.quitarFiltro")}
-                  >
-                    <X className="h-2.5 w-2.5" />
-                  </span>
-                )}
-              </button>
-              {filterOpen && (
-                <div className="absolute left-0 top-full z-20 mt-1 w-52 rounded-xl border border-border bg-surface shadow-lg" role="listbox" aria-label="Filtrar por usuario">
-                  <div className="py-1">
-                    <button
-                      onClick={() => { setFilterUserId("all"); setFilterOpen(false); }}
-                      role="option"
-                      aria-selected={filterUserId === "all"}
-                      className={`flex w-full items-center px-4 py-2.5 text-sm transition-colors hover:bg-background ${filterUserId === "all" ? "font-semibold text-primary" : "text-text-primary"}`}
-                    >
-                      {t("calendar.todosLosUsuarios")}
-                    </button>
-                    {filterableUsers.map((u) => (
-                      <button
-                        key={u.id}
-                        onClick={() => { setFilterUserId(u.id); setFilterOpen(false); }}
-                        role="option"
-                        aria-selected={filterUserId === u.id}
-                        className={`flex w-full items-center px-4 py-2.5 text-sm transition-colors hover:bg-background ${filterUserId === u.id ? "font-semibold text-primary" : "text-text-primary"}`}
-                      >
-                        {u.name}
-                        {u.id === currentUserId && (
-                          <span className="ml-1.5 text-xs text-text-secondary">({t("calendar.yo")})</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <FilterSelect
+              value={filterUserId === "all" ? "all" : String(filterUserId)}
+              onChange={(e) => setFilterUserId(e.target.value === "all" ? "all" : Number(e.target.value))}
+              label={t("calendar.filtroPorUsuario")}
+            >
+              <option value="all">{t("calendar.todosLosUsuarios")}</option>
+              {filterableUsers.map((u) => (
+                <option key={u.id} value={String(u.id)}>
+                  {u.name}{u.id === currentUserId ? ` (${t("calendar.yo")})` : ""}
+                </option>
+              ))}
+            </FilterSelect>
           )}
         </div>
 

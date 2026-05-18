@@ -2,7 +2,8 @@
 
 import { memo, useCallback, useEffect, useMemo, useState, useId, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Calendar, CheckCircle2, ChevronDown, Circle, Clock, Loader2, Pencil, Plus, Trash2, User } from "lucide-react";
+import { Bell, Calendar, CheckCircle2, Circle, Clock, Loader2, Pencil, Plus, Trash2, User } from "lucide-react";
+import FilterSelect from "@/components/ui/filters/FilterSelect";
 import { createClient } from "@/lib/supabase-browser";
 import Drawer from "@/components/ui/drawer";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
@@ -464,17 +465,14 @@ export default function OrdenesClient({
 
         <div className="flex items-center gap-2">
           {canManageOthers(currentUserRole) && usuarios.length > 1 && (
-            <div className="relative">
-              <select
-                value={filterUserId ?? ""}
-                onChange={(e) => setFilterUserId(e.target.value ? Number(e.target.value) : null)}
-                className="input h-9 appearance-none py-0 pl-3 pr-8 text-sm"
-              >
-                <option value="">{t("ordenes.todos")}</option>
-                {usuarios.map((u) => <option key={u.id} value={u.id}>{nombreCompleto(u)}</option>)}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-secondary" />
-            </div>
+            <FilterSelect
+              value={filterUserId ?? ""}
+              onChange={(e) => setFilterUserId(e.target.value ? Number(e.target.value) : null)}
+              label={t("ordenes.filtroUsuario")}
+            >
+              <option value="">{t("ordenes.todos")}</option>
+              {usuarios.map((u) => <option key={u.id} value={u.id}>{nombreCompleto(u)}</option>)}
+            </FilterSelect>
           )}
           <button
             onClick={openCreate}

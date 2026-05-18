@@ -23,10 +23,10 @@ const securityHeaders = [
       // Next.js requiere unsafe-inline/unsafe-eval; Google Maps carga scripts externos
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.googleapis.com maps.gstatic.com",
       "style-src 'self' 'unsafe-inline' *.googleapis.com",
-      `img-src 'self' blob: data: ${supabaseHostname} *.googleapis.com *.gstatic.com lh3.googleusercontent.com`,
+      `img-src 'self' https: blob: data: ${supabaseHostname} *.googleapis.com *.gstatic.com lh3.googleusercontent.com`,
       `connect-src 'self' ${supabaseHostname} wss://${supabaseHostname} maps.googleapis.com`,
       "font-src 'self' fonts.gstatic.com",
-      "frame-src 'none'",
+      "frame-src 'self'",
       "object-src 'none'",
     ].join("; "),
   },

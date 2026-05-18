@@ -107,7 +107,14 @@ const NAV_SECTIONS: NavSectionConfig[] = [
   },
 ];
 
-// ─── Estilos compartidos de item ──────────────────────────────────────────────
+// ─── Estilos compartidos ──────────────────────────────────────────────────────
+
+const NAV_ITEM_HEIGHT = "h-[42px]";
+const NAV_ITEM_COLLAPSED_SIZE = "h-10 w-10";
+const NAV_ICON_BOX = "h-7 w-7";
+const NAV_ICON_SIZE = "h-[18px] w-[18px]";
+const NAV_RADIUS = "rounded-xl";
+const NAV_ACTIVE_INDICATOR = "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:rounded-r-full before:bg-primary";
 
 function NavItem({
   href,
@@ -127,79 +134,91 @@ function NavItem({
   collapsed?: boolean;
 }) {
   const isCore = priority === "core";
+  const hasInlineActions = !collapsed && actions.some((a) => a.display !== "subitem");
+  const hasSubItems = !collapsed && actions.some((a) => a.display === "subitem");
+
+  const containerClasses = [
+    "group/item relative",
+    !collapsed && active && NAV_ACTIVE_INDICATOR,
+  ].filter(Boolean).join(" ");
+
+  const buttonClasses = [
+    "pressable inline-flex items-center outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar cursor-pointer",
+    NAV_RADIUS,
+    active
+      ? "bg-sidebar-active text-primary"
+      : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary",
+    collapsed
+      ? `${NAV_ITEM_COLLAPSED_SIZE} justify-center`
+      : `${NAV_ITEM_HEIGHT} w-full gap-3 px-3`,
+  ].join(" ");
 
   return (
     <motion.div variants={staggerItem}>
-      <div className="group/item relative">
-        <div
-          className={[
-            "pressable group/link flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
-            isCore ? "py-2.5 font-semibold" : "py-2 font-medium",
-            collapsed && "justify-center px-0",
-            active
-              ? "bg-sidebar-active text-primary shadow-[inset_0_0_0_1px_rgba(37,99,235,0.16)]"
-              : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary hover:shadow-[inset_0_0_0_1px_rgba(148,163,184,0.18)]",
-          ].join(" ")}
+      <div className={containerClasses}>
+        <Link
+          href={href}
+          className={buttonClasses}
           title={collapsed ? label : undefined}
         >
-          <Link
-            href={href}
-            className="flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+          <span
+            className={[
+              "flex shrink-0 items-center justify-center",
+              NAV_ICON_BOX,
+              NAV_RADIUS,
+              "transition-colors duration-150",
+              active
+                ? "bg-primary/10 text-primary"
+                : isCore
+                  ? "bg-text-primary/[0.04] text-text-primary group-hover:bg-primary/10 group-hover:text-primary"
+                  : "text-text-secondary group-hover:text-text-primary",
+            ].join(" ")}
           >
-            <span
-              className={[
-                "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors duration-200",
-                active
-                  ? "bg-primary/10 text-primary"
-                  : isCore
-                    ? "bg-text-primary/[0.04] text-text-primary group-hover/link:bg-primary/10 group-hover/link:text-primary"
-                    : "text-text-secondary group-hover/link:text-text-primary",
-              ].join(" ")}
-            >
-              <Icon className="h-[17px] w-[17px]" aria-hidden="true" />
-            </span>
-            {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
-          </Link>
-          {!collapsed && actions.some((action) => action.display !== "subitem") && (
-            <span
-              className={[
-                "ml-auto flex shrink-0 items-center gap-1 opacity-100 md:opacity-0 md:transition-opacity md:duration-150 md:group-hover/item:opacity-100 md:group-focus-within/item:opacity-100",
-              ].join(" ")}
-            >
-              {actions.filter((action) => action.display !== "subitem").map((action) => (
-                <Link
-                  key={action.href}
-                  href={action.href}
-                  aria-label={action.label}
-                  title={action.label}
-                  className={[
-                    "flex h-7 w-7 items-center justify-center rounded-md transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
-                    action.active
-                      ? "bg-primary text-white"
-                      : "text-text-secondary hover:bg-background hover:text-primary",
-                  ].join(" ")}
-                >
-                  <action.icon className="h-4 w-4" aria-hidden="true" />
-                </Link>
-              ))}
+            <Icon className={NAV_ICON_SIZE} aria-hidden="true" />
+          </span>
+          {!collapsed && (
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              {label}
             </span>
           )}
-          {!collapsed && active && !actions.some((action) => action.display !== "subitem") && !actions.some((action) => action.display === "subitem") && (
-            <motion.span
-              layoutId="sidebar-active"
-              className="complete-pop ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
-              transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            />
-          )}
-        </div>
-        {!collapsed && actions.some((action) => action.display === "subitem") && active && (
-          <div className="ml-10 mt-1 space-y-1 border-l border-border pl-2">
+        </Link>
+        {hasInlineActions && (
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/item:opacity-100 group-focus-within/item:opacity-100">
+            {actions.filter((action) => action.display !== "subitem").map((action) => (
+              <Link
+                key={action.href}
+                href={action.href}
+                aria-label={action.label}
+                title={action.label}
+                className={[
+                  "flex h-7 w-7 items-center justify-center",
+                  NAV_RADIUS,
+                  "transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                  action.active
+                    ? "bg-primary text-white"
+                    : "text-text-secondary hover:bg-background hover:text-primary",
+                ].join(" ")}
+              >
+                <action.icon className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            ))}
+          </span>
+        )}
+        {!collapsed && active && !hasInlineActions && !hasSubItems && (
+          <motion.span
+            layoutId="sidebar-active"
+            className="complete-pop absolute right-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          />
+        )}
+        {hasSubItems && active && (
+          <div className="ml-[52px] mt-1 space-y-0.5 border-l border-border pl-3">
             {actions.filter((action) => action.display === "subitem").map((action) => (
               <Link
                 key={action.href}
                 href={action.href}
                 className={[
-                  "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                  "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
                   action.active
                     ? "bg-primary/10 text-primary"
                     : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary",
@@ -218,11 +237,14 @@ function NavItem({
 
 function NavGroup({ label, collapsed, children }: { label?: string; collapsed?: boolean; children: React.ReactNode }) {
   return (
-    <div className="space-y-1">
+    <div className={collapsed ? "flex flex-col items-center gap-0.5" : "space-y-0.5"}>
       {label && !collapsed && (
-        <p className="mb-1.5 mt-5 px-3 text-[10px] font-semibold uppercase tracking-widest text-text-secondary/55 first:mt-0">
+        <p className="mb-2 mt-6 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-text-secondary/50 first:mt-0">
           {label}
         </p>
+      )}
+      {collapsed && label && (
+        <div className="my-2 h-px w-5 rounded-full bg-border" aria-hidden="true" />
       )}
       {children}
     </div>
@@ -324,7 +346,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
     return (
       <div className="flex h-full min-h-0 flex-col">
         {/* ── Logo ─────────────────────────────────────────────────── */}
-        <div className={`flex h-16 shrink-0 items-center border-b border-border bg-sidebar-logo ${collapsed ? 'justify-center px-0' : 'justify-center px-4'}`}>
+        <div className={`flex h-14 shrink-0 items-center border-b border-border bg-sidebar-logo ${collapsed ? 'justify-center' : 'justify-center px-4'}`}>
           {collapsed ? (
             <Image
               src="/favicon-32x32.png"
@@ -340,7 +362,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
               alt="Master Ibérica"
               width={240}
               height={56}
-              className="max-h-20 w-auto object-contain"
+              className="max-h-16 w-auto max-w-full object-contain"
               priority
             />
           )}
@@ -356,7 +378,11 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
         </div>
 
         {/* ── Navegación ───────────────────────────────────────────── */}
-        <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4" aria-label={t("navigation.mainNavigation") || "Navegación principal"} style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}>
+        <nav
+          className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${collapsed ? 'space-y-1 px-4 py-5' : 'space-y-1 px-[14px] py-5'}`}
+          aria-label={t("navigation.mainNavigation") || "Navegación principal"}
+          style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
+        >
 
           {NAV_SECTIONS.map((section) => (
             <motion.div key={section.labelKey} variants={staggerContainer} initial="initial" animate="animate">
@@ -416,17 +442,24 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
         </nav>
 
         {/* ── Toggle button ─────────────────────────────────────────── */}
-        <div className="border-t border-border p-3">
+        <div className={`border-t border-border ${collapsed ? 'flex justify-center px-4 py-3' : 'px-[14px] py-3'}`}>
           <button
             onClick={toggleCollapsed}
-            className={`flex w-full items-center gap-3 rounded-xl py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-sidebar-hover ${collapsed ? 'justify-center px-0' : 'px-3'}`}
-            title={collapsed ? 'Expandir menú' : 'Minimizar menú'}
+            className={[
+              "inline-flex items-center outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar cursor-pointer",
+              NAV_RADIUS,
+              "text-sm font-medium text-text-secondary hover:bg-sidebar-hover hover:text-text-primary",
+              collapsed
+                ? `${NAV_ITEM_COLLAPSED_SIZE} justify-center`
+                : `${NAV_ITEM_HEIGHT} w-full gap-3 px-3`,
+            ].join(" ")}
+            title={collapsed ? "Expandir menú" : "Minimizar menú"}
           >
             {collapsed ? (
-              <PanelLeftOpen className="h-5 w-5" />
+              <PanelLeftOpen className={NAV_ICON_SIZE} />
             ) : (
               <>
-                <PanelLeftClose className="h-5 w-5" />
+                <PanelLeftClose className={NAV_ICON_SIZE} />
                 <span>Minimizar menú</span>
               </>
             )}

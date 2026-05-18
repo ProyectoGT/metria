@@ -7,7 +7,6 @@ import {
   LayoutGrid,
   List,
   MapPin,
-  Search,
   Star,
   Globe,
   User,
@@ -20,6 +19,15 @@ import {
   WEB_SYNC_STATUS_COLOR,
   type WebSyncStatus,
 } from "@/lib/web-sync";
+import {
+  usePropiedadesFilters,
+  useSetPropiedadesFilter,
+  useResetPropiedadesFilters,
+} from "@/hooks/use-filters";
+import FilterBar from "@/components/ui/filters/FilterBar";
+import FilterSearch from "@/components/ui/filters/FilterSearch";
+import FilterSelect from "@/components/ui/filters/FilterSelect";
+import FilterDrawer from "@/components/ui/filters/FilterDrawer";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -99,38 +107,45 @@ type Props = {
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function PropiedadesClient({ propiedades, zonas, agentes, isManager, loadError }: Props) {
-  const [view, setView]           = useState<"table" | "cards">("table");
-  const [search, setSearch]       = useState("");
-  const [filterEstado, setEstado] = useState("");
-  const [filterZona, setZona]     = useState("");
-  const [filterAgente, setAgente] = useState("");
-  const [filterOp, setOp]         = useState("");
-  const [filterWeb, setWeb]       = useState("");
-  const [filterFicha, setFicha]   = useState("");
+  const [view, setView] = useState<"table" | "cards">("table");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const filtros = usePropiedadesFilters();
+  const setFiltro = useSetPropiedadesFilter();
+  const resetFiltros = useResetPropiedadesFilters();
+
+  const hasQuickFilters = filtros.search || filtros.estado || filtros.zonaId || filtros.agentId;
+  const hasAdvancedFilters = filtros.tipo || filtros.web || filtros.ficha;
+  const hasFilters = hasQuickFilters || hasAdvancedFilters;
+
+  const advancedCount = [filtros.tipo, filtros.web, filtros.ficha].filter(Boolean).length;
 
   // ── Filtros client-side ─────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
+    const q = filtros.search.toLowerCase();
     return propiedades.filter((p) => {
       if (q && ![getDisplayTitle(p), p.propietario, p.planta, p.puerta, p.zona_nombre, p.finca_numero]
         .some((v) => v?.toLowerCase().includes(q))) return false;
-      if (filterEstado && p.estado !== filterEstado) return false;
-      if (filterZona   && String(p.zona_id) !== filterZona) return false;
-      if (filterAgente && String(p.agente_asignado) !== filterAgente) return false;
-      if (filterOp     && p.tipo_operacion !== filterOp) return false;
-      if (filterWeb === "si"  && !p.publicar_en_web) return false;
-      if (filterWeb === "no"  && p.publicar_en_web)  return false;
-      if (filterFicha === "completa"   && !p.ficha_completa) return false;
-      if (filterFicha === "incompleta" && p.ficha_completa)  return false;
+      if (filtros.estado && p.estado !== filtros.estado) return false;
+      if (filtros.zonaId && String(p.zona_id) !== filtros.zonaId) return false;
+      if (filtros.agentId && String(p.agente_asignado) !== filtros.agentId) return false;
+      if (filtros.tipo && p.tipo_operacion !== filtros.tipo) return false;
+      if (filtros.web === "si"  && !p.publicar_en_web) return false;
+      if (filtros.web === "no"  && p.publicar_en_web)  return false;
+      if (filtros.ficha === "completa"   && !p.ficha_completa) return false;
+      if (filtros.ficha === "incompleta" && p.ficha_completa)  return false;
       return true;
     });
-  }, [propiedades, search, filterEstado, filterZona, filterAgente, filterOp, filterWeb, filterFicha]);
+  }, [propiedades, filtros]);
 
-  const resetFilters = () => {
-    setSearch(""); setEstado(""); setZona(""); setAgente("");
-    setOp(""); setWeb(""); setFicha("");
-  };
-  const hasFilters = search || filterEstado || filterZona || filterAgente || filterOp || filterWeb || filterFicha;
+  // ── Chips activos ───────────────────────────────────────────────────────
+  const chips: { key: string; label: string; onRemove: () => void }[] = [];
+  if (filtros.estado) chips.push({ key: "estado", label: `Estado: ${ESTADOS[filtros.estado] ?? filtros.estado}`, onRemove: () => setFiltro("estado", null) });
+  if (filtros.zonaId) chips.push({ key: "zona", label: `Zona: ${zonas.find((z) => String(z.id) === filtros.zonaId)?.nombre ?? filtros.zonaId}`, onRemove: () => setFiltro("zonaId", null) });
+  if (filtros.agentId) chips.push({ key: "agente", label: `Agente: ${agentes.find((a) => String(a.id) === filtros.agentId)?.nombre ?? filtros.agentId}`, onRemove: () => setFiltro("agentId", null) });
+  if (filtros.tipo) chips.push({ key: "tipo", label: `Operacion: ${OPERACION_LABEL[filtros.tipo] ?? filtros.tipo}`, onRemove: () => setFiltro("tipo", null) });
+  if (filtros.web) chips.push({ key: "web", label: `Web: ${filtros.web === "si" ? "En web" : "No en web"}`, onRemove: () => setFiltro("web", null) });
+  if (filtros.ficha) chips.push({ key: "ficha", label: `Ficha: ${filtros.ficha === "completa" ? "Completa" : "Incompleta"}`, onRemove: () => setFiltro("ficha", null) });
 
   return (
     <div className="space-y-4">
@@ -139,82 +154,140 @@ export default function PropiedadesClient({ propiedades, zonas, agentes, isManag
           No se han podido cargar las propiedades: {loadError}
         </div>
       )}
-      {/* ── Barra de filtros ───────────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 px-4 py-3">
-          {/* Search */}
-          <div className="relative min-w-[200px] flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
-            <input
-              type="text"
-              placeholder="Buscar propiedad..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="input pl-9"
-            />
+
+      {/* ── FilterBar ──────────────────────────────────────────────────── */}
+      <FilterBar
+        searchSlot={
+          <FilterSearch
+            value={filtros.search}
+            onChange={(v) => setFiltro("search", v)}
+            placeholder="Buscar propiedad..."
+            className="min-w-[180px] flex-1"
+          />
+        }
+        activeCount={hasFilters ? chips.length : 0}
+        onClear={hasFilters ? resetFiltros : undefined}
+        onOpenAdvanced={() => setDrawerOpen(true)}
+        advancedCount={advancedCount}
+        chips={chips}
+      >
+        <FilterSelect
+          value={filtros.estado ?? ""}
+          onChange={(e) => setFiltro("estado", e.target.value || null)}
+          label="Estado"
+        >
+          <option value="">Todos los estados</option>
+          {Object.entries(ESTADOS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </FilterSelect>
+
+        <FilterSelect
+          value={filtros.zonaId ?? ""}
+          onChange={(e) => setFiltro("zonaId", e.target.value || null)}
+          label="Zona"
+        >
+          <option value="">Todas las zonas</option>
+          {zonas.map((z) => <option key={z.id} value={String(z.id)}>{z.nombre}</option>)}
+        </FilterSelect>
+
+        {isManager && (
+          <FilterSelect
+            value={filtros.agentId ?? ""}
+            onChange={(e) => setFiltro("agentId", e.target.value || null)}
+            label="Agente"
+          >
+            <option value="">Todos los agentes</option>
+            {agentes.map((a) => <option key={a.id} value={String(a.id)}>{a.nombre}</option>)}
+          </FilterSelect>
+        )}
+
+        {/* View toggle */}
+        <div className="ml-auto flex items-center gap-1 rounded-lg border border-border p-1">
+          <button
+            onClick={() => setView("table")}
+            className={`rounded-md p-1.5 transition-colors ${view === "table" ? "bg-primary text-white" : "text-text-secondary hover:text-text-primary"}`}
+            title="Vista tabla"
+          >
+            <List className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setView("cards")}
+            className={`rounded-md p-1.5 transition-colors ${view === "cards" ? "bg-primary text-white" : "text-text-secondary hover:text-text-primary"}`}
+            title="Vista cards"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+        </div>
+      </FilterBar>
+
+      {/* ── Drawer filtros avanzados ────────────────────────────────────── */}
+      <FilterDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title="Filtros avanzados"
+        footer={
+          <div className="flex justify-end gap-3">
+            {hasAdvancedFilters && (
+              <button
+                type="button"
+                onClick={() => { setFiltro("tipo", null); setFiltro("web", null); setFiltro("ficha", null); }}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background"
+              >
+                Limpiar avanzados
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(false)}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark"
+            >
+              Cerrar
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-5">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              Operacion
+            </label>
+            <FilterSelect
+              value={filtros.tipo ?? ""}
+              onChange={(e) => setFiltro("tipo", e.target.value || null)}
+            >
+              <option value="">Todas</option>
+              {Object.entries(OPERACION_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </FilterSelect>
           </div>
 
-          <select value={filterEstado} onChange={(e) => setEstado(e.target.value)} className="input w-auto">
-            <option value="">Todos los estados</option>
-            {Object.entries(ESTADOS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-
-          <select value={filterZona} onChange={(e) => setZona(e.target.value)} className="input w-auto">
-            <option value="">Todas las zonas</option>
-            {zonas.map((z) => <option key={z.id} value={String(z.id)}>{z.nombre}</option>)}
-          </select>
-
-          {isManager && (
-            <select value={filterAgente} onChange={(e) => setAgente(e.target.value)} className="input w-auto">
-              <option value="">Todos los agentes</option>
-              {agentes.map((a) => <option key={a.id} value={String(a.id)}>{a.nombre}</option>)}
-            </select>
-          )}
-
-          <select value={filterOp} onChange={(e) => setOp(e.target.value)} className="input w-auto">
-            <option value="">Operacion</option>
-            {Object.entries(OPERACION_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-
-          <select value={filterWeb} onChange={(e) => setWeb(e.target.value)} className="input w-auto">
-            <option value="">Publicacion web</option>
-            <option value="si">En web</option>
-            <option value="no">No en web</option>
-          </select>
-
-          <select value={filterFicha} onChange={(e) => setFicha(e.target.value)} className="input w-auto">
-            <option value="">Ficha</option>
-            <option value="completa">Completa</option>
-            <option value="incompleta">Incompleta</option>
-          </select>
-
-          {/* View toggle */}
-          <div className="ml-auto flex items-center gap-1 rounded-lg border border-border p-1">
-            <button
-              onClick={() => setView("table")}
-              className={`rounded-md p-1.5 transition-colors ${view === "table" ? "bg-primary text-white" : "text-text-secondary hover:text-text-primary"}`}
-              title="Vista tabla"
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              Publicacion web
+            </label>
+            <FilterSelect
+              value={filtros.web ?? ""}
+              onChange={(e) => setFiltro("web", e.target.value || null)}
             >
-              <List className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setView("cards")}
-              className={`rounded-md p-1.5 transition-colors ${view === "cards" ? "bg-primary text-white" : "text-text-secondary hover:text-text-primary"}`}
-              title="Vista cards"
+              <option value="">Todas</option>
+              <option value="si">En web</option>
+              <option value="no">No en web</option>
+            </FilterSelect>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              Ficha
+            </label>
+            <FilterSelect
+              value={filtros.ficha ?? ""}
+              onChange={(e) => setFiltro("ficha", e.target.value || null)}
             >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
+              <option value="">Todas</option>
+              <option value="completa">Completa</option>
+              <option value="incompleta">Incompleta</option>
+            </FilterSelect>
           </div>
         </div>
-
-        {hasFilters && (
-          <div className="border-t border-border px-4 py-2">
-            <button onClick={resetFilters} className="text-xs text-text-secondary hover:text-text-primary">
-              Limpiar filtros · {filtered.length} resultado{filtered.length !== 1 ? "s" : ""}
-            </button>
-          </div>
-        )}
-      </div>
+      </FilterDrawer>
 
       {/* ── Empty state ────────────────────────────────────────────────── */}
       {filtered.length === 0 && (

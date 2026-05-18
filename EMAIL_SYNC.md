@@ -85,10 +85,35 @@ La deteccion de intencion esta preparada en `src/lib/email/rules.ts` para reglas
 - Busqueda global: el buscador general incluye emails por asunto, cliente, snippet, cuerpo, telefono o referencia.
 - Adjuntos: se registran metadatos y se clasifican como PDF, encargo, foto, documentacion u otro para vinculado posterior.
 
-## Limitaciones actuales
+## Estado actual de sincronizacion
 
-- La sincronizacion trae los ultimos 90 dias y limita cada ejecucion a 30 emails de entrada y 20 enviados.
+- El sync inicial recorre Gmail paginado con `maxResults=500` e `includeSpamTrash=true`, sin filtro `newer_than`, hasta completar el buzon o agotar el limite tecnico de seguridad de paginas.
+- Las cuentas anteriores a la migracion enterprise vuelven a ejecutar sync inicial porque `full_sync_completed_at` queda vacio, evitando que un `last_history_id` creado por un sync parcial oculte correos antiguos.
+- El sync incremental usa Gmail History API y rehidrata mensajes afectados por altas o cambios de etiquetas. Si History caduca, cae a una consulta por fecha con solape de 24h.
+- La UI carga mensajes desde `/api/email/messages` con paginacion e infinite scroll virtualizado.
 - No descarga binarios de adjuntos a Storage todavia; guarda metadatos y clasificacion.
+
+## Cliente de correo integrado
+
+La UI de `/email` usa una capa interna (`src/modules/email/services/email-service.ts`) para que el frontend no hable directamente con Gmail. Las acciones implementadas contra el proveedor son:
+
+- Enviar correo nuevo.
+- Responder, responder a todos y reenviar manteniendo `threadId`, `In-Reply-To` y `References` cuando existen.
+- Marcar leido/no leido.
+- Archivar y restaurar a entrada.
+- Mover a papelera y restaurar desde papelera.
+- Marcar como spam.
+- Destacar/quitar destacado.
+- Marcar/quitar importante.
+- Descargar adjuntos pasando por backend y validando propiedad del usuario.
+
+Pendientes reales, no simulados:
+
+- Previsualizacion de adjuntos binarios.
+- Reenvio con adjuntos originales seleccionables.
+- Labels personalizados de Gmail con alta/baja desde UI.
+- Acciones en lote.
+- Borradores persistentes.
 - La vista de hilo usa `provider_thread_id` en datos, pero la UI inicial prioriza el detalle del mensaje seleccionado.
 - La vinculacion manual requiere conocer el ID de la entidad.
 - Outlook queda preparado como adaptador, pero no implementado.

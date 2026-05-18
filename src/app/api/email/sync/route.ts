@@ -6,7 +6,16 @@ import { linkEmailMessageToEntities } from "@/modules/email/services/linking";
 import { createClientNoReplyAlerts, enrichCommercialEmail } from "@/modules/email/services/commercial";
 import { getEmailProviderAdapter } from "@/modules/email/services/providers";
 
-export async function POST() {
+function errorMessage(error: unknown) {
+  if (error instanceof Error) return error.message.slice(0, 500);
+  if (error && typeof error === "object") {
+    const value = error as { message?: unknown; details?: unknown; code?: unknown };
+    return [value.message, value.details, value.code].filter(Boolean).join(" | ").slice(0, 500) || "sync_failed";
+  }
+  return "sync_failed";
+}
+
+export async function POST(request: Request) {
   const currentUser = await getCurrentUserContext();
   if (!currentUser) return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
 
@@ -17,7 +26,7 @@ export async function POST() {
     .select("*")
     .eq("user_id", currentUser.id)
     .eq("provider", "gmail")
-    .eq("status", "connected")
+    .in("status", ["connected", "sync_error"])
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -27,6 +36,13 @@ export async function POST() {
   }
 
   try {
+    if (!("full_sync_completed_at" in account) || !("sync_cursor" in account)) {
+      return NextResponse.json({
+        error: "database_migration_required",
+        message: "Falta aplicar la migracion 20260518000001_email_enterprise_sync.sql en Supabase.",
+      }, { status: 409 });
+    }
+
     const adapter = getEmailProviderAdapter(account.provider);
     const token = await adapter.getValidAccessToken(supabase, account as EmailAccount);
     if (!token) return NextResponse.json({ error: "reauth_required" }, { status: 401 });
@@ -34,7 +50,9 @@ export async function POST() {
     const lastHistoryId = account.last_history_id as string | null;
     const isFullSync = !lastHistoryId;
 
-    const synced = await adapter.syncMessages(supabase, account as EmailAccount, token);
+    const body = await request.json().catch(() => ({}));
+    const mode = body?.mode === "full" || body?.mode === "incremental" ? body.mode : "auto";
+    const synced = await adapter.syncMessages(supabase, account as EmailAccount, token, { mode });
     const messages = (synced.messages ?? []) as Array<{
       id: number;
       empresa_id: number | null;
@@ -68,22 +86,23 @@ export async function POST() {
     return NextResponse.json({
       synced: synced.synced,
       linked,
-      isFullSync,
+      isFullSync: synced.isFullSync ?? isFullSync,
+      pagesFetched: synced.pagesFetched ?? null,
       lastSyncAt: updatedAccount?.last_sync_at ?? null,
       lastHistoryId: updatedAccount?.last_history_id ?? null,
       syncedMessages: messages.map((m) => ({ id: m.id, subject: m.subject, direction: m.direction })),
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message.slice(0, 240) : "sync_failed";
+    const message = errorMessage(error);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase as any)
       .from("email_accounts")
       .update({
         status: "sync_error",
-        last_error: errorMessage,
+        last_error: message,
       })
       .eq("id", account.id);
 
-    return NextResponse.json({ error: "sync_failed", message: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: "sync_failed", message }, { status: 500 });
   }
 }

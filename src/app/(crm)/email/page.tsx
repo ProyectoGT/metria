@@ -17,9 +17,8 @@ export default async function EmailPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
       .from("email_messages")
-      .select("id,account_id,provider_thread_id,from_email,from_name,to_emails,subject,snippet,received_at,sent_at,is_read,has_attachments,direction,folder,commercial_priority,commercial_bucket,intent,urgency,needs_response,response_due_at,responded_at,portal_source")
+      .select("id,account_id,provider_thread_id,from_email,from_name,to_emails,cc_emails,subject,snippet,received_at,sent_at,is_read,has_attachments,direction,folder,commercial_priority,commercial_bucket,intent,urgency,needs_response,response_due_at,responded_at,portal_source,raw_metadata,body_html")
       .eq("user_id", currentUser.id)
-      .is("archived_at", null)
       .order("commercial_priority", { ascending: false })
       .order("received_at", { ascending: false, nullsFirst: false })
       .order("sent_at", { ascending: false, nullsFirst: false })
@@ -43,7 +42,7 @@ export default async function EmailPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
       .from("email_attachments")
-      .select("id,email_message_id,filename,mime_type,document_type,storage_path")
+      .select("id,email_message_id,filename,mime_type,document_type,storage_path,provider_attachment_id")
       .eq("user_id", currentUser.id),
   ]);
 

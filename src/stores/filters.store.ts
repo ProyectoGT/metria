@@ -21,9 +21,12 @@ interface SolicitudesFilters {
 
 interface PropiedadesFilters {
   search:  string;
+  estado:  string | null;
   tipo:    string | null;
   agentId: number | null;
   zonaId:  number | null;
+  web:     string | null;
+  ficha:   string | null;
 }
 
 interface ContactosFilters {
@@ -91,7 +94,7 @@ const defaults = {
     presupuestoMin: "",
     presupuestoMax: "",
   },
-  propiedades: { search: "", tipo: null, agentId: null, zonaId: null },
+  propiedades: { search: "", estado: null, tipo: null, agentId: null, zonaId: null, web: null, ficha: null },
   contactos:   { search: "", tipo: null, agentId: null },
   usuarios:    { search: "", rol: null },
   ordenes:     { date: today(), agentId: null },

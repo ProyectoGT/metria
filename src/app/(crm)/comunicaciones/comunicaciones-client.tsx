@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import Link from "next/link";
 import {
-  MessageCircle, Search, Filter, Clock, Check, CheckCheck,
-  AlertCircle, RefreshCw, Wifi, WifiOff, ChevronLeft, ChevronRight,
+  MessageCircle, Clock, Check, CheckCheck,
+  AlertCircle, Wifi, WifiOff, ChevronLeft, ChevronRight, RefreshCw,
 } from "lucide-react";
 import { getComunicacionesAction, type ComunicacionesMetrics, type ComunicacionesRow } from "@/app/(crm)/whatsapp/actions";
+import FilterBar from "@/components/ui/filters/FilterBar";
+import FilterSearch from "@/components/ui/filters/FilterSearch";
+import FilterSelect from "@/components/ui/filters/FilterSelect";
+import FilterDateRange from "@/components/ui/filters/FilterDateRange";
+import FilterDrawer from "@/components/ui/filters/FilterDrawer";
 
 type Props = {
   metrics: ComunicacionesMetrics;
@@ -58,6 +63,7 @@ export default function ComunicacionesClient({ metrics, agentes, currentUserRole
   const [page, setPage]       = useState(1);
   const [loaded, setLoaded]   = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const [busqueda,   setBusqueda]   = useState("");
   const [agenteId,   setAgenteId]   = useState<number | undefined>();
@@ -69,7 +75,7 @@ export default function ComunicacionesClient({ metrics, agentes, currentUserRole
   const isManager = currentUserRole === "Administrador" || currentUserRole === "Director";
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  function load(p: number = 1) {
+  const load = useCallback((p: number = 1) => {
     startTransition(async () => {
       const result = await getComunicacionesAction({
         busqueda:   busqueda || undefined,
@@ -86,12 +92,7 @@ export default function ComunicacionesClient({ metrics, agentes, currentUserRole
       setPage(p);
       setLoaded(true);
     });
-  }
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    load(1);
-  }
+  }, [busqueda, agenteId, estado, tipo, fechaDesde, fechaHasta]);
 
   return (
     <div className="space-y-5">
@@ -125,92 +126,139 @@ export default function ComunicacionesClient({ metrics, agentes, currentUserRole
       </div>
 
       {/* Filtros */}
-      <div className="rounded-2xl border border-border bg-surface shadow-sm">
-        <form onSubmit={handleSearch} className="flex flex-wrap items-end gap-3 p-4">
-          <div className="flex min-w-[180px] flex-1 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
-            <Search className="h-4 w-4 shrink-0 text-text-secondary" />
-            <input
-              type="text"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Nombre o telefono..."
-              className="w-full bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
-            />
-          </div>
-
-          {isManager && agentes.length > 0 && (
-            <select
-              value={agenteId ?? ""}
-              onChange={(e) => setAgenteId(e.target.value ? Number(e.target.value) : undefined)}
-              className="input h-[38px] min-w-[150px] text-sm"
-            >
-              <option value="">Todos los agentes</option>
-              {agentes.map((a) => (
-                <option key={a.id} value={a.id}>{a.nombre} {a.apellidos}</option>
-              ))}
-            </select>
-          )}
-
-          <select
-            value={estado}
-            onChange={(e) => setEstado(e.target.value)}
-            className="input h-[38px] min-w-[130px] text-sm"
-          >
-            <option value="">Todos los estados</option>
-            <option value="prepared">Manual</option>
-            <option value="sent">Enviado</option>
-            <option value="delivered">Entregado</option>
-            <option value="read">Leido</option>
-            <option value="failed">Fallido</option>
-          </select>
-
-          <select
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value as "solicitud" | "propiedad" | "")}
-            className="input h-[38px] min-w-[130px] text-sm"
-          >
-            <option value="">Todos los tipos</option>
-            <option value="solicitud">Solicitud</option>
-            <option value="propiedad">Propiedad</option>
-          </select>
-
-          <input
-            type="date"
-            value={fechaDesde}
-            onChange={(e) => setFechaDesde(e.target.value)}
-            className="input h-[38px] text-sm"
-            title="Desde"
+      <FilterBar
+        searchSlot={
+          <FilterSearch
+            value={busqueda}
+            onChange={(v) => { setBusqueda(v); load(1); }}
+            placeholder="Nombre o telefono..."
+            className="min-w-[160px] flex-1"
           />
-          <input
-            type="date"
-            value={fechaHasta}
-            onChange={(e) => setFechaHasta(e.target.value)}
-            className="input h-[38px] text-sm"
-            title="Hasta"
-          />
+        }
+        activeCount={(() => {
+          let c = 0;
+          if (busqueda) c++;
+          if (estado) c++;
+          if (tipo) c++;
+          if (agenteId) c++;
+          if (fechaDesde) c++;
+          if (fechaHasta) c++;
+          return c;
+        })()}
+        onClear={() => {
+          setBusqueda(""); setEstado(""); setTipo("");
+          setAgenteId(undefined); setFechaDesde(""); setFechaHasta("");
+          load(1);
+        }}
+        onOpenAdvanced={() => setDrawerOpen(true)}
+        advancedCount={(() => {
+          let c = 0;
+          if (agenteId) c++;
+          if (fechaDesde || fechaHasta) c++;
+          return c;
+        })()}
+        chips={(() => {
+          const c: { key: string; label: string; onRemove: () => void }[] = [];
+          if (estado) c.push({ key: "estado", label: `Estado: ${estado}`, onRemove: () => { setEstado(""); load(1); } });
+          if (tipo) c.push({ key: "tipo", label: `Tipo: ${tipo}`, onRemove: () => { setTipo(""); load(1); } });
+          if (agenteId) {
+            const a = agentes.find((x) => x.id === agenteId);
+            c.push({ key: "agente", label: `Agente: ${a?.nombre ?? agenteId}`, onRemove: () => { setAgenteId(undefined); load(1); } });
+          }
+          if (fechaDesde) c.push({ key: "fdesde", label: `Desde: ${fechaDesde}`, onRemove: () => { setFechaDesde(""); load(1); } });
+          if (fechaHasta) c.push({ key: "fhasta", label: `Hasta: ${fechaHasta}`, onRemove: () => { setFechaHasta(""); load(1); } });
+          return c;
+        })()}
+      >
+        <FilterSelect
+          value={estado}
+          onChange={(e) => { setEstado(e.target.value); load(1); }}
+          label="Estado"
+        >
+          <option value="">Todos los estados</option>
+          <option value="prepared">Manual</option>
+          <option value="sent">Enviado</option>
+          <option value="delivered">Entregado</option>
+          <option value="read">Leido</option>
+          <option value="failed">Fallido</option>
+        </FilterSelect>
 
+        <FilterSelect
+          value={tipo}
+          onChange={(e) => { setTipo(e.target.value as "solicitud" | "propiedad" | ""); load(1); }}
+          label="Tipo"
+        >
+          <option value="">Todos los tipos</option>
+          <option value="solicitud">Solicitud</option>
+          <option value="propiedad">Propiedad</option>
+        </FilterSelect>
+
+        {loaded && (
           <button
-            type="submit"
+            type="button"
+            onClick={() => load(page)}
             disabled={isPending}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-text-secondary transition-colors hover:bg-surface-raised disabled:opacity-60"
+            title="Actualizar"
           >
-            <Filter className="h-4 w-4" />
-            {isPending ? "Buscando..." : "Filtrar"}
+            <RefreshCw className={`h-4 w-4 ${isPending ? "animate-spin" : ""}`} />
           </button>
+        )}
+      </FilterBar>
 
-          {loaded && (
+      {/* Drawer avanzados */}
+      <FilterDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title="Filtros avanzados"
+        footer={
+          <div className="flex justify-end gap-3">
             <button
               type="button"
-              onClick={() => load(page)}
-              disabled={isPending}
-              className="rounded-lg border border-border p-2 text-text-secondary transition-colors hover:bg-surface-raised"
-              title="Actualizar"
+              onClick={() => { setAgenteId(undefined); setFechaDesde(""); setFechaHasta(""); load(1); }}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background"
             >
-              <RefreshCw className={`h-4 w-4 ${isPending ? "animate-spin" : ""}`} />
+              Limpiar avanzados
             </button>
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(false)}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark"
+            >
+              Cerrar
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-5">
+          {isManager && agentes.length > 0 && (
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-secondary">Agente</label>
+              <FilterSelect
+                value={agenteId ?? ""}
+                onChange={(e) => { setAgenteId(e.target.value ? Number(e.target.value) : undefined); load(1); }}
+              >
+                <option value="">Todos los agentes</option>
+                {agentes.map((a) => (
+                  <option key={a.id} value={a.id}>{a.nombre} {a.apellidos}</option>
+                ))}
+              </FilterSelect>
+            </div>
           )}
-        </form>
-      </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-secondary">Fecha</label>
+            <FilterDateRange
+              valueFrom={fechaDesde}
+              valueTo={fechaHasta}
+              onChangeFrom={(v) => { setFechaDesde(v); load(1); }}
+              onChangeTo={(v) => { setFechaHasta(v); load(1); }}
+              labelFrom=""
+              labelTo=""
+            />
+          </div>
+        </div>
+      </FilterDrawer>
 
       {/* Tabla */}
       <div className="rounded-2xl border border-border bg-surface shadow-sm">

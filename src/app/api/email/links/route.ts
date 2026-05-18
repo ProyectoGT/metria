@@ -41,3 +41,28 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: "link_failed" }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
+
+export async function DELETE(request: NextRequest) {
+  const currentUser = await getCurrentUserContext();
+  if (!currentUser) return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
+
+  const body = await request.json();
+  const linkId = Number(body.linkId);
+  if (!linkId) return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
+
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: link } = await (supabase as any)
+    .from("email_entity_links")
+    .select("id,email_messages!inner(user_id)")
+    .eq("id", linkId)
+    .eq("email_messages.user_id", currentUser.id)
+    .maybeSingle();
+
+  if (!link) return NextResponse.json({ error: "link_not_found" }, { status: 404 });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any).from("email_entity_links").delete().eq("id", linkId);
+  if (error) return NextResponse.json({ error: "unlink_failed" }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

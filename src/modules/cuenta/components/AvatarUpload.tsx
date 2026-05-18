@@ -86,23 +86,35 @@ export default function AvatarUpload({
   }
 
   return (
-    <div className="flex items-center gap-5">
-      <div className="relative">
-        {previewUrl ? (
-          <Image
-            src={previewUrl}
-            alt={userName}
-            width={80}
-            height={80}
-            unoptimized
-            className="h-20 w-20 rounded-full object-cover border border-border"
-          />
-        ) : (
-          <Avatar name={userName} size="lg" />
-        )}
+    <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+      <div className="group relative shrink-0">
+        <div className="relative h-24 w-24">
+          {previewUrl ? (
+            <Image
+              src={previewUrl}
+              alt={userName}
+              width={96}
+              height={96}
+              unoptimized
+              className="h-full w-full rounded-full border-2 border-border object-cover ring-2 ring-primary/5"
+            />
+          ) : (
+            <Avatar name={userName} size="xl" />
+          )}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/0 transition-colors hover:bg-black/20"
+            aria-label="Cambiar foto"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface/90 text-text-secondary opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+              <Camera className="h-4 w-4" />
+            </span>
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="flex flex-col items-center gap-2 sm:items-start sm:pt-1">
         <input
           ref={fileInputRef}
           type="file"
@@ -114,7 +126,7 @@ export default function AvatarUpload({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-background"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium text-text-primary shadow-sm transition-colors hover:bg-background"
           >
             <Camera className="h-4 w-4" />
             Cambiar foto
@@ -124,17 +136,21 @@ export default function AvatarUpload({
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               {saving ? "Subiendo..." : "Guardar foto"}
             </button>
           )}
         </div>
-        <p className="mt-2 text-xs text-text-secondary">
-          PNG o JPG, máximo 5 MB.
+        <p className="text-xs text-text-secondary">
+          PNG o JPG, máximo 5 MB
         </p>
-        {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+        {error && (
+          <p className="rounded-lg bg-danger/10 px-3 py-1.5 text-xs text-danger">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   );

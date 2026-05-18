@@ -14,6 +14,8 @@ export type EmailAccount = {
   token_expires_at: string | null;
   last_sync_at: string | null;
   last_history_id: string | null;
+  sync_cursor?: string | null;
+  full_sync_completed_at?: string | null;
   last_error?: string | null;
 };
 
@@ -34,6 +36,12 @@ type GmailMessage = {
   payload?: GmailPayload;
 };
 
+type GmailListResponse = {
+  messages?: Array<{ id: string; threadId?: string }>;
+  nextPageToken?: string;
+  resultSizeEstimate?: number;
+};
+
 type TokenResponse = {
   access_token?: string;
   refresh_token?: string;
@@ -45,13 +53,52 @@ function gmailUrl(path: string) {
   return `https://gmail.googleapis.com/gmail/v1${path}`;
 }
 
-function decodeBase64Url(data?: string) {
-  if (!data) return "";
+function decodeBase64UrlBytes(data?: string) {
+  if (!data) return Buffer.from("");
   try {
-    return Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+    return Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64");
   } catch {
-    return "";
+    return Buffer.from("");
   }
+}
+
+function charsetForPayload(payload: GmailPayload) {
+  const contentType = header(payload.headers, "Content-Type");
+  return contentType.match(/charset=["']?([^;"'\s]+)/i)?.[1]?.toLowerCase() ?? "utf-8";
+}
+
+function decodeBytes(bytes: Uint8Array, charset: string) {
+  try {
+    return new TextDecoder(charset).decode(bytes);
+  } catch {
+    return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+  }
+}
+
+function decodeQuotedPrintableBytes(value: string) {
+  const bytes: number[] = [];
+  const normalized = value.replace(/=\r?\n/g, "");
+
+  for (let i = 0; i < normalized.length; i++) {
+    if (normalized[i] === "=" && /^[A-Fa-f0-9]{2}$/.test(normalized.slice(i + 1, i + 3))) {
+      bytes.push(Number.parseInt(normalized.slice(i + 1, i + 3), 16));
+      i += 2;
+    } else {
+      bytes.push(normalized.charCodeAt(i) & 0xff);
+    }
+  }
+
+  return Uint8Array.from(bytes);
+}
+
+function decodeMimeBody(payload: GmailPayload) {
+  const bytes = decodeBase64UrlBytes(payload.body?.data);
+  const charset = charsetForPayload(payload);
+  const transferEncoding = header(payload.headers, "Content-Transfer-Encoding").toLowerCase();
+  if (transferEncoding === "quoted-printable") {
+    return decodeBytes(decodeQuotedPrintableBytes(bytes.toString("latin1")), charset);
+  }
+  return decodeBytes(bytes, charset);
 }
 
 function stripHtml(html: string) {
@@ -73,7 +120,7 @@ function stripHtml(html: string) {
 function findBody(payload: GmailPayload | undefined, mimeType: "text/plain" | "text/html"): string {
   if (!payload) return "";
   if (payload.mimeType === mimeType && payload.body?.data) {
-    return decodeBase64Url(payload.body.data);
+    return decodeMimeBody(payload);
   }
   for (const part of payload.parts ?? []) {
     const body = findBody(part, mimeType);
@@ -121,6 +168,13 @@ function parseAddressList(value: string) {
     .split(",")
     .map((part) => parseMailbox(part.trim()))
     .filter((item) => item.email);
+}
+
+function normalizeSubjectPrefix(subject: string, prefix: "Re" | "Fwd") {
+  const clean = subject.trim() || "(Sin asunto)";
+  if (prefix === "Re" && /^re:/i.test(clean)) return clean;
+  if (prefix === "Fwd" && /^(fwd|fw):/i.test(clean)) return clean;
+  return `${prefix}: ${clean}`;
 }
 
 function messageDate(message: GmailMessage, dateHeader: string) {
@@ -228,8 +282,15 @@ export function mapGmailMessage(message: GmailMessage, account: EmailAccount) {
   const date = messageDate(message, header(headers, "Date"));
   const html = findBody(message.payload, "text/html");
   const plain = findBody(message.payload, "text/plain") || stripHtml(html);
-  const isSent = message.labelIds?.includes("SENT") ?? false;
-  const isInbox = message.labelIds?.includes("INBOX") ?? !isSent;
+  const labels = message.labelIds ?? [];
+  const isSent = labels.includes("SENT");
+  const isInbox = labels.includes("INBOX");
+  const folder =
+    labels.includes("TRASH") ? "trash"
+      : labels.includes("SPAM") ? "spam"
+        : isSent ? "sent"
+          : isInbox ? "inbox"
+            : "archive";
 
   return {
     empresa_id: account.empresa_id,
@@ -251,9 +312,18 @@ export function mapGmailMessage(message: GmailMessage, account: EmailAccount) {
     is_read: !(message.labelIds?.includes("UNREAD") ?? false),
     has_attachments: hasAttachment(message.payload),
     direction: isSent ? "outbound" : "inbound",
-    folder: isSent ? "sent" : isInbox ? "inbox" : "archive",
-    raw_metadata: { labelIds: message.labelIds ?? [] },
-    archived_at: isInbox || isSent ? null : new Date().toISOString(),
+    folder,
+    raw_metadata: {
+      labelIds: labels,
+      isStarred: labels.includes("STARRED"),
+      isImportant: labels.includes("IMPORTANT"),
+      isDraft: labels.includes("DRAFT"),
+      messageIdHeader: header(headers, "Message-ID"),
+      inReplyTo: header(headers, "In-Reply-To"),
+      references: header(headers, "References"),
+      dateHeader: header(headers, "Date"),
+    },
+    archived_at: null,
     _attachments: collectAttachments(message.payload),
   };
 }
@@ -331,57 +401,62 @@ export async function syncGmailMessages(
   supabase: SupabaseClient,
   account: EmailAccount,
   accessToken: string,
-  folder: "inbox" | "sent" = "inbox",
-  maxPages = 5,
+  options: { mode?: "auto" | "full" | "incremental"; maxPages?: number } = {},
 ) {
   const now = new Date().toISOString();
-  const isFullSync = !account.last_history_id;
+  const maxPages = options.maxPages ?? 10000;
+  const isFullSync = options.mode === "full" || !account.full_sync_completed_at || !account.last_history_id;
 
   if (isFullSync) {
     // ── Full sync: paginated list ──────────────────────────────────────
-    const query = folder === "sent" ? "in:sent newer_than:90d" : "in:inbox newer_than:90d";
     let nextPageToken: string | undefined;
-    const allIds: string[] = [];
+    let totalSynced = 0;
+    const syncedMessages: unknown[] = [];
     let pagesFetched = 0;
 
     do {
-      let url = `/users/me/messages?q=${encodeURIComponent(query)}&maxResults=100`;
+      let url = "/users/me/messages?maxResults=500&includeSpamTrash=true";
       if (nextPageToken) url += `&pageToken=${nextPageToken}`;
 
-      const list = await gmailFetch<{ messages?: Array<{ id: string }>; nextPageToken?: string }>(url, accessToken);
+      const list = await gmailFetch<GmailListResponse>(url, accessToken);
       const ids = list.messages?.map((m) => m.id) ?? [];
-      allIds.push(...ids);
+      if (ids.length > 0) {
+        const pageData = await fetchAndUpsertMessages(supabase, account, accessToken, ids);
+        totalSynced += pageData?.length ?? 0;
+        syncedMessages.push(...(pageData ?? []));
+      }
       nextPageToken = list.nextPageToken;
       pagesFetched++;
 
-      if (allIds.length >= 500) break;
     } while (nextPageToken && pagesFetched < maxPages);
 
-    if (allIds.length === 0) {
+    if (totalSynced === 0) {
       const newHistoryId = await getGmailHistoryId(accessToken);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any).from("email_accounts").update({
         status: "connected", last_sync_at: now, last_error: null,
         last_history_id: newHistoryId,
+        sync_cursor: null,
+        full_sync_completed_at: now,
       }).eq("id", account.id);
-      return { synced: 0 };
+      return { synced: 0, isFullSync: true, pagesFetched };
     }
-
-    const data = await fetchAndUpsertMessages(supabase, account, accessToken, allIds);
 
     const newHistoryId = await getGmailHistoryId(accessToken);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase as any).from("email_accounts").update({
       status: "connected", last_sync_at: now, last_error: null,
       last_history_id: newHistoryId,
+      sync_cursor: null,
+      full_sync_completed_at: now,
     }).eq("id", account.id);
 
-    return { synced: data?.length ?? 0, messages: data ?? [] };
+    return { synced: totalSynced, messages: syncedMessages, isFullSync: true, pagesFetched };
   }
 
   // ── Incremental sync via History API ─────────────────────────────────
   try {
-    const historyUrl = `/users/me/history?startHistoryId=${account.last_history_id}&historyTypes=messageAdded&maxResults=100`;
+    const historyUrl = `/users/me/history?startHistoryId=${account.last_history_id}&historyTypes=messageAdded&historyTypes=labelAdded&historyTypes=labelRemoved&maxResults=500`;
     let nextPageToken: string | undefined;
     const allIds: string[] = [];
     let pagesFetched = 0;
@@ -391,34 +466,35 @@ export async function syncGmailMessages(
       if (nextPageToken) url += `&pageToken=${nextPageToken}`;
 
       const history = await gmailFetch<{
-        history?: Array<{ messagesAdded?: Array<{ message: { id: string } }> }>;
+        history?: Array<{
+          messagesAdded?: Array<{ message: { id: string } }>;
+          labelsAdded?: Array<{ message: { id: string } }>;
+          labelsRemoved?: Array<{ message: { id: string } }>;
+        }>;
         nextPageToken?: string;
       }>(url, accessToken);
 
       if (history.history) {
         for (const entry of history.history) {
-          if (entry.messagesAdded) {
-            for (const ma of entry.messagesAdded) {
-              allIds.push(ma.message.id);
-            }
-          }
+          for (const change of entry.messagesAdded ?? []) allIds.push(change.message.id);
+          for (const change of entry.labelsAdded ?? []) allIds.push(change.message.id);
+          for (const change of entry.labelsRemoved ?? []) allIds.push(change.message.id);
         }
       }
 
       nextPageToken = history.nextPageToken;
       pagesFetched++;
-      if (allIds.length >= 500) break;
     } while (nextPageToken && pagesFetched < maxPages);
 
     if (allIds.length > 0) {
-      const data = await fetchAndUpsertMessages(supabase, account, accessToken, allIds);
+      const data = await fetchAndUpsertMessages(supabase, account, accessToken, [...new Set(allIds)]);
       const newHistoryId = await getGmailHistoryId(accessToken);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any).from("email_accounts").update({
         status: "connected", last_sync_at: now, last_error: null,
         last_history_id: newHistoryId,
       }).eq("id", account.id);
-      return { synced: data?.length ?? 0, messages: data ?? [] };
+      return { synced: data?.length ?? 0, messages: data ?? [], isFullSync: false, pagesFetched };
     }
 
     // No new messages, just update timestamps
@@ -428,28 +504,27 @@ export async function syncGmailMessages(
       status: "connected", last_sync_at: now, last_error: null,
       last_history_id: newHistoryId,
     }).eq("id", account.id);
-    return { synced: 0 };
+    return { synced: 0, isFullSync: false, pagesFetched };
   } catch {
-    // History API fallback: use date-based query
+    // History API fallback: use a date query with overlap to avoid gaps.
     const since = account.last_sync_at
       ? new Date(new Date(account.last_sync_at).getTime() - 86400000).toISOString().split("T")[0]
       : new Date(Date.now() - 86400000 * 7).toISOString().split("T")[0];
-    const query = `${folder === "sent" ? "in:sent" : "in:inbox"} after:${since}`;
+    const query = `after:${since}`;
 
     let nextPageToken: string | undefined;
     const allIds: string[] = [];
     let pagesFetched = 0;
 
     do {
-      let url = `/users/me/messages?q=${encodeURIComponent(query)}&maxResults=100`;
+      let url = `/users/me/messages?q=${encodeURIComponent(query)}&maxResults=500&includeSpamTrash=true`;
       if (nextPageToken) url += `&pageToken=${nextPageToken}`;
 
-      const list = await gmailFetch<{ messages?: Array<{ id: string }>; nextPageToken?: string }>(url, accessToken);
+      const list = await gmailFetch<GmailListResponse>(url, accessToken);
       const ids = list.messages?.map((m) => m.id) ?? [];
       allIds.push(...ids);
       nextPageToken = list.nextPageToken;
       pagesFetched++;
-      if (allIds.length >= 500) break;
     } while (nextPageToken && pagesFetched < maxPages);
 
     if (allIds.length === 0) {
@@ -459,10 +534,10 @@ export async function syncGmailMessages(
         status: "connected", last_sync_at: now, last_error: null,
         last_history_id: newHistoryId,
       }).eq("id", account.id);
-      return { synced: 0 };
+      return { synced: 0, isFullSync: false, pagesFetched, fallback: true };
     }
 
-    const data = await fetchAndUpsertMessages(supabase, account, accessToken, allIds);
+    const data = await fetchAndUpsertMessages(supabase, account, accessToken, [...new Set(allIds)]);
     const newHistoryId = await getGmailHistoryId(accessToken);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase as any).from("email_accounts").update({
@@ -470,21 +545,45 @@ export async function syncGmailMessages(
       last_history_id: newHistoryId,
     }).eq("id", account.id);
 
-    return { synced: data?.length ?? 0, messages: data ?? [] };
+    return { synced: data?.length ?? 0, messages: data ?? [], isFullSync: false, pagesFetched, fallback: true };
   }
 }
 
 export async function modifyGmailMessage(
   accessToken: string,
   providerMessageId: string,
-  action: "read" | "unread" | "archive",
+  action:
+    | "read"
+    | "unread"
+    | "archive"
+    | "restore"
+    | "untrash"
+    | "trash"
+    | "spam"
+    | "star"
+    | "unstar"
+    | "important"
+    | "unimportant",
 ) {
-  const body =
-    action === "read"
-      ? { removeLabelIds: ["UNREAD"] }
-      : action === "unread"
-        ? { addLabelIds: ["UNREAD"] }
-        : { removeLabelIds: ["INBOX"] };
+  if (action === "trash") {
+    return gmailFetch(`/users/me/messages/${providerMessageId}/trash`, accessToken, { method: "POST" });
+  }
+  if (action === "untrash") {
+    return gmailFetch(`/users/me/messages/${providerMessageId}/untrash`, accessToken, { method: "POST" });
+  }
+
+  const body = {
+    read: { removeLabelIds: ["UNREAD"] },
+    unread: { addLabelIds: ["UNREAD"] },
+    archive: { removeLabelIds: ["INBOX"] },
+    restore: { addLabelIds: ["INBOX"], removeLabelIds: ["TRASH", "SPAM"] },
+    trash: { addLabelIds: ["TRASH"], removeLabelIds: ["INBOX", "SPAM"] },
+    spam: { addLabelIds: ["SPAM"], removeLabelIds: ["INBOX"] },
+    star: { addLabelIds: ["STARRED"] },
+    unstar: { removeLabelIds: ["STARRED"] },
+    important: { addLabelIds: ["IMPORTANT"] },
+    unimportant: { removeLabelIds: ["IMPORTANT"] },
+  }[action];
 
   return gmailFetch(`/users/me/messages/${providerMessageId}/modify`, accessToken, {
     method: "POST",
@@ -496,22 +595,103 @@ export async function sendGmailMessage(accessToken: string, params: {
   from: string;
   to: string;
   cc?: string;
+  bcc?: string;
   subject: string;
   bodyText: string;
+  threadId?: string | null;
+  inReplyTo?: string | null;
+  references?: string | null;
 }) {
   const lines = [
     `From: ${params.from}`,
     `To: ${params.to}`,
     params.cc ? `Cc: ${params.cc}` : "",
+    params.bcc ? `Bcc: ${params.bcc}` : "",
     `Subject: ${params.subject}`,
+    params.inReplyTo ? `In-Reply-To: ${params.inReplyTo}` : "",
+    params.references ? `References: ${params.references}` : "",
     "MIME-Version: 1.0",
     "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: 8bit",
     "",
     params.bodyText,
   ].filter(Boolean);
   const raw = Buffer.from(lines.join("\r\n"), "utf8").toString("base64url");
   return gmailFetch<{ id: string; threadId: string }>("/users/me/messages/send", accessToken, {
     method: "POST",
-    body: JSON.stringify({ raw }),
+    body: JSON.stringify({ raw, threadId: params.threadId ?? undefined }),
   });
+}
+
+export async function downloadGmailAttachment(accessToken: string, providerMessageId: string, providerAttachmentId: string) {
+  const attachment = await gmailFetch<{ data?: string; size?: number }>(
+    `/users/me/messages/${providerMessageId}/attachments/${providerAttachmentId}`,
+    accessToken,
+  );
+  return Buffer.from((attachment.data ?? "").replace(/-/g, "+").replace(/_/g, "/"), "base64");
+}
+
+export function buildGmailReply(params: {
+  accountEmail: string;
+  message: {
+    from_email: string | null;
+    from_name: string | null;
+    to_emails: Array<{ email: string; name: string | null }>;
+    cc_emails?: Array<{ email: string; name: string | null }>;
+    subject: string | null;
+    provider_thread_id: string | null;
+    raw_metadata?: { messageIdHeader?: string | null; references?: string | null };
+  };
+  mode: "reply" | "replyAll" | "forward";
+  bodyText: string;
+  to?: string;
+  cc?: string;
+  bcc?: string;
+  originalText?: string | null;
+}) {
+  const original = params.message;
+  const account = params.accountEmail.toLowerCase();
+  const originalFrom = original.from_email ?? "";
+  const originalTo = original.to_emails ?? [];
+  const originalCc = original.cc_emails ?? [];
+  const messageId = original.raw_metadata?.messageIdHeader ?? null;
+  const references = [original.raw_metadata?.references, messageId].filter(Boolean).join(" ");
+
+  if (params.mode === "forward") {
+    return {
+      to: params.to ?? "",
+      cc: params.cc,
+      bcc: params.bcc,
+      subject: normalizeSubjectPrefix(original.subject ?? "", "Fwd"),
+      bodyText: `${params.bodyText}\n\n---------- Mensaje reenviado ----------\nDe: ${originalFrom}\nAsunto: ${original.subject ?? ""}\n\n${params.originalText ?? ""}`,
+      threadId: null,
+      inReplyTo: null,
+      references: null,
+    };
+  }
+
+  const recipients = params.mode === "replyAll"
+    ? [
+        originalFrom,
+        ...originalTo.map((item) => item.email),
+      ].filter((email, index, list) => email && email.toLowerCase() !== account && list.indexOf(email) === index)
+    : [originalFrom].filter(Boolean);
+
+  const cc = params.mode === "replyAll"
+    ? originalCc
+        .map((item) => item.email)
+        .filter((email, index, list) => email && email.toLowerCase() !== account && list.indexOf(email) === index)
+        .join(", ")
+    : params.cc;
+
+  return {
+    to: params.to || recipients.join(", "),
+    cc,
+    bcc: params.bcc,
+    subject: normalizeSubjectPrefix(original.subject ?? "", "Re"),
+    bodyText: params.bodyText,
+    threadId: original.provider_thread_id,
+    inReplyTo: messageId,
+    references,
+  };
 }

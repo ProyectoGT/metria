@@ -5,17 +5,25 @@ import {
   Bath,
   BedDouble,
   Car,
+  CheckSquare,
   FileText,
-  Filter,
   History,
   Inbox,
+  Loader2,
   MapPin,
+  MessageCircle,
   Phone,
   Plus,
   SearchX,
-  SlidersHorizontal,
+  Send,
+  Square,
   Users,
+  X as XIcon,
 } from "lucide-react";
+import WhatsAppMessageModal from "@/components/whatsapp/WhatsAppMessageModal";
+import WhatsAppHistory from "@/components/whatsapp/WhatsAppHistory";
+import { sendOrPrepareWhatsAppAction } from "@/app/(crm)/whatsapp/actions";
+import { buildWhatsAppMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
 import Drawer from "@/components/ui/drawer";
 import DocumentGeneratorModal from "@/modules/documents/components/DocumentGeneratorModal";
 import ColaboracionesPanel from "@/modules/colaboraciones/components/ColaboracionesPanel";
@@ -43,6 +51,11 @@ import {
   useSetSolicitudesFilter,
   useSolicitudesFilters,
 } from "@/hooks/use-filters";
+import FilterBar from "@/components/ui/filters/FilterBar";
+import FilterSearch from "@/components/ui/filters/FilterSearch";
+import FilterSelect from "@/components/ui/filters/FilterSelect";
+import FilterNumberRange from "@/components/ui/filters/FilterNumberRange";
+import FilterDrawer from "@/components/ui/filters/FilterDrawer";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -167,6 +180,7 @@ function TabBtn({ active, onClick, children, title }: { active: boolean; onClick
 
 export default function PedidosClient({ initialPedidos, agentes, currentUserId, currentUserRole }: Props) {
   const [pedidos, setPedidos] = useState<Pedido[]>(initialPedidos);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<PedidoForm>(emptyForm());
@@ -177,6 +191,16 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // WhatsApp multi-selección
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+
+  // WhatsApp modal individual (renderizado fuera de la tabla para evitar conflictos de stacking context)
+  const [waModalPedido, setWaModalPedido] = useState<Pedido | null>(null);
+  const [waMessage, setWaMessage] = useState("");
+  const [waSending, setWaSending] = useState(false);
 
   const filtros = useSolicitudesFilters();
   const setFiltro = useSetSolicitudesFilter();
@@ -211,6 +235,12 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
 
   const supabase = useMemo(() => createClient(), []);
   const { toasts, toast } = useToast();
+
+  const agenteActual = useMemo(() => {
+    if (!currentUserId) return "";
+    const yo = agentes.find((a) => a.id === currentUserId);
+    return yo ? `${yo.nombre ?? ""} ${yo.apellidos ?? ""}`.trim() : "";
+  }, [agentes, currentUserId]);
 
   // Tipo propiedad — multi-chip helpers
   function getTipos(): string[] {
@@ -322,6 +352,100 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
     }];
   }
 
+  // ─── Selección + envío masivo WhatsApp ───────────────────────────────────────
+
+  const selectablePedidos = filtered.filter((p) => !!p.telefono);
+  const allSelected = selectablePedidos.length > 0 && selectablePedidos.every((p) => selectedIds.has(p.id));
+
+  function toggleSelect(id: number, e: React.MouseEvent) {
+    e.stopPropagation();
+    setSelectedIds((prev) => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id); else s.add(id);
+      return s;
+    });
+  }
+
+  function toggleSelectAll(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(selectablePedidos.map((p) => p.id)));
+    }
+  }
+
+  function openWaModal(pedido: Pedido) {
+    if (!pedido.telefono) return;
+    setWaModalPedido(pedido);
+    setWaMessage(buildWhatsAppMessage("cliente_solicitud", {
+      nombre: pedido.nombre_cliente,
+      agente: agenteActual,
+      tipo: pedido.tipo_propiedad ?? undefined,
+      zona: pedido.zona_busqueda ?? undefined,
+    }));
+  }
+
+  async function handleWaSend() {
+    if (!waModalPedido?.telefono || !waMessage.trim()) return;
+    setWaSending(true);
+    try {
+      const result = await sendOrPrepareWhatsAppAction({
+        phone: waModalPedido.telefono,
+        recipientName: waModalPedido.nombre_cliente,
+        messageBody: waMessage,
+        templateName: "cliente_solicitud",
+        relatedType: "solicitud",
+        relatedId: waModalPedido.id,
+        pedidoId: waModalPedido.id,
+      });
+      if (result.sent) {
+        toast("Mensaje enviado por WhatsApp");
+      } else {
+        window.open(result.fallbackUrl, "_blank", "noopener,noreferrer");
+        toast("WhatsApp abierto");
+      }
+      setWaModalPedido(null);
+    } catch {
+      toast("Error al enviar WhatsApp", "error");
+    }
+    setWaSending(false);
+  }
+
+  async function handleBulkSend() {
+    const targets = filtered.filter((p) => selectedIds.has(p.id) && p.telefono);
+    if (targets.length === 0) return;
+    setBulkSending(true);
+    setBulkProgress({ done: 0, total: targets.length });
+    let ok = 0; let manual = 0;
+    for (const p of targets) {
+      try {
+        const msg = buildWhatsAppMessage("cliente_solicitud", {
+          nombre: p.nombre_cliente,
+          agente: agenteActual,
+          tipo: p.tipo_propiedad ?? undefined,
+          zona: p.zona_busqueda ?? undefined,
+        });
+        const result = await sendOrPrepareWhatsAppAction({
+          phone: p.telefono!,
+          recipientName: p.nombre_cliente,
+          messageBody: msg,
+          templateName: "cliente_solicitud",
+          relatedType: "solicitud",
+          relatedId: p.id,
+          pedidoId: p.id,
+        });
+        if (result.sent) { ok++; }
+        else { window.open(buildWhatsAppUrl(p.telefono!, msg), "_blank", "noopener,noreferrer"); manual++; }
+        setSelectedIds((prev) => { const s = new Set(prev); s.delete(p.id); return s; });
+      } catch { /* continuar */ }
+      setBulkProgress((prev) => prev ? { done: prev.done + 1, total: prev.total } : null);
+    }
+    setBulkSending(false);
+    setBulkProgress(null);
+    if (ok > 0 || manual > 0) toast(`${ok + manual} mensajes procesados (${ok} enviados, ${manual} manuales)`);
+  }
+
   async function handleDelete() {
     if (deleteId === null) return;
     setDeleting(true);
@@ -380,90 +504,110 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
       </div>
 
       {/* Filtros */}
-      <div className="mb-5 rounded-xl border border-border bg-surface p-4 shadow-sm">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-background text-text-secondary">
-              <SlidersHorizontal className="h-4 w-4" />
-            </span>
+      <div className="mb-5">
+        <FilterBar
+          searchSlot={
+            <FilterSearch
+              value={filtros.tipo ?? ""}
+              onChange={(v) => setFiltro("tipo", v || null)}
+              placeholder="Piso, Casa..."
+              className="min-w-[160px] flex-1"
+            />
+          }
+          activeCount={hasFilters ? (() => {
+            let c = 0;
+            if (filtros.tipo) c++;
+            if (filtros.modalidad) c++;
+            if (filtros.origen) c++;
+            if (presupuestoMinValue) c++;
+            if (presupuestoMaxValue) c++;
+            return c;
+          })() : 0}
+          onClear={hasFilters ? resetFiltros : undefined}
+          onOpenAdvanced={() => setDrawerOpen(true)}
+          advancedCount={(() => {
+            let c = 0;
+            if (filtros.origen) c++;
+            if (presupuestoMinValue || presupuestoMaxValue) c++;
+            return c;
+          })()}
+          chips={(() => {
+            const c: { key: string; label: string; onRemove: () => void }[] = [];
+            if (filtros.tipo) c.push({ key: "tipo", label: `Tipo: ${filtros.tipo}`, onRemove: () => setFiltro("tipo", null) });
+            if (filtros.modalidad) {
+              const m = MODALIDADES_PEDIDO.find((x) => x.value === filtros.modalidad);
+              c.push({ key: "modalidad", label: `Modalidad: ${m?.label ?? filtros.modalidad}`, onRemove: () => setFiltro("modalidad", null) });
+            }
+            if (filtros.origen) c.push({ key: "origen", label: `Origen: ${filtros.origen === "oficina" ? "Oficina" : "Online"}`, onRemove: () => setFiltro("origen", null) });
+            if (presupuestoMinValue) c.push({ key: "pmin", label: `Desde: ${presupuestoMinValue}`, onRemove: () => setFiltro("presupuestoMin", "") });
+            if (presupuestoMaxValue) c.push({ key: "pmax", label: `Hasta: ${presupuestoMaxValue}`, onRemove: () => setFiltro("presupuestoMax", "") });
+            return c;
+          })()}
+        >
+          <FilterSelect
+            value={filtros.modalidad ?? ""}
+            onChange={(e) => setFiltro("modalidad", e.target.value || null)}
+            label="Modalidad"
+          >
+            <option value="">Todas</option>
+            {MODALIDADES_PEDIDO.map((m) => <option key={m.value} value={m.value}>{m.label} - {m.title}</option>)}
+          </FilterSelect>
+        </FilterBar>
+
+        {/* Drawer filtros avanzados */}
+        <FilterDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          title="Filtros avanzados"
+          footer={
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => { setFiltro("origen", null); setFiltro("presupuestoMin", ""); setFiltro("presupuestoMax", ""); }}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background"
+              >
+                Limpiar avanzados
+              </button>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark"
+              >
+                Cerrar
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-5">
             <div>
-              <p className="text-sm font-semibold text-text-primary">Filtros</p>
-              <p className="text-xs text-text-secondary">Ajusta el listado sin perder la vista comercial.</p>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-secondary">Origen</label>
+              <FilterSelect
+                value={filtros.origen ?? ""}
+                onChange={(e) => setFiltro("origen", e.target.value || null)}
+              >
+                <option value="">Todos</option>
+                <option value="oficina">Oficina</option>
+                <option value="online">Online</option>
+              </FilterSelect>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-secondary">Presupuesto</label>
+              <FilterNumberRange
+                valueMin={presupuestoMinValue}
+                valueMax={presupuestoMaxValue}
+                onChangeMin={(v) => setFiltro("presupuestoMin", v)}
+                onChangeMax={(v) => setFiltro("presupuestoMax", v)}
+                placeholderMin="200.000 €"
+                placeholderMax="350.000 €"
+                invalid={invalidBudgetRange}
+                invalidMessage="El presupuesto minimo no puede ser mayor que el maximo."
+                labelMin=""
+                labelMax=""
+              />
             </div>
           </div>
-          {hasFilters && (
-            <button
-              onClick={resetFiltros}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-text-secondary transition-colors hover:border-danger/40 hover:bg-danger/5 hover:text-danger"
-            >
-              <Filter className="h-3.5 w-3.5" />
-              Limpiar filtros
-            </button>
-          )}
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <div className="flex min-w-0 flex-col gap-1">
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Tipo</label>
-            <input
-              type="text"
-              value={filtros.tipo ?? ""}
-              onChange={(e) => setFiltro("tipo", e.target.value || null)}
-              placeholder="Piso, Casa..."
-              className="input h-9 py-0 text-sm transition-colors hover:border-border-strong"
-            />
-          </div>
-          <div className="flex min-w-0 flex-col gap-1">
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Modalidad</label>
-            <select
-              value={filtros.modalidad ?? ""}
-              onChange={(e) => setFiltro("modalidad", e.target.value || null)}
-              className="input h-9 py-0 text-sm transition-colors hover:border-border-strong"
-            >
-              <option value="">Todas</option>
-              {MODALIDADES_PEDIDO.map((m) => <option key={m.value} value={m.value}>{m.label} - {m.title}</option>)}
-            </select>
-          </div>
-          <div className="flex min-w-0 flex-col gap-1">
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Origen</label>
-            <select
-              value={filtros.origen ?? ""}
-              onChange={(e) => setFiltro("origen", e.target.value || null)}
-              className="input h-9 py-0 text-sm transition-colors hover:border-border-strong"
-            >
-              <option value="">Todos</option>
-              <option value="oficina">Oficina</option>
-              <option value="online">Online</option>
-            </select>
-          </div>
-          <div className="flex min-w-0 flex-col gap-1">
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Desde</label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={presupuestoMinValue}
-              onChange={(e) => setFiltro("presupuestoMin", e.target.value)}
-              placeholder="200.000 €"
-              className={`input h-9 py-0 text-sm transition-colors hover:border-border-strong ${invalidBudgetRange ? "border-danger focus:border-danger" : ""}`}
-              aria-invalid={invalidBudgetRange}
-            />
-          </div>
-          <div className="flex min-w-0 flex-col gap-1">
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Hasta</label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={presupuestoMaxValue}
-              onChange={(e) => setFiltro("presupuestoMax", e.target.value)}
-              placeholder="350.000 €"
-              className={`input h-9 py-0 text-sm transition-colors hover:border-border-strong ${invalidBudgetRange ? "border-danger focus:border-danger" : ""}`}
-              aria-invalid={invalidBudgetRange}
-            />
-          </div>
-        </div>
-        {invalidBudgetRange && (
-          <p className="mt-2 text-xs font-medium text-danger">El presupuesto minimo no puede ser mayor que el maximo.</p>
-        )}
+        </FilterDrawer>
       </div>
 
       {/* Tabla */}
@@ -508,8 +652,19 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
           <table className="w-full min-w-[900px] text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-border bg-background/95 backdrop-blur">
+                <th className="w-10 px-3 py-3 text-center">
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    disabled={selectablePedidos.length === 0}
+                    className="text-text-secondary transition-colors hover:text-primary disabled:opacity-30"
+                    title={allSelected ? "Deseleccionar todos" : "Seleccionar todos con teléfono"}
+                  >
+                    {allSelected ? <CheckSquare className="h-4 w-4 text-primary" /> : <Square className="h-4 w-4" />}
+                  </button>
+                </th>
                 <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Cliente</th>
-                <th className="w-32 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Telefono</th>
+                <th className="w-40 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Telefono</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Tipo</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Zona</th>
                 <th className="w-24 px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Modal.</th>
@@ -523,8 +678,24 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map((pedido) => (
-                <tr key={pedido.id} onClick={() => openEdit(pedido)} className="group cursor-pointer transition-colors hover:bg-primary/5">
+              {filtered.map((pedido) => {
+                const isSelected = selectedIds.has(pedido.id);
+                const hasPhone   = !!pedido.telefono;
+                return (
+                <tr key={pedido.id} onClick={() => openEdit(pedido)} className={`group cursor-pointer transition-colors ${isSelected ? "bg-primary/5" : "hover:bg-primary/5"}`}>
+                  <td className="w-10 px-3 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                    {hasPhone ? (
+                      <button
+                        type="button"
+                        onClick={(e) => toggleSelect(pedido.id, e)}
+                        className="text-text-secondary transition-colors hover:text-primary"
+                      >
+                        {isSelected ? <CheckSquare className="h-4 w-4 text-primary" /> : <Square className="h-4 w-4" />}
+                      </button>
+                    ) : (
+                      <span className="block h-4 w-4" />
+                    )}
+                  </td>
                   <td className="px-5 py-4">
                     <div className="flex min-w-0 items-center gap-3">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background text-sm font-semibold text-primary ring-1 ring-border">
@@ -536,13 +707,27 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-text-secondary">
+                  <td className="px-4 py-4 text-text-secondary" onClick={(e) => e.stopPropagation()}>
                     {pedido.telefono ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Phone className="h-3.5 w-3.5" />
-                        {pedido.telefono}
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => openWaModal(pedido)}
+                          title={`WhatsApp a ${pedido.nombre_cliente}`}
+                          className="inline-flex items-center rounded-lg p-1 text-emerald-600 transition-colors hover:bg-emerald-500/10 dark:text-emerald-400"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </button>
+                        <a
+                          href={`tel:${pedido.telefono}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 transition-colors hover:bg-primary/10 hover:text-primary"
+                          title="Llamar"
+                        >
+                          <Phone className="h-3.5 w-3.5 shrink-0" />
+                          {pedido.telefono}
+                        </a>
                       </span>
-                    ) : "-"}
+                    ) : <span className="whitespace-nowrap">-</span>}
                   </td>
                   <td className="px-4 py-4 text-xs font-medium text-text-secondary">{pedido.tipo_propiedad ?? "-"}</td>
                   <td className="max-w-[150px] truncate px-4 py-4 text-xs text-text-secondary" title={pedido.zona_busqueda ?? ""}>
@@ -588,10 +773,43 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           </div>
+        </div>
+      )}
+
+      {/* ── Barra flotante de envío masivo ── */}
+      {(selectedIds.size > 0 || bulkSending) && (
+        <div className="fixed inset-x-0 bottom-6 z-50 mx-auto flex max-w-lg items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-5 py-3 shadow-xl">
+          {bulkSending && bulkProgress ? (
+            <div className="flex w-full flex-col gap-1.5">
+              <div className="flex items-center justify-between text-xs text-text-secondary">
+                <span className="flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" />Enviando {bulkProgress.done} de {bulkProgress.total}...</span>
+                <span className="font-semibold text-primary">{Math.round((bulkProgress.done / bulkProgress.total) * 100)}%</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
+                <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }} />
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-text-primary">{selectedIds.size} seleccionado{selectedIds.size !== 1 ? "s" : ""}</span>
+                <button type="button" onClick={() => setSelectedIds(new Set())} className="text-xs text-text-secondary hover:text-text-primary">Limpiar</button>
+              </div>
+              <button
+                type="button"
+                onClick={handleBulkSend}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-dark"
+              >
+                <Send className="h-4 w-4" />
+                Enviar WhatsApp a {selectedIds.size}
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -857,6 +1075,44 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
             ) : null;
           })()}
 
+          {/* Sección WhatsApp en el drawer */}
+          {editId !== null && (() => {
+            const pedido = pedidos.find((p) => p.id === editId);
+            if (!pedido) return null;
+            return (
+              <div className="border-t border-border pt-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4 text-emerald-600" />
+                    <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">WhatsApp</p>
+                  </div>
+                  {pedido.telefono && (
+                    <WhatsAppMessageModal
+                      phone={pedido.telefono}
+                      recipientName={pedido.nombre_cliente}
+                      initialMessage={buildWhatsAppMessage("cliente_solicitud", {
+                        nombre: pedido.nombre_cliente,
+                        agente: agenteActual,
+                        tipo: pedido.tipo_propiedad ?? undefined,
+                        zona: pedido.zona_busqueda ?? undefined,
+                      })}
+                      templateName="cliente_solicitud"
+                      relatedType="solicitud"
+                      relatedId={pedido.id}
+                      pedidoId={pedido.id}
+                      buttonLabel="Enviar WhatsApp"
+                      buttonVariant="default"
+                    />
+                  )}
+                </div>
+                {!pedido.telefono && (
+                  <p className="text-xs text-text-secondary">Sin teléfono — añade uno para activar WhatsApp.</p>
+                )}
+                <WhatsAppHistory pedidoId={pedido.id} />
+              </div>
+            );
+          })()}
+
           {saveError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{saveError}</p>}
         </div>
       </Drawer>
@@ -924,6 +1180,57 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
           }}
           onClose={() => setDocPedido(null)}
         />
+      )}
+
+      {/* Modal WhatsApp individual — renderizado en la raíz, fuera de cualquier overflow */}
+      {waModalPedido && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setWaModalPedido(null); }}
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-surface shadow-xl">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5 text-emerald-600" />
+                <h2 className="text-base font-semibold text-text-primary">Enviar WhatsApp</h2>
+              </div>
+              <button type="button" onClick={() => setWaModalPedido(null)} className="rounded-lg p-1.5 text-text-secondary hover:bg-surface-raised hover:text-text-primary">
+                <XIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="border-b border-border bg-background px-5 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Destinatario</p>
+              <p className="mt-0.5 font-semibold text-text-primary">{waModalPedido.nombre_cliente}</p>
+              <p className="text-xs text-text-secondary">{waModalPedido.telefono}</p>
+            </div>
+            <div className="p-5">
+              <textarea
+                value={waMessage}
+                onChange={(e) => setWaMessage(e.target.value)}
+                rows={5}
+                className="input w-full resize-y text-sm leading-6"
+              />
+              <p className="mt-1 text-right text-xs text-text-secondary">{waMessage.length} caracteres</p>
+            </div>
+            <div className="flex items-center justify-between border-t border-border px-5 py-3">
+              <p className="text-xs text-text-secondary">Se abrirá WhatsApp o se enviará automáticamente</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setWaModalPedido(null)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background">
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleWaSend}
+                  disabled={waSending || !waMessage.trim()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  <Send className="h-4 w-4" />
+                  {waSending ? "Enviando..." : "Enviar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       <Toaster toasts={toasts} />

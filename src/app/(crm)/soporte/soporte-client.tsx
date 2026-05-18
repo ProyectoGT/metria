@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LifeBuoy, Search, X, Filter, Plus, Pencil, Trash2,
+  LifeBuoy, Filter, Plus, Pencil, Trash2,
   Phone, Mail, User, ExternalLink, GitBranch, Database, Server,
   Archive, MessageSquare, Clock, AlertCircle, ChevronDown,
   LayoutList, Columns2, Bug, Lightbulb, HelpCircle, Headphones,
@@ -14,6 +14,11 @@ import { createClient } from "@/lib/supabase-browser";
 import { useToast, Toaster } from "@/components/ui/toast";
 import Drawer from "@/components/ui/drawer";
 import Avatar from "@/components/ui/avatar";
+import FilterBar from "@/components/ui/filters/FilterBar";
+import FilterSearch from "@/components/ui/filters/FilterSearch";
+import FilterSelect from "@/components/ui/filters/FilterSelect";
+import FilterToggle from "@/components/ui/filters/FilterToggle";
+import FilterDrawer from "@/components/ui/filters/FilterDrawer";
 import TicketDetailSidePanel from "@/modules/soporte/components/TicketDetailSidePanel";
 import type { UserRole } from "@/lib/roles";
 
@@ -164,6 +169,7 @@ export default function SoporteClient({
   const [filterUsuario, setFilterUsuario] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [smartFilter, setSmartFilter] = useState<string>("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Admin tabs
   const [adminTab, setAdminTab] = useState<"tickets" | "contactos" | "recursos">("tickets");
@@ -638,48 +644,73 @@ export default function SoporteClient({
               </div>
 
               {/* Filters + View toggle */}
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* Search */}
-                  <div className="relative w-48">
-                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-secondary" />
-                    <input type="text" value={searchText}
-                      onChange={(e) => setSearchText(e.target.value)}
-                      placeholder="Buscar tickets..." className="input h-9 pl-8 pr-8 text-xs" />
-                    {searchText && (
-                      <button onClick={() => setSearchText("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                  <select value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)} className="input h-9 w-auto text-xs">
-                    <option value="">Todos estados</option>
-                    {ESTADOS.filter((e) => e !== "archivado" || showArchived).map((e) => (
-                      <option key={e} value={e}>{ESTADO_LABELS[e]}</option>
-                    ))}
-                  </select>
-                  <select value={filterPrioridad} onChange={(e) => setFilterPrioridad(e.target.value)} className="input h-9 w-auto text-xs">
-                    <option value="">Toda prioridad</option>
-                    {Object.entries(PRIORIDAD_LABELS).map(([k, v]) => (<option key={k} value={k}>{v}</option>))}
-                  </select>
-                  <select value={filterTipo} onChange={(e) => setFilterTipo(e.target.value)} className="input h-9 w-auto text-xs">
-                    <option value="">Todo tipo</option>
-                    {tipos.map((t) => (<option key={t} value={t}>{t}</option>))}
-                  </select>
-                  <select value={filterUsuario} onChange={(e) => setFilterUsuario(e.target.value)} className="input h-9 w-auto text-xs">
-                    <option value="">Todos usuarios</option>
-                    {usuarios.map((u) => (<option key={u} value={u}>{u}</option>))}
-                  </select>
-                  <button onClick={() => setShowArchived(!showArchived)}
-                    className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors ${
-                      showArchived ? "border-primary bg-primary/10 text-primary" : "border-border text-text-secondary hover:text-text-primary"
-                    }`}
-                  >
-                    <Archive className="h-3.5 w-3.5" />
-                    Archivados
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
+              <FilterBar
+                searchSlot={
+                  <FilterSearch
+                    value={searchText}
+                    onChange={setSearchText}
+                    placeholder="Buscar tickets..."
+                    className="w-48"
+                  />
+                }
+                activeCount={(() => {
+                  let c = 0;
+                  if (searchText) c++;
+                  if (filterEstado) c++;
+                  if (filterPrioridad) c++;
+                  if (filterTipo) c++;
+                  if (filterUsuario) c++;
+                  if (showArchived) c++;
+                  return c;
+                })()}
+                onClear={() => {
+                  setSearchText("");
+                  setFilterEstado("");
+                  setFilterPrioridad("");
+                  setFilterTipo("");
+                  setFilterUsuario("");
+                  setShowArchived(false);
+                }}
+                onOpenAdvanced={() => setDrawerOpen(true)}
+                advancedCount={(() => {
+                  let c = 0;
+                  if (filterTipo) c++;
+                  if (filterUsuario) c++;
+                  if (showArchived) c++;
+                  return c;
+                })()}
+                chips={(() => {
+                  const c: { key: string; label: string; onRemove: () => void }[] = [];
+                  if (filterEstado) c.push({ key: "estado", label: `Estado: ${ESTADO_LABELS[filterEstado] ?? filterEstado}`, onRemove: () => setFilterEstado("") });
+                  if (filterPrioridad) c.push({ key: "prio", label: `Prioridad: ${PRIORIDAD_LABELS[filterPrioridad] ?? filterPrioridad}`, onRemove: () => setFilterPrioridad("") });
+                  if (filterTipo) c.push({ key: "tipo", label: `Tipo: ${filterTipo}`, onRemove: () => setFilterTipo("") });
+                  if (filterUsuario) c.push({ key: "user", label: `Usuario: ${filterUsuario}`, onRemove: () => setFilterUsuario("") });
+                  if (showArchived) c.push({ key: "arch", label: "Archivados", onRemove: () => setShowArchived(false) });
+                  return c;
+                })()}
+              >
+                <FilterSelect
+                  value={filterEstado}
+                  onChange={(e) => setFilterEstado(e.target.value)}
+                  label="Estado"
+                >
+                  <option value="">Todos estados</option>
+                  {ESTADOS.filter((e) => e !== "archivado" || showArchived).map((e) => (
+                    <option key={e} value={e}>{ESTADO_LABELS[e]}</option>
+                  ))}
+                </FilterSelect>
+
+                <FilterSelect
+                  value={filterPrioridad}
+                  onChange={(e) => setFilterPrioridad(e.target.value)}
+                  label="Prioridad"
+                >
+                  <option value="">Toda prioridad</option>
+                  {Object.entries(PRIORIDAD_LABELS).map(([k, v]) => (<option key={k} value={k}>{v}</option>))}
+                </FilterSelect>
+
+                {/* View toggle */}
+                <div className="ml-auto flex items-center gap-2">
                   <span className="text-xs text-text-secondary/60">{filteredTickets.length} ticket{filteredTickets.length !== 1 ? "s" : ""}</span>
                   <div className="flex gap-1 rounded-lg border border-border bg-background p-0.5">
                     <button onClick={() => setViewMode("list")}
@@ -694,7 +725,65 @@ export default function SoporteClient({
                     </button>
                   </div>
                 </div>
-              </div>
+              </FilterBar>
+
+              {/* Drawer advanced filters */}
+              <FilterDrawer
+                open={drawerOpen}
+                onClose={() => setDrawerOpen(false)}
+                title="Filtros avanzados"
+                footer={
+                  <div className="flex justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => { setFilterTipo(""); setFilterUsuario(""); setShowArchived(false); }}
+                      className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background"
+                    >
+                      Limpiar avanzados
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDrawerOpen(false)}
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                }
+              >
+                <div className="space-y-5">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-secondary">Tipo</label>
+                    <FilterSelect
+                      value={filterTipo}
+                      onChange={(e) => setFilterTipo(e.target.value)}
+                    >
+                      <option value="">Todo tipo</option>
+                      {tipos.map((t) => (<option key={t} value={t}>{t}</option>))}
+                    </FilterSelect>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-secondary">Usuario</label>
+                    <FilterSelect
+                      value={filterUsuario}
+                      onChange={(e) => setFilterUsuario(e.target.value)}
+                    >
+                      <option value="">Todos usuarios</option>
+                      {usuarios.map((u) => (<option key={u} value={u}>{u}</option>))}
+                    </FilterSelect>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-text-secondary">Estado</label>
+                    <FilterToggle
+                      label="Archivados"
+                      active={showArchived}
+                      onChange={setShowArchived}
+                    />
+                  </div>
+                </div>
+              </FilterDrawer>
 
               {/* Ticket list or Kanban */}
               {viewMode === "list" ? (

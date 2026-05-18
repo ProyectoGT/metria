@@ -330,6 +330,7 @@ export default function DashboardWorkspace(props: Props) {
   const [activeFilter, setActiveFilter] = useState<MetricKey | null>(null);
   const [openInsight, setOpenInsight] = useState<IntelligenceKey | null>(null);
   const [openDevelopment, setOpenDevelopment] = useState(false);
+
   const [layerVisibility, setLayerVisibility] = useState({
     zonas: true,
     noticias: true,

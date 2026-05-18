@@ -2,14 +2,14 @@
 
 // Módulo WhatsApp — Server Actions
 //
-// sendOrPrepareWhatsAppAction: envía vía Cloud API si hay credenciales,
-// si no registra como "prepared" y devuelve la URL de wa.me para que el
-// cliente abra WhatsApp manualmente. Sin cambios en el frontend.
+// sendOrPrepareWhatsAppAction: enruta al proveedor activo (manual, meta u openwa)
+// según WHATSAPP_PROVIDER. Si el envío automático falla, devuelve URL de wa.me
+// como fallback. Sin cambios en el contrato con el frontend.
 
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
-import { sendTextMessage, isApiEnabled } from "@/lib/whatsapp-api";
-import { formatPhoneForWhatsApp, buildWhatsAppUrl } from "@/lib/whatsapp";
+import { buildWhatsAppUrl } from "@/lib/whatsapp";
+import { getWhatsAppProvider } from "@/lib/whatsapp/provider-factory";
 
 export type SendWhatsAppParams = {
   phone: string;
@@ -26,7 +26,7 @@ export type SendWhatsAppResult =
   | { sent: true;  messageId: string }
   | { sent: false; fallbackUrl: string };
 
-// Acción principal: API si disponible, wa.me si no
+// Acción principal: enruta al proveedor activo (manual, meta, openwa)
 export async function sendOrPrepareWhatsAppAction(
   params: SendWhatsAppParams
 ): Promise<SendWhatsAppResult> {
@@ -35,59 +35,48 @@ export async function sendOrPrepareWhatsAppAction(
     return { sent: false, fallbackUrl: buildWhatsAppUrl(params.phone, params.messageBody) };
   }
 
-  const supabase = await createClient();
-  const normalizedPhone = formatPhoneForWhatsApp(params.phone) ?? params.phone.replace(/\D/g, "");
-
-  if (isApiEnabled()) {
-    // Intentar envío real
-    const result = await sendTextMessage({ to: normalizedPhone, body: params.messageBody });
-
-    if (result.ok) {
-      // Registrar como enviado
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from("whatsapp_messages").insert({
-        empresa_id:          yo.empresaId,
-        direction:           "outbound",
-        related_type:        params.relatedType,
-        related_id:          params.relatedId,
-        pedido_id:           params.pedidoId ?? null,
-        propiedad_id:        params.propiedadId ?? null,
-        phone:               normalizedPhone,
-        recipient_name:      params.recipientName,
-        message_body:        params.messageBody,
-        template_name:       params.templateName ?? null,
-        status:              "sent",
-        sent_by_user_id:     yo.id,
-        sent_at:             new Date().toISOString(),
-        provider_message_id: result.messageId,
-      });
-      return { sent: true, messageId: result.messageId };
-    }
-    // Si falla la API, caer a wa.me
-  }
-
-  // Modo manual: registrar como "prepared" y devolver URL para abrir WhatsApp
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase as any).from("whatsapp_messages").insert({
-    empresa_id:      yo.empresaId,
-    direction:       "outbound",
-    related_type:    params.relatedType,
-    related_id:      params.relatedId,
-    pedido_id:       params.pedidoId ?? null,
-    propiedad_id:    params.propiedadId ?? null,
-    phone:           normalizedPhone,
-    recipient_name:  params.recipientName,
-    message_body:    params.messageBody,
-    template_name:   params.templateName ?? null,
-    status:          "prepared",
-    sent_by_user_id: yo.id,
-    sent_at:         new Date().toISOString(),
+  const provider = getWhatsAppProvider();
+  const providerResult = await provider.sendTextMessage({
+    to:           params.phone,
+    text:         params.messageBody,
+    recipientName: params.recipientName,
+    pedidoId:     params.pedidoId,
+    propiedadId:  params.propiedadId,
+    relatedType:  params.relatedType,
+    relatedId:    params.relatedId,
+    templateName: params.templateName,
   });
 
-  return {
-    sent: false,
-    fallbackUrl: buildWhatsAppUrl(params.phone, params.messageBody),
-  };
+  // El proveedor manual devuelve success:true pero no envía — se guarda como "prepared"
+  const isActuallySent = providerResult.success && provider.name !== "manual";
+  const dbStatus = isActuallySent ? "sent" : (providerResult.success ? "prepared" : "failed");
+
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase as any).from("whatsapp_messages").insert({
+    empresa_id:          yo.empresaId,
+    direction:           "outbound",
+    related_type:        params.relatedType,
+    related_id:          params.relatedId,
+    pedido_id:           params.pedidoId ?? null,
+    propiedad_id:        params.propiedadId ?? null,
+    phone:               params.phone,
+    recipient_name:      params.recipientName,
+    message_body:        params.messageBody,
+    template_name:       params.templateName ?? null,
+    status:              dbStatus,
+    sent_by_user_id:     yo.id,
+    sent_at:             new Date().toISOString(),
+    provider_message_id: providerResult.externalMessageId ?? null,
+  });
+
+  if (isActuallySent) {
+    return { sent: true, messageId: providerResult.messageId ?? providerResult.externalMessageId ?? "" };
+  }
+
+  const fallbackUrl =
+    providerResult.fallbackUrl ?? buildWhatsAppUrl(params.phone, params.messageBody);
+  return { sent: false, fallbackUrl };
 }
 
 // Alias para compatibilidad con código existente

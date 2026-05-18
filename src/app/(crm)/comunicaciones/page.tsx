@@ -3,7 +3,7 @@ import { requirePageAccess } from "@/lib/access-control/route-guard";
 import PageHeader from "@/components/layout/page-header";
 import ComunicacionesClient from "./comunicaciones-client";
 import { getComunicacionesMetricsAction } from "@/app/(crm)/whatsapp/actions";
-import { isApiEnabled } from "@/lib/whatsapp-api";
+import { getWhatsAppProviderInfo } from "@/lib/whatsapp/provider-factory";
 
 export default async function ComunicacionesPage() {
   const yo = await requirePageAccess("comunicaciones");
@@ -24,7 +24,8 @@ export default async function ComunicacionesPage() {
   }
 
   const metrics = await getComunicacionesMetricsAction();
-  const apiEnabled = isApiEnabled();
+  const providerInfo = getWhatsAppProviderInfo();
+  const apiEnabled = providerInfo.isAutomatic;
 
   return (
     <>
