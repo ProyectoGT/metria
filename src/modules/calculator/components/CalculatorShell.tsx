@@ -1,8 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import Button from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import CalculatorActions from "./CalculatorActions";
 import type { CalculatorType } from "../types";
 
@@ -25,23 +24,27 @@ export default function CalculatorShell({
 }: CalculatorShellProps) {
   return (
     <div className="space-y-4">
-      <div className="rounded-ds-lg border border-border bg-surface p-5 shadow-layer-1">
-        <div className="flex min-w-0 items-start gap-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<ArrowLeft className="h-4 w-4" />}
-            onClick={onBack}
-          >
-            Volver a calculadoras
-          </Button>
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
-            <p className="mt-1 text-sm text-text-secondary">{description}</p>
-          </div>
-        </div>
+      {/* Breadcrumb sutil */}
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1 text-xs font-medium text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none"
+          aria-label="Volver a la lista de calculadoras"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Calculadoras
+        </button>
+        <ChevronRight className="h-3 w-3 text-border-strong" />
+        <span className="text-xs font-medium text-text-primary">{title}</span>
       </div>
+
+      {description && (
+        <p className="-mt-2 text-sm text-text-secondary">{description}</p>
+      )}
+
       {children}
+
       <CalculatorActions
         summary={summary}
         calculatorType={calculatorType}

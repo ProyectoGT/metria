@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Button from "@/components/ui/button";
 import type { CalculatorScreenProps } from "../../types";
 import { calculateCommission, type CommissionMode } from "../../formulas/commission";
 import { clamp, isValidNumberInput, parseNumberInput } from "../../formulas/number";
-import NumericSliderField from "../../components/NumericSliderField";
-import { ResultRow, ResultSummary } from "../../components/ResultSummary";
+import { CalcSection } from "../../components/CalcSection";
+import { CalcSliderInput } from "../../components/CalcSliderInput";
+import { CalcHeroResult } from "../../components/CalcHeroResult";
+import { CalcMetricTile } from "../../components/CalcMetricTile";
 import { formatCurrency } from "../../components/format";
+import { AdvisoryNote } from "../../components/ResultSummary";
 
 const COMMISSION_OPTIONS = [3, 4, 5, 6, 8, 10];
 const DEFAULT_AMOUNT = 300000;
@@ -34,9 +36,9 @@ export default function SimpleCommissionCalculator({ onSummaryChange }: Calculat
     setAmount(clamp(nextAmount, 0, MAX_AMOUNT));
   }
 
-  function handleCommissionChange(nextCommissionPercent: number) {
-    setCommissionPercent(clamp(nextCommissionPercent, 0, 99.99));
-    setCommissionText(String(nextCommissionPercent).replace(".", ","));
+  function handleCommissionChange(nextPct: number) {
+    setCommissionPercent(clamp(nextPct, 0, 99.99));
+    setCommissionText(String(nextPct).replace(".", ","));
     setCommissionError(false);
   }
 
@@ -56,105 +58,134 @@ export default function SimpleCommissionCalculator({ onSummaryChange }: Calculat
     if (clamped !== commissionPercent) setCommissionPercent(clamped);
   }
 
-  function handleCommissionBlur() {
-    setCommissionText(String(commissionPercent).replace(".", ","));
-    setCommissionError(false);
-  }
-
-  function handleVatToggle() {
-    setIncludeVat((current) => !current);
-  }
-
   useEffect(() => {
     onSummaryChange?.([
-      "Simulación de comisión",
-      mode === "base_to_final" ? `Base vendedor: ${formatCurrency(amount)}` : `Precio final: ${formatCurrency(amount)}`,
-      `Comisión: ${commissionPercent.toLocaleString("es-ES")}%`,
-      `IVA comisión: ${includeVat ? "Sí" : "No"}`,
-      `Comisión agencia: ${formatCurrency(result.commission)}`,
+      "Simulacion de comision",
+      mode === "base_to_final"
+        ? `Base vendedor: ${formatCurrency(amount)}`
+        : `Precio final: ${formatCurrency(amount)}`,
+      `Comision: ${commissionPercent.toLocaleString("es-ES")}%`,
+      `IVA comision: ${includeVat ? "Si" : "No"}`,
+      `Comision agencia: ${formatCurrency(result.commission)}`,
       `IVA: ${formatCurrency(result.commissionVat)}`,
       `Precio comprador: ${formatCurrency(result.buyerPrice)}`,
       `Neto vendedor: ${formatCurrency(result.netSeller)}`,
     ].join("\n"));
   }, [amount, commissionPercent, includeVat, mode, onSummaryChange, result]);
 
+  const heroLabel = mode === "base_to_final" ? "Precio al comprador" : "Neto para el vendedor";
+  const heroValue = mode === "base_to_final" ? result.buyerPrice : result.netSeller;
+  const secondLabel = mode === "base_to_final" ? "Neto vendedor" : "Precio comprador";
+  const secondValue = mode === "base_to_final" ? result.netSeller : result.buyerPrice;
+
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <div className="space-y-4 rounded-ds-lg border border-border bg-surface p-5 shadow-layer-1">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
+      {/* Panel de resultado — mobile first */}
+      <div className="order-first flex flex-col gap-3 lg:order-last lg:sticky lg:top-4 lg:self-start">
+        <CalcHeroResult
+          label={heroLabel}
+          value={formatCurrency(heroValue)}
+          status="neutral"
+          secondaryLabel={secondLabel}
+          secondaryValue={formatCurrency(secondValue)}
+          helpText={`Comision del ${commissionPercent.toLocaleString("es-ES")}%${includeVat ? " + IVA 21%" : ""} sobre el precio final`}
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <CalcMetricTile label="Comision agencia" value={formatCurrency(result.commission)} />
+          {includeVat && <CalcMetricTile label="IVA sobre comision" value={formatCurrency(result.commissionVat)} />}
+          {includeVat && <CalcMetricTile label="Precio sin IVA" value={formatCurrency(result.priceWithoutVat)} />}
+          <CalcMetricTile label="Verificacion" value={result.verification} />
+        </div>
+      </div>
+
+      {/* Panel de inputs */}
+      <div className="flex flex-col gap-4">
+        {/* Modo de calculo */}
         <div>
-          <p className="text-sm font-semibold text-text-primary">Modo de cálculo</p>
-          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-text-secondary">
+            Modo de calculo
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <button
               type="button"
               onClick={() => handleModeChange("base_to_final")}
-              className={`rounded-ds-md border px-4 py-3 text-sm font-semibold transition-colors ${mode === "base_to_final" ? "border-primary bg-primary-soft text-primary" : "border-border bg-surface-elevated text-text-secondary hover:text-text-primary"}`}
+              className={`rounded-ds-md border px-4 py-3 text-sm font-semibold transition-colors ${mode === "base_to_final" ? "border-primary bg-primary-soft text-primary" : "border-border bg-surface text-text-secondary hover:text-text-primary"}`}
             >
               Base vendedor → precio final
             </button>
             <button
               type="button"
               onClick={() => handleModeChange("final_to_net")}
-              className={`rounded-ds-md border px-4 py-3 text-sm font-semibold transition-colors ${mode === "final_to_net" ? "border-primary bg-primary-soft text-primary" : "border-border bg-surface-elevated text-text-secondary hover:text-text-primary"}`}
+              className={`rounded-ds-md border px-4 py-3 text-sm font-semibold transition-colors ${mode === "final_to_net" ? "border-primary bg-primary-soft text-primary" : "border-border bg-surface text-text-secondary hover:text-text-primary"}`}
             >
               Precio final → neto vendedor
             </button>
           </div>
         </div>
 
-        <NumericSliderField
-          label={mode === "base_to_final" ? "Precio acordado con vendedor" : "Precio final comprador"}
-          value={amount}
-          min={0}
-          max={MAX_AMOUNT}
-          step={1000}
-          prefix="€"
-          onChange={handleAmountChange}
-        />
+        <CalcSection label="El precio">
+          <CalcSliderInput
+            label={mode === "base_to_final" ? "Precio acordado con vendedor" : "Precio final al comprador"}
+            value={amount}
+            min={0}
+            max={MAX_AMOUNT}
+            step={1000}
+            prefix="€"
+            onChange={handleAmountChange}
+          />
+        </CalcSection>
 
-        <div className="rounded-ds-md border border-border bg-surface-elevated p-4 shadow-layer-1">
-          <p className="text-sm font-semibold text-text-primary">Comisión</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {COMMISSION_OPTIONS.map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => handleCommissionChange(option)}
-                className={`rounded-ds-sm border px-3 py-2 text-sm font-semibold transition-colors ${commissionPercent === option ? "border-primary bg-primary text-white" : "border-border bg-surface text-text-secondary hover:text-text-primary"}`}
+        <CalcSection label="Comision">
+          <div>
+            <p className="mb-2 text-sm text-text-secondary">Porcentaje de comision</p>
+            <div className="flex flex-wrap gap-2">
+              {COMMISSION_OPTIONS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => handleCommissionChange(option)}
+                  className={`rounded-ds-sm border px-3 py-2 text-sm font-semibold transition-colors ${commissionPercent === option ? "border-primary bg-primary text-white" : "border-border bg-surface text-text-secondary hover:text-text-primary"}`}
+                >
+                  {option}%
+                </button>
+              ))}
+              <div
+                className={`flex h-10 w-28 items-center rounded-ds-sm border bg-background px-3 ${commissionError ? "border-danger" : "border-border"}`}
               >
-                {option}%
-              </button>
-            ))}
-            <div className={`flex h-10 w-28 items-center rounded-ds-sm border bg-surface px-3 ${commissionError ? "border-danger" : "border-border"}`}>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={commissionText}
-                onChange={(event) => handleManualCommissionChange(event.target.value)}
-                onBlur={handleCommissionBlur}
-                className="w-full bg-transparent text-right text-sm font-semibold text-text-primary outline-none"
-              />
-              <span className="ml-1 text-sm text-text-secondary">%</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={commissionText}
+                  onChange={(e) => handleManualCommissionChange(e.target.value)}
+                  onBlur={() => {
+                    setCommissionText(String(commissionPercent).replace(".", ","));
+                    setCommissionError(false);
+                  }}
+                  className="w-full bg-transparent text-right text-sm font-semibold text-text-primary outline-none"
+                />
+                <span className="ml-1 text-sm text-text-secondary">%</span>
+              </div>
             </div>
+            {commissionError && (
+              <p className="mt-1 text-xs text-danger">La comision debe estar entre 0% y 99,99%.</p>
+            )}
           </div>
-        </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-secondary">IVA sobre la comision (21%)</span>
+            <button
+              type="button"
+              onClick={() => setIncludeVat((v) => !v)}
+              className={`rounded-ds-sm border px-3 py-1.5 text-sm font-semibold transition-colors ${includeVat ? "border-primary bg-primary-soft text-primary" : "border-border bg-surface text-text-secondary hover:text-text-primary"}`}
+            >
+              {includeVat ? "Activado" : "Desactivado"}
+            </button>
+          </div>
+        </CalcSection>
 
-        <Button
-          type="button"
-          variant={includeVat ? "primary" : "secondary"}
-          onClick={handleVatToggle}
-        >
-          {includeVat ? "IVA 21% activado" : "Añadir IVA 21% sobre comisión"}
-        </Button>
+        <AdvisoryNote>
+          La comision se calcula sobre el precio final. Si activas el IVA, se suma el 21% solo sobre la comision.
+        </AdvisoryNote>
       </div>
-
-      <ResultSummary title="Resultado rápido">
-        <ResultRow label="Precio comprador" value={formatCurrency(result.buyerPrice)} highlight />
-        <ResultRow label="Neto vendedor" value={formatCurrency(result.netSeller)} highlight />
-        {includeVat && <ResultRow label="Precio sin IVA" value={formatCurrency(result.priceWithoutVat)} />}
-        <ResultRow label="Comisión agencia" value={formatCurrency(result.commission)} />
-        {includeVat && <ResultRow label="IVA sobre comisión" value={formatCurrency(result.commissionVat)} />}
-        <ResultRow label="Verificación" value={result.verification} />
-      </ResultSummary>
     </div>
   );
 }

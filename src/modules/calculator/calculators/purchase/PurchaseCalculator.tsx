@@ -3,10 +3,12 @@
 import { useEffect } from "react";
 import { useForm, useWatch, type FieldPath, type FieldPathValue } from "react-hook-form";
 import FormField from "../../components/FormField";
-import NumericSliderField from "../../components/NumericSliderField";
-import { AdvisoryNote, ResultRow, ResultSummary } from "../../components/ResultSummary";
+import { CalcSection } from "../../components/CalcSection";
+import { CalcSliderInput } from "../../components/CalcSliderInput";
+import { CalcHeroResult, type CalcStatus } from "../../components/CalcHeroResult";
+import { CalcMetricTile } from "../../components/CalcMetricTile";
+import { AdvisoryNote } from "../../components/ResultSummary";
 import { formatCurrency, formatPercent } from "../../components/format";
-import { ViabilityBadge } from "../../components/ViabilityBadge";
 import { calculateHomePurchase } from "../../formulas/purchase";
 import { purchaseSchema, type PurchaseFormValues } from "../../schemas/purchase.schema";
 import { calculatorResolver } from "../../schemas/resolver";
@@ -16,7 +18,7 @@ const DEFAULTS: PurchaseFormValues = {
   price: 300000,
   savings: 95000,
   propertyKind: "used",
-  autonomousCommunity: "Cataluña",
+  autonomousCommunity: "Cataluna",
   financingPercent: 80,
   annualInterestRate: 3.5,
   years: 30,
@@ -26,6 +28,18 @@ const DEFAULTS: PurchaseFormValues = {
   firstHome: false,
   buyerAge: 40,
 };
+
+function viabilityToStatus(v: string): CalcStatus {
+  if (v === "viable") return "success";
+  if (v === "tight") return "warning";
+  return "danger";
+}
+
+function viabilityLabel(v: string): string {
+  if (v === "viable") return "Viable";
+  if (v === "tight") return "Ajustada";
+  return "No viable";
+}
 
 export default function PurchaseCalculator({ onSummaryChange }: CalculatorScreenProps) {
   const { control, setValue, formState: { errors } } = useForm<PurchaseFormValues>({
@@ -38,13 +52,15 @@ export default function PurchaseCalculator({ onSummaryChange }: CalculatorScreen
   const result = calculateHomePurchase(input);
   const paymentMode = input.paymentMode;
   const showMortgageFields = paymentMode !== "cash";
-  const setCurrentValue = <K extends FieldPath<PurchaseFormValues>>(name: K, value: FieldPathValue<PurchaseFormValues, K>) => {
-    setValue(name, value, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
-  };
+
+  const setCurrentValue = <K extends FieldPath<PurchaseFormValues>>(
+    name: K,
+    value: FieldPathValue<PurchaseFormValues, K>,
+  ) => setValue(name, value, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
 
   useEffect(() => {
     onSummaryChange?.([
-      "Simulación de compra",
+      "Simulacion de compra",
       `Modalidad: ${paymentMode === "cash" ? "Contado" : paymentMode === "mixed" ? "Mixto" : "Hipoteca"}`,
       `Precio vivienda: ${formatCurrency(input.price)}`,
       `Ahorros: ${formatCurrency(input.savings)}`,
@@ -68,78 +84,131 @@ export default function PurchaseCalculator({ onSummaryChange }: CalculatorScreen
     result.viability,
   ]);
 
+  const status = viabilityToStatus(result.viability);
+  const heroLabel = showMortgageFields ? "Cuota mensual estimada" : "Dinero total necesario";
+  const heroValue = showMortgageFields
+    ? formatCurrency(result.monthlyPayment)
+    : formatCurrency(result.totalNeeded);
+
+  const debtRatioPct = result.debtRatio > 0
+    ? Math.min((result.debtRatio / 50) * 100, 100)
+    : undefined;
+
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <div className="space-y-4 rounded-ds-lg border border-border bg-surface p-5 shadow-layer-1">
-        <NumericSliderField
-          label="Precio vivienda"
-          value={input.price}
-          min={0}
-          max={1000000}
-          step={1000}
-          prefix="€"
-          onChange={(value) => setCurrentValue("price", value)}
-          helperText={errors.price?.message}
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
+      {/* Panel de resultado — mobile first */}
+      <div className="order-first flex flex-col gap-3 lg:order-last lg:sticky lg:top-4 lg:self-start">
+        <CalcHeroResult
+          label={heroLabel}
+          value={heroValue}
+          status={status}
+          statusLabel={viabilityLabel(result.viability)}
+          secondaryLabel={showMortgageFields ? "Ratio de endeudamiento" : undefined}
+          secondaryValue={result.debtRatio > 0 ? formatPercent(result.debtRatio) : undefined}
+          progressValue={debtRatioPct}
+          helpText={result.summary}
         />
-        <NumericSliderField
-          label="Ahorros disponibles"
-          value={input.savings}
-          min={0}
-          max={500000}
-          step={1000}
-          prefix="€"
-          onChange={(value) => setCurrentValue("savings", value)}
-          helperText={errors.savings?.message}
-        />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <FormField label="Tipo vivienda">
-            <select className="input" value={input.propertyKind} onChange={(event) => setCurrentValue("propertyKind", event.target.value as PurchaseFormValues["propertyKind"])}>
-              <option value="used">Segunda mano</option>
-              <option value="new">Nueva</option>
-            </select>
-          </FormField>
-          <FormField label="Modalidad de pago">
-            <select className="input" value={paymentMode} onChange={(event) => setCurrentValue("paymentMode", event.target.value as PurchaseFormValues["paymentMode"])}>
-              <option value="mortgage">Hipoteca</option>
-              <option value="cash">Contado</option>
-              <option value="mixed">Mixto</option>
-            </select>
-          </FormField>
+        <div className="grid grid-cols-2 gap-2">
+          <CalcMetricTile label="Entrada necesaria" value={formatCurrency(result.requiredDownPayment)} />
+          <CalcMetricTile label="Gastos estimados" value={formatCurrency(result.purchaseCosts)} />
+          {result.mortgagePrincipal > 0 && (
+            <CalcMetricTile label="Hipoteca estimada" value={formatCurrency(result.mortgagePrincipal)} />
+          )}
+          <CalcMetricTile label="Ahorro restante" value={formatCurrency(result.remainingSavings)} highlight={result.remainingSavings < 0} />
+          <CalcMetricTile label="Precio max. recomendado" value={formatCurrency(result.maxRecommendedPrice)} />
+          <CalcMetricTile label="Total necesario" value={formatCurrency(result.totalNeeded)} highlight />
         </div>
+      </div>
+
+      {/* Panel de inputs */}
+      <div className="flex flex-col gap-4">
+        <CalcSection label="La vivienda">
+          <CalcSliderInput
+            label="Precio de la vivienda"
+            value={input.price}
+            min={0}
+            max={1000000}
+            step={1000}
+            prefix="€"
+            onChange={(value) => setCurrentValue("price", value)}
+            error={errors.price?.message}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Tipo de vivienda">
+              <select
+                className="input"
+                value={input.propertyKind}
+                onChange={(e) => setCurrentValue("propertyKind", e.target.value as PurchaseFormValues["propertyKind"])}
+              >
+                <option value="used">Segunda mano</option>
+                <option value="new">Nueva</option>
+              </select>
+            </FormField>
+            <FormField label="Modalidad de pago">
+              <select
+                className="input"
+                value={paymentMode}
+                onChange={(e) => setCurrentValue("paymentMode", e.target.value as PurchaseFormValues["paymentMode"])}
+              >
+                <option value="mortgage">Hipoteca</option>
+                <option value="cash">Contado</option>
+                <option value="mixed">Mixto</option>
+              </select>
+            </FormField>
+          </div>
+        </CalcSection>
+
+        <CalcSection label="Los ahorros">
+          <CalcSliderInput
+            label="Ahorros disponibles"
+            value={input.savings}
+            min={0}
+            max={500000}
+            step={1000}
+            prefix="€"
+            onChange={(value) => setCurrentValue("savings", value)}
+            error={errors.savings?.message}
+          />
+        </CalcSection>
 
         {showMortgageFields && (
-          <>
-            <NumericSliderField
-              label={paymentMode === "mixed" ? "Parte financiada" : "Financiación"}
+          <CalcSection label="La financiacion">
+            <CalcSliderInput
+              label={paymentMode === "mixed" ? "Parte financiada" : "Financiacion"}
               value={input.financingPercent}
               min={0}
               max={100}
               step={1}
               unit="%"
               onChange={(value) => setCurrentValue("financingPercent", value)}
-              helperText={errors.financingPercent?.message}
+              error={errors.financingPercent?.message}
             />
-            <NumericSliderField
-              label="Tipo interés"
+            <CalcSliderInput
+              label="Tipo de interes nominal"
               value={input.annualInterestRate}
               min={0}
               max={10}
               step={0.1}
               unit="%"
               onChange={(value) => setCurrentValue("annualInterestRate", value)}
-              helperText={errors.annualInterestRate?.message}
+              error={errors.annualInterestRate?.message}
             />
-            <NumericSliderField
+            <CalcSliderInput
               label="Plazo"
               value={input.years}
               min={5}
               max={40}
               step={1}
-              unit="años"
+              unit="anos"
               onChange={(value) => setCurrentValue("years", value)}
-              helperText={errors.years?.message}
+              error={errors.years?.message}
             />
-            <NumericSliderField
+          </CalcSection>
+        )}
+
+        {showMortgageFields && (
+          <CalcSection label="Tu situacion">
+            <CalcSliderInput
               label="Ingresos netos mensuales"
               value={input.monthlyIncome}
               min={0}
@@ -147,9 +216,9 @@ export default function PurchaseCalculator({ onSummaryChange }: CalculatorScreen
               step={100}
               prefix="€"
               onChange={(value) => setCurrentValue("monthlyIncome", value)}
-              helperText={errors.monthlyIncome?.message}
+              error={errors.monthlyIncome?.message}
             />
-            <NumericSliderField
+            <CalcSliderInput
               label="Otras deudas mensuales"
               value={input.monthlyDebt}
               min={0}
@@ -157,34 +226,15 @@ export default function PurchaseCalculator({ onSummaryChange }: CalculatorScreen
               step={50}
               prefix="€"
               onChange={(value) => setCurrentValue("monthlyDebt", value)}
-              helperText={errors.monthlyDebt?.message}
+              error={errors.monthlyDebt?.message}
             />
-          </>
+          </CalcSection>
         )}
 
-        <AdvisoryNote>Los gastos e impuestos son orientativos. Las bonificaciones avanzadas quedan preparadas para una fase posterior.</AdvisoryNote>
+        <AdvisoryNote>
+          Los gastos e impuestos son orientativos. Las bonificaciones avanzadas quedan preparadas para una fase posterior.
+        </AdvisoryNote>
       </div>
-
-      <PurchaseResults result={result} />
     </div>
-  );
-}
-
-function PurchaseResults({ result }: { result: ReturnType<typeof calculateHomePurchase> }) {
-  return (
-    <ResultSummary title="Resumen de compra" footer={<p className="text-sm leading-relaxed text-text-secondary">{result.summary}</p>}>
-      <div className="flex items-center justify-between rounded-ds-md bg-surface-muted px-4 py-3">
-        <span className="text-sm font-semibold text-text-primary">Viabilidad</span>
-        <ViabilityBadge status={result.viability} />
-      </div>
-      <ResultRow label="Entrada necesaria" value={formatCurrency(result.requiredDownPayment)} />
-      <ResultRow label="Gastos aproximados" value={formatCurrency(result.purchaseCosts)} />
-      {result.mortgagePrincipal > 0 && <ResultRow label="Hipoteca necesaria" value={formatCurrency(result.mortgagePrincipal)} />}
-      {result.monthlyPayment > 0 && <ResultRow label="Cuota estimada" value={formatCurrency(result.monthlyPayment)} highlight />}
-      {result.debtRatio > 0 && <ResultRow label="Ratio endeudamiento" value={formatPercent(result.debtRatio)} />}
-      <ResultRow label="Dinero total necesario" value={formatCurrency(result.totalNeeded)} highlight />
-      <ResultRow label="Ahorro restante" value={formatCurrency(result.remainingSavings)} />
-      <ResultRow label="Precio máximo recomendado" value={formatCurrency(result.maxRecommendedPrice)} />
-    </ResultSummary>
   );
 }

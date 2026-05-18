@@ -4,8 +4,11 @@ import { useEffect, useMemo } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import CompactNumberField from "../../components/CompactNumberField";
 import FormField from "../../components/FormField";
-import NumericSliderField from "../../components/NumericSliderField";
-import { AdvisoryNote, ResultRow, ResultSummary } from "../../components/ResultSummary";
+import { CalcSection } from "../../components/CalcSection";
+import { CalcSliderInput } from "../../components/CalcSliderInput";
+import { CalcHeroResult } from "../../components/CalcHeroResult";
+import { CalcMetricTile } from "../../components/CalcMetricTile";
+import { AdvisoryNote } from "../../components/ResultSummary";
 import { formatCurrency } from "../../components/format";
 import { calculatePlusvaliaEstimate } from "../../formulas/plusvalia";
 import { plusvaliaSchema, type PlusvaliaFormValues } from "../../schemas/plusvalia.schema";
@@ -38,58 +41,177 @@ export default function PlusvaliaCalculator({ onSummaryChange }: CalculatorScree
 
   useEffect(() => {
     onSummaryChange?.([
-      "Simulación de plusvalía municipal",
+      "Simulacion de plusvalia municipal",
       `Municipio: ${values.municipality ?? "-"}`,
       `Precio compra: ${formatCurrency(values.purchasePrice ?? 0)}`,
       `Precio venta: ${formatCurrency(values.salePrice ?? 0)}`,
-      `Método recomendado: ${result.recommendedMethod === "real" ? "Real" : "Objetivo"}`,
-      `Estimación: ${formatCurrency(result.estimatedAmount)}`,
+      `Metodo recomendado: ${result.recommendedMethod === "real" ? "Real" : "Objetivo"}`,
+      `Estimacion: ${formatCurrency(result.estimatedAmount)}`,
     ].join("\n"));
-  }, [onSummaryChange, result.estimatedAmount, result.recommendedMethod, values.municipality, values.purchasePrice, values.salePrice]);
+  }, [
+    onSummaryChange,
+    result.estimatedAmount,
+    result.recommendedMethod,
+    values.municipality,
+    values.purchasePrice,
+    values.salePrice,
+  ]);
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <div className="space-y-4 rounded-ds-lg border border-border bg-surface p-5 shadow-layer-1">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <FormField label="Modo">
-            <select className="input" value={values.mode ?? DEFAULTS.mode} onChange={(event) => setValue("mode", event.target.value as PlusvaliaFormValues["mode"], { shouldValidate: true })}>
-              <option value="simple">Simple</option>
-              <option value="advanced">Avanzado</option>
-            </select>
-          </FormField>
-          <FormField label="Municipio">
-            <input className="input" value={values.municipality ?? DEFAULTS.municipality} onChange={(event) => setValue("municipality", event.target.value, { shouldValidate: true })} />
-          </FormField>
-          <FormField label="Fecha compra">
-            <input className="input" type="date" value={values.purchaseDate ?? DEFAULTS.purchaseDate} onChange={(event) => setValue("purchaseDate", event.target.value, { shouldValidate: true })} />
-          </FormField>
-          <FormField label="Fecha venta" error={errors.saleDate?.message}>
-            <input className="input" type="date" value={values.saleDate ?? DEFAULTS.saleDate} onChange={(event) => setValue("saleDate", event.target.value, { shouldValidate: true })} />
-          </FormField>
-        </div>
-        <NumericSliderField label="Valor catastral suelo" value={values.landCadastralValue ?? DEFAULTS.landCadastralValue} min={0} max={500000} step={1000} prefix="€" onChange={(value) => setValue("landCadastralValue", value, { shouldValidate: true })} />
-        <NumericSliderField label="Precio compra" value={values.purchasePrice ?? DEFAULTS.purchasePrice} min={0} max={1500000} step={1000} prefix="€" onChange={(value) => setValue("purchasePrice", value, { shouldValidate: true })} />
-        <NumericSliderField label="Precio venta" value={values.salePrice ?? DEFAULTS.salePrice} min={0} max={1500000} step={1000} prefix="€" onChange={(value) => setValue("salePrice", value, { shouldValidate: true })} />
-        {advanced && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <CompactNumberField label="Coeficiente municipal" value={values.municipalCoefficient ?? DEFAULTS.municipalCoefficient} step={0.01} onChange={(value) => setValue("municipalCoefficient", value, { shouldValidate: true })} />
-            <CompactNumberField label="Porcentaje suelo" hint="%" value={values.landPercentage ?? DEFAULTS.landPercentage} onChange={(value) => setValue("landPercentage", value, { shouldValidate: true })} />
-            <CompactNumberField label="Tipo gravamen" hint="%" value={values.taxRate ?? DEFAULTS.taxRate} onChange={(value) => setValue("taxRate", value, { shouldValidate: true })} />
-            <CompactNumberField label="Bonificación" hint="%" value={values.bonusPercent ?? DEFAULTS.bonusPercent} onChange={(value) => setValue("bonusPercent", value, { shouldValidate: true })} />
-          </div>
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
+      {/* Panel de resultado — mobile first */}
+      <div className="order-first flex flex-col gap-3 lg:order-last lg:sticky lg:top-4 lg:self-start">
+        <CalcHeroResult
+          label="Estimacion de plusvalia municipal"
+          value={formatCurrency(result.estimatedAmount)}
+          status="neutral"
+          secondaryLabel="Metodo recomendado"
+          secondaryValue={result.recommendedMethod === "real" ? "Metodo real" : "Metodo objetivo"}
+          helpText={
+            result.isValidDateRange
+              ? `Tenencia de ${result.yearsHeld} ${result.yearsHeld === 1 ? "ano" : "anos"}.`
+              : undefined
+          }
+        />
+        {!result.isValidDateRange && (
+          <p className="rounded-ds-md bg-danger-soft px-4 py-3 text-xs font-medium text-danger">
+            La fecha de venta debe ser posterior a la de compra.
+          </p>
         )}
-        <AdvisoryNote>Cálculo orientativo. La cuota definitiva depende de ordenanzas municipales y revisión profesional.</AdvisoryNote>
+        <div className="grid grid-cols-2 gap-2">
+          <CalcMetricTile label="Metodo objetivo" value={formatCurrency(result.objectiveEstimate)} />
+          <CalcMetricTile label="Metodo real" value={formatCurrency(result.realEstimate)} />
+          <CalcMetricTile label="Anos de tenencia" value={`${result.yearsHeld} anos`} />
+          <CalcMetricTile label="Estimacion final" value={formatCurrency(result.estimatedAmount)} highlight />
+        </div>
+        <p className="px-1 text-xs leading-relaxed text-text-secondary">
+          Se aplica el metodo mas favorable para el contribuyente:{" "}
+          <strong className="text-text-primary">
+            {result.recommendedMethod === "real" ? "real" : "objetivo"}
+          </strong>.
+        </p>
       </div>
 
-      <div className="space-y-4">
-        <ResultSummary title="Estimación de plusvalía">
-          <ResultRow label="Método recomendado" value={result.recommendedMethod === "real" ? "Real" : "Objetivo"} highlight />
-          <ResultRow label="Método objetivo" value={formatCurrency(result.objectiveEstimate)} />
-          <ResultRow label="Método real" value={formatCurrency(result.realEstimate)} />
-          <ResultRow label="Estimación plusvalía" value={formatCurrency(result.estimatedAmount)} highlight />
-          <ResultRow label="Años de tenencia" value={String(result.yearsHeld)} />
-        </ResultSummary>
-        {!result.isValidDateRange && <p className="rounded-ds-md bg-danger-soft px-4 py-3 text-xs font-medium text-danger">La fecha de venta debe ser posterior a la compra.</p>}
+      {/* Panel de inputs */}
+      <div className="flex flex-col gap-4">
+        <CalcSection label="La operacion">
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Modo de calculo">
+              <select
+                className="input"
+                value={values.mode ?? DEFAULTS.mode}
+                onChange={(e) =>
+                  setValue("mode", e.target.value as PlusvaliaFormValues["mode"], {
+                    shouldValidate: true,
+                  })
+                }
+              >
+                <option value="simple">Simple</option>
+                <option value="advanced">Avanzado</option>
+              </select>
+            </FormField>
+            <FormField label="Municipio">
+              <input
+                className="input"
+                value={values.municipality ?? DEFAULTS.municipality}
+                onChange={(e) =>
+                  setValue("municipality", e.target.value, { shouldValidate: true })
+                }
+              />
+            </FormField>
+            <FormField label="Fecha de compra">
+              <input
+                className="input"
+                type="date"
+                value={values.purchaseDate ?? DEFAULTS.purchaseDate}
+                onChange={(e) =>
+                  setValue("purchaseDate", e.target.value, { shouldValidate: true })
+                }
+              />
+            </FormField>
+            <FormField label="Fecha de venta" error={errors.saleDate?.message}>
+              <input
+                className="input"
+                type="date"
+                value={values.saleDate ?? DEFAULTS.saleDate}
+                onChange={(e) =>
+                  setValue("saleDate", e.target.value, { shouldValidate: true })
+                }
+              />
+            </FormField>
+          </div>
+        </CalcSection>
+
+        <CalcSection label="El inmueble">
+          <CalcSliderInput
+            label="Valor catastral del suelo"
+            value={values.landCadastralValue ?? DEFAULTS.landCadastralValue}
+            min={0}
+            max={500000}
+            step={1000}
+            prefix="€"
+            onChange={(value) => setValue("landCadastralValue", value, { shouldValidate: true })}
+          />
+          <CalcSliderInput
+            label="Precio de compra"
+            value={values.purchasePrice ?? DEFAULTS.purchasePrice}
+            min={0}
+            max={1500000}
+            step={1000}
+            prefix="€"
+            onChange={(value) => setValue("purchasePrice", value, { shouldValidate: true })}
+          />
+          <CalcSliderInput
+            label="Precio de venta"
+            value={values.salePrice ?? DEFAULTS.salePrice}
+            min={0}
+            max={1500000}
+            step={1000}
+            prefix="€"
+            onChange={(value) => setValue("salePrice", value, { shouldValidate: true })}
+          />
+        </CalcSection>
+
+        {advanced && (
+          <CalcSection label="Parametros avanzados">
+            <div className="grid grid-cols-2 gap-3">
+              <CompactNumberField
+                label="Coef. municipal"
+                value={values.municipalCoefficient ?? DEFAULTS.municipalCoefficient}
+                step={0.01}
+                onChange={(value) =>
+                  setValue("municipalCoefficient", value, { shouldValidate: true })
+                }
+              />
+              <CompactNumberField
+                label="% suelo"
+                hint="%"
+                value={values.landPercentage ?? DEFAULTS.landPercentage}
+                onChange={(value) =>
+                  setValue("landPercentage", value, { shouldValidate: true })
+                }
+              />
+              <CompactNumberField
+                label="Tipo gravamen"
+                hint="%"
+                value={values.taxRate ?? DEFAULTS.taxRate}
+                onChange={(value) => setValue("taxRate", value, { shouldValidate: true })}
+              />
+              <CompactNumberField
+                label="Bonificacion"
+                hint="%"
+                value={values.bonusPercent ?? DEFAULTS.bonusPercent}
+                onChange={(value) =>
+                  setValue("bonusPercent", value, { shouldValidate: true })
+                }
+              />
+            </div>
+          </CalcSection>
+        )}
+
+        <AdvisoryNote>
+          Calculo orientativo por el metodo objetivo (RDL 26/2021). La cuota definitiva depende de ordenanzas municipales.
+        </AdvisoryNote>
       </div>
     </div>
   );
