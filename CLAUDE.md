@@ -424,8 +424,8 @@ Reglas del módulo:
 - Los componentes UI están en `components/`.
 - La validación de forms usa Zod en `schemas/`.
 - `number.ts` contiene `parseNumberInput` (formato español), `clamp`, `roundMoney`, `isValidNumberInput`, `isEmptyNumberInput`.
-- Los resultados se muestran con `ResultSummary` + `ResultRow`.
-- Acciones comerciales: solo "Copiar resumen" funciona (clipboard API). Las demás (Guardar, Duplicar, Vincular, WhatsApp, PDF, Crear tarea) están marcadas "Próximamente".
+- Los resultados se muestran con `CalcHeroResult` + `CalcMetricTile` (ver sección "Sistema de calculadoras").
+- Acciones comerciales: solo "Copiar resumen" funciona (clipboard API). Las demás (Guardar, Duplicar, Vincular, WhatsApp, PDF, Crear tarea) están en `CalculatorActions`.
 - Los tests de fórmulas están en `src/__tests__/calculator-formulas.test.ts` (vitest).
 
 ### Usuarios (`/usuarios`)
@@ -439,6 +439,64 @@ Perfil, avatar (upload a Supabase Storage), cambio de contraseña, confirmación
 ### Soporte (`/soporte`)
 
 Sistema de tickets internos. Tablas: `soporte_tickets`, `soporte_mensajes`.
+
+---
+
+## 8b. Sistema de calculadoras
+
+### Componentes reutilizables (`src/modules/calculator/components/`)
+
+| Componente | Descripción |
+|-----------|-------------|
+| `CalcSection` | Agrupa inputs relacionados bajo una etiqueta semántica. Cada fila interna se separa con `border-t`. |
+| `CalcSliderInput` | Fila compacta label + input con adorno + slider opcional. Sin card propio — vive dentro de `CalcSection`. |
+| `CalcHeroResult` | Card protagonista del resultado: valor grande, pill de estado semántico, barra de progreso opcional. |
+| `CalcMetricTile` | Tile pequeño `bg-background` para métricas secundarias en un grid 2-col. |
+| `CalculatorShell` | Envuelve cada calculadora: breadcrumb sutil (no card) + contenido + `CalculatorActions`. |
+
+### Layout estándar
+
+Grid `lg:grid-cols-[1.4fr_1fr]` con resultado a la derecha (sticky en desktop):
+
+```tsx
+<div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
+  {/* Resultado — mobile primero, desktop a la derecha */}
+  <div className="order-first flex flex-col gap-3 lg:order-last lg:sticky lg:top-4 lg:self-start">
+    <CalcHeroResult label="..." value="..." status="success|warning|danger|neutral" />
+    <div className="grid grid-cols-2 gap-2">
+      <CalcMetricTile label="..." value="..." />
+    </div>
+  </div>
+
+  {/* Inputs — agrupados por contexto */}
+  <div className="flex flex-col gap-4">
+    <CalcSection label="La vivienda">
+      <CalcSliderInput label="Precio" value={...} min={0} max={1000000} step={1000} prefix="€" onChange={...} />
+    </CalcSection>
+    <CalcSection label="La financiacion">...</CalcSection>
+  </div>
+</div>
+```
+
+### Hero metric obligatorio por calculadora
+
+| Calculadora | Hero metric | Estado semántico |
+|------------|-------------|-----------------|
+| Comisión simplificada | Precio al comprador / Neto vendedor | `neutral` |
+| Comprar vivienda | Cuota mensual (o total necesario si contado) | `viable/tight/not_viable` |
+| Hipoteca | Cuota mensual | `viable/tight/not_viable` |
+| Gastos de compraventa | Total gastos | `neutral` |
+| Plusvalía municipal | Estimación plusvalía | `neutral` |
+| Venta de vivienda | Neto para el propietario | `success/danger` según signo |
+| Rentabilidad inversión | Rentabilidad neta % | `good/tight/weak` |
+| Precio máximo comprador | Precio máximo recomendado | `neutral` |
+
+### Reglas inviolables del módulo
+
+- **Toda calculadora nueva debe seguir este patrón.** Prohibido volver a cards verticales por input.
+- **Hero metric obligatorio.** Si no hay un número clave claro, replantearse si la calculadora tiene sentido.
+- **No usar `NumericSliderField` directamente** en nuevas calculadoras. Usar `CalcSliderInput` dentro de `CalcSection`.
+- **Tokens semánticos siempre.** Nunca `bg-white`, `text-gray-*`.
 
 ---
 
@@ -613,6 +671,24 @@ GOOGLE_CLIENT_ID=tu-google-client-id
 GOOGLE_CLIENT_SECRET=tu-google-client-secret
 NEXT_PUBLIC_BASE_URL=http://localhost:3000            # URL base para callbacks OAuth
 DELETE_CONFIRMATION_PASSWORD=password-fallback        # Fallback si no hay configuracion_seguridad
+
+# WhatsApp — Proveedor activo (manual | meta | openwa). Default: manual
+WHATSAPP_PROVIDER=manual
+WHATSAPP_FALLBACK_PROVIDER=manual
+
+# WhatsApp Cloud API (Meta) — solo si WHATSAPP_PROVIDER=meta
+WHATSAPP_ACCESS_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+WHATSAPP_VERIFY_TOKEN=
+WHATSAPP_APP_SECRET=
+
+# OpenWA self-hosted — solo si WHATSAPP_PROVIDER=openwa
+OPENWA_BASE_URL=http://localhost:2785/api
+OPENWA_API_KEY=
+OPENWA_DEFAULT_SESSION_NAME=metria-main
+OPENWA_DEFAULT_SESSION_ID=
+OPENWA_WEBHOOK_SECRET=
+OPENWA_TIMEOUT_MS=10000
 ```
 
 ---
@@ -680,3 +756,5 @@ supabase gen types typescript --project-id PROJECT_ID > src/types/database.types
 | 2026-05-17 | `docs` | Creación del CLAUDE.md técnico completo con análisis profundo del proyecto |
 | 2026-05-17 | `docs` | Ampliada documentación del módulo calculadora (arquitectura, patrones, gotchas) |
 | 2026-05-17 | `feat` | Rediseño premium de la toolbar de zonas geográficas: glassmorphism, segmented control, microinteracciones, responsive |
+| 2026-05-18 | `feat` | Integración OpenWA: capa de proveedores WhatsApp (manual/meta/openwa), cliente HTTP OpenWA, endpoints internos, webhook con idempotencia y firma HMAC, migraciones whatsapp_sessions y whatsapp_webhook_events, documentación |
+| 2026-05-18 | `feat` | Rediseño del sistema de calculadoras: layout grid 1.4fr/1fr con hero metric, nuevos componentes CalcSection/CalcSliderInput/CalcHeroResult/CalcMetricTile, eliminados cards verticales por input, CalculatorShell simplificado a breadcrumb. Documentado en sección 8b. |
