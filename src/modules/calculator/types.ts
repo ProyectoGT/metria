@@ -11,6 +11,8 @@ export type CalculatorType =
   | "max_budget"
   | "saved";
 
+export type CalculatorCategoryId = "purchase_sale" | "financing" | "investment" | "taxes";
+
 export type ViabilityStatus = "viable" | "tight" | "not_viable";
 export type InvestmentStatus = "good" | "tight" | "weak";
 export type PropertyKind = "new" | "used";
@@ -22,6 +24,14 @@ export type CalculatorConfig = {
   title: string;
   description: string;
   badge?: string;
+  icon: ElementType;
+  category: CalculatorCategoryId;
+  tags?: string[];
+};
+
+export type CalculatorCategory = {
+  id: CalculatorCategoryId;
+  label: string;
   icon: ElementType;
 };
 
