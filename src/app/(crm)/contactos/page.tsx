@@ -1,14 +1,24 @@
-import PageHeader from "@/components/layout/page-header";
-import ContactosClient from "./contactos-client";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import type { Contacto } from "@/types";
+import { canAccessContactos } from "@/lib/roles";
 import { requirePageAccess } from "@/lib/access-control/route-guard";
+import PageHeader from "@/components/layout/page-header";
+import ContactosClient from "./contactos-client";
 
 export default async function ContactosPage() {
   const supabase = await createClient();
   const yo = await requirePageAccess("contactos");
 
+  if (!yo) {
+    redirect("/login");
+  }
+
   const role = yo?.role ?? "Agente";
+  if (!canAccessContactos(role)) {
+    redirect("/dashboard");
+  }
+
   const userId = yo?.id ?? 0;
 
   // La RLS ya filtra por empresa y visibilidad; el filtro explícito es
@@ -28,6 +38,7 @@ export default async function ContactosPage() {
   if (role === "Agente") {
     query = query.or(`owner_user_id.eq.${userId},visibility.eq.company`);
   }
+
 
   const { data: contactos } = await query;
 

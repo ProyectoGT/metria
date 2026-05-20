@@ -73,30 +73,40 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Obtener usuario real (refresca el token si es necesario)
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  // 1. Fast local session check — lee cookie JWT, sin llamada HTTP
+  const { data: { session } } = await supabase.auth.getSession();
+  const hasSession = !!session;
 
-  const isAuthenticated = !!user;
+  // 2. Intentar refresh/verificación con getUser, pero no bloquear si falla
+  let isAuthenticated = hasSession;
 
-  // Token caducado o inválido en ruta protegida
-  if (authError && !isAuthenticated && !isPublicPage) {
-    if (isApiRoute) {
-      return Response.json({ error: "Sesion expirada" }, { status: 401 });
+  if (hasSession) {
+    const { error: verifyError } = await supabase.auth.getUser();
+    if (verifyError) {
+      console.error("[middleware] getUser verification error (session exists, continuing):", verifyError.message);
     }
-    const loginUrl = new URL("/login", request.url);
-    const redirectResponse = NextResponse.redirect(loginUrl);
-    request.cookies.getAll().forEach(({ name }) => {
-      if (name.startsWith("sb-")) {
-        redirectResponse.cookies.delete(name);
-      }
-    });
-    return redirectResponse;
+  } else {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    isAuthenticated = !!user;
+
+    if (authError && !isAuthenticated && !isPublicPage) {
+      const loginUrl = new URL("/login", request.url);
+      const redirectResponse = NextResponse.redirect(loginUrl);
+      request.cookies.getAll().forEach(({ name }) => {
+        if (name.startsWith("sb-")) {
+          redirectResponse.cookies.delete(name);
+        }
+      });
+      return redirectResponse;
+    }
   }
 
-  // Sin sesión en ruta protegida
+  // Sin-acceso es accesible siempre: AppShell redirige aquí si falta perfil,
+  // y la página de error debe verse sin importar el estado de sesión.
+  if (pathname === "/sin-acceso") {
+    return response;
+  }
+
   if (!isAuthenticated && !isPublicPage) {
     if (isApiRoute) {
       return Response.json({ error: "No autorizado" }, { status: 401 });

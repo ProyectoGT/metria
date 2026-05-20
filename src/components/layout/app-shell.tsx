@@ -28,7 +28,14 @@ export default async function AppShell({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  let currentUser = user;
+
+  if (!currentUser) {
+    const { data: { session } } = await supabase.auth.getSession();
+    currentUser = session?.user ?? null;
+  }
+
+  if (!currentUser) redirect("/login");
 
   let userName = "Usuario";
   let userEmail: string | null = null;
@@ -38,43 +45,40 @@ export default async function AppShell({
   let empresaId: number | null = null;
   let deniedKeys: string[] = [];
 
-  if (user) {
-    userEmail = user.email ?? null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let { data: profile } = await (supabase as any)
+    .from("usuarios")
+    .select("id, nombre, apellidos, rol, avatar_url, empresa_id")
+    .eq("auth_id", currentUser.id)
+    .maybeSingle() as { data: { id: number; nombre: string; apellidos: string; rol: string; avatar_url: string | null; empresa_id: number | null } | null };
 
+  if (!profile && currentUser.email) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let { data: profile } = await (supabase as any)
+    const { data: byEmail } = await (supabase as any)
       .from("usuarios")
       .select("id, nombre, apellidos, rol, avatar_url, empresa_id")
-      .eq("auth_id", user.id)
+      .eq("correo", currentUser.email)
       .maybeSingle() as { data: { id: number; nombre: string; apellidos: string; rol: string; avatar_url: string | null; empresa_id: number | null } | null };
+    profile = byEmail;
+  }
 
-    if (!profile && user.email) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: byEmail } = await (supabase as any)
-        .from("usuarios")
-        .select("id, nombre, apellidos, rol, avatar_url, empresa_id")
-        .eq("correo", user.email)
-        .maybeSingle() as { data: { id: number; nombre: string; apellidos: string; rol: string; avatar_url: string | null; empresa_id: number | null } | null };
-      profile = byEmail;
-    }
+  if (!profile) {
+    redirect("/sin-acceso");
+  }
 
-    if (!profile) {
-      redirect("/sin-acceso");
-    }
+  userName = `${profile.nombre} ${profile.apellidos}`.trim() || "Usuario";
+  userEmail = currentUser.email ?? null;
+  userRole = normalizeUserRole(profile.rol);
+  userId = profile.id ?? null;
+  userAvatarUrl = profile.avatar_url
+    ?? (currentUser.user_metadata?.avatar_url as string | undefined)
+    ?? null;
+  empresaId = profile.empresa_id ?? null;
 
-    userName = `${profile.nombre} ${profile.apellidos}`.trim() || "Usuario";
-    userRole = normalizeUserRole(profile.rol);
-    userId = profile.id ?? null;
-    userAvatarUrl = profile.avatar_url
-      ?? (user.user_metadata?.avatar_url as string | undefined)
-      ?? null;
-    empresaId = profile.empresa_id ?? null;
-
-    // Cargar recursos denegados desde access_control_rules (capa configurable)
-    if (empresaId && userRole) {
-      const deniedSet = await getDeniedResourceKeys(empresaId, userRole);
-      deniedKeys = Array.from(deniedSet);
-    }
+  // Cargar recursos denegados desde access_control_rules (capa configurable)
+  if (empresaId && userRole) {
+    const deniedSet = await getDeniedResourceKeys(empresaId, userRole);
+    deniedKeys = Array.from(deniedSet);
   }
 
   // Notificaciones: tareas pendientes + notificaciones de soporte + login alerts (solo admin)

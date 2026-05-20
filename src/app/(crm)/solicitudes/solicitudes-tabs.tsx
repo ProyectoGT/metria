@@ -8,12 +8,20 @@ type Tab = "solicitudes" | "idealista";
 type Props = {
   defaultTab: Tab;
   nuevosLeads: number;
+  showIdealista: boolean;
   solicitudesContent: React.ReactNode;
-  idealistaContent: React.ReactNode;
+  idealistaContent?: React.ReactNode;
 };
 
-export default function SolicitudesTabs({ defaultTab, nuevosLeads, solicitudesContent, idealistaContent }: Props) {
+export default function SolicitudesTabs({
+  defaultTab,
+  nuevosLeads,
+  showIdealista,
+  solicitudesContent,
+  idealistaContent,
+}: Props) {
   const [active, setActive] = useState<Tab>(defaultTab);
+  const activeTab = showIdealista ? active : "solicitudes";
 
   return (
     <div className="space-y-5">
@@ -47,24 +55,26 @@ export default function SolicitudesTabs({ defaultTab, nuevosLeads, solicitudesCo
           Solicitudes
         </button>
 
-        <button
-          onClick={() => setActive("idealista")}
-          role="tab"
-          aria-selected={active === "idealista"}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-            active === "idealista"
-              ? "bg-surface text-text-primary shadow-sm ring-1 ring-border/70"
-              : "text-text-secondary hover:bg-surface/70 hover:text-text-primary"
-          }`}
-        >
-          <Mail className="size-4 text-orange-500" />
-          <span className="font-black text-orange-500">idealista</span>
-          {nuevosLeads > 0 && (
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white">
-              {nuevosLeads > 9 ? "9+" : nuevosLeads}
-            </span>
-          )}
-        </button>
+        {showIdealista && (
+          <button
+            onClick={() => setActive("idealista")}
+            role="tab"
+            aria-selected={active === "idealista"}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+              active === "idealista"
+                ? "bg-surface text-text-primary shadow-sm ring-1 ring-border/70"
+                : "text-text-secondary hover:bg-surface/70 hover:text-text-primary"
+            }`}
+          >
+            <Mail className="size-4 text-orange-500" />
+            <span className="font-black text-orange-500">idealista</span>
+            {nuevosLeads > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white">
+                {nuevosLeads > 9 ? "9+" : nuevosLeads}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Content */}

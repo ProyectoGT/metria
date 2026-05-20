@@ -83,6 +83,7 @@ export async function createAgendaAction(data: {
     throw new Error("Se requiere hora de inicio para configurar un recordatorio");
   }
 
+
   const { data: row, error } = await supabase.rpc("create_agenda_activity_v2", {
     p_description: data.description,
     p_event_date: normalizeDateKey(data.eventDate),
@@ -183,6 +184,7 @@ export async function updateAgendaAction(
     throw new Error("Se requiere hora de inicio para configurar un recordatorio");
   }
 
+
   const fallbackAssigned = currentAssigned.length
     ? currentAssigned
     : [existing.user_id, existing.owner_user_id, yo.id].filter((value): value is number => value != null);
@@ -269,6 +271,7 @@ export async function updateAgendaAction(
     result: (updates.result ?? existing.result)?.trim() || null,
     assignedUserIds,
   }, { empresaId: existing.empresa_id });
+
 
   revalidatePath("/dashboard");
   revalidatePath("/ordenes");
@@ -780,6 +783,35 @@ export async function deleteKanbanColumnAction(col_id: string): Promise<void> {
     .delete()
     .eq("user_id", yo.id)
     .eq("col_id", col_id);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function updateKanbanCardOrderAction(rows: Array<{
+  source: "tarea" | "agenda";
+  dbId: number;
+  columnId: string;
+  position: number;
+}>): Promise<void> {
+  const supabase = await createClient();
+  const yo = await getCurrentUserContext();
+  if (!yo) throw new Error("No autenticado");
+
+  if (rows.length === 0) return;
+
+  const payload = rows.map((row) => ({
+    user_id: yo.id,
+    source: row.source,
+    db_id: row.dbId,
+    column_id: row.columnId,
+    posicion: row.position,
+    updated_at: new Date().toISOString(),
+  }));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from("kanban_card_orden")
+    .upsert(payload, { onConflict: "user_id,source,db_id" });
 
   if (error) throw new Error(error.message);
 }

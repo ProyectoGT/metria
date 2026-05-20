@@ -95,6 +95,7 @@ type Props = {
 const TIPOS_PROPIEDAD = ["Piso", "Casa", "Chalet", "Local", "Nave", "Garaje", "Terreno", "Otro"];
 
 const ALCANCE_ORDEN: AccessScope[] = ["private", "company", "team", "agents", "responsable"];
+const PEDIDOS_SELECT = "id,nombre_cliente,telefono,tipo_propiedad,zona_busqueda,presupuesto,modalidad,habitaciones,banos,altura_deseada,garaje,origen,referencia,notas,visibility,visibility_agente_ids,owner_user_id,empresa_id,equipo_id";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -319,11 +320,11 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
     };
 
     if (editId !== null) {
-      const { data, error } = await supabase.from("pedidos").update(payload).eq("id", editId).select().single();
+      const { data, error } = await supabase.from("pedidos").update(payload).eq("id", editId).select(PEDIDOS_SELECT).single();
       if (error) { setSaveError(error.message); setSaving(false); return; }
       if (data) { setPedidos((prev) => prev.map((p) => (p.id === editId ? (data as Pedido) : p))); toast("Solicitud actualizada"); setModalOpen(false); }
     } else {
-      const { data, error } = await supabase.from("pedidos").insert(payload).select().single();
+      const { data, error } = await supabase.from("pedidos").insert(payload).select(PEDIDOS_SELECT).single();
       if (error) { setSaveError(error.message); setSaving(false); return; }
       if (data) { setPedidos((prev) => [data as Pedido, ...prev]); toast("Solicitud creada"); setModalOpen(false); }
     }

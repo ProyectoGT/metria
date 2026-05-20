@@ -3786,6 +3786,49 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_agenda_activity_v2: {
+        Args: {
+          p_assigned_user_ids?: number[]
+          p_completed?: boolean
+          p_description: string
+          p_event_date: string
+          p_priority?: string
+          p_reminder_minutes?: number | null
+          p_result?: string | null
+          p_time: string
+          p_time_end?: string | null
+          p_tipo?: string
+          p_visibility?: string
+        }
+        Returns: {
+          archived_at: string | null
+          archived_reason: string | null
+          completed: boolean
+          converted_to_tarea_id: number | null
+          created_at: string
+          description: string
+          empresa_id: number | null
+          equipo_id: number | null
+          event_date: string
+          gcal_event_id: string | null
+          id: number
+          owner_user_id: number | null
+          priority: string
+          reminder_minutes_before: number | null
+          result: string | null
+          time: string | null
+          time_end: string | null
+          tipo: string
+          user_id: number | null
+          visibility: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agenda"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_pending_tarea: {
         Args: {
           p_assigned_user_ids?: number[]
