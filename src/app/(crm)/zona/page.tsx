@@ -1,12 +1,12 @@
 import { createClient } from "@/lib/supabase";
-import { getCurrentUserContext } from "@/lib/current-user";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import { getUserOrdenAction } from "@/app/(crm)/zona/actions";
 import ZonasClient from "./zonas-client";
 
 export default async function ZonaPage() {
   const supabase = await createClient();
-  const user = await getCurrentUserContext();
-  const role = user?.role ?? "Agente";
+  const user = await requirePageAccess("zona");
+  const role = user.role;
   const userId = user?.id ?? 0;
   const isManager = role === "Administrador" || role === "Director";
 

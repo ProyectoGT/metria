@@ -1,183 +1,498 @@
-"use client";
+﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useUIStore } from "@/stores/ui.store";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { canAccessContactos, canManageUsers, normalizeUserRole } from "@/lib/roles";
+import { canManageUsers, canViewInsights, canViewOrgChart, normalizeUserRole } from "@/lib/roles";
+import { staggerContainer, staggerItem } from "@/lib/animations";
+import { useI18n } from "@/lib/i18n";
 import {
   LayoutDashboard,
   MapPin,
+  Map,
   ClipboardList,
   TrendingUp,
   Calendar,
   Calculator,
   FileText,
   LifeBuoy,
-  Moon,
-  Sun,
+  Network,
   Users,
   BookUser,
+  BarChart3,
+  Building2,
+  Mail,
+  Settings,
+  Shield,
+  MessageCircle,
   X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
-const baseNavItems = [
-  { label: "Dashboard",      href: "/dashboard",  icon: LayoutDashboard },
-  { label: "Zona",           href: "/zona",        icon: MapPin },
-  { label: "Solicitudes",    href: "/solicitudes", icon: ClipboardList },
-  { label: "Desarrollo",     href: "/desarrollo",  icon: TrendingUp },
-  { label: "Calendario",     href: "/calendario",  icon: Calendar },
-  { label: "Ordenes del dia",href: "/ordenes",     icon: FileText },
-  { label: "Calculadora",    href: "/calculadora", icon: Calculator },
+// ─── Grupos de navegación ─────────────────────────────────────────────────────
+
+type NavAction = {
+  labelKey: string;
+  href: string;
+  resourceKey: string;
+  icon: React.ElementType;
+  display?: "icon" | "subitem";
+};
+
+type NavItemConfig = NavAction & {
+  priority?: "core";
+  badge?: string;
+  favoriteSlot?: boolean;
+  actions?: NavAction[];
+};
+
+type NavSectionConfig = {
+  labelKey: string;
+  items: NavItemConfig[];
+};
+
+const NAV_SECTIONS: NavSectionConfig[] = [
+  {
+    labelKey: "navigation.sectionPrincipal",
+    items: [
+      { labelKey: "navigation.dashboard", href: "/dashboard", resourceKey: "dashboard", icon: LayoutDashboard, priority: "core", favoriteSlot: true },
+      { labelKey: "navigation.requests", href: "/solicitudes", resourceKey: "solicitudes", icon: ClipboardList, priority: "core", favoriteSlot: true },
+      {
+        labelKey: "navigation.zone",
+        href: "/zona",
+        resourceKey: "zona",
+        icon: MapPin,
+        priority: "core",
+        favoriteSlot: true,
+        actions: [
+          { labelKey: "navigation.zoneMapAction", href: "/zonas-geograficas", resourceKey: "zonas-geograficas", icon: Map, display: "icon" },
+        ],
+      },
+      { labelKey: "navigation.properties", href: "/propiedades", resourceKey: "propiedades", icon: Building2 },
+    ],
+  },
+  {
+    labelKey: "navigation.sectionActivity",
+    items: [
+      { labelKey: "navigation.calendar", href: "/calendario", resourceKey: "calendario", icon: Calendar },
+      { labelKey: "navigation.dayOrders", href: "/ordenes", resourceKey: "ordenes", icon: FileText },
+      { labelKey: "navigation.communications", href: "/comunicaciones", resourceKey: "comunicaciones", icon: MessageCircle },
+      { labelKey: "navigation.email", href: "/email", resourceKey: "email", icon: Mail },
+    ],
+  },
+  {
+    labelKey: "navigation.sectionCrm",
+    items: [
+      { labelKey: "navigation.contacts", href: "/contactos", resourceKey: "contactos", icon: BookUser },
+    ],
+  },
+  {
+    labelKey: "navigation.sectionTools",
+    items: [
+      { labelKey: "navigation.calculator", href: "/calculadora", resourceKey: "calculadora", icon: Calculator },
+      {
+        labelKey: "navigation.development",
+        href: "/desarrollo",
+        resourceKey: "desarrollo",
+        icon: TrendingUp,
+        actions: [
+          { labelKey: "navigation.businessIntelligence", href: "/desarrollo/insights", resourceKey: "desarrollo-insights", icon: BarChart3, display: "subitem" },
+        ],
+      },
+    ],
+  },
 ];
+
+// ─── Estilos compartidos ──────────────────────────────────────────────────────
+
+const NAV_ITEM_HEIGHT = "h-[42px]";
+const NAV_ITEM_COLLAPSED_SIZE = "h-10 w-10";
+const NAV_ICON_BOX = "h-7 w-7";
+const NAV_ICON_SIZE = "h-[18px] w-[18px]";
+const NAV_RADIUS = "rounded-xl";
+const NAV_ACTIVE_INDICATOR = "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:rounded-r-full before:bg-primary";
+
+function NavItem({
+  href,
+  icon: Icon,
+  label,
+  active,
+  priority,
+  actions = [],
+  collapsed = false,
+}: {
+  href: string;
+  icon: React.ElementType;
+  label: string;
+  active: boolean;
+  priority?: "core";
+  actions?: Array<NavAction & { label: string; active: boolean }>;
+  collapsed?: boolean;
+}) {
+  const isCore = priority === "core";
+  const hasInlineActions = !collapsed && actions.some((a) => a.display !== "subitem");
+  const hasSubItems = !collapsed && actions.some((a) => a.display === "subitem");
+
+  const containerClasses = [
+    "group/item relative",
+    !collapsed && active && NAV_ACTIVE_INDICATOR,
+  ].filter(Boolean).join(" ");
+
+  const buttonClasses = [
+    "pressable inline-flex items-center outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar cursor-pointer",
+    NAV_RADIUS,
+    active
+      ? "bg-sidebar-active text-primary"
+      : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary",
+    collapsed
+      ? `${NAV_ITEM_COLLAPSED_SIZE} justify-center`
+      : `${NAV_ITEM_HEIGHT} w-full gap-3 px-3`,
+  ].join(" ");
+
+  return (
+    <motion.div variants={staggerItem}>
+      <div className={containerClasses}>
+        <Link
+          href={href}
+          className={buttonClasses}
+          title={collapsed ? label : undefined}
+        >
+          <span
+            className={[
+              "flex shrink-0 items-center justify-center",
+              NAV_ICON_BOX,
+              NAV_RADIUS,
+              "transition-colors duration-150",
+              active
+                ? "bg-primary/10 text-primary"
+                : isCore
+                  ? "bg-text-primary/[0.04] text-text-primary group-hover:bg-primary/10 group-hover:text-primary"
+                  : "text-text-secondary group-hover:text-text-primary",
+            ].join(" ")}
+          >
+            <Icon className={NAV_ICON_SIZE} aria-hidden="true" />
+          </span>
+          {!collapsed && (
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              {label}
+            </span>
+          )}
+        </Link>
+        {hasInlineActions && (
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/item:opacity-100 group-focus-within/item:opacity-100">
+            {actions.filter((action) => action.display !== "subitem").map((action) => (
+              <Link
+                key={action.href}
+                href={action.href}
+                aria-label={action.label}
+                title={action.label}
+                className={[
+                  "flex h-7 w-7 items-center justify-center",
+                  NAV_RADIUS,
+                  "transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                  action.active
+                    ? "bg-primary text-white"
+                    : "text-text-secondary hover:bg-background hover:text-primary",
+                ].join(" ")}
+              >
+                <action.icon className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            ))}
+          </span>
+        )}
+        {!collapsed && active && !hasInlineActions && !hasSubItems && (
+          <motion.span
+            layoutId="sidebar-active"
+            className="complete-pop absolute right-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          />
+        )}
+        {hasSubItems && active && (
+          <div className="ml-[52px] mt-1 space-y-0.5 border-l border-border pl-3">
+            {actions.filter((action) => action.display === "subitem").map((action) => (
+              <Link
+                key={action.href}
+                href={action.href}
+                className={[
+                  "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                  action.active
+                    ? "bg-primary/10 text-primary"
+                    : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary",
+                ].join(" ")}
+              >
+                <action.icon className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="truncate">{action.label}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+function NavGroup({ label, collapsed, children }: { label?: string; collapsed?: boolean; children: React.ReactNode }) {
+  return (
+    <div className={collapsed ? "flex flex-col items-center gap-0.5" : "space-y-0.5"}>
+      {label && !collapsed && (
+        <p className="mb-2 mt-6 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-text-secondary/50 first:mt-0">
+          {label}
+        </p>
+      )}
+      {collapsed && label && (
+        <div className="my-2 h-px w-5 rounded-full bg-border" aria-hidden="true" />
+      )}
+      {children}
+    </div>
+  );
+}
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 interface Props {
   userRole?: string | null;
+  deniedResourceKeys?: string[];
 }
 
-export default function Sidebar({ userRole: _userRole }: Props) {
+export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }: Props) {
   const pathname = usePathname();
-  const [dark, setDark] = useState(() =>
-    typeof document !== "undefined" && document.documentElement.classList.contains("dark")
-  );
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const { t } = useI18n();
+
+  const sidebarOpen   = useUIStore((s) => s.sidebarOpen);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const closeSidebar  = useUIStore((s) => s.closeSidebar);
 
   const userRole = _userRole ? normalizeUserRole(_userRole) : null;
   const role = userRole ?? "Agente";
-  const navItems = [
-    ...baseNavItems.slice(0, 3),
-    ...(canAccessContactos(role) ? [{ label: "Contactos", href: "/contactos", icon: BookUser }] : []),
-    ...baseNavItems.slice(3),
-    ...(canManageUsers(role) ? [{ label: "Usuarios", href: "/usuarios", icon: Users }] : []),
-  ];
+  const canSeeUsers = canManageUsers(role);
+  const canSeeOrganigrama = canViewOrgChart(role);
+  const canSeeInsights = canViewInsights(role);
+  const isAdmin = role === "Administrador";
+  const deniedSet = new Set(deniedResourceKeys);
 
-  // Escuchar evento del botón hamburger en el header
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Sync sidebar collapsed state from localStorage after hydration.
+  // Intentionally setState in effect — required for SSR-safe localStorage persistence.
   useEffect(() => {
-    function handleToggle() {
-      setMobileOpen((prev) => !prev);
-    }
-    window.addEventListener("sidebar:toggle", handleToggle);
-    return () => window.removeEventListener("sidebar:toggle", handleToggle);
+    const stored = localStorage.getItem("metria-sidebar-collapsed");
+    if (stored === "true") setIsCollapsed(true); // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
+
+  const toggleCollapsed = useCallback(() => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("metria-sidebar-collapsed", String(next));
+      document.documentElement.style.setProperty("--sidebar-width", next ? "72px" : "260px");
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--sidebar-width", isCollapsed ? "72px" : "260px");
+  }, [isCollapsed]);
+
+  function isNavVisible(key: string): boolean {
+    return !deniedSet.has(key);
+  }
+
+  // Mantener compatibilidad con el evento legacy del Header (sidebar:toggle)
+  useEffect(() => {
+    window.addEventListener("sidebar:toggle", toggleSidebar);
+    return () => window.removeEventListener("sidebar:toggle", toggleSidebar);
+  }, [toggleSidebar]);
 
   // Cerrar al navegar
   useEffect(() => {
-    const id = window.requestAnimationFrame(() => setMobileOpen(false));
+    const id = window.requestAnimationFrame(closeSidebar);
     return () => window.cancelAnimationFrame(id);
-  }, [pathname]);
+  }, [pathname, closeSidebar]);
 
-  function toggleTheme() {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("metria-theme", next ? "dark" : "light");
+  function isActive(href: string) {
+    if (href === "/dashboard") return pathname === "/dashboard";
+    if (href === "/zona") {
+      return pathname === "/zona" || pathname.startsWith("/zona/") || pathname.startsWith("/zonas-geograficas");
+    }
+    if (href === "/usuarios") {
+      return pathname.startsWith("/usuarios") || pathname.startsWith("/empresa/organigrama");
+    }
+    if (href === "/desarrollo") {
+      return pathname.startsWith("/desarrollo");
+    }
+    return pathname.startsWith(href);
   }
 
-  const navContent = (
-    <>
-      {/* Logo */}
-      <div className="relative flex h-16 items-center justify-center bg-sidebar-logo px-2">
-        <Image
-          src="/logo-bg-master-iberica.png"
-          alt="Master Ibérica"
-          width={240}
-          height={56}
-          className="h-20 w-auto object-contain"
-          priority
-        />
-        {/* Cerrar drawer — solo en móvil */}
-        <button
-          onClick={() => setMobileOpen(false)}
-          className="absolute right-2 rounded-lg p-1.5 text-white/70 hover:bg-white/10 md:hidden"
-          aria-label="Cerrar menú"
-        >
-          <X className="h-5 w-5" />
-        </button>
-      </div>
+  function actionIsVisible(action: NavAction): boolean {
+    if (action.resourceKey === "organigrama") return canSeeOrganigrama && isNavVisible(action.resourceKey);
+    if (action.resourceKey === "desarrollo-insights") return canSeeInsights;
+    return isNavVisible(action.resourceKey);
+  }
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname.startsWith(item.href);
+  function itemIsVisible(item: NavItemConfig): boolean {
+    return isNavVisible(item.resourceKey) || Boolean(item.actions?.some(actionIsVisible));
+  }
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-primary text-white"
-                  : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary"
-              }`}
-            >
-              <Icon className="h-[18px] w-[18px] shrink-0" />
-              {item.label}
-            </Link>
-          );
-        })}
+  function getVisibleActions(item: NavItemConfig) {
+    return item.actions
+      ?.filter(actionIsVisible)
+      .map((action) => ({ ...action, label: t(action.labelKey), active: isActive(action.href) })) ?? [];
+  }
 
-        <div className="my-3 border-t border-border" />
-
-        <Link
-          href="/soporte"
-          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-            pathname.startsWith("/soporte")
-              ? "bg-primary text-white"
-              : "text-text-secondary hover:bg-sidebar-hover hover:text-text-primary"
-          }`}
-        >
-          <LifeBuoy className="h-[18px] w-[18px] shrink-0" />
-          Soporte
-        </Link>
-      </nav>
-
-      {/* Tema */}
-      <div className="border-t border-border px-3 py-3 space-y-0.5">
-        <p className="px-3 pb-1 text-[10px] font-medium text-text-secondary/50 tracking-widest uppercase">
-          v1.0.0
-        </p>
-        <button
-          onClick={toggleTheme}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-sidebar-hover hover:text-text-primary"
-        >
-          {dark ? (
-            <Sun className="h-[18px] w-[18px] shrink-0" />
+  function getNavContent(collapsed: boolean) {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        {/* ── Logo ─────────────────────────────────────────────────── */}
+        <div suppressHydrationWarning className={`flex h-16 shrink-0 items-center border-b border-border bg-sidebar-logo ${collapsed ? 'justify-center' : 'justify-center px-4'}`}>
+          {collapsed ? (
+            <Image
+              suppressHydrationWarning
+              src="/favicon-32x32.png"
+              alt="Master Ibérica"
+              width={28}
+              height={28}
+              className="object-contain"
+              priority
+            />
           ) : (
-            <Moon className="h-[18px] w-[18px] shrink-0" />
+            <Image
+              suppressHydrationWarning
+              src="/logo-bg-master-iberica.png"
+              alt="Master Ibérica"
+              width={240}
+              height={56}
+              className="max-h-16 w-auto max-w-full object-contain"
+              priority
+            />
           )}
-          {dark ? "Modo claro" : "Modo oscuro"}
-        </button>
+          {!collapsed && (
+            <button
+              onClick={() => closeSidebar()}
+              className="touch-target absolute right-2 rounded-lg p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white md:hidden"
+              aria-label={t("navigation.closeMenu")}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {/* ── Navegación ───────────────────────────────────────────── */}
+        <nav
+          className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${collapsed ? 'space-y-1 px-4 py-5' : 'space-y-1 px-[14px] py-5'}`}
+          aria-label={t("navigation.mainNavigation") || "Navegación principal"}
+          style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
+        >
+
+          {NAV_SECTIONS.map((section) => (
+            <motion.div key={section.labelKey} variants={staggerContainer} initial="initial" animate="animate">
+              <NavGroup label={collapsed ? undefined : t(section.labelKey)} collapsed={collapsed}>
+                {section.items.filter(itemIsVisible).map((item) => (
+                  <NavItem
+                    key={item.href}
+                    href={item.href}
+                    icon={item.icon}
+                    label={t(item.labelKey)}
+                    active={isActive(item.href)}
+                    priority={item.priority}
+                    actions={getVisibleActions(item)}
+                    collapsed={collapsed}
+                  />
+                ))}
+              </NavGroup>
+            </motion.div>
+          ))}
+
+          {/* Gestión: base permission + configurable layer */}
+          {(canSeeUsers || canSeeOrganigrama) && (
+            <NavGroup label={collapsed ? undefined : t("navigation.sectionCompany")} collapsed={collapsed}>
+              {canSeeUsers && isNavVisible("usuarios") && (
+                <NavItem
+                  href="/usuarios"
+                  icon={Users}
+                  label={t("navigation.users")}
+                  active={isActive("/usuarios")}
+                  collapsed={collapsed}
+                  actions={[
+                    { labelKey: "navigation.userList", href: "/usuarios", resourceKey: "usuarios", icon: Users, display: "subitem", label: t("navigation.userList"), active: pathname.startsWith("/usuarios") },
+                    ...(canSeeOrganigrama && isNavVisible("organigrama")
+                      ? [{ labelKey: "navigation.orgChart", href: "/empresa/organigrama", resourceKey: "organigrama", icon: Network, display: "subitem" as const, label: t("navigation.orgChart"), active: pathname.startsWith("/empresa/organigrama") }]
+                      : []),
+                  ]}
+                />
+              )}
+            </NavGroup>
+          )}
+
+          <div className="mt-5 border-t border-border pt-4">
+            {(isNavVisible("soporte") || isAdmin) && (
+              <NavGroup label={collapsed ? undefined : t("navigation.sectionSystem")} collapsed={collapsed}>
+                {isNavVisible("soporte") && (
+                  <NavItem href="/soporte" icon={LifeBuoy} label={t("navigation.support")} active={isActive("/soporte")} collapsed={collapsed} />
+                )}
+                {isAdmin && isNavVisible("configuracion") && (
+                  <NavItem href="/configuracion/control-acceso" icon={Settings} label={t("navigation.accessControl")} active={isActive("/configuracion/control-acceso")} collapsed={collapsed} />
+                )}
+                {isAdmin && (
+                  <NavItem href="/seguridad" icon={Shield} label={t("navigation.audit")} active={isActive("/seguridad")} collapsed={collapsed} />
+                )}
+              </NavGroup>
+            )}
+          </div>
+        </nav>
+
+        {/* ── Toggle button ─────────────────────────────────────────── */}
+        <div className={`border-t border-border ${collapsed ? 'flex justify-center px-4 py-3' : 'px-[14px] py-3'}`}>
+          <button
+            onClick={toggleCollapsed}
+            className={[
+              "inline-flex items-center outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar cursor-pointer",
+              NAV_RADIUS,
+              "text-sm font-medium text-text-secondary hover:bg-sidebar-hover hover:text-text-primary",
+              collapsed
+                ? `${NAV_ITEM_COLLAPSED_SIZE} justify-center`
+                : `${NAV_ITEM_HEIGHT} w-full gap-3 px-3`,
+            ].join(" ")}
+            title={collapsed ? "Expandir menú" : "Minimizar menú"}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className={NAV_ICON_SIZE} />
+            ) : (
+              <>
+                <PanelLeftClose className={NAV_ICON_SIZE} />
+                <span>Minimizar menú</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
-    </>
-  );
+    );
+  }
 
   return (
     <>
-      {/* Desktop: sidebar visible en el layout */}
-      <aside className="sticky top-0 z-50 hidden h-screen w-[220px] flex-col border-r border-border bg-sidebar md:flex">
-        {navContent}
+      <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-sidebar border-r border-border transition-all duration-300 hidden md:flex ${isCollapsed ? 'w-[72px]' : 'w-[260px]'}`} aria-label={t("navigation.sidebar") || "Menú lateral"}>
+        {getNavContent(isCollapsed)}
       </aside>
 
-      {/* ── Móvil: overlay + drawer deslizante ──────────────────────── */}
       <div
-        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 md:hidden ${
-          mobileOpen
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none"
-        }`}
-        onClick={() => setMobileOpen(false)}
+        className={[
+          "fixed inset-0 z-40 bg-overlay transition-opacity duration-300 md:hidden",
+          sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
+        ].join(" ")}
+        onClick={() => closeSidebar()}
         aria-hidden="true"
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col border-r border-border bg-sidebar transition-transform duration-300 md:hidden ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={[
+          `fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col bg-sidebar border-r border-border transition-transform duration-300 ease-out md:hidden`,
+          sidebarOpen ? "translate-x-0 shadow-xl" : "-translate-x-full",
+        ].join(" ")}
+        aria-label={t("navigation.sidebar") || "Menú lateral"}
       >
-        {navContent}
+        {getNavContent(false)}
       </aside>
     </>
   );

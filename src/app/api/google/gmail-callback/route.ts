@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUserContext } from "@/lib/current-user";
-import { canViewIdealistaLeads } from "@/lib/roles";
+import { getCallbackOrigin } from "@/lib/google-redirect";
+
+// ─── Redirigir al callback unificado ────────────────────────────────────
+// Este endpoint se ha consolidado en /api/google/callback.
+// Si llegas aquí, el flujo OAuth original ya no está activo.
+// Google debería redirigir a /api/google/callback vía state=gmail_idealista.
 
 export async function GET(request: NextRequest) {
-  const origin = new URL(request.url).origin;
-  const currentUser = await getCurrentUserContext();
-
-  if (!currentUser || !canViewIdealistaLeads(currentUser.role)) {
-    return NextResponse.redirect(`${origin}/dashboard`);
-  }
-
+  const origin = getCallbackOrigin(request);
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");
@@ -18,45 +16,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/solicitudes?gmail_error=access_denied`);
   }
 
-  const redirectUri = `${origin}/api/google/gmail-callback`;
+  // Reintento: redirigir al callback unificado
+  const callbackUrl = new URL(`${origin}/api/google/callback`);
+  callbackUrl.searchParams.set("code", code);
+  callbackUrl.searchParams.set("state", "gmail_idealista");
+  if (error) callbackUrl.searchParams.set("error", error);
 
-  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-    }),
-  });
-
-  const tokens = await tokenRes.json();
-
-  if (!tokens.access_token) {
-    return NextResponse.redirect(`${origin}/solicitudes?gmail_error=token_failed`);
-  }
-
-  const response = NextResponse.redirect(`${origin}/solicitudes?tab=idealista&gmail_connected=1`);
-
-  response.cookies.set("gmail_access_token", tokens.access_token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    maxAge: tokens.expires_in ?? 3600,
-    path: "/",
-    sameSite: "lax",
-  });
-
-  if (tokens.refresh_token) {
-    response.cookies.set("gmail_refresh_token", tokens.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 24 * 30,
-      path: "/",
-      sameSite: "lax",
-    });
-  }
-
-  return response;
+  return NextResponse.redirect(callbackUrl.toString());
 }

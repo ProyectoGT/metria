@@ -12,6 +12,44 @@ export type Usuario = import("./database.types").Tables<"usuarios">;
 export type Pedido = import("./database.types").Tables<"pedidos">;
 export type Tarea = import("./database.types").Tables<"tareas">;
 export type Agenda = import("./database.types").Tables<"agenda">;
+export type Job = import("./database.types").Tables<"jobs">;
+export type JobLog = import("./database.types").Tables<"job_logs">;
+export type JobSchedule = import("./database.types").Tables<"job_schedules">;
+export type AuditLog = import("./database.types").Tables<"audit_log">;
+
+// ─── Zonas Geográficas (dibujadas en mapa) ────────────────────────────────────
+
+export type ZonaGeograficaEstado = "activa" | "archivada";
+
+export type GeoJsonPolygon = {
+  type: "Polygon";
+  coordinates: number[][][];
+};
+
+export type GeoJsonMultiPolygon = {
+  type: "MultiPolygon";
+  coordinates: number[][][][];
+};
+
+export type ZonaGeografica = {
+  id: number;
+  empresa_id: number;
+  nombre: string;
+  descripcion: string | null;
+  color: string;
+  tipo: string;
+  estado: ZonaGeograficaEstado;
+  geojson: GeoJsonPolygon | GeoJsonMultiPolygon;
+  area_sqm: number | null;
+  created_by: number;
+  updated_by: number | null;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+};
+export type SoporteTicket = import("./database.types").Tables<"tickets_soporte">;
+export type SoporteMensaje = import("./database.types").Tables<"soporte_mensajes">;
+export type SoporteNotificacion = import("./database.types").Tables<"soporte_notificaciones">;
 
 // ─── Contactos ────────────────────────────────────────────────────────────────
 

@@ -8,6 +8,7 @@ import {
 } from "@/lib/delete-confirmation-password";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { validatePassword } from "@/lib/password";
+import { canUseFeature } from "@/lib/access-control/can-access";
 
 type ActionResult = {
   success?: boolean;
@@ -114,6 +115,17 @@ async function deleteWithConfirmation(
   }
 
   if (!getDeletePermission(table, user)) {
+    return { error: getDeleteErrorMessage(table) };
+  }
+
+  const featureKey: Record<DeleteTable, string> = {
+    zona: "zones.delete_zona",
+    sectores: "zones.delete_sector",
+    fincas: "properties.delete",
+    propiedades: "properties.delete",
+  };
+
+  if (!(await canUseFeature(user, featureKey[table]))) {
     return { error: getDeleteErrorMessage(table) };
   }
 

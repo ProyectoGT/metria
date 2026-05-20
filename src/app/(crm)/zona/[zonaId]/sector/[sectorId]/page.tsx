@@ -17,7 +17,7 @@ export default async function SectorDetailPage({
     supabase.from("zona").select("id, nombre").eq("id", Number(zonaId)).single(),
     supabase
       .from("sectores")
-      .select("id, numero, fincas(id, numero, propiedades(id))")
+      .select("id, numero, fincas(id, numero)")
       .eq("id", Number(sectorId))
       .single(),
     getUserOrdenAction("fincas"),
@@ -25,8 +25,39 @@ export default async function SectorDetailPage({
 
   if (!zona || !sector) notFound();
 
+  const fincaIds = (sector.fincas ?? []).map((f) => f.id);
+
+  // Cuenta propiedades visibles por finca con el mismo alcance que el listado interior,
+  // de modo que el contador de la tarjeta coincide con lo que vera el usuario al entrar.
+  const propiedadesPerFinca: Record<number, number> = {};
+
+  if (fincaIds.length > 0) {
+    let conteoQuery = supabase
+      .from("propiedades")
+      .select("id, finca_id")
+      .in("finca_id", fincaIds);
+
+    if (user?.role === "Agente") {
+      conteoQuery = conteoQuery.or(`agente_asignado.eq.${user.id},owner_user_id.eq.${user.id}`) as typeof conteoQuery;
+    } else if (user?.role === "Responsable") {
+      const ids = [user.id, ...user.supervisedAgentIds];
+      conteoQuery = conteoQuery.or(`owner_user_id.eq.${user.id},agente_asignado.in.(${ids.join(",")})`) as typeof conteoQuery;
+    }
+
+    const { data: propiedadesConteo } = await conteoQuery;
+    for (const p of propiedadesConteo ?? []) {
+      if (p.finca_id != null) {
+        propiedadesPerFinca[p.finca_id] = (propiedadesPerFinca[p.finca_id] ?? 0) + 1;
+      }
+    }
+  }
+
   const fincas = (sector.fincas ?? [])
-    .map((f) => ({ ...f, posicion: ordenFincas[f.id] ?? null }))
+    .map((f) => ({
+      ...f,
+      propiedades: Array.from({ length: propiedadesPerFinca[f.id] ?? 0 }, (_, i) => ({ id: i })),
+      posicion: ordenFincas[f.id] ?? null,
+    }))
     .sort((a, b) => {
       const ap = a.posicion, bp = b.posicion;
       if (ap != null && bp != null) return ap - bp;

@@ -1,13 +1,17 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  Archive, Download, Mail, Pencil, Phone, Plus, RotateCcw, Search,
-  SlidersHorizontal, Upload, User, X,
+  Archive, Download, Plus, RotateCcw, Search,
+  History, SlidersHorizontal, Upload, User, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 import { useToast, Toaster } from "@/components/ui/toast";
-import type { Contacto, ContactoTipo, ContactoEstado } from "@/types";
+import ContactoTimeline, { type TimelineEvent } from "@/modules/contactos/components/ContactoTimeline";
+import RelatedEmailsPanel from "@/modules/email/components/RelatedEmailsPanel";
+import Drawer from "@/components/ui/drawer";
+import { ContactosTable } from "./contactos-table";
+import type { Contacto, ContactoTipo, ContactoEstado, ContactoInsert } from "@/types";
 import type { UserRole } from "@/lib/roles";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -28,7 +32,7 @@ export const TIPOS: { value: ContactoTipo; label: string; badge: string }[] = [
   { value: "otro",                 label: "Otro",             badge: "bg-gray-500/15 text-gray-600 dark:text-gray-400" },
 ];
 
-const ESTADOS: { value: ContactoEstado; label: string; badge: string }[] = [
+export const ESTADOS: { value: ContactoEstado; label: string; badge: string }[] = [
   { value: "activo",   label: "Activo",   badge: "bg-success/15 text-success" },
   { value: "inactivo", label: "Inactivo", badge: "bg-gray-500/15 text-gray-600 dark:text-gray-400" },
 ];
@@ -171,13 +175,7 @@ function rowToInsert(row: ParsedCSVRow): ContactoFormPayload | null {
 
 // ─── Tipos locales ─────────────────────────────────────────────────────────────
 
-type ContactoFormPayload = {
-  nombre: string; apellidos: string | null; empresa: string | null; cargo: string | null;
-  tipo: ContactoTipo; email: string | null; telefono: string | null;
-  telefono_secundario: string | null; direccion: string | null; ciudad: string | null;
-  provincia: string | null; codigo_postal: string | null; pais: string;
-  notas: string | null; origen: string | null; estado: ContactoEstado; visibility: string;
-};
+type ContactoFormPayload = ContactoInsert;
 
 type ContactoForm = {
   nombre: string; apellidos: string; empresa: string; cargo: string;
@@ -211,8 +209,7 @@ type Props = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ContactosClient({ initialContactos, currentUserId, currentUserRole }: Props) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = useMemo(() => createClient() as any, []);
+  const db = useMemo(() => createClient(), []);
   const { toast, toasts } = useToast();
 
   const [contactos, setContactos] = useState<Contacto[]>(initialContactos);
@@ -227,6 +224,7 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
   const [form, setForm]           = useState<ContactoForm>(emptyForm());
   const [saving, setSaving]       = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [timelineContacto, setTimelineContacto] = useState<Contacto | null>(null);
 
   // Archive / restore
   const [archivingId, setArchivingId]   = useState<number | null>(null);
@@ -265,10 +263,11 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
 
   // ─── Modal create/edit ───────────────────────────────────────────────────────
 
-  function openCreate() {
+  const openCreate = useCallback(() => {
     setEditId(null); setForm(emptyForm()); setSaveError(null); setModalOpen(true);
-  }
-  function openEdit(c: Contacto) {
+  }, []);
+
+  const openEdit = useCallback((c: Contacto) => {
     setEditId(c.id);
     setForm({
       nombre: c.nombre, apellidos: c.apellidos ?? "", empresa: c.empresa ?? "",
@@ -280,8 +279,9 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
       visibility: c.visibility ?? "company",
     });
     setSaveError(null); setModalOpen(true);
-  }
-  function closeModal() { setModalOpen(false); setEditId(null); setSaveError(null); }
+  }, []);
+
+  const closeModal = useCallback(() => { setModalOpen(false); setEditId(null); setSaveError(null); }, []);
   function setField<K extends keyof ContactoForm>(key: K, value: ContactoForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -320,7 +320,26 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
 
   // ─── Archivar / Restaurar ────────────────────────────────────────────────────
 
-  async function handleArchive(id: number) {
+  function contactoTimelineEvents(c: Contacto): TimelineEvent[] {
+    const details = [
+      c.tipo && `Tipo: ${tipoMeta(c.tipo).label}`,
+      c.telefono && `Telefono: ${c.telefono}`,
+      c.email && `Email: ${c.email}`,
+      c.origen && `Origen: ${c.origen}`,
+    ].filter(Boolean);
+
+    return [{
+      id: `contacto-${c.id}`,
+      contacto_id: c.id,
+      tipo_evento: "contacto",
+      titulo: "Contacto registrado",
+      descripcion: details.join("\n") || null,
+      created_at: c.created_at,
+      synthetic: true,
+    }];
+  }
+
+  const handleArchive = useCallback(async (id: number) => {
     if (archivingId === id) return;
     setArchivingId(id);
     const { error } = await db.from("contactos").update({ archived_at: new Date().toISOString() }).eq("id", id);
@@ -328,7 +347,11 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
     if (error) { toast(error.message, "error"); return; }
     setContactos((prev) => prev.filter((c) => c.id !== id));
     toast("Contacto archivado");
-  }
+  }, [archivingId, db, toast]);
+
+  const handleTimeline = useCallback((c: Contacto) => {
+    setTimelineContacto(c);
+  }, []);
 
   const fetchArchived = useCallback(async () => {
     setLoadingArchived(true);
@@ -551,77 +574,15 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-background text-left text-xs font-medium text-text-secondary">
-                    <th className="px-4 py-3">Contacto</th>
-                    <th className="px-4 py-3">Tipo</th>
-                    <th className="hidden px-4 py-3 md:table-cell">Empresa</th>
-                    <th className="hidden px-4 py-3 lg:table-cell">Telefono</th>
-                    <th className="hidden px-4 py-3 lg:table-cell">Email</th>
-                    <th className="hidden px-4 py-3 xl:table-cell">Ciudad</th>
-                    <th className="px-4 py-3">Estado</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filtered.map((c) => {
-                    const t = tipoMeta(c.tipo);
-                    const e = estadoMeta(c.estado);
-                    const nombre = nombreCompleto(c);
-                    return (
-                      <tr key={c.id} onClick={() => openEdit(c)} className="cursor-pointer hover:bg-background">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${avatarColor(nombre)}`}>
-                              {initials(c)}
-                            </span>
-                            <span className="font-medium text-text-primary">{nombre}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${t.badge}`}>{t.label}</span>
-                        </td>
-                        <td className="hidden px-4 py-3 text-text-secondary md:table-cell">{c.empresa ?? "—"}</td>
-                        <td className="hidden px-4 py-3 lg:table-cell">
-                          {c.telefono ? (
-                            <a href={`tel:${c.telefono}`} onClick={(ev) => ev.stopPropagation()} className="flex items-center gap-1 text-text-secondary hover:text-primary">
-                              <Phone className="h-3.5 w-3.5" />{c.telefono}
-                            </a>
-                          ) : <span className="text-text-secondary">—</span>}
-                        </td>
-                        <td className="hidden px-4 py-3 lg:table-cell">
-                          {c.email ? (
-                            <a href={`mailto:${c.email}`} onClick={(ev) => ev.stopPropagation()} className="flex max-w-[180px] items-center gap-1 truncate text-text-secondary hover:text-primary">
-                              <Mail className="h-3.5 w-3.5 shrink-0" />{c.email}
-                            </a>
-                          ) : <span className="text-text-secondary">—</span>}
-                        </td>
-                        <td className="hidden px-4 py-3 text-text-secondary xl:table-cell">
-                          {[c.ciudad, c.provincia].filter(Boolean).join(", ") || "—"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${e.badge}`}>{e.label}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1">
-                            <button onClick={(ev) => { ev.stopPropagation(); openEdit(c); }} className="rounded p-1.5 text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary" title="Editar">
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                            {(canManageAll || c.owner_user_id === currentUserId) && (
-                              <button onClick={(ev) => { ev.stopPropagation(); handleArchive(c.id); }} disabled={archivingId === c.id} className="rounded p-1.5 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50" title="Archivar">
-                                <Archive className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <ContactosTable
+              contacts={filtered}
+              currentUserId={currentUserId}
+              canManageAll={canManageAll}
+              archivingId={archivingId}
+              onEdit={openEdit}
+              onArchive={handleArchive}
+              onTimeline={handleTimeline}
+            />
             <div className="flex items-center justify-between border-t border-border px-4 py-2">
               <span className="text-xs text-text-secondary">
                 {filtered.length} {filtered.length === 1 ? "contacto" : "contactos"}{filtered.length !== contactos.length && ` de ${contactos.length}`}
@@ -682,183 +643,263 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
         </div>
       )}
 
-      {/* ── Modal crear/editar ── */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
-          <div className="w-full max-w-2xl rounded-2xl bg-surface shadow-xl">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">{editId ? "Editar contacto" : "Nuevo contacto"}</h2>
-              <button onClick={closeModal} className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"><X className="h-4 w-4" /></button>
+      {/* ── Drawer crear/editar ── */}
+      <Drawer
+        open={modalOpen}
+        onClose={closeModal}
+        title={
+          editId !== null
+            ? (() => { const c = contactos.find((x) => x.id === editId); return c ? nombreCompleto(c) : "Editar contacto"; })()
+            : "Nuevo contacto"
+        }
+        subtitle={
+          editId !== null
+            ? (() => {
+                const c = contactos.find((cc) => cc.id === editId);
+                if (!c) return undefined;
+                return [c.empresa, c.cargo].filter(Boolean).join(" · ") || undefined;
+              })()
+            : undefined
+        }
+        width="xl"
+        headerActions={
+          editId !== null
+            ? (() => {
+                const c = contactos.find((cc) => cc.id === editId);
+                if (!c) return null;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setTimelineContacto(c)}
+                    className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-raised hover:text-primary"
+                    title="Timeline"
+                  >
+                    <History className="h-4 w-4" />
+                  </button>
+                );
+              })()
+            : undefined
+        }
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={closeModal}
+              className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form="contact-form"
+              disabled={saving || !form.nombre.trim()}
+              className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? "Guardando..." : editId ? "Guardar cambios" : "Crear contacto"}
+            </button>
+          </div>
+        }
+      >
+        {editId !== null &&
+          (() => {
+            const c = contactos.find((cc) => cc.id === editId);
+            if (!c) return null;
+            const t = tipoMeta(c.tipo);
+            const n = nombreCompleto(c);
+            return (
+              <div className="flex items-center gap-3 border-b border-border px-6 py-4 bg-background/50">
+                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white ${avatarColor(n)}`}>
+                  {initials(c)}
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${t.badge}`}>{t.label}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${estadoMeta(c.estado).badge}`}>
+                    {estadoMeta(c.estado).label}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
+        <form id="contact-form" onSubmit={handleSave} className="flex flex-1 flex-col">
+          <div className="space-y-5 px-6 py-5">
+            {/* Datos básicos */}
+            <div className="space-y-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Datos basicos</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-text-secondary">Nombre <span className="text-danger">*</span></label>
+                  <input value={form.nombre} onChange={(e) => setField("nombre", e.target.value)} className="input" required autoFocus placeholder="Nombre" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-text-secondary">Apellidos</label>
+                  <input value={form.apellidos} onChange={(e) => setField("apellidos", e.target.value)} className="input" placeholder="Apellidos" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-text-secondary">Tipo <span className="text-danger">*</span></label>
+                  <select value={form.tipo} onChange={(e) => setField("tipo", e.target.value as ContactoTipo)} className="input" required>
+                    {TIPOS.map((t_) => <option key={t_.value} value={t_.value}>{t_.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-text-secondary">Estado</label>
+                  <select value={form.estado} onChange={(e) => setField("estado", e.target.value as ContactoEstado)} className="input">
+                    {ESTADOS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-text-secondary">Empresa</label>
+                  <input value={form.empresa} onChange={(e) => setField("empresa", e.target.value)} className="input" placeholder="Nombre de la empresa" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-text-secondary">Cargo</label>
+                  <input value={form.cargo} onChange={(e) => setField("cargo", e.target.value)} className="input" placeholder="Cargo o puesto" />
+                </div>
+              </div>
             </div>
 
-            <form onSubmit={handleSave} className="max-h-[75vh] overflow-y-auto">
-              <div className="space-y-5 px-6 py-5">
-                {/* Datos básicos */}
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Datos basicos</p>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Nombre <span className="text-danger">*</span></label>
-                      <input value={form.nombre} onChange={(e) => setField("nombre", e.target.value)} className="input" required autoFocus placeholder="Nombre" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Apellidos</label>
-                      <input value={form.apellidos} onChange={(e) => setField("apellidos", e.target.value)} className="input" placeholder="Apellidos" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Tipo <span className="text-danger">*</span></label>
-                      <select value={form.tipo} onChange={(e) => setField("tipo", e.target.value as ContactoTipo)} className="input" required>
-                        {TIPOS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Estado</label>
-                      <select value={form.estado} onChange={(e) => setField("estado", e.target.value as ContactoEstado)} className="input">
-                        {ESTADOS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Empresa</label>
-                      <input value={form.empresa} onChange={(e) => setField("empresa", e.target.value)} className="input" placeholder="Nombre de la empresa" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Cargo</label>
-                      <input value={form.cargo} onChange={(e) => setField("cargo", e.target.value)} className="input" placeholder="Cargo o puesto" />
-                    </div>
-                  </div>
+            {/* Contacto */}
+            <div className="space-y-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Informacion de contacto</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-text-secondary">Email</label>
+                  <input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} className="input" placeholder="correo@ejemplo.com" />
                 </div>
-
-                {/* Contacto */}
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Informacion de contacto</p>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Email</label>
-                      <input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} className="input" placeholder="correo@ejemplo.com" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Telefono</label>
-                      <input type="tel" value={form.telefono} onChange={(e) => setField("telefono", e.target.value)} className="input" placeholder="600 000 000" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-text-primary">Telefono secundario</label>
-                    <input type="tel" value={form.telefono_secundario} onChange={(e) => setField("telefono_secundario", e.target.value)} className="input" placeholder="Segundo numero opcional" />
-                  </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-text-secondary">Telefono</label>
+                  <input type="tel" value={form.telefono} onChange={(e) => setField("telefono", e.target.value)} className="input" placeholder="600 000 000" />
                 </div>
-
-                {/* Ubicación */}
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Ubicacion</p>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Ciudad</label>
-                      <input value={form.ciudad} onChange={(e) => setField("ciudad", e.target.value)} className="input" placeholder="Ciudad" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text-primary">Provincia</label>
-                      <input value={form.provincia} onChange={(e) => setField("provincia", e.target.value)} className="input" placeholder="Provincia" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-text-primary">Direccion</label>
-                    <input value={form.direccion} onChange={(e) => setField("direccion", e.target.value)} className="input" placeholder="Calle, numero, piso..." />
-                  </div>
-                </div>
-
-                {/* Otros */}
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Otros datos</p>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-text-primary">Origen</label>
-                    <input value={form.origen} onChange={(e) => setField("origen", e.target.value)} className="input" placeholder="Como ha llegado este contacto" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-text-primary">Notas</label>
-                    <textarea value={form.notas} onChange={(e) => setField("notas", e.target.value)} rows={3} className="input resize-none" placeholder="Notas adicionales..." />
-                  </div>
-                </div>
-
-                {saveError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{saveError}</p>}
               </div>
-
-              <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
-                <button type="button" onClick={closeModal} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">Cancelar</button>
-                <button type="submit" disabled={saving || !form.nombre.trim()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50">
-                  {saving ? "Guardando..." : editId ? "Guardar cambios" : "Crear contacto"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── Modal importar CSV ── */}
-      {importModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-3xl rounded-2xl bg-surface shadow-xl">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <div>
-                <h2 className="text-base font-semibold text-text-primary">Importar contactos</h2>
-                <p className="mt-0.5 text-xs text-text-secondary">{importRows.length} {importRows.length === 1 ? "fila valida" : "filas validas"} encontradas</p>
+                <label className="mb-1 block text-xs font-medium text-text-secondary">Telefono secundario</label>
+                <input type="tel" value={form.telefono_secundario} onChange={(e) => setField("telefono_secundario", e.target.value)} className="input" placeholder="Segundo numero opcional" />
               </div>
-              <button onClick={() => { setImportModal(false); setImportRows([]); }} className="rounded-lg p-1.5 text-text-secondary hover:bg-background hover:text-text-primary"><X className="h-4 w-4" /></button>
             </div>
 
-            <div className="max-h-[55vh] overflow-auto p-4">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-background text-left text-text-secondary">
-                    <th className="px-3 py-2">Nombre</th>
-                    <th className="px-3 py-2">Apellidos</th>
-                    <th className="px-3 py-2">Tipo</th>
-                    <th className="px-3 py-2">Empresa</th>
-                    <th className="px-3 py-2">Telefono</th>
-                    <th className="px-3 py-2">Email</th>
-                    <th className="px-3 py-2">Ciudad</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {importRows.slice(0, 50).map((row, i) => {
-                    const t = tipoMeta(row.tipo);
-                    return (
-                      <tr key={i} className="hover:bg-background">
-                        <td className="px-3 py-2 font-medium">{row.nombre}</td>
-                        <td className="px-3 py-2 text-text-secondary">{row.apellidos ?? "—"}</td>
-                        <td className="px-3 py-2"><span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${t.badge}`}>{t.label}</span></td>
-                        <td className="px-3 py-2 text-text-secondary">{row.empresa ?? "—"}</td>
-                        <td className="px-3 py-2 text-text-secondary">{row.telefono ?? "—"}</td>
-                        <td className="px-3 py-2 text-text-secondary">{row.email ?? "—"}</td>
-                        <td className="px-3 py-2 text-text-secondary">{row.ciudad ?? "—"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {importRows.length > 50 && (
-                <p className="mt-2 text-center text-xs text-text-secondary">... y {importRows.length - 50} filas mas</p>
-              )}
+            {/* Ubicación */}
+            <div className="space-y-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Ubicacion</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-text-secondary">Ciudad</label>
+                  <input value={form.ciudad} onChange={(e) => setField("ciudad", e.target.value)} className="input" placeholder="Ciudad" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-text-secondary">Provincia</label>
+                  <input value={form.provincia} onChange={(e) => setField("provincia", e.target.value)} className="input" placeholder="Provincia" />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-text-secondary">Direccion</label>
+                <input value={form.direccion} onChange={(e) => setField("direccion", e.target.value)} className="input" placeholder="Calle, numero, piso..." />
+              </div>
             </div>
 
-            {importError && <p className="mx-4 mb-2 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{importError}</p>}
+            {/* Otros */}
+            <div className="space-y-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Otros datos</p>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-text-secondary">Origen</label>
+                <input value={form.origen} onChange={(e) => setField("origen", e.target.value)} className="input" placeholder="Como ha llegado este contacto" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-text-secondary">Notas</label>
+                <textarea value={form.notas} onChange={(e) => setField("notas", e.target.value)} rows={3} className="input resize-none" placeholder="Notas adicionales..." />
+              </div>
+            </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4">
-              <button onClick={handleExportTemplate} className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-primary">
-                <Download className="h-3.5 w-3.5" /> Descargar plantilla CSV
+            {saveError && <p className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{saveError}</p>}
+          </div>
+        </form>
+      </Drawer>
+
+      {/* ── Drawer importar CSV ── */}
+      <Drawer
+        open={importModal}
+        onClose={() => { setImportModal(false); setImportRows([]); }}
+        title="Importar contactos"
+        subtitle={`${importRows.length} ${importRows.length === 1 ? "fila valida" : "filas validas"} encontradas`}
+        width="xl"
+      >
+        <div className="flex h-full flex-col">
+          <div className="flex-1 overflow-auto p-4">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-background text-left text-text-secondary">
+                  <th className="px-3 py-2">Nombre</th>
+                  <th className="px-3 py-2">Apellidos</th>
+                  <th className="px-3 py-2">Tipo</th>
+                  <th className="px-3 py-2">Empresa</th>
+                  <th className="px-3 py-2">Telefono</th>
+                  <th className="px-3 py-2">Email</th>
+                  <th className="px-3 py-2">Ciudad</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {importRows.slice(0, 50).map((row, i) => {
+                  const t = tipoMeta(row.tipo);
+                  return (
+                    <tr key={i} className="hover:bg-background">
+                      <td className="px-3 py-2 font-medium">{row.nombre}</td>
+                      <td className="px-3 py-2 text-text-secondary">{row.apellidos ?? "—"}</td>
+                      <td className="px-3 py-2"><span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${t.badge}`}>{t.label}</span></td>
+                      <td className="px-3 py-2 text-text-secondary">{row.empresa ?? "—"}</td>
+                      <td className="px-3 py-2 text-text-secondary">{row.telefono ?? "—"}</td>
+                      <td className="px-3 py-2 text-text-secondary">{row.email ?? "—"}</td>
+                      <td className="px-3 py-2 text-text-secondary">{row.ciudad ?? "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {importRows.length > 50 && (
+              <p className="mt-2 text-center text-xs text-text-secondary">... y {importRows.length - 50} filas mas</p>
+            )}
+          </div>
+
+          {importError && <p className="mx-4 mb-2 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{importError}</p>}
+
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4">
+            <button onClick={handleExportTemplate} className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-primary">
+              <Download className="h-3.5 w-3.5" /> Descargar plantilla CSV
+            </button>
+            <div className="flex gap-3">
+              <button onClick={() => { setImportModal(false); setImportRows([]); }} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background">Cancelar</button>
+              <button onClick={handleImport} disabled={importing} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50">
+                {importing ? "Importando..." : `Importar ${importRows.length} contactos`}
               </button>
-              <div className="flex gap-3">
-                <button onClick={() => { setImportModal(false); setImportRows([]); }} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background">Cancelar</button>
-                <button onClick={handleImport} disabled={importing} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50">
-                  {importing ? "Importando..." : `Importar ${importRows.length} contactos`}
-                </button>
-              </div>
             </div>
           </div>
         </div>
+      </Drawer>
+
+      {timelineContacto && (
+        <Drawer
+          open={!!timelineContacto}
+          onClose={() => setTimelineContacto(null)}
+          title={nombreCompleto(timelineContacto)}
+          subtitle="Timeline del contacto"
+          width="xl"
+          zIndex="z-[50]"
+        >
+          <>
+              <ContactoTimeline
+                subject={{ type: "contacto", id: timelineContacto.id, title: nombreCompleto(timelineContacto) }}
+                currentUserId={currentUserId}
+                initialEvents={contactoTimelineEvents(timelineContacto)}
+              />
+              <RelatedEmailsPanel
+                entityType="contacto"
+                entityId={timelineContacto.id}
+                replyTo={timelineContacto.email}
+              />
+          </>
+        </Drawer>
       )}
     </div>
   );

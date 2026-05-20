@@ -1,0 +1,7 @@
+{
+  "unauthorized": "Non autorizzato. La preghiamo di effettuare l'accesso.",
+  "notFound": "Pagina non trovata.",
+  "serverError": "Errore interno del server. La preghiamo di riprovare più tardi.",
+  "networkError": "Errore di rete. Controlli la Sua connessione.",
+  "invalidCredentials": "Email o password non valide."
+}

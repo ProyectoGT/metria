@@ -1,0 +1,13 @@
+{
+  "title": "Impostazioni",
+  "profile": "Profilo",
+  "language": "Lingua",
+  "languages": {
+    "en": "English",
+    "es": "Español",
+    "it": "Italiano"
+  },
+  "saveChanges": "Salva le modifiche",
+  "notifications": "Notifiche",
+  "security": "Sicurezza"
+}

@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { MoreVertical, Plus, Search, UserCheck, UserX, Mail } from "lucide-react";
+import { MoreVertical, Plus, UserCheck, UserX, Mail } from "lucide-react";
+import FilterSearch from "@/components/ui/filters/FilterSearch";
+import FilterSelect from "@/components/ui/filters/FilterSelect";
 import Avatar from "@/components/ui/avatar";
+import Drawer from "@/components/ui/drawer";
 import { useToast, Toaster } from "@/components/ui/toast";
 import {
   deleteUserAction,
-  updateUserRoleAction,
   updateUserInfoAction,
   toggleUserStatusAction,
-  updateUserSupervisorAction,
   resendVerificationAction,
 } from "./actions";
 import CreateUserForm from "./create-user-form";
@@ -40,8 +41,6 @@ type Props = {
   currentUserRole: UserRole;
   currentUserId: number;
 };
-
-const DIRECTOR_ALLOWED_ROLES = ["Responsable", "Agente"];
 
 export default function UsersManagementPanel({
   users: initialUsers,
@@ -94,26 +93,22 @@ export default function UsersManagementPanel({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[140px] flex-1 md:flex-none">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar"
-                className="input h-9 w-full pl-9 pr-3 md:w-64"
-              />
-            </div>
-            <select
+            <FilterSearch
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar"
+              className="w-48"
+            />
+            <FilterSelect
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="input h-9 py-0 text-sm md:w-40"
+              label="Rol"
             >
               <option value="">Todos los rangos</option>
               {roles.map((role) => (
                 <option key={role} value={role}>{role}</option>
               ))}
-            </select>
+            </FilterSelect>
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
@@ -443,110 +438,111 @@ function EditUserDialog({
   const editableRoles = roles.filter((r) => r !== "Administrador");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl">
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="text-base font-semibold text-text-primary">Editar usuario</h2>
-          <button onClick={onClose} className="text-text-secondary hover:text-text-primary">×</button>
+    <Drawer
+      open
+      onClose={onClose}
+      title="Editar usuario"
+      subtitle={`${user.nombre} ${user.apellidos}`.trim()}
+      width="sm"
+      footer={
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isPending}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
+          >
+            {isPending ? "Guardando..." : "Guardar cambios"}
+          </button>
         </div>
-        <div className="space-y-4 p-6">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Nombre</label>
-              <input
-                value={form.nombre}
-                onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
-                className="input"
-                placeholder="Nombre"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Apellidos</label>
-              <input
-                value={form.apellidos}
-                onChange={(e) => setForm((f) => ({ ...f, apellidos: e.target.value }))}
-                className="input"
-                placeholder="Apellidos"
-              />
-            </div>
-          </div>
-
+      }
+    >
+      <div className="space-y-4 px-5 py-5">
+        <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-text-secondary">Correo</label>
+            <label className="text-xs font-medium text-text-secondary">Nombre</label>
             <input
-              type="email"
-              value={form.correo}
-              onChange={(e) => setForm((f) => ({ ...f, correo: e.target.value }))}
+              value={form.nombre}
+              onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
               className="input"
-              placeholder="usuario@empresa.com"
+              placeholder="Nombre"
             />
           </div>
-
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-text-secondary">Rango</label>
-            <div className="grid grid-cols-3 gap-2">
-              {editableRoles.map((role) => (
-                <button
-                  key={role}
-                  type="button"
-                  onClick={() => setForm((f) => ({ ...f, rol: role }))}
-                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                    form.rol === role
-                      ? "border-primary bg-primary text-white"
-                      : "border-border bg-background text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  {role}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {needsSupervisor && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Supervisor</label>
-              <select
-                value={form.supervisorId ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    supervisorId: e.target.value ? Number(e.target.value) : null,
-                  }))
-                }
-                className="input"
-              >
-                <option value="">Sin supervisor asignado</option>
-                {availableSupervisors.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {`${s.nombre} ${s.apellidos}`.trim()} ({s.rol})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {error && (
-            <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>
-          )}
-
-          <div className="flex justify-end gap-3 border-t border-border pt-4">
-            <button
-              onClick={onClose}
-              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isPending}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
-            >
-              {isPending ? "Guardando..." : "Guardar cambios"}
-            </button>
+            <label className="text-xs font-medium text-text-secondary">Apellidos</label>
+            <input
+              value={form.apellidos}
+              onChange={(e) => setForm((f) => ({ ...f, apellidos: e.target.value }))}
+              className="input"
+              placeholder="Apellidos"
+            />
           </div>
         </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-text-secondary">Correo</label>
+          <input
+            type="email"
+            value={form.correo}
+            onChange={(e) => setForm((f) => ({ ...f, correo: e.target.value }))}
+            className="input"
+            placeholder="usuario@empresa.com"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-text-secondary">Rango</label>
+          <div className="grid grid-cols-3 gap-2">
+            {editableRoles.map((role) => (
+              <button
+                key={role}
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, rol: role }))}
+                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  form.rol === role
+                    ? "border-primary bg-primary text-white"
+                    : "border-border bg-background text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {role}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {needsSupervisor && (
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-text-secondary">Supervisor</label>
+            <select
+              value={form.supervisorId ?? ""}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  supervisorId: e.target.value ? Number(e.target.value) : null,
+                }))
+              }
+              className="input"
+            >
+              <option value="">Sin supervisor asignado</option>
+              {availableSupervisors.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {`${s.nombre} ${s.apellidos}`.trim()} ({s.rol})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {error && (
+          <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>
+        )}
       </div>
-    </div>
+    </Drawer>
   );
 }
 
@@ -575,22 +571,13 @@ function DeleteUserDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
-        <h2 className="text-base font-semibold text-text-primary">Eliminar usuario</h2>
-        <p className="mt-2 text-sm text-text-secondary">
-          Vas a eliminar el perfil de{" "}
-          <span className="font-medium text-text-primary">
-            {`${user.nombre} ${user.apellidos}`.trim()}
-          </span>
-          . Si tiene datos vinculados en el CRM, se desactivara su acceso en su lugar.
-        </p>
-
-        {error && (
-          <p className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>
-        )}
-
-        <div className="mt-5 flex justify-end gap-3">
+    <Drawer
+      open
+      onClose={onClose}
+      title="Eliminar usuario"
+      width="sm"
+      footer={
+        <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
             className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
@@ -605,8 +592,22 @@ function DeleteUserDialog({
             {isPending ? "Eliminando..." : "Eliminar"}
           </button>
         </div>
+      }
+    >
+      <div className="px-5 py-5">
+        <p className="text-sm text-text-secondary">
+          Vas a eliminar el perfil de{" "}
+          <span className="font-medium text-text-primary">
+            {`${user.nombre} ${user.apellidos}`.trim()}
+          </span>
+          . Si tiene datos vinculados en el CRM, se desactivara su acceso en su lugar.
+        </p>
+
+        {error && (
+          <p className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>
+        )}
       </div>
-    </div>
+    </Drawer>
   );
 }
 
@@ -620,21 +621,9 @@ function FormModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-2xl rounded-2xl bg-surface shadow-xl">
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="text-base font-semibold text-text-primary">{title}</h2>
-          <button
-            onClick={onClose}
-            className="text-text-secondary transition-colors hover:text-text-primary"
-            aria-label="Cerrar"
-          >
-            ×
-          </button>
-        </div>
-        <div className="max-h-[80vh] overflow-y-auto">{children}</div>
-      </div>
-    </div>
+    <Drawer open onClose={onClose} title={title} width="lg">
+      <div className="overflow-y-auto">{children}</div>
+    </Drawer>
   );
 }
 

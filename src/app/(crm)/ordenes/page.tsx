@@ -1,26 +1,20 @@
-import { createClient } from "@/lib/supabase";
+﻿import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { getCurrentUserContext } from "@/lib/current-user";
-import { canViewAllAgents, canViewSupervisedAgents } from "@/lib/roles";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import { formatLocalDateEs, localDateKey } from "@/lib/local-date-time";
-import { normalizeAgendaEvent } from "@/lib/agenda/normalize-agenda-event";
+import { normalizeAgendaEvent } from "@/modules/calendario/services/normalize-agenda-event";
 import PageHeader from "@/components/layout/page-header";
 import OrdenesClient from "./ordenes-client";
 
 export default async function OrdenesPage() {
   const supabase = await createClient();
-  const yo = await getCurrentUserContext();
-
-  if (!yo) {
-    return <div className="p-6 text-text-secondary">No autenticado.</div>;
-  }
+  const yo = await requirePageAccess("ordenes");
 
   const today = localDateKey();
-  const allowedUserIds = canViewAllAgents(yo.role)
-    ? null
-    : canViewSupervisedAgents(yo.role)
-      ? [yo.id, ...yo.supervisedAgentIds]
-      : [yo.id];
+  // Orden del día es una vista personal: cada usuario ve solo sus propias
+  // actividades, independientemente del rol. Los roles de gestión no implican
+  // ver las tareas ajenas aquí; para eso existe la vista de equipo/dashboard.
+  const allowedUserIds = [yo.id];
 
   const agendaAdmin = createAdminClient();
 

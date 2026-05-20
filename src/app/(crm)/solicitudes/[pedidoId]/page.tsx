@@ -3,9 +3,13 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Bath, BedDouble, Car, Euro, Home, MapPin, Phone, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
-import { canReadPedido } from "@/lib/pedidos-access";
 import Breadcrumb from "@/components/ui/breadcrumb";
 import { ACCESS_SCOPE_LABELS, normalizeAccessScope } from "@/lib/access-scope";
+import { formatModalidadPedido } from "@/modules/solicitudes/services/modalidades";
+import WhatsAppMessageModal from "@/components/whatsapp/WhatsAppMessageModal";
+import PropertyMatcherModal from "@/components/whatsapp/PropertyMatcherModal";
+import WhatsAppHistory from "@/components/whatsapp/WhatsAppHistory";
+import { buildWhatsAppMessage } from "@/lib/whatsapp";
 
 type PedidoDetail = {
   id: number;
@@ -23,10 +27,6 @@ type PedidoDetail = {
   referencia: string | null;
   notas: string | null;
   visibility: string | null;
-  visibility_agente_ids: number[] | null;
-  owner_user_id: number | null;
-  empresa_id: number | null;
-  equipo_id: number | null;
   usuarios: { id: number; nombre: string | null; apellidos: string | null } | null;
   zona: { id: number; nombre: string | null } | null;
 };
@@ -38,13 +38,6 @@ function formatPresupuesto(value: number | null) {
     currency: "EUR",
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-function modalidadLabel(value: string | null) {
-  if (value === "CV") return "Compra / venta";
-  if (value === "CH") return "Compra con hipoteca";
-  if (value === "ALQ") return "Alquiler";
-  return value ?? "-";
 }
 
 function origenLabel(value: string | null) {
@@ -60,7 +53,7 @@ export default async function PedidoDetailPage({
 }) {
   const { pedidoId } = await params;
   const supabase = await createClient();
-  const user = await getCurrentUserContext();
+  const yo = await getCurrentUserContext();
 
   const { data } = await supabase
     .from("pedidos")
@@ -80,10 +73,6 @@ export default async function PedidoDetailPage({
       referencia,
       notas,
       visibility,
-      visibility_agente_ids,
-      owner_user_id,
-      empresa_id,
-      equipo_id,
       usuarios:usuarios!pedidos_owner_user_id_fkey(id, nombre, apellidos),
       zona:zona_deseada(id, nombre)
     `)
@@ -93,12 +82,11 @@ export default async function PedidoDetailPage({
   if (!data) notFound();
 
   const pedido = data as unknown as PedidoDetail;
-  if (!canReadPedido(pedido, user)) notFound();
-
   const agente = pedido.usuarios
     ? `${pedido.usuarios.nombre ?? ""} ${pedido.usuarios.apellidos ?? ""}`.trim()
     : "";
   const scope = normalizeAccessScope(pedido.visibility);
+  const agenteActual = yo ? `${yo.nombre} ${yo.apellidos}`.trim() : agente;
 
   return (
     <div className="space-y-6">
@@ -120,7 +108,7 @@ export default async function PedidoDetailPage({
           </Link>
           <h1 className="text-2xl font-bold text-text-primary">{pedido.nombre_cliente}</h1>
           <p className="mt-1 text-sm text-text-secondary">
-            {[pedido.tipo_propiedad, pedido.zona_busqueda ?? pedido.zona?.nombre, modalidadLabel(pedido.modalidad)]
+            {[pedido.tipo_propiedad, pedido.zona_busqueda ?? pedido.zona?.nombre, formatModalidadPedido(pedido.modalidad)]
               .filter((item) => item && item !== "-")
               .join(" · ") || "Solicitud"}
           </p>
@@ -135,10 +123,36 @@ export default async function PedidoDetailPage({
           <h2 className="mb-4 text-base font-semibold text-text-primary">Datos de la solicitud</h2>
           <dl className="grid gap-4 sm:grid-cols-2">
             <Info label="Cliente" value={pedido.nombre_cliente} icon={<UserRound className="h-4 w-4" />} />
-            <Info label="Telefono" value={pedido.telefono ?? "-"} icon={<Phone className="h-4 w-4" />} />
+            {pedido.telefono ? (
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Telefono</dt>
+                <dd className="mt-1 flex flex-wrap items-center gap-2 text-sm font-medium text-text-primary">
+                  <span className="flex items-center gap-2 text-text-secondary"><Phone className="h-4 w-4" /></span>
+                  <span>{pedido.telefono}</span>
+                  <WhatsAppMessageModal
+                    phone={pedido.telefono}
+                    recipientName={pedido.nombre_cliente}
+                    initialMessage={buildWhatsAppMessage("cliente_solicitud", {
+                      nombre: pedido.nombre_cliente,
+                      agente: agenteActual,
+                      tipo: pedido.tipo_propiedad ?? undefined,
+                      zona: pedido.zona_busqueda ?? pedido.zona?.nombre ?? undefined,
+                    })}
+                    templateName="cliente_solicitud"
+                    relatedType="solicitud"
+                    relatedId={pedido.id}
+                    pedidoId={pedido.id}
+                    buttonLabel="WhatsApp"
+                    buttonVariant="compact"
+                  />
+                </dd>
+              </div>
+            ) : (
+              <Info label="Telefono" value="-" icon={<Phone className="h-4 w-4" />} />
+            )}
             <Info label="Tipo de propiedad" value={pedido.tipo_propiedad ?? "-"} icon={<Home className="h-4 w-4" />} />
             <Info label="Presupuesto" value={formatPresupuesto(pedido.presupuesto)} icon={<Euro className="h-4 w-4" />} />
-            <Info label="Modalidad" value={modalidadLabel(pedido.modalidad)} />
+            <Info label="Modalidad" value={formatModalidadPedido(pedido.modalidad)} />
             <Info label="Habitaciones" value={pedido.habitaciones != null ? String(pedido.habitaciones) : "-"} icon={<BedDouble className="h-4 w-4" />} />
             <Info label="Banos" value={pedido.banos != null ? String(pedido.banos) : "-"} icon={<Bath className="h-4 w-4" />} />
             <Info label="Garaje" value={pedido.garaje === true ? "Si" : pedido.garaje === false ? "No" : "-"} icon={<Car className="h-4 w-4" />} />
@@ -169,6 +183,20 @@ export default async function PedidoDetailPage({
             <h2 className="mb-4 text-base font-semibold text-text-primary">Visibilidad</h2>
             <p className="text-sm text-text-secondary">{ACCESS_SCOPE_LABELS[scope]}</p>
           </div>
+
+          <div className="rounded-lg border border-border bg-surface p-5">
+            <h2 className="mb-3 text-base font-semibold text-text-primary">Acciones</h2>
+            <div className="flex flex-col gap-2">
+              <PropertyMatcherModal
+                pedidoId={pedido.id}
+                clienteNombre={pedido.nombre_cliente}
+                clienteTelefono={pedido.telefono}
+                currentUserName={agenteActual}
+              />
+            </div>
+          </div>
+
+          <WhatsAppHistory pedidoId={pedido.id} />
         </aside>
       </section>
     </div>

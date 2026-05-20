@@ -3,11 +3,14 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
+import { useI18n } from "@/lib/i18n";
+import { translateVisibleText } from "@/lib/i18n/translate-text";
 
 const fieldClassName =
   "w-full border-0 border-b border-[#d8d3cb] bg-transparent px-0 py-3 text-sm text-[#171717] outline-none transition placeholder:text-[#b1aba3] focus:border-[#7ba4e0] focus:ring-0";
 
 export default function NuevaContrasenaForm() {
+  const { t } = useI18n();
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -19,11 +22,11 @@ export default function NuevaContrasenaForm() {
     setError(null);
 
     if (password.length < 8) {
-      setError("La contraseña debe tener al menos 8 caracteres.");
+      setError(t("auth:passwordMinError"));
       return;
     }
     if (password !== confirm) {
-      setError("Las contraseñas no coinciden.");
+      setError(t("auth:passwordMismatch"));
       return;
     }
 
@@ -44,21 +47,21 @@ export default function NuevaContrasenaForm() {
     <form onSubmit={handleSubmit} className="space-y-8">
       {error && (
         <div className="rounded-2xl border border-[#f2c7c7] bg-[#fff3f3] px-4 py-3 text-sm text-[#b42318]">
-          {error}
+          {translateVisibleText(error)}
         </div>
       )}
 
       <div className="space-y-7">
         <div>
           <label htmlFor="password" className="mb-2 block text-sm font-medium text-[#2f2f2f]">
-            Nueva contraseña
+            {t("auth:newPassword")}
           </label>
           <input
             id="password"
             type="password"
             required
             minLength={8}
-            placeholder="Mínimo 8 caracteres"
+            placeholder={t("auth:minimumPasswordLength")}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
@@ -68,14 +71,14 @@ export default function NuevaContrasenaForm() {
 
         <div>
           <label htmlFor="confirm" className="mb-2 block text-sm font-medium text-[#2f2f2f]">
-            Confirmar contraseña
+            {t("auth:confirmPassword")}
           </label>
           <input
             id="confirm"
             type="password"
             required
             minLength={8}
-            placeholder="Repite la contraseña"
+            placeholder={t("auth:repeatPassword")}
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             autoComplete="new-password"
@@ -89,7 +92,7 @@ export default function NuevaContrasenaForm() {
         disabled={isPending}
         className="w-full rounded-full border border-[#9fc0ee] px-4 py-2.5 text-sm font-medium text-[#6f96cf] transition hover:border-[#7ba4e0] hover:text-[#5f8fd4] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isPending ? "Guardando..." : "Guardar nueva contraseña"}
+        {isPending ? t("common:loading") : t("auth:saveNewPassword")}
       </button>
     </form>
   );

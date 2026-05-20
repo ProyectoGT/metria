@@ -1,17 +1,18 @@
-import { createClient } from "@/lib/supabase";
-import { getCurrentUserContext } from "@/lib/current-user";
-import { getPeriodRange, mergeRendimientoRowsAnual } from "@/lib/desarrollo-metrics";
+﻿import { createClient } from "@/lib/supabase";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
+import { getPeriodRange, mergeRendimientoRows } from "@/modules/desarrollo/services/desarrollo-metrics";
 import PageHeader from "@/components/layout/page-header";
 import DesarrolloClient from "./desarrollo-client";
 
 export default async function DesarrolloPage() {
   const supabase = await createClient();
   const anioActual = new Date().getFullYear();
-  const periodRange = getPeriodRange(anioActual, 0);
+  const mesActual = new Date().getMonth() + 1;
+  const periodRange = getPeriodRange(anioActual, mesActual);
 
-  const yo = await getCurrentUserContext();
-  const role = yo?.role ?? "Agente";
-  const userId = yo?.id ?? 0;
+  const yo = await requirePageAccess("desarrollo");
+  const role = yo.role;
+  const userId = yo.id;
   const isManager = role === "Administrador" || role === "Director";
 
   // Resolver fincas accesibles para filtrar noticias por zona (igual que dashboard)
@@ -51,7 +52,7 @@ export default async function DesarrolloPage() {
   ] = await Promise.all([
     supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
     // Cargar todos los meses del año para calcular objetivos anuales correctamente
-    supabase.from("rendimiento").select("agente_id, anio, mes, facturado, objetivo_facturado, encargos, objetivo_encargos, ventas, objetivo_ventas, contactos, objetivo_contactos").eq("anio", anioActual).gte("mes", 1).lte("mes", 12),
+    supabase.from("rendimiento").select("agente_id, anio, mes, facturado, objetivo_facturado, encargos, objetivo_encargos, ventas, objetivo_ventas, contactos, objetivo_contactos").eq("anio", anioActual).eq("mes", mesActual),
     supabase
       .from("actividad_desarrollo")
       .select("agente_id, metric, value")
@@ -83,11 +84,12 @@ export default async function DesarrolloPage() {
 
   const canManageObjectives = (yo?.canViewAllAgents ?? false) && isManager;
 
-  const statsMap = mergeRendimientoRowsAnual({
+  const statsMap = mergeRendimientoRows({
     agentes,
     objetivos: rendimiento ?? [],
     actividades: actividad ?? [],
     anio: anioActual,
+    mes: mesActual,
   });
 
   const agentesConStats = agentes.map((a) => ({
@@ -106,6 +108,7 @@ export default async function DesarrolloPage() {
         totalNoticias={totalNoticias ?? 0}
         canManageObjectives={canManageObjectives}
         defaultAnio={anioActual}
+        defaultMes={mesActual}
         role={role}
       />
     </>

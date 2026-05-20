@@ -1,0 +1,17 @@
+{
+  "title": "Attività",
+  "addTask": "Aggiungi attività",
+  "status": {
+    "pending": "In sospeso",
+    "inProgress": "In corso",
+    "completed": "Completata"
+  },
+  "dueDate": "Data di scadenza",
+  "assignee": "Assegnato a",
+  "description": "Descrizione",
+  "priority": {
+    "low": "Bassa",
+    "medium": "Media",
+    "high": "Alta"
+  }
+}

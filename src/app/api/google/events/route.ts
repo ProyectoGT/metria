@@ -94,13 +94,21 @@ export async function POST(request: NextRequest) {
 
   const body = parsed.data;
   const startTime = normalizeTime(body.time, "09:00");
-  const end = addOneHourLocal(body.date, startTime);
+  // Usar timeEnd si se proporciona; si no, calcular start + 1h por defecto
+  const endTime = body.timeEnd ? normalizeTime(body.timeEnd, "") : null;
+  const end = endTime ? { date: body.date, time: endTime } : addOneHourLocal(body.date, startTime);
+
+  // Construir recordatorios de Google Calendar si se especifica
+  const reminders = body.reminderMinutes != null
+    ? { useDefault: false, overrides: [{ method: "popup", minutes: body.reminderMinutes }] }
+    : { useDefault: true };
 
   const event = {
     summary: body.summary,
     description: body.description,
     start: { dateTime: googleCalendarDateTime(body.date, startTime), timeZone: MADRID_TIME_ZONE },
     end: { dateTime: googleCalendarDateTime(end.date, end.time), timeZone: MADRID_TIME_ZONE },
+    reminders,
     extendedProperties: body.agendaId
       ? {
           private: {
@@ -147,13 +155,19 @@ export async function PUT(request: NextRequest) {
 
   const body = parsed.data;
   const startTime = normalizeTime(body.time, "09:00");
-  const end = addOneHourLocal(body.date, startTime);
+  const endTime = body.timeEnd ? normalizeTime(body.timeEnd, "") : null;
+  const end = endTime ? { date: body.date, time: endTime } : addOneHourLocal(body.date, startTime);
+
+  const reminders = body.reminderMinutes != null
+    ? { useDefault: false, overrides: [{ method: "popup", minutes: body.reminderMinutes }] }
+    : { useDefault: true };
 
   const event = {
     summary: body.summary,
     description: body.description,
     start: { dateTime: googleCalendarDateTime(body.date, startTime), timeZone: MADRID_TIME_ZONE },
     end: { dateTime: googleCalendarDateTime(end.date, end.time), timeZone: MADRID_TIME_ZONE },
+    reminders,
     extendedProperties: body.agendaId
       ? {
           private: {

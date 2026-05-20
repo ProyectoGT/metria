@@ -1,9 +1,8 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
-import { getCurrentUserContext } from "@/lib/current-user";
-import { canViewIdealistaLeads } from "@/lib/roles";
-import { filterReadablePedidos } from "@/lib/pedidos-access";
-import PageHeader from "@/components/layout/page-header";
+
+export const dynamic = "force-dynamic";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import PedidosClient from "./solicitudes-client";
 import IdealistaClient from "./idealista-client";
 import SolicitudesTabs from "./solicitudes-tabs";
@@ -25,19 +24,9 @@ export default async function PedidosPage({
     cookieStore.get("gmail_refresh_token")?.value
   );
 
-  const user = await getCurrentUserContext();
-  const canViewIdealista = canViewIdealistaLeads(user?.role ?? "Agente");
-
-  let pedidosQuery = supabase
-    .from("pedidos")
-    .select(PEDIDOS_SELECT)
-    .order("id", { ascending: false });
-  if (user?.empresaId != null) {
-    pedidosQuery = pedidosQuery.eq("empresa_id", user.empresaId);
-  }
-
-  const [{ data: pedidos }, { data: agentes }, { data: leads }] = await Promise.all([
-    pedidosQuery,
+  const [user, { data: pedidos }, { data: agentes }, { data: leads }] = await Promise.all([
+    requirePageAccess("solicitudes"),
+    supabase.from("pedidos").select(PEDIDOS_SELECT).order("id", { ascending: false }),
     supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
     canViewIdealista
       ? supabase
@@ -62,7 +51,6 @@ export default async function PedidosPage({
 
   return (
     <>
-      <PageHeader title="Solicitudes" description="Gestion de solicitudes y leads de clientes" />
       <SolicitudesTabs
         defaultTab={canViewIdealista && tab === "idealista" ? "idealista" : "solicitudes"}
         nuevosLeads={nuevosLeads}

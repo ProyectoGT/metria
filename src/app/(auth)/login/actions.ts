@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase";
 import { authRateLimiter, getIp } from "@/lib/rate-limiter";
 import { LoginSchema } from "@/lib/validations/auth";
+import { recordLoginAudit } from "@/lib/login-audit";
 
 export async function login(formData: FormData) {
   const headersList = await headers();
@@ -40,16 +41,24 @@ export async function login(formData: FormData) {
   if (data.user) {
     const { data: byAuthId } = await supabase
       .from("usuarios")
-      .select("id")
+      .select("id, nombre, apellidos, rol, empresa_id")
       .eq("auth_id", data.user.id)
       .maybeSingle();
 
     if (!byAuthId && data.user.email) {
       const { data: byEmail } = await supabase
         .from("usuarios")
-        .select("id")
+        .select("id, auth_id, nombre, apellidos, rol, empresa_id")
         .eq("correo", data.user.email)
         .maybeSingle();
+
+      if (byEmail && !byEmail.auth_id) {
+        await supabase
+          .from("usuarios")
+          .update({ auth_id: data.user.id })
+          .eq("id", byEmail.id);
+      }
+
       profile = byEmail;
     } else {
       profile = byAuthId;
@@ -60,6 +69,16 @@ export async function login(formData: FormData) {
     await supabase.auth.signOut();
     return { error: "Tu cuenta no está registrada en el sistema. Contacta con el administrador." };
   }
+
+  await recordLoginAudit({
+    userId: profile.id,
+    empresaId: (profile as { empresa_id?: number | null }).empresa_id ?? null,
+    userName: `${(profile as { nombre?: string }).nombre ?? ""} ${(profile as { apellidos?: string }).apellidos ?? ""}`.trim() || parsed.data.email,
+    userEmail: parsed.data.email,
+    userRole: (profile as { rol?: string | null }).rol ?? "Agente",
+    ipAddress: ip !== "unknown" ? ip : null,
+    userAgent: headersList.get("user-agent"),
+  });
 
   redirect("/dashboard");
 }

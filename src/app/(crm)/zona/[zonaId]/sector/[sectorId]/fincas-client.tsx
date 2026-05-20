@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useId } from "react";
 import { useRouter } from "next/navigation";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deleteFincaAction } from "@/app/actions/security";
 import { updateFincasPosicionesAction, resetFincasPosicionesAction } from "@/app/(crm)/zona/actions";
 import Breadcrumb from "@/components/ui/breadcrumb";
 import DeleteConfirmationDialog from "@/components/ui/delete-confirmation-dialog";
+import Drawer from "@/components/ui/drawer";
 import { useToast, Toaster } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase-browser";
 
@@ -26,6 +27,20 @@ type Props = {
   canDeleteFincas: boolean;
 };
 
+function DragHandle() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className="size-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+    </svg>
+  );
+}
+
 export default function FincasClient({
   zonaId,
   zonaNombre,
@@ -35,7 +50,7 @@ export default function FincasClient({
   canDeleteFincas,
 }: Props) {
   const [fincas, setFincas] = useState<Finca[]>(
-    initialFincas.map((f, i) => ({ ...f, posicion: f.posicion ?? i }))
+    () => initialFincas.map((f, i) => ({ ...f, posicion: f.posicion ?? i }))
   );
   const [modalOpen, setModalOpen] = useState(false);
   const [numero, setNumero] = useState("");
@@ -48,6 +63,7 @@ export default function FincasClient({
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const { toasts, toast } = useToast();
+  const formId = useId();
 
   async function handleCreate() {
     if (!numero.trim()) return;
@@ -129,18 +145,6 @@ export default function FincasClient({
     }, 0);
   }
 
-  const DragHandle = () => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      className="h-4 w-4"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-    </svg>
-  );
-
   return (
     <>
       <Breadcrumb
@@ -158,7 +162,7 @@ export default function FincasClient({
             className="rounded-lg border border-border p-2 text-text-secondary transition-colors hover:bg-background hover:text-text-primary"
             title="Volver a sectores"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
@@ -220,7 +224,7 @@ export default function FincasClient({
                           <div
                             ref={drag.innerRef}
                             {...drag.draggableProps}
-                            className={`flex items-center gap-2 px-4 py-4 transition-colors hover:bg-background ${snapshot.isDragging ? "opacity-90 shadow-lg" : ""}`}
+                            className={`flex items-center gap-2 p-4 transition-colors hover:bg-background ${snapshot.isDragging ? "opacity-90 shadow-lg" : ""}`}
                           >
                             <div
                               {...drag.dragHandleProps}
@@ -243,126 +247,125 @@ export default function FincasClient({
                                 className="rounded p-1 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
                                 title="Eliminar finca"
                               >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
                               </button>
                             )}
-                          </div>
-                        )}
-                      </Draggable>
-                    );
-                  })}
-                  {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
-          </DragDropContext>
+                        </div>
+                      )}
+                    </Draggable>
+                  );
+                })}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
 
-          {/* Desktop */}
-          <table className="hidden w-full min-w-[420px] text-sm md:table">
-            <thead>
-              <tr className="border-b border-border bg-background">
-                <th className="w-8 px-2 py-3" />
-                <th className="px-5 py-3 text-left font-medium text-text-secondary">Finca</th>
-                <th className="w-32 px-5 py-3 text-center font-medium text-text-secondary">Propiedades</th>
-                <th className="w-12 px-5 py-3" />
-              </tr>
-            </thead>
-            <DragDropContext onDragEnd={handleDragEnd}>
-              <Droppable droppableId="fincas-table" direction="vertical">
-                {(provided) => (
-                  <tbody
-                    className="divide-y divide-border"
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                  >
-                    {fincas.map((finca, index) => {
-                      const propiedadCount = finca.propiedades?.length ?? 0;
-                      return (
-                        <Draggable key={finca.id} draggableId={String(finca.id)} index={index}>
-                          {(drag, snapshot) => (
-                            <tr
-                              ref={drag.innerRef}
-                              {...drag.draggableProps}
-                              className={`group cursor-pointer transition-colors hover:bg-background ${snapshot.isDragging ? "opacity-90 shadow-lg" : ""}`}
-                            >
-                              <td className="w-8 px-2 py-3">
-                                <div
-                                  {...drag.dragHandleProps}
-                                  className="flex cursor-grab items-center justify-center text-text-secondary opacity-30 hover:opacity-70 active:cursor-grabbing"
-                                  title="Arrastrar para reordenar"
+        {/* Desktop */}
+              <table className="hidden w-full min-w-[420px] text-sm md:table">
+                <thead>
+                  <tr className="border-b border-border bg-background">
+                    <th className="w-8 px-2 py-3" />
+                    <th className="px-5 py-3 text-left font-medium text-text-secondary">Finca</th>
+                    <th className="w-32 px-5 py-3 text-center font-medium text-text-secondary">Propiedades</th>
+                    <th className="w-12 px-5 py-3" />
+                  </tr>
+                </thead>
+                <DragDropContext onDragEnd={handleDragEnd}>
+                  <Droppable droppableId="fincas-table" direction="vertical">
+                    {(provided) => (
+                      <tbody
+                        className="divide-y divide-border"
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                      >
+                        {fincas.map((finca, index) => {
+                          const propiedadCount = finca.propiedades?.length ?? 0;
+                          return (
+                            <Draggable key={finca.id} draggableId={String(finca.id)} index={index}>
+                              {(drag, snapshot) => (
+                                <tr
+                                  ref={drag.innerRef}
+                                  {...drag.draggableProps}
+                                  className={`group cursor-pointer transition-colors hover:bg-background ${snapshot.isDragging ? "opacity-90 shadow-lg" : ""}`}
                                 >
-                                  <DragHandle />
-                                </div>
-                              </td>
-                              <td
-                                className="px-5 py-3.5 font-medium text-text-primary"
-                                onClick={() => router.push(`/zona/${zonaId}/sector/${sectorId}/finca/${finca.id}`)}
-                              >
-                                {finca.numero}
-                              </td>
-                              <td
-                                className="w-32 px-5 py-3.5 text-center text-text-secondary"
-                                onClick={() => router.push(`/zona/${zonaId}/sector/${sectorId}/finca/${finca.id}`)}
-                              >
-                                {propiedadCount}
-                              </td>
-                              <td className="w-12 px-5 py-3.5 text-right">
-                                {canDeleteFincas && (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setError(null); setDeletePassword(""); setDeleteId(finca.id); }}
-                                    className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
-                                    title="Eliminar finca"
+                                  <td className="w-8 px-2 py-3">
+                                    <div
+                                      {...drag.dragHandleProps}
+                                      className="flex cursor-grab items-center justify-center text-text-secondary opacity-30 hover:opacity-70 active:cursor-grabbing"
+                                      title="Arrastrar para reordenar"
+                                    >
+                                      <DragHandle />
+                                    </div>
+                                  </td>
+                                  <td
+                                    className="px-5 py-3.5 font-medium text-text-primary"
+                                    onClick={() => router.push(`/zona/${zonaId}/sector/${sectorId}/finca/${finca.id}`)}
                                   >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          )}
-                        </Draggable>
-                      );
-                    })}
-                    {provided.placeholder}
-                  </tbody>
-                )}
-              </Droppable>
-            </DragDropContext>
-          </table>
+                                    {finca.numero}
+                                  </td>
+                                  <td
+                                    className="w-32 px-5 py-3.5 text-center text-text-secondary"
+                                    onClick={() => router.push(`/zona/${zonaId}/sector/${sectorId}/finca/${finca.id}`)}
+                                  >
+                                    {propiedadCount}
+                                  </td>
+                                  <td className="w-12 px-5 py-3.5 text-right">
+                                    {canDeleteFincas && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); setError(null); setDeletePassword(""); setDeleteId(finca.id); }}
+                                        className="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
+                                        title="Eliminar finca"
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Draggable>
+                  );
+                })}
+                {provided.placeholder}
+              </tbody>
+            )}
+          </Droppable>
+        </DragDropContext>
+      </table>
         </div>
       )}
 
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-surface shadow-xl">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-text-primary">Nueva finca</h2>
-              <button onClick={() => setModalOpen(false)} className="text-text-secondary transition-colors hover:text-text-primary">×</button>
-            </div>
-            <div className="px-6 py-5">
-              <label className="text-xs font-medium text-text-secondary">Nombre de la finca</label>
-              <input
-                type="text"
-                value={numero}
-                onChange={(e) => setNumero(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                placeholder="Ej: Las Palmeras"
-                className="input mt-1.5"
-                autoFocus
-              />
-            </div>
-            <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
-              <button onClick={() => setModalOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">Cancelar</button>
-              <button onClick={handleCreate} disabled={saving || !numero.trim()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60">
-                {saving ? "Creando..." : "Crear finca"}
-              </button>
-            </div>
+      <Drawer
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Nueva finca"
+        width="sm"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background">Cancelar</button>
+            <button onClick={handleCreate} disabled={saving || !numero.trim()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60">
+              {saving ? "Creando..." : "Crear finca"}
+            </button>
           </div>
+        }
+      >
+        <div className="px-5 py-5">
+          <label htmlFor={formId} className="text-xs font-medium text-text-secondary">Nombre de la finca</label>
+          <input
+            id={formId}
+            type="text"
+            value={numero}
+            onChange={(e) => setNumero(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            placeholder="Ej: Las Palmeras"
+            className="input mt-1.5"
+          />
         </div>
-      )}
+      </Drawer>
 
       {deleteId !== null && (
         <DeleteConfirmationDialog

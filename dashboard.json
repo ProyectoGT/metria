@@ -1,0 +1,14 @@
+{
+  "title": "Dashboard",
+  "welcome": "Benvenuto, {{name}}",
+  "stats": {
+    "encargos": "Incarichi",
+    "noticias": "Annunci",
+    "investigaciones": "Immobili in analisi",
+    "pedidos_activos": "Acquirenti attivi",
+    "zonas": "Zone",
+    "inmuebles": "Immobili"
+  },
+  "recentActivity": "Attività recente",
+  "viewAll": "Vedi tutto"
+}

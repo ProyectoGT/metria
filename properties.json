@@ -1,0 +1,21 @@
+{
+  "title": "Immobili",
+  "addProperty": "Aggiungi immobile",
+  "details": "Dettagli immobile",
+  "price": "Prezzo",
+  "address": "Indirizzo",
+  "status": {
+    "available": "Disponibile",
+    "sold": "Venduto",
+    "rented": "Affittato"
+  },
+  "features": "Caratteristiche",
+  "rooms": "{{count}} stanza",
+  "rooms_plural": "{{count}} stanze",
+  "bathrooms": "{{count}} bagno",
+  "bathrooms_plural": "{{count}} bagni",
+  "area": "Superficie",
+  "propertyType": "Tipo di immobile",
+  "description": "Descrizione",
+  "images": "Immagini"
+}

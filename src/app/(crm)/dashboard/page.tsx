@@ -1,7 +1,12 @@
-import { createClient } from "@/lib/supabase";
+﻿import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { cookies } from "next/headers";
 import { getCurrentUserContext } from "@/lib/current-user";
-import { getPeriodRange, mergeRendimientoRows } from "@/lib/desarrollo-metrics";
+import { getPeriodRange, mergeRendimientoRows } from "@/modules/desarrollo/services/desarrollo-metrics";
+import { getNextBestActions } from "@/modules/dashboard/services/next-actions";
+import { generateAndFetchSuggestions } from "@/modules/dashboard/services/pipeline-suggestions";
+import { detectLostOpportunities } from "@/modules/dashboard/services/opportunities";
+import { listZonasGeograficas } from "@/modules/zonas-geograficas/services/actions";
 import {
   emptyRendimiento,
   type SummaryData,
@@ -14,39 +19,13 @@ import {
   type OrdenDiaAgente,
   type KanbanPriority,
 } from "@/lib/mock/dashboard";
-import SummaryPanel from "@/components/dashboard/SummaryPanel";
-import KanbanBoard from "@/components/dashboard/KanbanBoard";
-import OrdenDiaPanel from "@/components/dashboard/OrdenDiaPanel";
-import AgentOfMonth from "@/components/dashboard/AgentOfMonth";
-import AgentPerformanceTable from "@/components/dashboard/AgentPerformanceTable";
-import MyActivity from "@/components/dashboard/MyActivity";
-import MapaDashboardLazy from "@/components/dashboard/MapaDashboardLazy";
-import type { NoticiaMapPoint } from "@/components/dashboard/MapaDashboard";
-import { combineLocalDateTime, localDateKey, normalizeTime } from "@/lib/local-date-time";
-import { normalizeAgendaEvent } from "@/lib/agenda/normalize-agenda-event";
-import { rolloverOverdueAgendaToPendingTasks } from "@/lib/agenda/rollover-overdue-agenda";
+import DashboardWorkspace from "@/modules/dashboard/components/DashboardWorkspace";
+import type { NoticiaMapPoint } from "@/modules/dashboard/components/MapaDashboard";
+import { combineLocalDateTime, formatLocalDateEs, localDateKey, normalizeTime } from "@/lib/local-date-time";
+import { normalizeAgendaEvent } from "@/modules/calendario/services/normalize-agenda-event";
 import { normalizeActivityType } from "@/lib/activity-options";
-import { filterReadablePedidos } from "@/lib/pedidos-access";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Buenos días";
-  if (hour < 20) return "Buenas tardes";
-  return "Buenas noches";
-}
-
-function formatDateEs() {
-  return new Date()
-    .toLocaleDateString("es-ES", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    })
-    .replace(/^./, (c) => c.toUpperCase());
-}
 
 function normalizePriority(p: string | null): KanbanPriority {
   if (p === "alta" || p === "media" || p === "baja") return p;
@@ -62,8 +41,12 @@ function normalizeNullablePriority(p: string | null): KanbanPriority | null {
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
+  const cookieStore = await cookies();
+  const isGoogleCalendarConnected = !!(
+    cookieStore.get("google_access_token")?.value ||
+    cookieStore.get("google_refresh_token")?.value
+  );
   const supabase = await createClient();
-  const agendaAdmin = createAdminClient();
   const yo = await getCurrentUserContext();
 
   const role = yo?.role ?? "Agente";
@@ -71,8 +54,11 @@ export default async function DashboardPage() {
   const userId = yo?.id ?? 0;
   const fullName = yo ? `${yo.nombre} ${yo.apellidos}`.trim() : "Usuario";
   const anioActual = new Date().getFullYear();
+  const currentDateLabel = formatLocalDateEs(localDateKey());
   const periodRange = getPeriodRange(anioActual, 0);
-  const today = localDateKey();
+  const nextBestActionsPromise = getNextBestActions(yo);
+  const pipelineSuggestionsPromise = yo ? generateAndFetchSuggestions(yo) : Promise.resolve([]);
+  const lostOpportunitiesPromise = yo ? detectLostOpportunities(yo) : Promise.resolve([]);
 
   const isManager = role === "Administrador" || role === "Director";
 
@@ -168,15 +154,17 @@ export default async function DashboardPage() {
   }
 
   // ─── 1. Summary counts + listings (paralelo) ────────────────────────────
-  const propSelect = "id, planta, puerta, propietario, estado, fincas(id, numero, sectores(id, numero, zona_id)), usuarios:usuarios!propiedades_agente_asignado_fkey(nombre, apellidos)";
+  const propSelect = "id, planta, puerta, propietario, estado, fincas(id, numero, sectores(id, numero, zona_id, zona(nombre))), usuarios:usuarios!propiedades_agente_asignado_fkey(nombre, apellidos)";
 
   const [
     { count: noticiasCount },
     { count: investigacionesCount },
+    { count: seguimientosCount },
     { count: encargosCount },
     { count: pedidosCount },
     { data: noticiasList },
     { data: investigacionesList },
+    { data: seguimientosList },
     { data: encargosList },
     { data: pedidosList },
     { data: todosAgentes },
@@ -189,9 +177,14 @@ export default async function DashboardPage() {
     { data: agenteMesData },
     { data: noticiasMapData },
     { data: encargosMapData },
+    nextBestActions,
+    pipelineSuggestions,
+    lostOpportunities,
+    zonasGeograficas,
   ] = await Promise.all([
     applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "noticia")),
     applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "investig%")),
+    applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "seguimiento")),
     applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "encarg%")),
     applyPedidoFilters(supabase.from("pedidos").select("id", { count: "exact", head: true })),
 
@@ -200,6 +193,9 @@ export default async function DashboardPage() {
     ),
     applyPropFilters(
       supabase.from("propiedades").select(propSelect).ilike("estado", "investig%").order("id", { ascending: false }).limit(50)
+    ),
+    applyPropFilters(
+      supabase.from("propiedades").select(propSelect).ilike("estado", "seguimiento").order("id", { ascending: false }).limit(50)
     ),
     applyPropFilters(
       supabase.from("propiedades").select(propSelect).ilike("estado", "encarg%").order("id", { ascending: false }).limit(50)
@@ -223,16 +219,16 @@ export default async function DashboardPage() {
       .from("tareas")
       .select("id, titulo, prioridad, fecha, estado, resultado, from_orden_dia, owner_user_id, tarea_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
-      .is("fecha", null)
       .in("estado", ["pendiente", "completado"])
       .order("id", { ascending: false }),
 
-    agendaAdmin
+    createAdminClient()
       .from("agenda")
-      .select("id, description, event_date, time, priority, completed, result, gcal_event_id, user_id, owner_user_id, empresa_id, equipo_id, visibility, tipo, archived_at, archived_reason, converted_to_tarea_id, created_at, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .select("id, description, event_date, time, time_end, priority, tipo, completed, result, reminder_minutes_before, gcal_event_id, user_id, owner_user_id, empresa_id, created_at, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
+      .eq("event_date", localDateKey())
       .eq("empresa_id", yo?.empresaId ?? -1)
-      .eq("event_date", today),
+      .order("time", { ascending: true, nullsFirst: false }),
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
@@ -270,6 +266,10 @@ export default async function DashboardPage() {
         .not("latitud", "is", null)
         .not("longitud", "is", null)
     ),
+    nextBestActionsPromise,
+    pipelineSuggestionsPromise,
+    lostOpportunitiesPromise,
+    listZonasGeograficas(),
   ]);
 
   if (process.env.NODE_ENV !== "production") {
@@ -293,6 +293,7 @@ export default async function DashboardPage() {
   const summary: SummaryData = {
     noticias: noticiasCount ?? 0,
     investigaciones: investigacionesCount ?? 0,
+    seguimientos: seguimientosCount ?? 0,
     encargos: encargosCount ?? 0,
     pedidosActivos: pedidosCount ?? 0,
   };
@@ -303,20 +304,19 @@ export default async function DashboardPage() {
     puerta: string | null;
     propietario: string | null;
     estado: string | null;
-    fincas: { id: number; numero: string; sectores: { id: number; numero: number; zona_id: number } | null } | null;
+    fincas: { id: number; numero: string; sectores: { id: number; numero: number; zona_id: number; zona: { nombre: string | null } | null } | null } | null;
     usuarios: { nombre: string | null; apellidos: string | null } | null;
   };
 
   function mapPropiedad(p: PropRow): PropertyListing {
     const planta = p.planta ?? "";
     const puerta = p.puerta ?? "";
-    const nombre = p.propietario?.trim()
-      ? p.propietario
-      : planta || puerta
-        ? `Planta ${planta}${puerta ? ` ${puerta}` : ""}`.trim()
-        : `Propiedad #${p.id}`;
+    const nombre = planta || puerta
+      ? `Planta ${planta}${puerta ? ` ${puerta}` : ""}`.trim()
+      : `Propiedad #${p.id}`;
     const finca = p.fincas?.numero != null ? p.fincas.numero : "—";
     const sector = p.fincas?.sectores?.numero != null ? `Sector ${p.fincas.sectores.numero}` : "—";
+    const zona = p.fincas?.sectores?.zona?.nombre ?? sector;
     const agente = p.usuarios
       ? `${p.usuarios.nombre ?? ""} ${p.usuarios.apellidos ?? ""}`.trim() || "Sin asignar"
       : "Sin asignar";
@@ -325,6 +325,8 @@ export default async function DashboardPage() {
       nombre,
       sector,
       finca,
+      zona,
+      propietario: p.propietario?.trim() || "—",
       estado: p.estado ?? "—",
       agente,
       fincaId: p.fincas?.id,
@@ -363,6 +365,7 @@ export default async function DashboardPage() {
   const listings: Record<SummaryType, PropertyListing[]> = {
     noticias: ((noticiasList ?? []) as unknown as PropRow[]).map(mapPropiedad),
     investigaciones: ((investigacionesList ?? []) as unknown as PropRow[]).map(mapPropiedad),
+    seguimientos: ((seguimientosList ?? []) as unknown as PropRow[]).map(mapPropiedad),
     encargos: ((encargosList ?? []) as unknown as PropRow[]).map(mapPropiedad),
     pedidosActivos: filterReadablePedidos((pedidosList ?? []) as unknown as PedidoRow[], yo).map(mapPedido),
   };
@@ -429,10 +432,12 @@ export default async function DashboardPage() {
     description: string;
     event_date: string;
     time: string | null;
+    time_end: string | null;
     priority: string | null;
     tipo: string | null;
     completed: boolean;
     result: string | null;
+    reminder_minutes_before: number | null;
     gcal_event_id?: string | null;
     user_id: number | null;
     owner_user_id: number | null;
@@ -477,6 +482,22 @@ export default async function DashboardPage() {
   }
 
   const tareas: TareaDbRow[] = (tareasData ?? []) as TareaDbRow[];
+
+  // Filtrar filas de agenda por rol (usando admin client, aplicamos el filtro en JS)
+  if (process.env.NODE_ENV !== "production" && agendaData) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const agendaError = (agendaData as any)?.error;
+    if (agendaError) {
+      console.error("[dashboard] Error cargando agenda:", {
+        message: agendaError?.message,
+        details: agendaError?.details,
+        hint: agendaError?.hint,
+        code: agendaError?.code,
+        raw: JSON.stringify(agendaError, Object.getOwnPropertyNames(agendaError)),
+      });
+    }
+  }
+
   const agendaRows = ((agendaData ?? []) as AgendaDbRow[]).filter((row) => {
     if (role === "Administrador" || role === "Director") return true;
     const assigned = assignedIdsFromRows(row.agenda_usuarios);
@@ -498,8 +519,9 @@ export default async function DashboardPage() {
       time: normalized.timeLabel,
     };
   });
+
   const myTareas = tareas.filter((t) => assignedIdsFromRows(t.tarea_usuarios).includes(userId) || t.owner_user_id === userId);
-  const myAgendaHoy = agendaHoy.filter((a) => assignedIdsFromRows(a.agenda_usuarios).includes(userId) || a.owner_user_id === userId || a.user_id === userId);
+  const myAgendaHoy = agendaHoy.filter((a) => assignedIdsFromRows(a.agenda_usuarios).includes(userId) || a.user_id === userId);
 
   function toCard(t: TareaDbRow) {
     return {
@@ -529,6 +551,8 @@ export default async function DashboardPage() {
       tipo: normalizeActivityType(a.tipo),
       dueDate: combineLocalDateTime(a.event_date, normalizeTime(a.time, "09:00")),
       time: normalizeTime(a.time, "09:00"),
+      timeEnd: a.time_end ?? null,
+      reminderMinutesBefore: a.reminder_minutes_before ?? null,
       assignedBy: null,
       assignedUserIds: assignedIdsFromRows(a.agenda_usuarios),
       assignedUsers: assignedNamesFromRows(a.agenda_usuarios),
@@ -553,7 +577,7 @@ export default async function DashboardPage() {
       },
       {
         id: "en_progreso",
-        title: "Orden del dia",
+        title: "Agenda hoy",
         fixed: true,
         cards: sortKanbanCards("en_progreso", [
           ...myAgendaHoy.filter((a) => !a.completed).map(agendaToCard),
@@ -619,86 +643,46 @@ export default async function DashboardPage() {
   const noticiasMap: NoticiaMapPoint[] = ((noticiasMapData ?? []) as unknown as NoticiasMapRow[]).map(mapRowToPoint);
   const encargosMap: NoticiaMapPoint[] = ((encargosMapData ?? []) as unknown as NoticiasMapRow[]).map(mapRowToPoint);
 
+  const assignableAgents = (todosAgentes ?? [])
+    .filter((a) => {
+      const isTargetAdmin = a.rol?.toLowerCase() === "administrador" || a.rol?.toLowerCase() === "admin";
+      if (isTargetAdmin) {
+        return role === "Administrador";
+      }
+      if (role === "Administrador" || role === "Director") return true;
+      if (role === "Responsable") return a.id === userId || (yo?.supervisedAgentIds ?? []).includes(a.id);
+      return a.id === userId;
+    })
+    .map((a) => ({ id: String(a.id), nombre: `${a.nombre} ${a.apellidos}`.trim() }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
   return (
-    <div className="flex flex-col gap-8">
-      {/* 1 — Saludo */}
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">
-          {getGreeting()}, {userName}
-        </h1>
-        <p className="mt-1 text-sm text-text-secondary">{formatDateEs()}</p>
-      </div>
-
-      {/* 2 — Summary panel */}
-      <SummaryPanel summary={summary} listings={listings} />
-
-      {/* 4 — Mis tareas (Kanban) */}
-      <section className="min-w-0">
-        <div className="mb-4">
-          <h2 className="font-semibold text-text-primary">Mis tareas</h2>
-          <p className="text-sm text-text-secondary">
-            Organiza tu trabajo arrastrando las tarjetas entre columnas.
-          </p>
-        </div>
-        <KanbanBoard
-          key={JSON.stringify(kanbanData.columns.map((column) => ({
-            id: column.id,
-            cards: column.cards.map((card) => ({
-              id: card.id,
-              title: card.title,
-              priority: card.priority,
-              tipo: card.tipo,
-              dueDate: card.dueDate,
-              isCompleted: card.isCompleted,
-              assignedUserIds: card.assignedUserIds,
-              gcalEventId: card.gcalEventId,
-            })),
-          })))}
-          initialData={kanbanData}
-          customColumns={(kanbanColsData ?? []).map((c: { col_id: string; titulo: string }) => ({ id: c.col_id, title: c.titulo }))}
-          role={role}
-          currentUserId={String(userId)}
-          agents={agentMetrics.map((a) => ({ id: a.id, nombre: a.nombre }))}
-        />
-      </section>
-
-      {/* 5 — Orden del día + Mapa (grid en desktop grande, mapa primero en móvil) */}
-      {showOrdenDia ? (
-        <div className="grid grid-cols-1 items-stretch gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" style={{ minHeight: 480 }}>
-          <div className="order-2 flex xl:order-1">
-            <OrdenDiaPanel agentes={ordenDiaAgentes} />
-          </div>
-          <div className="order-1 flex xl:order-2">
-            <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
-          </div>
-        </div>
-      ) : (
-        <MapaDashboardLazy noticias={noticiasMap} encargos={encargosMap} />
-      )}
-
-      {/* 7 — Agente del mes */}
-      <AgentOfMonth
-        initialData={
-          agenteMesData
-            ? {
-                id: agenteMesData.id,
-                mes: agenteMesData.mes,
-                premio: agenteMesData.premio,
-                agente: agenteMesData.agente_nombre ?? null,
-                agenteId: agenteMesData.agente_id ?? null,
-                añadidoPor: agenteMesData.anadido_por,
-              }
-            : null
-        }
-        empresaId={yo?.empresaId ?? null}
-        role={role}
-        currentUserName={fullName}
-        agents={agentMetrics.map((a) => ({ id: a.id, nombre: a.nombre }))}
-      />
-
-      {/* 8 — Rendimiento / Mi actividad */}
-      {showAgentPerformance && <AgentPerformanceTable agents={agentMetrics} role={role} />}
-      {showMyActivity && <MyActivity rendimiento={ownMetrics} role={role} />}
-    </div>
+    <DashboardWorkspace
+      role={role}
+      userName={userName}
+      currentUserId={userId}
+      summary={summary}
+      listings={listings}
+      nextBestActions={nextBestActions}
+      pipelineSuggestions={pipelineSuggestions}
+      lostOpportunities={lostOpportunities}
+      kanbanData={kanbanData}
+      kanbanCols={(kanbanColsData ?? []).map((c: { col_id: string; titulo: string }) => ({ id: c.col_id, title: c.titulo }))}
+      agentMetrics={agentMetrics}
+      ownMetrics={ownMetrics}
+      ordenDiaAgentes={ordenDiaAgentes}
+      showOrdenDia={showOrdenDia}
+      showAgentPerformance={showAgentPerformance}
+      showMyActivity={showMyActivity}
+      noticiasMap={noticiasMap}
+      encargosMap={encargosMap}
+      empresaId={yo?.empresaId ?? null}
+      fullName={fullName}
+      currentDateLabel={currentDateLabel}
+      agenteMesData={agenteMesData}
+      assignableAgents={assignableAgents}
+      zonasGeograficas={zonasGeograficas}
+      isGoogleCalendarConnected={isGoogleCalendarConnected}
+    />
   );
 }
