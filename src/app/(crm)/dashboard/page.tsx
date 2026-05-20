@@ -24,6 +24,8 @@ import type { NoticiaMapPoint } from "@/modules/dashboard/components/MapaDashboa
 import { combineLocalDateTime, formatLocalDateEs, localDateKey, normalizeTime } from "@/lib/local-date-time";
 import { normalizeAgendaEvent } from "@/modules/calendario/services/normalize-agenda-event";
 import { normalizeActivityType } from "@/lib/activity-options";
+import { rolloverOverdueAgendaToPendingTasks } from "@/lib/agenda/rollover-overdue-agenda";
+import { filterReadablePedidos } from "@/lib/pedidos-access";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -54,7 +56,8 @@ export default async function DashboardPage() {
   const userId = yo?.id ?? 0;
   const fullName = yo ? `${yo.nombre} ${yo.apellidos}`.trim() : "Usuario";
   const anioActual = new Date().getFullYear();
-  const currentDateLabel = formatLocalDateEs(localDateKey());
+  const today = localDateKey();
+  const currentDateLabel = formatLocalDateEs(today);
   const periodRange = getPeriodRange(anioActual, 0);
   const nextBestActionsPromise = getNextBestActions(yo);
   const pipelineSuggestionsPromise = yo ? generateAndFetchSuggestions(yo) : Promise.resolve([]);

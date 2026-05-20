@@ -1,8 +1,10 @@
+import { redirect } from "next/navigation";
 import PageHeader from "@/components/layout/page-header";
 import ContactosClient from "./contactos-client";
 import { createClient } from "@/lib/supabase";
 import type { Contacto } from "@/types";
 import { requirePageAccess } from "@/lib/access-control/route-guard";
+import { canAccessContactos } from "@/lib/roles";
 
 export default async function ContactosPage() {
   const supabase = await createClient();
