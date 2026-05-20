@@ -690,7 +690,7 @@ export default function CalendarioClient({
     console.debug("[agenda:calendario:client]", {
       currentUserId,
       role,
-      filterUserId,
+      filterUserIds: [...filterUserIds],
       receivedEvents: initialEvents.length,
       stateEvents: events.length,
       filteredEvents: filteredEvents.length,

@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
+import { canViewIdealistaLeads } from "@/lib/roles";
+import { filterReadablePedidos } from "@/lib/pedidos-access";
 
 export const dynamic = "force-dynamic";
 import { requirePageAccess } from "@/lib/access-control/route-guard";
@@ -24,8 +26,12 @@ export default async function PedidosPage({
     cookieStore.get("gmail_refresh_token")?.value
   );
 
-  const [user, { data: pedidos }, { data: agentes }, { data: leads }] = await Promise.all([
-    requirePageAccess("solicitudes"),
+  const user = await requirePageAccess("solicitudes");
+  const role = user?.role ?? "Agente";
+  const userId = user?.id ?? 0;
+  const canViewIdealista = canViewIdealistaLeads(role);
+
+  const [{ data: pedidos }, { data: agentes }, { data: leads }] = await Promise.all([
     supabase.from("pedidos").select(PEDIDOS_SELECT).order("id", { ascending: false }),
     supabase.from("usuarios").select("id, nombre, apellidos, rol").order("nombre"),
     canViewIdealista
@@ -35,9 +41,6 @@ export default async function PedidosPage({
           .order("fecha_contacto", { ascending: false })
       : Promise.resolve({ data: [] }),
   ]);
-
-  const role = user?.role ?? "Agente";
-  const userId = user?.id ?? 0;
   const supervisedIds = new Set([userId, ...(user?.supervisedAgentIds ?? [])]);
 
   const agentesFiltrados = (agentes ?? []).filter((a) => {

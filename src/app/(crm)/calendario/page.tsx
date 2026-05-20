@@ -20,6 +20,12 @@ export default async function CalendarioPage() {
   const empresaId = yo.empresaId ?? null;
   const supervisedIds = yo.supervisedAgentIds ?? [];
 
+  const _today = new Date();
+  const calendarRange = {
+    from: new Date(_today.getFullYear(), _today.getMonth() - 6, 1).toISOString().slice(0, 10),
+    to: new Date(_today.getFullYear(), _today.getMonth() + 13, 0).toISOString().slice(0, 10),
+  };
+
   let eventsQuery;
 
   if (role === "Administrador" || role === "Director") {
