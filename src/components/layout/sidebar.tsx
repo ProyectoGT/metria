@@ -346,9 +346,10 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
     return (
       <div className="flex h-full min-h-0 flex-col">
         {/* ── Logo ─────────────────────────────────────────────────── */}
-        <div className={`flex h-14 shrink-0 items-center border-b border-border bg-sidebar-logo ${collapsed ? 'justify-center' : 'justify-center px-4'}`}>
+        <div suppressHydrationWarning className={`flex h-16 shrink-0 items-center border-b border-border bg-sidebar-logo ${collapsed ? 'justify-center' : 'justify-center px-4'}`}>
           {collapsed ? (
             <Image
+              suppressHydrationWarning
               src="/favicon-32x32.png"
               alt="Master Ibérica"
               width={28}
@@ -358,6 +359,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
             />
           ) : (
             <Image
+              suppressHydrationWarning
               src="/logo-bg-master-iberica.png"
               alt="Master Ibérica"
               width={240}

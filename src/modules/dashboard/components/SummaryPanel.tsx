@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Newspaper,
   Search,
+  Radio,
   ClipboardList,
   ShoppingBag,
   ArrowLeft,
@@ -40,6 +41,13 @@ const CARDS: CardDef[] = [
     activeBg: "bg-purple-500/5 dark:bg-purple-500/10",
   },
   {
+    key: "seguimientos",
+    label: "Seguimiento",
+    icon: Radio,
+    accentColor: "bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400",
+    activeBg: "bg-amber-500/5 dark:bg-amber-500/10",
+  },
+  {
     key: "encargos",
     label: "Encargos",
     icon: ClipboardList,
@@ -63,6 +71,7 @@ function estadoBadge(estado: string) {
   if (s === "cerrado") return "bg-gray-500/15 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400";
   if (s === "reservado") return "bg-purple-500/15 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400";
   if (s === "pendiente") return "bg-yellow-500/15 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400";
+  if (s === "seguimiento") return "bg-amber-500/15 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400";
   if (s.startsWith("encarg")) return "bg-green-500/15 text-green-700 dark:bg-green-500/20 dark:text-green-400";
   return "bg-blue-500/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400";
 }
@@ -175,7 +184,7 @@ export default function SummaryPanel({ summary, listings }: SummaryPanelProps) {
   return (
     <>
       {/* ── Cards row ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {CARDS.map((card) => (
           <SummaryCard
             key={card.key}

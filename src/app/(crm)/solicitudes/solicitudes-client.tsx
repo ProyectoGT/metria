@@ -652,12 +652,12 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
           <table className="w-full min-w-[900px] text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-border bg-background/95 backdrop-blur">
-                <th className="w-10 px-3 py-3 text-center">
+                <th className="w-10 px-3 py-3 text-center align-middle">
                   <button
                     type="button"
                     onClick={toggleSelectAll}
                     disabled={selectablePedidos.length === 0}
-                    className="text-text-secondary transition-colors hover:text-primary disabled:opacity-30"
+                    className="mx-auto flex items-center justify-center text-text-secondary transition-colors hover:text-primary disabled:opacity-30"
                     title={allSelected ? "Deseleccionar todos" : "Seleccionar todos con teléfono"}
                   >
                     {allSelected ? <CheckSquare className="h-4 w-4 text-primary" /> : <Square className="h-4 w-4" />}
@@ -683,17 +683,17 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
                 const hasPhone   = !!pedido.telefono;
                 return (
                 <tr key={pedido.id} onClick={() => openEdit(pedido)} className={`group cursor-pointer transition-colors ${isSelected ? "bg-primary/5" : "hover:bg-primary/5"}`}>
-                  <td className="w-10 px-3 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                  <td className="w-10 px-3 py-4 text-center align-middle" onClick={(e) => e.stopPropagation()}>
                     {hasPhone ? (
                       <button
                         type="button"
                         onClick={(e) => toggleSelect(pedido.id, e)}
-                        className="text-text-secondary transition-colors hover:text-primary"
+                        className="mx-auto flex items-center justify-center text-text-secondary transition-colors hover:text-primary"
                       >
                         {isSelected ? <CheckSquare className="h-4 w-4 text-primary" /> : <Square className="h-4 w-4" />}
                       </button>
                     ) : (
-                      <span className="block h-4 w-4" />
+                      <span className="mx-auto block h-4 w-4" />
                     )}
                   </td>
                   <td className="px-5 py-4">

@@ -16,6 +16,7 @@ export type DraftInfo =
 
 const MAP_ID = "metria-zonageo-map";
 const DEFAULT_CENTER = { lat: 41.365795, lng: 2.053508 };
+const GOOGLE_MAPS_LIBRARIES = ["drawing"];
 
 function themeColor(name: string, fallback: string) {
   if (typeof window === "undefined") return fallback;
@@ -457,7 +458,7 @@ export default function ZonaGeoMap({
     <div className="map-surface h-full w-full overflow-hidden rounded-ds-lg">
       <APIProvider
         apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""}
-        libraries={["drawing"]}
+        libraries={GOOGLE_MAPS_LIBRARIES}
       >
         <Map
           defaultCenter={DEFAULT_CENTER}

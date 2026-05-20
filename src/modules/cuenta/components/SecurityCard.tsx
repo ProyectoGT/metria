@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, ChevronDown, Eye, EyeOff } from "lucide-react";
+import Link from "next/link";
+import { Lock, ChevronDown, Eye, EyeOff, Laptop, ArrowRight } from "lucide-react";
 import { updatePasswordAction } from "@/app/actions/perfil";
 import { PASSWORD_RULES } from "@/lib/password";
 
@@ -65,6 +66,26 @@ export default function SecurityCard() {
       </div>
 
       <div className="px-5 py-4">
+        <Link
+          href="/cuenta/dispositivos"
+          className="mb-2 flex w-full cursor-pointer items-center justify-between rounded-lg px-1 py-2 text-left transition-colors hover:bg-background"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-background text-text-secondary">
+              <Laptop className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="text-sm font-medium text-text-primary">
+                Mis dispositivos
+              </p>
+              <p className="text-xs text-text-secondary">
+                Gestiona sesiones y dispositivos de confianza
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-text-secondary" />
+        </Link>
+
         <button
           onClick={() => setOpen((v) => !v)}
           className="flex w-full cursor-pointer items-center justify-between rounded-lg px-1 py-2 text-left transition-colors hover:bg-background"

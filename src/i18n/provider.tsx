@@ -18,13 +18,7 @@ const ALL_MESSAGES: Record<Locale, FlatMessages> = {
 };
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(defaultLocale);
-
-  // Restore persisted locale after hydration to avoid SSR mismatch
-  useEffect(() => {
-    const stored = getStoredLocale();
-    if (stored !== defaultLocale) setLocaleState(stored);
-  }, []);
+  const [locale, setLocaleState] = useState<Locale>(() => getStoredLocale());
 
   // Keep html lang attribute in sync
   useEffect(() => {

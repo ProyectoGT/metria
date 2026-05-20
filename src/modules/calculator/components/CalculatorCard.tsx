@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { KeyboardEvent } from "react";
 import { motion } from "framer-motion";
 import { Heart, MoreVertical, Copy, ExternalLink } from "lucide-react";
 import Badge from "@/components/ui/badge";
@@ -25,12 +26,21 @@ export default function CalculatorCard({ config, isFavorite, usageCount, onSelec
     setMenuOpen(false);
   }
 
+  function handleCardKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onSelect(config.id);
+    }
+  }
+
   return (
-    <motion.button
-      type="button"
+    <motion.div
+      role="button"
+      tabIndex={0}
       whileHover={{ y: -2 }}
       whileTap={{ scale: 0.99 }}
       onClick={() => onSelect(config.id)}
+      onKeyDown={handleCardKeyDown}
       className={cn(
         "group relative flex flex-col rounded-2xl border bg-surface p-4 text-left shadow-sm transition-all",
         "border-border hover:border-border-strong hover:bg-surface-elevated hover:shadow-md",
@@ -103,6 +113,6 @@ export default function CalculatorCard({ config, isFavorite, usageCount, onSelec
         )}
         {isFavorite && <Heart className="h-3 w-3 fill-danger text-danger" />}
       </div>
-    </motion.button>
+    </motion.div>
   );
 }

@@ -11,8 +11,14 @@
     "test:watch": "vitest",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "validate": "npm run typecheck && npm run lint",
-    "generate-icons": "node scripts/generate-icons.mjs"
+    "validate": "pnpm typecheck && pnpm lint",
+    "generate-icons": "node scripts/generate-icons.mjs",
+    "doctor": "pnpm dlx react-doctor@latest --yes --project metria-crm",
+    "doctor:json": "pnpm dlx react-doctor@latest --yes --project metria-crm --json --offline",
+    "doctor:diff": "pnpm dlx react-doctor@latest --yes --project metria-crm --diff main --offline",
+    "doctor:staged": "pnpm dlx react-doctor@latest --yes --project metria-crm --staged --offline",
+    "doctor:openwa": "pnpm dlx react-doctor@latest --yes --project dashboard",
+    "doctor:all": "pnpm dlx react-doctor@latest --yes"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

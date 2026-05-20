@@ -12,6 +12,7 @@ import {
   GitBranch,
   Kanban,
   Lightbulb,
+  Radio,
   Search,
   TrendingUp,
   TriangleAlert,
@@ -45,7 +46,7 @@ import AgentOfMonth from "@/modules/dashboard/components/AgentOfMonth";
 import type { NoticiaMapPoint } from "@/modules/dashboard/components/MapaDashboard";
 import type { ZonaGeografica } from "@/types";
 
-type MetricKey = "noticias" | "investigaciones" | "encargos" | "pedidosActivos";
+type MetricKey = "noticias" | "investigaciones" | "seguimientos" | "encargos" | "pedidosActivos";
 
 type MetricCard = {
   key: MetricKey;
@@ -64,6 +65,7 @@ type Props = {
   summary: {
     noticias: number;
     investigaciones: number;
+    seguimientos: number;
     encargos: number;
     pedidosActivos: number;
   };
@@ -100,8 +102,9 @@ type Props = {
 const METRIC_ACCENT: Record<MetricKey, string> = {
   noticias: "bg-blue-500/12 text-blue-700 dark:text-blue-300",
   investigaciones: "bg-violet-500/12 text-violet-700 dark:text-violet-300",
+  seguimientos: "bg-amber-500/12 text-amber-700 dark:text-amber-300",
   encargos: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
-  pedidosActivos: "bg-amber-500/12 text-amber-700 dark:text-amber-300",
+  pedidosActivos: "bg-orange-500/12 text-orange-700 dark:text-orange-300",
 };
 
 function formatCompactCurrency(value: number) {
@@ -125,10 +128,19 @@ function buildMetricCards(summary: Props["summary"]): MetricCard[] {
       key: "investigaciones",
       title: "Investigaciones",
       value: summary.investigaciones,
-      subtitle: summary.investigaciones === 0 ? "No hay inmuebles en investigación." : "Seguimiento activo pendiente de avance.",
+      subtitle: summary.investigaciones === 0 ? "No hay inmuebles en investigación." : "Inmuebles en proceso de estudio activo.",
       href: "/zona",
       icon: Search,
       accent: METRIC_ACCENT.investigaciones,
+    },
+    {
+      key: "seguimientos",
+      title: "Seguimiento",
+      value: summary.seguimientos,
+      subtitle: summary.seguimientos === 0 ? "Sin oportunidades en seguimiento." : "Oportunidades activas pendientes de avance.",
+      href: "/zona",
+      icon: Radio,
+      accent: METRIC_ACCENT.seguimientos,
     },
     {
       key: "encargos",
@@ -404,7 +416,7 @@ export default function DashboardWorkspace(props: Props) {
 
       {showFeaturedAgentFirst && agentOfMonthSection}
 
-      <AnimatedList className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <AnimatedList className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
         {metricCards.map((card) => (
           <AnimatedListItem key={card.key}>
             <DashboardMetricCard

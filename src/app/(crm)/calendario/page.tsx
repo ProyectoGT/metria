@@ -147,6 +147,7 @@ export default async function CalendarioPage() {
       role={role}
       currentUserId={userId}
       empresaId={empresaId}
+      supervisedIds={supervisedIds}
       usersMap={usersMap}
       filterableUsers={filterableUsers}
       archivedGoogleEventIds={(archivedGoogleEvents ?? [])

@@ -132,10 +132,12 @@ export default async function DashboardPage() {
   const [
     { count: noticiasCount },
     { count: investigacionesCount },
+    { count: seguimientosCount },
     { count: encargosCount },
     { count: pedidosCount },
     { data: noticiasList },
     { data: investigacionesList },
+    { data: seguimientosList },
     { data: encargosList },
     { data: pedidosList },
     { data: todosAgentes },
@@ -154,6 +156,7 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "noticia")),
     applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "investig%")),
+    applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "seguimiento")),
     applyPropFilters(supabase.from("propiedades").select("id", { count: "exact", head: true }).ilike("estado", "encarg%")),
     applyPedidoFilters(supabase.from("pedidos").select("id", { count: "exact", head: true })),
 
@@ -162,6 +165,9 @@ export default async function DashboardPage() {
     ),
     applyPropFilters(
       supabase.from("propiedades").select(propSelect).ilike("estado", "investig%").order("id", { ascending: false }).limit(50)
+    ),
+    applyPropFilters(
+      supabase.from("propiedades").select(propSelect).ilike("estado", "seguimiento").order("id", { ascending: false }).limit(50)
     ),
     applyPropFilters(
       supabase.from("propiedades").select(propSelect).ilike("estado", "encarg%").order("id", { ascending: false }).limit(50)
@@ -236,6 +242,7 @@ export default async function DashboardPage() {
   const summary: SummaryData = {
     noticias: noticiasCount ?? 0,
     investigaciones: investigacionesCount ?? 0,
+    seguimientos: seguimientosCount ?? 0,
     encargos: encargosCount ?? 0,
     pedidosActivos: pedidosCount ?? 0,
   };
@@ -302,6 +309,7 @@ export default async function DashboardPage() {
   const listings: Record<SummaryType, PropertyListing[]> = {
     noticias: ((noticiasList ?? []) as unknown as PropRow[]).map(mapPropiedad),
     investigaciones: ((investigacionesList ?? []) as unknown as PropRow[]).map(mapPropiedad),
+    seguimientos: ((seguimientosList ?? []) as unknown as PropRow[]).map(mapPropiedad),
     encargos: ((encargosList ?? []) as unknown as PropRow[]).map(mapPropiedad),
     pedidosActivos: ((pedidosList ?? []) as unknown as PedidoRow[]).map(mapPedido),
   };

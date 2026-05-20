@@ -1,7 +1,6 @@
-import { createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { parseUserAgent } from "@/lib/parse-user-agent";
 import { getGeoFromIp } from "@/lib/geo-ip";
+import { getCurrentDeviceFingerprint } from "@/modules/security/devices/device-fingerprint";
 
 export interface LoginAuditParams {
   userId: number;
@@ -13,23 +12,26 @@ export interface LoginAuditParams {
   userAgent: string | null;
 }
 
-function makeFingerprint(browser: string, os: string, deviceType: string): string {
-  return createHash("sha256")
-    .update(`${browser}|${os}|${deviceType}`)
-    .digest("hex")
-    .slice(0, 16);
+function isMissingDeviceManagementColumns(error: { message?: string } | null) {
+  const message = error?.message ?? "";
+  return (
+    message.includes("device_sessions.user_agent") ||
+    message.includes("device_sessions.revoked_at") ||
+    message.includes("Could not find the") ||
+    message.includes("schema cache")
+  );
 }
 
 export async function recordLoginAudit(params: LoginAuditParams): Promise<void> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = createAdminClient() as any;
-    const parsed = parseUserAgent(params.userAgent ?? "");
+    const parsed = getCurrentDeviceFingerprint(params.userAgent);
     const geo = params.ipAddress
       ? await getGeoFromIp(params.ipAddress)
       : { country: null, region: null, city: null };
 
-    const fingerprint = makeFingerprint(parsed.browser, parsed.os, parsed.deviceType);
+    const fingerprint = parsed.deviceIdHash;
 
     const { data: existing } = await supabase
       .from("device_sessions")
@@ -64,20 +66,44 @@ export async function recordLoginAudit(params: LoginAuditParams): Promise<void> 
       .select("id")
       .single();
 
-    await supabase.from("device_sessions").upsert(
-      {
-        user_id: params.userId,
-        device_fingerprint: fingerprint,
-        device_type: parsed.deviceType,
-        os: parsed.os,
-        browser: parsed.browser,
-        last_seen_at: new Date().toISOString(),
-        last_ip: params.ipAddress ?? null,
-        last_country: geo.country,
-        last_city: geo.city,
-      },
+    const devicePayload = {
+      user_id: params.userId,
+      device_fingerprint: fingerprint,
+      device_type: parsed.deviceType,
+      os: parsed.os,
+      browser: parsed.browser,
+      user_agent: params.userAgent ? params.userAgent.slice(0, 500) : null,
+      last_seen_at: new Date().toISOString(),
+      last_ip: params.ipAddress ?? null,
+      last_country: geo.country,
+      last_city: geo.city,
+      revoked_at: null,
+      revoked_by: null,
+    };
+
+    const { error: deviceError } = await supabase.from("device_sessions").upsert(
+      devicePayload,
       { onConflict: "user_id,device_fingerprint" }
     );
+
+    if (isMissingDeviceManagementColumns(deviceError)) {
+      await supabase.from("device_sessions").upsert(
+        {
+          user_id: params.userId,
+          device_fingerprint: fingerprint,
+          device_type: parsed.deviceType,
+          os: parsed.os,
+          browser: parsed.browser,
+          last_seen_at: new Date().toISOString(),
+          last_ip: params.ipAddress ?? null,
+          last_country: geo.country,
+          last_city: geo.city,
+        },
+        { onConflict: "user_id,device_fingerprint" }
+      );
+    } else if (deviceError) {
+      throw new Error(deviceError.message);
+    }
 
     if (isNewDevice && auditRow && params.empresaId) {
       await notifyAdmins({

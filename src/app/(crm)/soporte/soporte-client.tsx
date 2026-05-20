@@ -7,7 +7,7 @@ import {
   Phone, Mail, User, ExternalLink, GitBranch, Database, Server,
   Archive, MessageSquare, Clock, AlertCircle, ChevronDown,
   LayoutList, Columns2, Bug, Lightbulb, HelpCircle, Headphones,
-  Inbox, CheckCircle2, Play, CircleDot,
+  Inbox, CheckCircle2, Play, CircleDot, Sparkles, ArrowRight, ClipboardList,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
@@ -97,6 +97,19 @@ function tipoIcon(t: string) {
   return Headphones;
 }
 
+function statusBadgeClass(estado: string) {
+  if (estado === "abierto") return "bg-blue-500/10 text-blue-600";
+  if (estado === "en_proceso") return "bg-amber-500/10 text-amber-600";
+  if (estado === "resuelto") return "bg-green-500/10 text-green-600";
+  return "bg-gray-500/10 text-gray-500";
+}
+
+function priorityBadgeClass(prioridad: string) {
+  if (prioridad === "alta") return "bg-red-500/10 text-red-600";
+  if (prioridad === "media") return "bg-amber-500/10 text-amber-600";
+  return "bg-blue-500/10 text-blue-600";
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatShort(iso: string) {
@@ -149,6 +162,8 @@ export default function SoporteClient({
   supabaseDashboardUrl, agents: initialAgents,
 }: Props) {
   const isAdmin = currentUserRole === "Administrador";
+  const isDirector = currentUserRole === "Director";
+  const isResponsable = currentUserRole === "Responsable";
   const searchParams = useSearchParams();
   const ticketParam = searchParams?.get("ticket");
 
@@ -295,6 +310,66 @@ export default function SoporteClient({
   }, [detailTicketId, mensajes]);
 
   const misTickets = tickets.filter((t) => t.user_id === currentUserId);
+  const roleView = isDirector ? "director" : isResponsable ? "responsable" : "agente";
+  const roleCopy = {
+    director: {
+      eyebrow: "Panel de supervision",
+      title: "Soporte operativo",
+      description: "Vista consolidada de las solicitudes disponibles para tu rol, con foco en bloqueos, prioridades y seguimiento.",
+      primaryAction: "Revisar tickets",
+      secondaryAction: "Nueva solicitud",
+    },
+    responsable: {
+      eyebrow: "Mesa de trabajo",
+      title: "Soporte del equipo",
+      description: "Seguimiento claro de incidencias, respuestas y solicitudes que requieren continuidad.",
+      primaryAction: "Ver seguimiento",
+      secondaryAction: "Crear incidencia",
+    },
+    agente: {
+      eyebrow: "Centro de ayuda",
+      title: "Mis solicitudes de soporte",
+      description: "Crea incidencias, consulta respuestas y revisa en que punto esta cada solicitud.",
+      primaryAction: "Ver mis tickets",
+      secondaryAction: "Nueva incidencia",
+    },
+  }[roleView];
+
+  const activeOwnTickets = misTickets.filter((t) => !["resuelto", "cerrado", "archivado"].includes(t.estado));
+  const recentTickets = [...tickets]
+    .filter((t) => !t.archived_at)
+    .sort((a, b) => new Date(b.updated_at ?? b.created_at).getTime() - new Date(a.updated_at ?? a.created_at).getTime())
+    .slice(0, 4);
+  const roleStats = [
+    {
+      label: isDirector ? "Tickets abiertos" : "Activos",
+      value: isDirector ? stats.abierto : activeOwnTickets.length,
+      color: "text-blue-600",
+      bg: "bg-blue-500/5",
+      helper: isDirector ? "Pendientes de entrada" : "En curso o abiertos",
+    },
+    {
+      label: "En proceso",
+      value: stats.en_proceso,
+      color: "text-amber-600",
+      bg: "bg-amber-500/5",
+      helper: "Con seguimiento",
+    },
+    {
+      label: "Alta prioridad",
+      value: stats.criticos,
+      color: "text-red-600",
+      bg: "bg-red-500/5",
+      helper: "Requieren atencion",
+    },
+    {
+      label: "Resueltos",
+      value: stats.resuelto,
+      color: "text-green-600",
+      bg: "bg-green-500/5",
+      helper: "Cerrados funcionalmente",
+    },
+  ];
 
   // ── Handlers ──────────────────────────────────────────────────────────
 
@@ -874,146 +949,305 @@ export default function SoporteClient({
           )}
         </div>
       ) : (
-        /* ═══════════════════════════════════════════════════════════════
-           USER VIEW (redesigned with richer cards)
-        ═══════════════════════════════════════════════════════════════ */
-        <div className="space-y-6">
-          {/* Contactos de soporte */}
-          <div>
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-secondary">Contactos de soporte</h2>
-            {contactos.length === 0 ? (
-              <p className="text-sm text-text-secondary">No hay contactos configurados.</p>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {contactos.map((c) => (
-                  <div key={c.id} className="flex items-start gap-3 rounded-xl border border-border bg-surface p-4">
-                    <Avatar name={`${c.nombre} ${c.apellidos ?? ""}`} size="md" />
-                    <div className="min-w-0">
-                      <p className="font-semibold text-text-primary">{c.nombre} {c.apellidos}</p>
-                      <p className="text-xs text-text-secondary">{c.cargo}</p>
-                      {c.telefono && <a href={`tel:${c.telefono}`} className="mt-1.5 flex items-center gap-1.5 text-xs text-text-secondary hover:text-primary"><Phone className="h-3 w-3" />{c.telefono}</a>}
-                      {c.email && <a href={`mailto:${c.email}`} className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-primary"><Mail className="h-3 w-3" />{c.email}</a>}
-                    </div>
+        <div className="space-y-5">
+          <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+            <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="p-5 md:p-6">
+                <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-primary/15 bg-primary/8 px-3 py-1 text-xs font-medium text-primary">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {roleCopy.eyebrow}
+                </div>
+                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                  <div className="max-w-2xl">
+                    <h2 className="text-xl font-semibold tracking-tight text-text-primary md:text-2xl">{roleCopy.title}</h2>
+                    <p className="mt-1 text-sm leading-relaxed text-text-secondary">{roleCopy.description}</p>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* New ticket / My tickets tabs */}
-          <div>
-            <div className="mb-4 flex gap-1 rounded-xl border border-border bg-background p-1">
-              <button onClick={() => setTab("incidencia")}
-                className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-                  tab === "incidencia" ? "bg-surface text-text-primary shadow-sm" : "text-text-secondary hover:text-text-primary"
-                }`}>Nueva incidencia</button>
-              <button onClick={() => setTab("mis-tickets")}
-                className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-                  tab === "mis-tickets" ? "bg-surface text-text-primary shadow-sm" : "text-text-secondary hover:text-text-primary"
-                }`}>Mis tickets {misTickets.length > 0 && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{misTickets.length}</span>}</button>
-            </div>
-
-            {tab === "incidencia" && (
-              <div className="rounded-xl border border-border bg-surface p-5">
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs font-medium text-text-secondary">Tipo de incidencia *</label>
-                    <select value={ticketForm.tipo} onChange={(e) => handleTipoChange(e.target.value)} className="input mt-1.5">
-                      <option value="">Seleccionar tipo...</option>
-                      {Object.keys(TIPOS_TICKET).map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
-                    </select>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="text-xs font-medium text-text-secondary">Asunto *</label>
-                      <input type="text" value={ticketForm.asunto}
-                        onChange={(e) => setTicketForm((prev) => ({ ...prev, asunto: e.target.value }))}
-                        placeholder="Resumen breve" className="input mt-1.5" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-text-secondary">Prioridad</label>
-                      <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
-                        {(["alta", "media", "baja"] as const).map((p, i) => (
-                          <button key={p} type="button" onClick={() => setTicketForm((prev) => ({ ...prev, prioridad: p }))}
-                            className={`flex-1 py-2 text-sm font-medium transition-colors ${i > 0 ? "border-l border-border" : ""} ${
-                              ticketForm.prioridad === p ? "bg-primary text-white" : "bg-surface text-text-secondary hover:bg-background"
-                            }`}>{PRIORIDAD_LABELS[p]}</button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-text-secondary">Descripcion *</label>
-                    <textarea value={ticketForm.descripcion}
-                      onChange={(e) => setTicketForm((prev) => ({ ...prev, descripcion: e.target.value }))}
-                      placeholder="Describe el problema..." rows={10} className="input mt-1.5 resize-none font-mono text-xs leading-relaxed" />
-                  </div>
-                  {sendError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{sendError}</p>}
-                  <div className="flex justify-end">
-                    <button onClick={handleSubmitTicket}
-                      disabled={sending || !ticketForm.tipo || !ticketForm.asunto.trim() || !ticketForm.descripcion.trim()}
-                      className="rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60">
-                      {sending ? "Enviando..." : "Enviar incidencia"}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setTab("mis-tickets")}
+                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:border-primary/30 hover:text-primary"
+                    >
+                      <ClipboardList className="h-4 w-4" />
+                      {roleCopy.primaryAction}
+                    </button>
+                    <button
+                      onClick={() => setTab("incidencia")}
+                      className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+                    >
+                      <Plus className="h-4 w-4" />
+                      {roleCopy.secondaryAction}
                     </button>
                   </div>
                 </div>
               </div>
-            )}
-
-            {tab === "mis-tickets" && (
-              <div>
-                {misTickets.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-border bg-surface py-16 text-center">
-                    <LifeBuoy className="mx-auto mb-3 h-8 w-8 text-text-secondary opacity-40" />
-                    <p className="text-sm text-text-secondary">No has enviado ningun ticket todavia</p>
-                    <button onClick={() => setTab("incidencia")} className="mt-4 rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:bg-background">Crear primera incidencia</button>
+              <div className="border-t border-border bg-background/45 p-5 lg:border-l lg:border-t-0">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-secondary">Actividad reciente</p>
+                {recentTickets.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-surface py-8 text-center">
+                    <MessageSquare className="mx-auto mb-2 h-6 w-6 text-text-secondary opacity-40" />
+                    <p className="text-xs text-text-secondary">Sin actividad de soporte</p>
                   </div>
                 ) : (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {misTickets.map((ticket) => {
-                      const msgs = mensajesPorTicket.get(ticket.id) ?? [];
-                      const hasAdminReply = msgs.some((m) => m.autor_rol === "admin");
-                      const lastMsg = msgs[msgs.length - 1];
-                      return (
-                        <motion.button key={ticket.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                          onClick={() => openTicket(ticket.id)}
-                          className={`group relative rounded-xl border border-border bg-surface p-4 text-left transition-all hover:shadow-md hover:-translate-y-0.5 ${PRIORIDAD_CARD_BORDER[ticket.prioridad] ?? ""} border-l-[3px]`}
-                        >
-                          <div className="mb-2 flex items-center gap-2">
-                            <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${tipoStyle(ticket.tipo)}`}>
-                              {(() => { const Ic = tipoIcon(ticket.tipo); return <Ic className="h-3 w-3" />; })()}
-                              {ticket.tipo}
-                            </span>
-                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${
-                              ticket.prioridad === "alta" ? "bg-red-500" : ticket.prioridad === "media" ? "bg-amber-500" : "bg-blue-500"
-                            }`} />
-                          </div>
-                          <p className="mb-1 text-sm font-semibold text-text-primary">{ticket.asunto}</p>
-                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-secondary/50">
-                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                              ticket.estado === "abierto" ? "bg-blue-500/10 text-blue-600" :
-                              ticket.estado === "en_proceso" ? "bg-amber-500/10 text-amber-600" :
-                              ticket.estado === "resuelto" ? "bg-green-500/10 text-green-600" :
-                              "bg-gray-500/10 text-gray-500"
-                            }`}>
-                              <span className={`h-1.5 w-1.5 rounded-full ${ESTADO_DOT[ticket.estado] ?? "bg-gray-400"}`} />
-                              {ESTADO_LABELS[ticket.estado] ?? ticket.estado}
-                            </span>
-                            <span>{formatShort(ticket.created_at!)}</span>
-                            {hasAdminReply && <span className="text-green-500/70">Con respuesta</span>}
-                          </div>
-                          {lastMsg && (
-                            <div className="mt-2.5 rounded-lg bg-background/50 px-2.5 py-1.5">
-                              <p className="line-clamp-1 text-xs text-text-secondary/70">{lastMsg.contenido}</p>
-                            </div>
-                          )}
-                        </motion.button>
-                      );
-                    })}
+                  <div className="space-y-2">
+                    {recentTickets.map((ticket) => (
+                      <button
+                        key={ticket.id}
+                        onClick={() => openTicket(ticket.id)}
+                        className="group flex w-full items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2 text-left transition-all hover:border-primary/25 hover:shadow-sm"
+                      >
+                        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${ESTADO_DOT[ticket.estado] ?? "bg-gray-400"}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-semibold text-text-primary">{ticket.asunto}</p>
+                          <p className="text-[11px] text-text-secondary/60">#{ticket.id} - {timeAgo(ticket.updated_at ?? ticket.created_at) ?? formatShort(ticket.created_at)}</p>
+                        </div>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0 text-text-secondary opacity-0 transition-opacity group-hover:opacity-100" />
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
-            )}
+            </div>
+          </section>
+
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {roleStats.map((s) => (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => {
+                  setFilterEstado("");
+                  setSmartFilter("");
+                  if (s.label.includes("Alta")) setSmartFilter("criticos");
+                  else if (s.label.includes("abiertos")) setFilterEstado("abierto");
+                  else if (s.label.includes("proceso")) setFilterEstado("en_proceso");
+                  else if (s.label.includes("Resueltos")) setFilterEstado("resuelto");
+                  setTab("mis-tickets");
+                }}
+                className={`rounded-xl ${s.bg} border border-border/60 px-4 py-3 text-left transition-all hover:border-primary/25 hover:shadow-sm`}
+              >
+                <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                <p className="text-xs font-medium text-text-primary">{s.label}</p>
+                <p className="mt-0.5 text-[11px] text-text-secondary">{s.helper}</p>
+              </button>
+            ))}
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+            <section className="min-w-0 rounded-2xl border border-border bg-surface p-4 shadow-sm md:p-5">
+              <div className="mb-4 flex gap-1 overflow-x-auto rounded-xl border border-border bg-background p-1">
+                <button onClick={() => setTab("incidencia")}
+                  className={`flex-1 whitespace-nowrap rounded-lg py-2 text-sm font-medium transition-colors ${
+                    tab === "incidencia" ? "bg-surface text-text-primary shadow-sm" : "text-text-secondary hover:text-text-primary"
+                  }`}>Nueva incidencia</button>
+                <button onClick={() => setTab("mis-tickets")}
+                  className={`flex-1 whitespace-nowrap rounded-lg py-2 text-sm font-medium transition-colors ${
+                    tab === "mis-tickets" ? "bg-surface text-text-primary shadow-sm" : "text-text-secondary hover:text-text-primary"
+                  }`}>Seguimiento {tickets.length > 0 && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{tickets.length}</span>}</button>
+              </div>
+
+              {tab === "incidencia" && (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-border bg-background/45 p-4">
+                    <div className="mb-4 flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <LifeBuoy className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-text-primary">Crear solicitud de soporte</h3>
+                        <p className="mt-0.5 text-xs text-text-secondary">Completa el contexto para que soporte pueda priorizar y responder con rapidez.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-xs font-medium text-text-secondary">Tipo de incidencia *</label>
+                        <select value={ticketForm.tipo} onChange={(e) => handleTipoChange(e.target.value)} className="input mt-1.5">
+                          <option value="">Seleccionar tipo...</option>
+                          {Object.keys(TIPOS_TICKET).map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="text-xs font-medium text-text-secondary">Asunto *</label>
+                          <input type="text" value={ticketForm.asunto}
+                            onChange={(e) => setTicketForm((prev) => ({ ...prev, asunto: e.target.value }))}
+                            placeholder="Resumen breve" className="input mt-1.5" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-text-secondary">Prioridad</label>
+                          <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border bg-surface">
+                            {(["alta", "media", "baja"] as const).map((p, i) => (
+                              <button key={p} type="button" onClick={() => setTicketForm((prev) => ({ ...prev, prioridad: p }))}
+                                className={`flex-1 py-2 text-sm font-medium transition-colors ${i > 0 ? "border-l border-border" : ""} ${
+                                  ticketForm.prioridad === p ? "bg-primary text-white" : "text-text-secondary hover:bg-background"
+                                }`}>{PRIORIDAD_LABELS[p]}</button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-text-secondary">Descripcion *</label>
+                        <textarea value={ticketForm.descripcion}
+                          onChange={(e) => setTicketForm((prev) => ({ ...prev, descripcion: e.target.value }))}
+                          placeholder="Describe el problema..." rows={10} className="input mt-1.5 resize-none font-mono text-xs leading-relaxed" />
+                      </div>
+                      {sendError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{sendError}</p>}
+                      <div className="flex justify-end">
+                        <button onClick={handleSubmitTicket}
+                          disabled={sending || !ticketForm.tipo || !ticketForm.asunto.trim() || !ticketForm.descripcion.trim()}
+                          className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark disabled:opacity-60">
+                          {sending ? "Enviando..." : "Enviar incidencia"}
+                          {!sending && <ArrowRight className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {tab === "mis-tickets" && (
+                <div className="space-y-4">
+                  <FilterBar
+                    searchSlot={
+                      <FilterSearch
+                        value={searchText}
+                        onChange={setSearchText}
+                        placeholder="Buscar tickets..."
+                        className="w-48"
+                      />
+                    }
+                    activeCount={(() => {
+                      let c = 0;
+                      if (searchText) c++;
+                      if (filterEstado) c++;
+                      if (filterPrioridad) c++;
+                      if (smartFilter) c++;
+                      return c;
+                    })()}
+                    onClear={() => {
+                      setSearchText("");
+                      setFilterEstado("");
+                      setFilterPrioridad("");
+                      setSmartFilter("");
+                    }}
+                    chips={(() => {
+                      const c: { key: string; label: string; onRemove: () => void }[] = [];
+                      if (filterEstado) c.push({ key: "estado", label: `Estado: ${ESTADO_LABELS[filterEstado] ?? filterEstado}`, onRemove: () => setFilterEstado("") });
+                      if (filterPrioridad) c.push({ key: "prio", label: `Prioridad: ${PRIORIDAD_LABELS[filterPrioridad] ?? filterPrioridad}`, onRemove: () => setFilterPrioridad("") });
+                      if (smartFilter) c.push({ key: "focus", label: smartFilter === "criticos" ? "Alta prioridad" : "Filtro aplicado", onRemove: () => setSmartFilter("") });
+                      return c;
+                    })()}
+                  >
+                    <FilterSelect value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)} label="Estado">
+                      <option value="">Todos estados</option>
+                      {ESTADOS.filter((e) => e !== "archivado").map((e) => (
+                        <option key={e} value={e}>{ESTADO_LABELS[e]}</option>
+                      ))}
+                    </FilterSelect>
+                    <FilterSelect value={filterPrioridad} onChange={(e) => setFilterPrioridad(e.target.value)} label="Prioridad">
+                      <option value="">Toda prioridad</option>
+                      {Object.entries(PRIORIDAD_LABELS).map(([k, v]) => (<option key={k} value={k}>{v}</option>))}
+                    </FilterSelect>
+                  </FilterBar>
+
+                  {filteredTickets.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-border bg-background/45 py-16 text-center">
+                      <LifeBuoy className="mx-auto mb-3 h-8 w-8 text-text-secondary opacity-40" />
+                      <p className="text-sm font-medium text-text-primary">{tickets.length === 0 ? "No hay tickets todavia" : "No hay tickets con los filtros actuales"}</p>
+                      <p className="mt-1 text-xs text-text-secondary">{tickets.length === 0 ? "Crea una solicitud para iniciar el seguimiento." : "Prueba a limpiar filtros o cambiar la busqueda."}</p>
+                      <button onClick={() => setTab("incidencia")} className="mt-4 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background">Crear incidencia</button>
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      {filteredTickets.map((ticket) => {
+                        const msgs = mensajesPorTicket.get(ticket.id) ?? [];
+                        const hasAdminReply = msgs.some((m) => m.autor_rol === "admin");
+                        const lastMsg = msgs[msgs.length - 1];
+                        const TicketIcon = tipoIcon(ticket.tipo);
+                        return (
+                          <motion.button key={ticket.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                            onClick={() => openTicket(ticket.id)}
+                            className={`group relative overflow-hidden rounded-xl border border-border bg-surface p-4 text-left shadow-sm transition-all hover:border-primary/25 hover:shadow-md ${PRIORIDAD_CARD_BORDER[ticket.prioridad] ?? ""} border-l-[3px]`}
+                          >
+                            <div className="mb-2 flex flex-wrap items-center gap-2">
+                              <span className="font-mono text-[11px] text-text-secondary/50">#{ticket.id}</span>
+                              <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${tipoStyle(ticket.tipo)}`}>
+                                <TicketIcon className="h-3 w-3" />
+                                <span className="max-w-[120px] truncate">{ticket.tipo}</span>
+                              </span>
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${priorityBadgeClass(ticket.prioridad)}`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${ticket.prioridad === "alta" ? "bg-red-500" : ticket.prioridad === "media" ? "bg-amber-500" : "bg-blue-500"}`} />
+                                {PRIORIDAD_LABELS[ticket.prioridad] ?? ticket.prioridad}
+                              </span>
+                            </div>
+                            <p className="mb-2 line-clamp-2 text-sm font-semibold text-text-primary">{ticket.asunto}</p>
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-secondary/50">
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusBadgeClass(ticket.estado)}`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${ESTADO_DOT[ticket.estado] ?? "bg-gray-400"}`} />
+                                {ESTADO_LABELS[ticket.estado] ?? ticket.estado}
+                              </span>
+                              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeAgo(ticket.updated_at ?? ticket.created_at) ?? formatShort(ticket.created_at)}</span>
+                              {hasAdminReply && <span className="text-green-500/80">Con respuesta</span>}
+                            </div>
+                            {lastMsg && (
+                              <div className="mt-3 rounded-lg bg-background/60 px-2.5 py-2">
+                                <p className="line-clamp-2 text-xs leading-relaxed text-text-secondary/75">{lastMsg.contenido}</p>
+                              </div>
+                            )}
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+
+            <aside className="space-y-5">
+              <section className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-text-primary">Contactos de soporte</h3>
+                  <span className="rounded-full bg-background px-2 py-0.5 text-[11px] text-text-secondary">{contactos.length}</span>
+                </div>
+                {contactos.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-background/45 py-10 text-center">
+                    <User className="mx-auto mb-2 h-6 w-6 text-text-secondary opacity-40" />
+                    <p className="text-xs text-text-secondary">No hay contactos configurados.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {contactos.map((c) => (
+                      <div key={c.id} className="flex items-start gap-3 rounded-xl border border-border bg-background/35 p-3">
+                        <Avatar name={`${c.nombre} ${c.apellidos ?? ""}`} size="md" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-text-primary">{c.nombre} {c.apellidos}</p>
+                          <p className="text-xs text-text-secondary">{c.cargo}</p>
+                          {c.telefono && <a href={`tel:${c.telefono}`} className="mt-1.5 flex items-center gap-1.5 text-xs text-text-secondary hover:text-primary"><Phone className="h-3 w-3" />{c.telefono}</a>}
+                          {c.email && <a href={`mailto:${c.email}`} className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-primary"><Mail className="h-3 w-3" />{c.email}</a>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+                <h3 className="mb-3 text-sm font-semibold text-text-primary">Resumen por estado</h3>
+                <div className="space-y-2">
+                  {ESTADOS.filter((e) => e !== "archivado").map((estadoKey) => (
+                    <button
+                      key={estadoKey}
+                      type="button"
+                      onClick={() => { setFilterEstado(estadoKey); setTab("mis-tickets"); }}
+                      className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-background"
+                    >
+                      <span className={`h-2.5 w-2.5 rounded-full ${ESTADO_DOT[estadoKey] ?? "bg-gray-400"}`} />
+                      <span className="flex-1 text-xs font-medium text-text-secondary">{ESTADO_LABELS[estadoKey]}</span>
+                      <span className="rounded-full bg-background px-2 py-0.5 text-[11px] font-medium text-text-primary">{stats[estadoKey as keyof typeof stats] ?? 0}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            </aside>
           </div>
         </div>
       )}

@@ -23,7 +23,7 @@ import {
 import { useCompleteTask, useTasks } from "@/modules/tareas/hooks/use-tasks";
 import type { TareaRow } from "@/modules/tareas/services/tareas.service";
 import EventFormModal from "./event-form-modal";
-import FilterSelect from "@/components/ui/filters/FilterSelect";
+import UserMultiFilter from "./UserMultiFilter";
 
 // â"€â"€â"€ Types â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
@@ -86,6 +86,7 @@ type Props = {
   role: UserRole;
   currentUserId: number;
   empresaId: number | null;
+  supervisedIds: number[];
   usersMap: Record<number, string>;
   filterableUsers: Array<{ id: number; name: string }>;
   archivedGoogleEventIds: string[];
@@ -240,6 +241,7 @@ export default function CalendarioClient({
   role,
   currentUserId,
   empresaId,
+  supervisedIds,
   usersMap,
   filterableUsers,
   archivedGoogleEventIds,
@@ -303,6 +305,22 @@ export default function CalendarioClient({
   const [completingAgendaIds, setCompletingAgendaIds] = useState<Set<number>>(new Set());
   const [completingTaskIds, setCompletingTaskIds] = useState<Set<number>>(new Set());
 
+  // Set of user IDs whose events this user is allowed to see.
+  // null = unrestricted (Admin / Director — RLS + empresa_id already gates).
+  // This is a client-side safety net in case RLS is more permissive than expected.
+  const allowedUserIdsSet = useMemo<Set<number> | null>(() => {
+    if (role === "Administrador" || role === "Director") return null;
+    if (role === "Responsable") return new Set([currentUserId, ...supervisedIds]);
+    return new Set([currentUserId]); // Agente
+  }, [role, currentUserId, supervisedIds]);
+
+  const isEventAllowed = useCallback((ev: { owner_user_id: number | null; user_id?: number | null; agenda_usuarios?: { usuario_id: number }[] }): boolean => {
+    if (!allowedUserIdsSet) return true;
+    if (ev.owner_user_id !== null && allowedUserIdsSet.has(ev.owner_user_id)) return true;
+    if (ev.user_id != null && allowedUserIdsSet.has(ev.user_id)) return true;
+    return (ev.agenda_usuarios ?? []).some((u) => allowedUserIdsSet.has(u.usuario_id));
+  }, [allowedUserIdsSet]);
+
   const agendaRange = useMemo(() => {
     if (viewMode === "week") {
       const end = new Date(weekStart);
@@ -321,21 +339,25 @@ export default function CalendarioClient({
     empresaId: empresaId ?? undefined,
     from: agendaRange.start,
     to: agendaRange.end,
+    // Agente: restrict at DB level too (defense-in-depth)
+    ...(role === "Agente" ? { assignedUserId: currentUserId } : {}),
   });
   const deleteAgendaItem = useDeleteAgendaItem();
   const completeAgendaItem = useCompleteAgendaItem();
   const completeTask = useCompleteTask();
 
-  const serverEvents = useMemo(
-    () => (agendaItemsQuery.data ?? initialEvents).map(normalizeCalendarEvent),
-    [agendaItemsQuery.data, initialEvents],
-  );
+  const serverEvents = useMemo(() => {
+    const raw = (agendaItemsQuery.data ?? initialEvents).map(normalizeCalendarEvent);
+    // Apply role-based visibility filter on client-fetched data (safety net over RLS)
+    if (!allowedUserIdsSet) return raw;
+    return raw.filter(isEventAllowed);
+  }, [agendaItemsQuery.data, initialEvents, allowedUserIdsSet, isEventAllowed]);
+
   const serverTareas = useMemo(() => {
-    const queryTareas = tasksQuery.data
-      ?.map(toTareaEvent)
-      .filter((tarea): tarea is TareaEvent => tarea !== null);
-    return queryTareas ?? initialTareas;
-  }, [initialTareas, tasksQuery.data]);
+    const raw = tasksQuery.data?.map(toTareaEvent).filter((t): t is TareaEvent => t !== null) ?? initialTareas;
+    if (!allowedUserIdsSet) return raw;
+    return raw.filter((t) => t.owner_user_id !== null && allowedUserIdsSet.has(t.owner_user_id));
+  }, [initialTareas, tasksQuery.data, allowedUserIdsSet]);
   const events = useMemo(
     () => applyLocalOverrides(serverEvents, eventOverrides),
     [eventOverrides, serverEvents],
@@ -367,10 +389,8 @@ export default function CalendarioClient({
   const eventsRef = useRef(events);
   useEffect(() => { eventsRef.current = events; }, [events]);
 
-  // Filter by user â€" default "all" for managers, currentUserId for agents
-  const [filterUserId, setFilterUserId] = useState<number | "all">(() =>
-    canSeeOthers(role) ? "all" : currentUserId
-  );
+  // Multi-user filter — empty Set = show all permitted events
+  const [filterUserIds, setFilterUserIds] = useState<Set<number>>(new Set());
 
   const { toasts, toast } = useToast();
 
@@ -378,15 +398,20 @@ export default function CalendarioClient({
 
   // â"€â"€ Apply user filter â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-  const filteredEvents = useMemo(() =>
-    filterUserId === "all" ? events : events.filter((e) => e.owner_user_id === filterUserId || e.user_id === filterUserId || agendaAssignedIds(e).includes(filterUserId)),
-    [events, filterUserId]
-  );
+  const filteredEvents = useMemo(() => {
+    if (filterUserIds.size === 0) return events;
+    return events.filter(
+      (e) =>
+        (e.owner_user_id !== null && filterUserIds.has(e.owner_user_id)) ||
+        (e.user_id !== null && filterUserIds.has(e.user_id)) ||
+        agendaAssignedIds(e).some((id) => filterUserIds.has(id)),
+    );
+  }, [events, filterUserIds]);
 
-  const filteredTareas = useMemo(() =>
-    filterUserId === "all" ? tareas : tareas.filter((t) => t.owner_user_id === filterUserId),
-    [tareas, filterUserId]
-  );
+  const filteredTareas = useMemo(() => {
+    if (filterUserIds.size === 0) return tareas;
+    return tareas.filter((t) => t.owner_user_id !== null && filterUserIds.has(t.owner_user_id));
+  }, [tareas, filterUserIds]);
 
   // â"€â"€ Calendar data maps â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
@@ -871,21 +896,20 @@ export default function CalendarioClient({
             </button>
           </div>
 
-          {/* User filter (managers only) */}
-          {canSeeOthers(role) && filterableUsers.length > 1 && (
-            <FilterSelect
-              value={filterUserId === "all" ? "all" : String(filterUserId)}
-              onChange={(e) => setFilterUserId(e.target.value === "all" ? "all" : Number(e.target.value))}
-              label={t("calendar.filtroPorUsuario")}
-            >
-              <option value="all">{t("calendar.todosLosUsuarios")}</option>
-              {filterableUsers.map((u) => (
-                <option key={u.id} value={String(u.id)}>
-                  {u.name}{u.id === currentUserId ? ` (${t("calendar.yo")})` : ""}
-                </option>
-              ))}
-            </FilterSelect>
-          )}
+          {/* User filter */}
+          {canSeeOthers(role) && filterableUsers.length > 1 ? (
+            <UserMultiFilter
+              users={filterableUsers}
+              selectedIds={filterUserIds}
+              onChange={setFilterUserIds}
+              currentUserId={currentUserId}
+              role={role}
+            />
+          ) : role === "Agente" ? (
+            <span className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-text-secondary">
+              Mis tareas
+            </span>
+          ) : null}
         </div>
 
         {/* Right: Google Calendar */}

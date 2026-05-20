@@ -314,8 +314,8 @@ Flujo: `/recuperar` → email con enlace → `/nueva-contrasena?token=...` → a
 | `sectores` | Sectores dentro de una zona | `zona_id` |
 | `fincas` | Fincas dentro de un sector | `sector_id` |
 | `propiedades` | Unidades inmobiliarias con estado y agente | `finca_id`, `agente_id` → `usuarios` |
-| `pedidos` | Solicitudes/pedidos de clientes | `empresa_id`, `propietario_id` → `usuarios` |
-| `tareas` | Tareas del Kanban personal | `usuario_id`, columnas: `pendiente/orden_dia/realizado` |
+| `pedidos` | Solicitudes/pedidos de clientes | `empresa_id`, `propietario_id` → `usuarios`. Tiene soft delete (`archived_at`). |
+| `tareas` | Tareas del Kanban personal | `usuario_id`, columnas: `pendiente/orden_dia/realizado`. Tiene `created_at`, `updated_at`. |
 | `agenda` | Eventos de calendario | `usuario_id`, sync con Google Calendar |
 | `rendimiento` | Métricas mensuales por agente | `usuario_id`, `mes`, `año`, objetivos vs. real |
 | `archivos` | Adjuntos y documentos | polimórfico: `entidad_tipo` + `entidad_id` |
@@ -758,3 +758,8 @@ supabase gen types typescript --project-id PROJECT_ID > src/types/database.types
 | 2026-05-17 | `feat` | Rediseño premium de la toolbar de zonas geográficas: glassmorphism, segmented control, microinteracciones, responsive |
 | 2026-05-18 | `feat` | Integración OpenWA: capa de proveedores WhatsApp (manual/meta/openwa), cliente HTTP OpenWA, endpoints internos, webhook con idempotencia y firma HMAC, migraciones whatsapp_sessions y whatsapp_webhook_events, documentación |
 | 2026-05-18 | `feat` | Rediseño del sistema de calculadoras: layout grid 1.4fr/1fr con hero metric, nuevos componentes CalcSection/CalcSliderInput/CalcHeroResult/CalcMetricTile, eliminados cards verticales por input, CalculatorShell simplificado a breadcrumb. Documentado en sección 8b. |
+| 2026-05-20 | `feat` | Calendario: filtro por usuarios refactorizado a multi-select. Nuevo componente `UserMultiFilter.tsx` (dropdown con checkboxes, búsqueda, chips, botón limpiar). Estado cambiado de `filterUserId: number\|"all"` a `filterUserIds: Set<number>`. Agente ve badge "Mis tareas" en lugar de filtro. Seguridad sin cambios: datos ya limitados por RLS y filtro JS en server. |
+| 2026-05-20 | `feat` | Dashboard: nueva fase "Seguimiento" entre Investigaciones y Encargos. Añadido a `SummaryData`, `DashboardWorkspace` (`MetricKey`, `buildMetricCards`, `METRIC_ACCENT`, grid 5 cols), queries de count y listing en `page.tsx`. DB y constantes ya tenían el estado; solo faltaba la UI. |
+| 2026-05-20 | `chore` | Auditoría BD: migración `20260520000002_performance_audit.sql`. Añade `created_at`/`updated_at` + trigger a `tareas`; `created_at`/`updated_at`/`archived_at` + trigger a `pedidos` (soft delete). 25 índices nuevos en propiedades, usuarios, pedidos, tareas, agenda, fincas/sectores, zona_acceso, actividad_desarrollo. Función genérica `set_updated_at()`. |
+| 2026-05-20 | `fix` | Calendario: corrección visibilidad eventos por rol (Responsable/Agente veían todos los eventos de empresa). Añadido `allowedUserIdsSet` + `isEventAllowed()` aplicado en `serverEvents`/`serverTareas` post-fetch. Agente también pasa `assignedUserId` a `useTasks` para restricción DB. |
+| 2026-05-20 | `chore` | Integración react-doctor v0.2.1: `react-doctor.config.json`, scripts `doctor*` en package.json, workflow `.github/workflows/react-doctor.yml` (phase 1 informativo, fail-on:none), `docs/dev/react-doctor.md` con diagnóstico inicial y plan de corrección. |

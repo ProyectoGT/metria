@@ -1,0 +1,20 @@
+{
+  "lint": true,
+  "offline": false,
+  "failOn": "none",
+  "ignore": {
+    "files": [
+      "src/types/database.types.ts",
+      "src/__tests__/**",
+      "scripts/**",
+      "supabase/**",
+      "OpenWA/**"
+    ],
+    "overrides": [
+      {
+        "files": ["src/app/(auth)/**"],
+        "rules": ["react-doctor/server-auth-actions"]
+      }
+    ]
+  }
+}

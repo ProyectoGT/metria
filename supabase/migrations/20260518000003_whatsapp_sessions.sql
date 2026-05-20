@@ -30,6 +30,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS whatsapp_sessions_external_id_idx
 -- RLS: solo el service role puede gestionar sesiones (accedido desde Server Actions / API routes)
 ALTER TABLE public.whatsapp_sessions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "whatsapp_sessions_service_role" ON public.whatsapp_sessions;
+
 CREATE POLICY "whatsapp_sessions_service_role"
   ON public.whatsapp_sessions
   FOR ALL

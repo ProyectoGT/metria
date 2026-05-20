@@ -5,6 +5,7 @@ import type { ActivityType } from "@/lib/activity-options";
 export type SummaryData = {
   noticias: number;
   investigaciones: number;
+  seguimientos: number;
   encargos: number;
   pedidosActivos: number;
 };

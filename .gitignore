@@ -48,3 +48,6 @@ next-env.d.ts
 # Artefactos de desarrollo local
 build_output.txt
 dev-server.*.log
+
+# Reportes de auditoría (generados localmente, no commitear)
+reports/react-doctor/
