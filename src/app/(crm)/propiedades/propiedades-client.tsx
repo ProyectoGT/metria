@@ -107,7 +107,11 @@ type Props = {
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function PropiedadesClient({ propiedades, zonas, agentes, isManager, loadError }: Props) {
-  const [view, setView] = useState<"table" | "cards">("table");
+  // On mobile (< 768px), default to cards view; on desktop, default to table
+  const [view, setView] = useState<"table" | "cards">(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) return "cards";
+    return "table";
+  });
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const filtros = usePropiedadesFilters();

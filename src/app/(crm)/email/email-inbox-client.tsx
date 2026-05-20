@@ -281,6 +281,8 @@ export default function EmailInboxClient({
   const selectedHtml = selectedFetchedBody?.html ?? selected?.body_html ?? null;
   const selectedText = selectedFetchedBody?.text ?? selected?.body_text ?? selected?.snippet ?? "";
   const selectedThread = selected ? threads[selected.id] ?? [] : [];
+  // TanStack Virtual returns imperative helpers that React Compiler cannot memoize safely.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: filtered.length,
     getScrollElement: () => listRef.current,

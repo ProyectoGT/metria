@@ -212,51 +212,91 @@ function ListingTable({ rows, titleKey }: { rows: PropertyListing[]; titleKey: M
       </div>
     );
   }
+
+  const detailUrl = (row: PropertyListing) => row.detailHref || (!isPedidos && row.id ? `/propiedades/${row.id}` : null);
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[780px] text-sm">
-        <thead className="border-b border-border bg-surface-raised/55">
-          <tr>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">{isPedidos ? "Nombre" : "Finca"}</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">{isPedidos ? "Tipo" : "Propiedad"}</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Zona</th>
-            {!isPedidos && (
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Propietario</th>
-            )}
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Estado</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Agente</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Ficha</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {rows.map((row) => (
-            <tr key={row.id} className="hover:bg-surface-raised/55">
-              <td className="px-5 py-3 font-medium text-text-primary">{isPedidos ? row.nombre : row.finca}</td>
-              <td className="px-5 py-3 text-text-secondary">{isPedidos ? row.finca : row.nombre}</td>
-              <td className="px-5 py-3 text-text-secondary">{isPedidos ? row.sector : row.zona ?? row.sector}</td>
-              {!isPedidos && (
-                <td className="px-5 py-3 text-text-secondary">{row.propietario ?? "—"}</td>
-              )}
-              <td className="px-5 py-3 text-text-secondary">{row.estado}</td>
-              <td className="px-5 py-3 text-text-secondary">{row.agente}</td>
-              <td className="px-5 py-3">
-                {row.detailHref || (!isPedidos && row.id) ? (
+    <>
+      {/* ── Mobile: card list (< md) ── */}
+      <div className="divide-y divide-border md:hidden">
+        {rows.map((row) => {
+          const href = detailUrl(row);
+          return (
+            <div key={row.id} className="px-4 py-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-text-primary">
+                    {isPedidos ? row.nombre : row.finca}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-text-secondary">
+                    {isPedidos ? (row.finca ?? "—") : row.nombre} · {isPedidos ? row.sector : (row.zona ?? row.sector)}
+                  </p>
+                </div>
+                {href && (
                   <Link
-                    href={row.detailHref || `/propiedades/${row.id}`}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    href={href}
+                    className="shrink-0 inline-flex items-center gap-0.5 text-xs font-medium text-primary hover:underline"
                   >
-                    Ver ficha
-                    <ChevronRight className="h-3 w-3" />
+                    Ver <ChevronRight className="h-3 w-3" />
                   </Link>
-                ) : (
-                  <span className="text-xs text-text-secondary">—</span>
                 )}
-              </td>
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-2 text-[11px] text-text-secondary">
+                {!isPedidos && row.propietario && <span>{row.propietario}</span>}
+                <span className="rounded-full bg-surface-raised px-2 py-0.5 font-medium">{row.estado}</span>
+                <span>{row.agente}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Desktop: table (md+) ── */}
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full min-w-[780px] text-sm">
+          <thead className="border-b border-border bg-surface-raised/55">
+            <tr>
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">{isPedidos ? "Nombre" : "Finca"}</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">{isPedidos ? "Tipo" : "Propiedad"}</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Zona</th>
+              {!isPedidos && (
+                <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Propietario</th>
+              )}
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Estado</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Agente</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-text-secondary">Ficha</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {rows.map((row) => (
+              <tr key={row.id} className="hover:bg-surface-raised/55">
+                <td className="px-5 py-3 font-medium text-text-primary">{isPedidos ? row.nombre : row.finca}</td>
+                <td className="px-5 py-3 text-text-secondary">{isPedidos ? row.finca : row.nombre}</td>
+                <td className="px-5 py-3 text-text-secondary">{isPedidos ? row.sector : row.zona ?? row.sector}</td>
+                {!isPedidos && (
+                  <td className="px-5 py-3 text-text-secondary">{row.propietario ?? "—"}</td>
+                )}
+                <td className="px-5 py-3 text-text-secondary">{row.estado}</td>
+                <td className="px-5 py-3 text-text-secondary">{row.agente}</td>
+                <td className="px-5 py-3">
+                  {detailUrl(row) ? (
+                    <Link
+                      href={detailUrl(row)!}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      Ver ficha
+                      <ChevronRight className="h-3 w-3" />
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-text-secondary">—</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

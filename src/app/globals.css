@@ -116,6 +116,21 @@
     @apply outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
   }
 
+  /*
+   * Sidebar layout wrapper — el padding-left solo aplica en desktop (md+).
+   * En móvil el sidebar es un drawer y NO ocupa espacio en el layout.
+   * La variable --sidebar-width es gestionada por sidebar.tsx vía JS.
+   */
+  .sidebar-content-wrapper {
+    padding-left: 0;
+    transition: padding-left 0.3s ease;
+  }
+  @media (min-width: 768px) {
+    .sidebar-content-wrapper {
+      padding-left: var(--sidebar-width, 260px);
+    }
+  }
+
   /* Focus-visible global para todos los elementos interactivos */
   a:focus-visible,
   button:focus-visible,

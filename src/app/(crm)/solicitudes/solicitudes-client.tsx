@@ -648,7 +648,81 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
               Ordenado por creacion
             </span>
           </div>
-          <div className="overflow-x-auto">
+          {/* ── Mobile: cards (< md) ── */}
+          <div className="divide-y divide-border md:hidden">
+            {filtered.map((pedido) => {
+              const hasPhone = !!pedido.telefono;
+              return (
+                <div
+                  key={pedido.id}
+                  onClick={() => openEdit(pedido)}
+                  className="cursor-pointer px-4 py-3 transition-colors hover:bg-primary/5 active:bg-primary/5"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background text-sm font-semibold text-primary ring-1 ring-border">
+                      {pedido.nombre_cliente.slice(0, 1).toUpperCase()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="truncate text-sm font-semibold text-text-primary">{pedido.nombre_cliente}</p>
+                        <span className="shrink-0">{modalidadBadge(pedido.modalidad)}</span>
+                      </div>
+                      {pedido.telefono && (
+                        <div className="mt-1 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => openWaModal(pedido)}
+                            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-500/10"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5" />
+                            WA
+                          </button>
+                          <a
+                            href={`tel:${pedido.telefono}`}
+                            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
+                          >
+                            <Phone className="h-3.5 w-3.5" />
+                            {pedido.telefono}
+                          </a>
+                        </div>
+                      )}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
+                        {pedido.tipo_propiedad && <span>{pedido.tipo_propiedad}</span>}
+                        {pedido.zona_busqueda && (
+                          <span className="inline-flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />{pedido.zona_busqueda}
+                          </span>
+                        )}
+                        {pedido.presupuesto && (
+                          <span className="font-semibold text-text-primary">{formatPresupuesto(pedido.presupuesto)}</span>
+                        )}
+                        {(pedido.habitaciones || pedido.banos) && (
+                          <span className="inline-flex items-center gap-1">
+                            {pedido.habitaciones && <><BedDouble className="h-3 w-3" />{pedido.habitaciones}</>}
+                            {pedido.banos && <><Bath className="ml-1 h-3 w-3" />{pedido.banos}</>}
+                          </span>
+                        )}
+                        {hasPhone && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); toggleSelect(pedido.id, e); }}
+                            className="ml-auto inline-flex items-center gap-1 text-text-secondary transition-colors hover:text-primary"
+                          >
+                            {selectedIds.has(pedido.id)
+                              ? <CheckSquare className="h-4 w-4 text-primary" />
+                              : <Square className="h-4 w-4" />}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Desktop: table (md+) ── */}
+          <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[900px] text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-border bg-background/95 backdrop-blur">
@@ -783,7 +857,7 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
 
       {/* ── Barra flotante de envío masivo ── */}
       {(selectedIds.size > 0 || bulkSending) && (
-        <div className="fixed inset-x-0 bottom-6 z-50 mx-auto flex max-w-lg items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-5 py-3 shadow-xl">
+        <div className="fixed inset-x-4 bottom-20 z-50 mx-auto flex max-w-lg items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-5 py-3 shadow-xl md:inset-x-0 md:bottom-6">
           {bulkSending && bulkProgress ? (
             <div className="flex w-full flex-col gap-1.5">
               <div className="flex items-center justify-between text-xs text-text-secondary">
@@ -878,8 +952,8 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
           })()}
 
           {/* Cliente + teléfono */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2 sm:col-span-1">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
               <label className="text-xs font-medium text-text-secondary">Nombre del cliente *</label>
               <input type="text" value={form.nombre_cliente} onChange={(e) => setForm({ ...form, nombre_cliente: e.target.value })}
                 placeholder="Nombre completo" className="input mt-1.5" autoFocus />
@@ -933,7 +1007,7 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
           </div>
 
           {/* Presupuesto + Habitaciones + Baños */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <label className="text-xs font-medium text-text-secondary">Presupuesto (€)</label>
               <input type="number" value={form.presupuesto ?? ""}
@@ -955,7 +1029,7 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
           </div>
 
           {/* Altura + Garaje */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs font-medium text-text-secondary">Altura deseada</label>
               <input type="text" value={form.altura_deseada ?? ""}
@@ -983,7 +1057,7 @@ export default function PedidosClient({ initialPedidos, agentes, currentUserId, 
           {/* Alcance */}
           <div>
             <label className="text-xs font-medium text-text-secondary">Alcance del contenido</label>
-            <div className="mt-1.5 grid grid-cols-5 gap-1.5">
+            <div className="mt-1.5 grid grid-cols-3 gap-1.5 sm:grid-cols-5">
               {ALCANCE_ORDEN.map((scope) => (
                 <button key={scope} type="button"
                   onClick={() => setForm({ ...form, visibility: scope, visibility_agente_ids: null })}
