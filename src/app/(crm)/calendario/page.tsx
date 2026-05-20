@@ -1,20 +1,10 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { getCurrentUserContext } from "@/lib/current-user";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import CalendarioClient from "./calendario-client";
 
 const AGENDA_SELECT = "id, description, event_date, time, priority, completed, result, gcal_event_id, user_id, created_at, owner_user_id, empresa_id, equipo_id, visibility, tipo, archived_at, archived_reason, converted_to_tarea_id, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))";
-
-function calendarRangeAroundToday() {
-  const today = new Date();
-  const from = new Date(today.getFullYear(), today.getMonth() - 6, 1);
-  const to = new Date(today.getFullYear(), today.getMonth() + 13, 0);
-  return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
-  };
-}
 
 export default async function CalendarioPage() {
   const cookieStore = await cookies();
@@ -24,52 +14,56 @@ export default async function CalendarioPage() {
   );
 
   const supabase = await createClient();
-  const yo = await getCurrentUserContext();
-  const userId = yo?.id ?? 0;
-  const role = yo?.role ?? "Agente";
-  const empresaId = yo?.empresaId ?? null;
-  const supervisedIds = yo?.supervisedAgentIds ?? [];
-  const calendarRange = calendarRangeAroundToday();
+  const yo = await requirePageAccess("calendario");
+  const userId = yo.id;
+  const role = yo.role;
+  const empresaId = yo.empresaId ?? null;
+  const supervisedIds = yo.supervisedAgentIds ?? [];
 
   let eventsQuery;
 
   if (role === "Administrador" || role === "Director") {
+    // Admin/Director usan admin client para leer todos los eventos de la empresa
+    // en una sola query sin restricciones de RLS por usuario individual.
+    // La segunda capa de seguridad es el eq("empresa_id") explícito.
     const adminSupa = createAdminClient();
     eventsQuery = adminSupa
       .from("agenda")
       .select(AGENDA_SELECT)
       .is("archived_at", null)
-      .gte("event_date", calendarRange.from)
-      .lte("event_date", calendarRange.to)
       .order("event_date", { ascending: true });
     if (empresaId !== null) eventsQuery = eventsQuery.eq("empresa_id", empresaId);
   } else if (role === "Responsable") {
-    const adminSupa = createAdminClient();
-    eventsQuery = adminSupa
+    // Responsable usa el cliente de usuario con RLS.
+    // La migración 20260514000003 restauró la cláusula de supervisados en la
+    // policy agenda_select_safe_no_recursion usando get_supervised_user_ids()
+    // (SECURITY DEFINER, sin recursión). RLS devuelve: eventos propios +
+    // eventos de supervisados + visibilidad company/team.
+    // NO usar createAdminClient() aquí: la RLS ya hace el filtrado correcto
+    // y así el server y el hook del cliente devuelven el mismo conjunto.
+    eventsQuery = supabase
       .from("agenda")
       .select(AGENDA_SELECT)
       .is("archived_at", null)
       .eq("empresa_id", empresaId ?? -1)
-      .gte("event_date", calendarRange.from)
-      .lte("event_date", calendarRange.to)
       .order("event_date", { ascending: true });
   } else {
-    // Agente: usar admin client con filtro explícito para garantizar visibilidad
-    // propia sin depender del RLS. El filtro JS posterior restringe al usuario.
+    // Agente: admin client con filtro de empresa. El filtro JS posterior
+    // restringe al propio agente (solo sus eventos asignados/propios).
+    // Nota: esto es más restrictivo que RLS pura (que incluiría company/team
+    // visibility). Cambio pendiente cuando se unifique con el hook.
     const agenteSupa = createAdminClient();
     eventsQuery = agenteSupa
       .from("agenda")
-      .select(AGENDA_SELECT)
+      .select("*, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
-      .gte("event_date", calendarRange.from)
-      .lte("event_date", calendarRange.to)
       .order("event_date", { ascending: true });
     if (empresaId !== null) eventsQuery = eventsQuery.eq("empresa_id", empresaId);
   }
 
   const [{ data: events }, { data: usersData }, { data: archivedGoogleEvents }] = await Promise.all([
     eventsQuery,
-    supabase.from("usuarios").select("id, nombre, apellidos"),
+    supabase.from("usuarios").select("id, nombre, apellidos, rol"),
     supabase
       .from("agenda")
       .select("gcal_event_id")
@@ -92,13 +86,14 @@ export default async function CalendarioPage() {
     created_at?: string | null;
     agenda_usuarios?: { usuario_id: number }[];
   };
-  const visibleIds = [userId, ...supervisedIds];
-  const visibleEvents = role === "Responsable"
+  // Responsable: RLS ya filtra correctamente (ver migración 20260514000003).
+  // Agente: el admin client devuelve todos los eventos de la empresa;
+  //   el filtro JS restringe al agente para evitar ver eventos ajenos.
+  // Admin/Director: sin filtro JS, RLS+empresa_id es suficiente.
+  const visibleEvents = role === "Agente"
     ? ((events ?? []) as unknown as EventWithAssignments[]).filter((event) => {
         const assigned = event.agenda_usuarios?.map((u) => u.usuario_id) ?? [];
-        return assigned.some((id) => visibleIds.includes(id))
-          || (event.owner_user_id != null && visibleIds.includes(event.owner_user_id))
-          || (event.user_id != null && visibleIds.includes(event.user_id));
+        return assigned.includes(userId) || event.owner_user_id === userId || event.user_id === userId;
       })
     : role === "Agente"
       ? ((events ?? []) as unknown as EventWithAssignments[]).filter((event) => {
@@ -142,9 +137,13 @@ export default async function CalendarioPage() {
 
   const filterableUsers = (usersData ?? [])
     .filter((u) => {
+      const isTargetAdmin = u.rol?.toLowerCase() === "administrador" || u.rol?.toLowerCase() === "admin";
+      if (isTargetAdmin) {
+        return role === "Administrador";
+      }
       if (role === "Administrador" || role === "Director") return true;
       if (role === "Responsable") return u.id === userId || supervisedIds.includes(u.id);
-      return false;
+      return u.id === userId;
     })
     .map((u) => ({ id: u.id, name: `${u.nombre} ${u.apellidos}`.trim() }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -157,6 +156,7 @@ export default async function CalendarioPage() {
       role={role}
       currentUserId={userId}
       empresaId={empresaId}
+      supervisedIds={supervisedIds}
       usersMap={usersMap}
       filterableUsers={filterableUsers}
       archivedGoogleEventIds={(archivedGoogleEvents ?? [])

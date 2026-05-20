@@ -1,6 +1,7 @@
-import { createClient } from "@/lib/supabase";
+﻿import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { sendTicketRespuestaEmail } from "@/lib/email";
+import { getCurrentUserContext } from "@/lib/current-user";
+import { sendTicketRespuestaEmail } from "@/modules/email/services/email";
 
 export async function PATCH(
   request: Request,
@@ -14,6 +15,14 @@ export async function PATCH(
 
   if (authError || !user) {
     return Response.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  // Solo Administradores pueden actualizar tickets de soporte.
+  // tickets_soporte_update RLS también lo garantiza, pero validamos aquí para
+  // devolver un error claro antes de llegar al admin client.
+  const yo = await getCurrentUserContext();
+  if (!yo || yo.role !== "Administrador") {
+    return Response.json({ error: "Solo Administradores pueden responder tickets" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -37,6 +46,8 @@ export async function PATCH(
     updates.respondido_at = new Date().toISOString();
   }
 
+  // admin client necesario: tickets_soporte_update RLS requiere rol Administrador
+  // pero el update usa service role para poder leer el correo del usuario en la respuesta.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const adminClient = createAdminClient() as any;
 

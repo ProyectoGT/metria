@@ -7,6 +7,21 @@ export const USER_ROLES = [
 
 export type UserRole = (typeof USER_ROLES)[number];
 
+export const USER_ROLES_HIERARCHY: Record<UserRole, number> = {
+  Administrador: 100,
+  Director: 75,
+  Responsable: 50,
+  Agente: 25,
+};
+
+export function roleGte(role: UserRole, minRole: UserRole): boolean {
+  return (USER_ROLES_HIERARCHY[role] ?? 0) >= (USER_ROLES_HIERARCHY[minRole] ?? 0);
+}
+
+export function roleLte(role: UserRole, maxRole: UserRole): boolean {
+  return (USER_ROLES_HIERARCHY[role] ?? 0) <= (USER_ROLES_HIERARCHY[maxRole] ?? 0);
+}
+
 function normalizeRoleValue(value: string | null | undefined) {
   return (value ?? "")
     .normalize("NFD")
@@ -34,11 +49,7 @@ export function normalizeUserRole(value: string | null | undefined): UserRole {
 }
 
 export function canDeletePropiedades(role: UserRole) {
-  return (
-    role === "Administrador" ||
-    role === "Director" ||
-    role === "Responsable"
-  );
+  return roleGte(role, "Responsable");
 }
 
 export function canDeleteFincas(role: UserRole) {
@@ -46,11 +57,23 @@ export function canDeleteFincas(role: UserRole) {
 }
 
 export function canDeleteSectores(role: UserRole) {
-  return role === "Administrador" || role === "Director";
+  return roleGte(role, "Director");
 }
 
 export function canDeleteZonas(role: UserRole) {
   return canDeleteSectores(role);
+}
+
+export function canDrawZones(role: UserRole) {
+  return roleGte(role, "Director");
+}
+
+export function canEditZoneGeometry(role: UserRole) {
+  return roleGte(role, "Director");
+}
+
+export function canDeleteZonasGeograficas(role: UserRole) {
+  return roleGte(role, "Director");
 }
 
 export function canManageConfirmationPassword(role: UserRole) {
@@ -66,19 +89,37 @@ export function canViewIdealistaLeads(role: UserRole) {
 }
 
 export function canManageUsers(role: UserRole) {
-  return role === "Administrador" || role === "Director";
+  return roleGte(role, "Director");
 }
 
 export function canCreateUsers(role: UserRole) {
-  return role === "Administrador" || role === "Director";
+  return roleGte(role, "Director");
 }
 
 export function canViewAllAgents(role: UserRole) {
-  return role === "Administrador" || role === "Director";
+  return roleGte(role, "Director");
+}
+
+export function canBeAssignedProperty(role: string | null | undefined) {
+  const normalized = normalizeRoleValue(role);
+  return !["administrador", "admin", "super_admin", "super admin", "superadministrador"].includes(normalized);
 }
 
 export function canViewSupervisedAgents(role: UserRole) {
   return role === "Responsable";
+}
+
+export function canViewOrgChart(role: UserRole) {
+  return roleGte(role, "Responsable");
+}
+
+export function canViewInsights(role: UserRole) {
+  return canViewOrgChart(role);
+}
+
+export function canAccessEmail(_role: UserRole) {
+  void _role;
+  return true;
 }
 
 /**
@@ -93,7 +134,7 @@ export function canSetVendido(
   currentUserId: number,
   supervisedAgentIds: number[]
 ): boolean {
-  if (role === "Administrador" || role === "Director") return true;
+  if (roleGte(role, "Director")) return true;
   if (role === "Responsable") {
     if (agenteAsignadoId === null) return true;
     return agenteAsignadoId === currentUserId || supervisedAgentIds.includes(agenteAsignadoId);

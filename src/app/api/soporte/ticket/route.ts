@@ -1,8 +1,8 @@
-import { createAdminClient } from "@/lib/supabase-admin";
+﻿import { createAdminClient } from "@/lib/supabase-admin";
 import { createClient } from "@/lib/supabase";
 import { rateLimiter, getIp } from "@/lib/rate-limiter";
 import { CreateTicketSchema } from "@/lib/validations/ticket";
-import { sendTicketAdminEmail } from "@/lib/email";
+import { sendTicketAdminEmail } from "@/modules/email/services/email";
 
 export async function POST(request: Request) {
   try {
@@ -30,18 +30,32 @@ export async function POST(request: Request) {
       return Response.json({ error: "Datos inválidos", details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const { tipo, asunto, descripcion, prioridad, nombre_usuario, user_id } = parsed.data;
+    const { tipo, asunto, descripcion, prioridad } = parsed.data;
 
+    // Derivar identidad del usuario autenticado — nunca del body.
+    const { data: profile } = await supabase
+      .from("usuarios")
+      .select("id, nombre, apellidos")
+      .eq("auth_id", user.id)
+      .maybeSingle();
+
+    const resolvedUserId = profile?.id ?? null;
+    const resolvedNombre = profile
+      ? `${profile.nombre} ${profile.apellidos ?? ""}`.trim() || "Usuario"
+      : "Usuario";
+
+    // admin client necesario: tickets_soporte tiene RLS INSERT que solo permite
+    // user_id = current_usuario_id() — el service role garantiza que siempre funciona
+    // aunque el perfil no esté perfectamente enlazado.
     const admin = createAdminClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const adminAny = admin as any;
 
-    // Insertar ticket
     const { data: ticket, error: insertError } = await adminAny
       .from("tickets_soporte")
       .insert({
-        user_id: user_id ?? null,
-        nombre_usuario: nombre_usuario?.trim() || "Usuario",
+        user_id: resolvedUserId,
+        nombre_usuario: resolvedNombre,
         tipo,
         asunto: asunto.trim(),
         descripcion: descripcion.trim(),
@@ -69,7 +83,7 @@ export async function POST(request: Request) {
       sendTicketAdminEmail({
         to: adminEmails,
         ticketId: ticket.id,
-        nombreUsuario: nombre_usuario || "Usuario",
+        nombreUsuario: resolvedNombre,
         tipo,
         asunto,
         descripcion,

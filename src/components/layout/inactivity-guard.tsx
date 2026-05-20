@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { logout } from "@/app/(auth)/actions";
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutos
+const MOBILE_SESSION_QUERY = "(max-width: 767px), (pointer: coarse)";
 const ACTIVITY_EVENTS = [
   "mousemove",
   "mousedown",
@@ -24,6 +25,10 @@ export default function InactivityGuard() {
   }, []);
 
   useEffect(() => {
+    if (window.matchMedia(MOBILE_SESSION_QUERY).matches) {
+      return;
+    }
+
     resetTimer();
     ACTIVITY_EVENTS.forEach((event) =>
       window.addEventListener(event, resetTimer, { passive: true })

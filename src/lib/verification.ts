@@ -1,16 +1,25 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-const SECRET =
-  process.env.VERIFICATION_SECRET ??
-  process.env.SUPABASE_SERVICE_ROLE_KEY ??
-  "fallback-secret-change-me";
+// VERIFICATION_SECRET debe definirse en .env.local (y en el entorno de producción).
+// No reutilizar SUPABASE_SERVICE_ROLE_KEY: un token HMAC filtrado comprometería
+// también el acceso admin a Supabase. Son secretos con propósitos distintos.
+function getSecret(): string {
+  const secret = process.env.VERIFICATION_SECRET;
+  if (!secret) {
+    throw new Error(
+      "[verification] VERIFICATION_SECRET no está definido. " +
+      "Añádelo a .env.local y al entorno de producción antes de arrancar."
+    );
+  }
+  return secret;
+}
 
 const EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 días
 
 export function generateVerificationToken(userId: number, email: string): string {
   const expiry = Date.now() + EXPIRY_MS;
   const payload = `${userId}|${email.toLowerCase()}|${expiry}`;
-  const hmac = createHmac("sha256", SECRET).update(payload).digest("hex");
+  const hmac = createHmac("sha256", getSecret()).update(payload).digest("hex");
   return Buffer.from(`${payload}|${hmac}`).toString("base64url");
 }
 
@@ -35,7 +44,7 @@ export function verifyVerificationToken(
     if (isNaN(expiry) || isNaN(userId)) return null;
     if (Date.now() > expiry) return null;
 
-    const expectedHmac = createHmac("sha256", SECRET).update(payload).digest("hex");
+    const expectedHmac = createHmac("sha256", getSecret()).update(payload).digest("hex");
 
     const a = Buffer.from(hmac, "hex");
     const b = Buffer.from(expectedHmac, "hex");

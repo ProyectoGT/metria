@@ -1,14 +1,16 @@
 import PageHeader from "@/components/layout/page-header";
-import CalculadoraClient from "./calculadora-client";
+import CalculatorDashboard from "@/modules/calculator/components/CalculatorDashboard";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 
-export default function CalculadoraPage() {
+export default async function CalculadoraPage() {
+  await requirePageAccess("calculadora");
   return (
     <>
       <PageHeader
-        title="Calculadora"
-        description="Herramientas de cálculo inmobiliario"
+        title="Centro de simulación inmobiliaria"
+        description="Calcula hipotecas, gastos, plusvalía, rentabilidad y viabilidad de operaciones."
       />
-      <CalculadoraClient />
+      <CalculatorDashboard />
     </>
   );
 }

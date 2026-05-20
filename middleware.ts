@@ -1,14 +1,47 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getPersistentAuthCookieOptions } from "@/lib/auth-session";
 
 export async function middleware(request: NextRequest) {
+  const start = Date.now();
   const { pathname } = request.nextUrl;
 
-  const isPublicPage =
+  const isApiRoute = pathname.startsWith("/api/");
+
+  // OAuth callbacks y rutas de infraestructura que el navegador o servicios
+  // externos invocan sin sesión Supabase activa. Cortocircuitamos aquí para
+  // evitar la llamada de red a Supabase.auth.getUser en estas rutas.
+  const isPublicApiRoute =
+    pathname.startsWith("/api/google/callback") ||
+    pathname.startsWith("/api/google/gmail-callback") ||
+    pathname.startsWith("/api/email/gmail/callback") ||
+    pathname === "/api/observability/log" ||
+    pathname === "/api/jobs/process";
+
+  if (isPublicApiRoute) {
+    return NextResponse.next();
+  }
+
+  // Páginas de login: unauthenticated puede acceder, pero un usuario con sesión
+  // activa es redirigido a /dashboard.
+  const isAuthPage =
     pathname === "/login" ||
     pathname === "/recuperar" ||
     pathname.startsWith("/auth/");
 
+  // Páginas accesibles para cualquier estado de sesión. No aplica la regla
+  // "autenticado en página pública → dashboard": un usuario con sesión puede
+  // llegar aquí legítimamente (/sin-acceso desde app-shell, /nueva-contrasena
+  // tras callback de reset de contraseña).
+  const isAlwaysAllowedPage =
+    pathname === "/sin-acceso" ||
+    pathname === "/nueva-contrasena" ||
+    pathname === "/offline" ||
+    pathname.startsWith("/legal/");
+
+  const isPublicPage = isAuthPage || isAlwaysAllowedPage;
+
+  // Crear respuesta mutable para que Supabase pueda refrescar la cookie si hace falta
   let response = NextResponse.next({
     request: { headers: request.headers },
   });
@@ -29,53 +62,59 @@ export async function middleware(request: NextRequest) {
             request: { headers: request.headers },
           });
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            response.cookies.set(
+              name,
+              value,
+              getPersistentAuthCookieOptions(options)
+            )
           );
         },
       },
     }
   );
 
-  // 1. Fast local session check — lee cookie JWT, sin llamada HTTP
-  const { data: { session } } = await supabase.auth.getSession();
-  const hasSession = !!session;
+  // Obtener usuario real (refresca el token si es necesario)
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-  // 2. Intentar refresh/verificación con getUser, pero no bloquear si falla
-  let isAuthenticated = hasSession;
+  const isAuthenticated = !!user;
 
-  if (hasSession) {
-    const { error: verifyError } = await supabase.auth.getUser();
-    if (verifyError) {
-      console.error("[middleware] getUser verification error (session exists, continuing):", verifyError.message);
+  // Token caducado o inválido en ruta protegida
+  if (authError && !isAuthenticated && !isPublicPage) {
+    if (isApiRoute) {
+      return Response.json({ error: "Sesion expirada" }, { status: 401 });
     }
-  } else {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    isAuthenticated = !!user;
-
-    if (authError && !isAuthenticated && !isPublicPage) {
-      const loginUrl = new URL("/login", request.url);
-      const redirectResponse = NextResponse.redirect(loginUrl);
-      request.cookies.getAll().forEach(({ name }) => {
-        if (name.startsWith("sb-")) {
-          redirectResponse.cookies.delete(name);
-        }
-      });
-      return redirectResponse;
-    }
+    const loginUrl = new URL("/login", request.url);
+    const redirectResponse = NextResponse.redirect(loginUrl);
+    request.cookies.getAll().forEach(({ name }) => {
+      if (name.startsWith("sb-")) {
+        redirectResponse.cookies.delete(name);
+      }
+    });
+    return redirectResponse;
   }
 
-  // Sin-acceso es accesible siempre: AppShell redirige aqui si falta perfil,
-  // y la pagina de error debe verse sin importar el estado de sesion.
-  if (pathname === "/sin-acceso") {
-    return response;
-  }
-
+  // Sin sesión en ruta protegida
   if (!isAuthenticated && !isPublicPage) {
+    if (isApiRoute) {
+      return Response.json({ error: "No autorizado" }, { status: 401 });
+    }
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (isAuthenticated && isPublicPage) {
+  // Sesión activa en página de login → dashboard.
+  // No aplica a /sin-acceso, /nueva-contrasena ni /offline (isAlwaysAllowedPage).
+  if (isAuthenticated && isAuthPage) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  const duration = Date.now() - start;
+  response.headers.set("X-Response-Time", `${duration}ms`);
+
+  if (duration > 2000) {
+    console.warn(`[SLOW] ${request.method} ${pathname} — ${duration}ms`);
   }
 
   return response;

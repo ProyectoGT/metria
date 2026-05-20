@@ -1,5 +1,9 @@
+import { Suspense } from "react";
 import AppShell from "@/components/layout/app-shell";
 import InactivityGuard from "@/components/layout/inactivity-guard";
+import ObservabilityProvider from "@/components/layout/observability-provider";
+import { QueryProvider } from "@/providers/query-provider";
+import { SyncProvider } from "@/providers/sync-provider";
 
 export default function CrmLayout({
   children,
@@ -7,9 +11,17 @@ export default function CrmLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
-      <InactivityGuard />
-      <AppShell>{children}</AppShell>
-    </>
+    <QueryProvider>
+      {/* SyncProvider wires the event bus to TanStack Query — must be inside QueryProvider */}
+      <SyncProvider>
+        <InactivityGuard />
+        {/* Suspense required because ObservabilityProvider uses useSearchParams() */}
+        <Suspense fallback={null}>
+          <ObservabilityProvider>
+            <AppShell>{children}</AppShell>
+          </ObservabilityProvider>
+        </Suspense>
+      </SyncProvider>
+    </QueryProvider>
   );
 }

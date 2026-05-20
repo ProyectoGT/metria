@@ -1,15 +1,21 @@
 import { createClient } from "@/lib/supabase";
-import { getCurrentUserContext } from "@/lib/current-user";
+import { normalizeUserRole } from "@/lib/roles";
+import { getDeniedResourceKeys } from "@/lib/access-control/can-access";
 import { redirect } from "next/navigation";
+import { ThemeProvider } from "@/lib/theme-context";
 import Sidebar from "./sidebar";
 import Header from "./header";
-import ThemeScript from "./theme-script";
+import MobileBottomNav from "./mobile-nav";
+import RoutePreloader from "./route-preloader";
+import KeyboardShortcuts from "./keyboard-shortcuts";
 
 export type NotificationItem = {
   id: number;
   titulo: string;
   fecha: string | null;
   prioridad: string | null;
+  type: "tarea" | "soporte" | "login";
+  href?: string;
 };
 
 export default async function AppShell({
@@ -22,48 +28,142 @@ export default async function AppShell({
     data: { user },
   } = await supabase.auth.getUser();
 
-  let currentUser = user;
+  if (!user) redirect("/login");
 
-  if (!currentUser) {
-    const { data: { session } } = await supabase.auth.getSession();
-    currentUser = session?.user ?? null;
+  let userName = "Usuario";
+  let userEmail: string | null = null;
+  let userRole: ReturnType<typeof normalizeUserRole> | null = null;
+  let userId: number | null = null;
+  let userAvatarUrl: string | null = null;
+  let empresaId: number | null = null;
+  let deniedKeys: string[] = [];
+
+  if (user) {
+    userEmail = user.email ?? null;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let { data: profile } = await (supabase as any)
+      .from("usuarios")
+      .select("id, nombre, apellidos, rol, avatar_url, empresa_id")
+      .eq("auth_id", user.id)
+      .maybeSingle() as { data: { id: number; nombre: string; apellidos: string; rol: string; avatar_url: string | null; empresa_id: number | null } | null };
+
+    if (!profile && user.email) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: byEmail } = await (supabase as any)
+        .from("usuarios")
+        .select("id, nombre, apellidos, rol, avatar_url, empresa_id")
+        .eq("correo", user.email)
+        .maybeSingle() as { data: { id: number; nombre: string; apellidos: string; rol: string; avatar_url: string | null; empresa_id: number | null } | null };
+      profile = byEmail;
+    }
+
+    if (!profile) {
+      redirect("/sin-acceso");
+    }
+
+    userName = `${profile.nombre} ${profile.apellidos}`.trim() || "Usuario";
+    userRole = normalizeUserRole(profile.rol);
+    userId = profile.id ?? null;
+    userAvatarUrl = profile.avatar_url
+      ?? (user.user_metadata?.avatar_url as string | undefined)
+      ?? null;
+    empresaId = profile.empresa_id ?? null;
+
+    // Cargar recursos denegados desde access_control_rules (capa configurable)
+    if (empresaId && userRole) {
+      const deniedSet = await getDeniedResourceKeys(empresaId, userRole);
+      deniedKeys = Array.from(deniedSet);
+    }
   }
 
-  if (!currentUser) redirect("/login");
-
-  const ctx = await getCurrentUserContext();
-
-  if (!ctx) {
-    redirect("/sin-acceso");
-  }
-
-  // Notificaciones: tareas pendientes del usuario actual
+  // Notificaciones: tareas pendientes + notificaciones de soporte + login alerts (solo admin)
   let notifications: NotificationItem[] = [];
-  const { data: tareas } = await supabase
-    .from("tareas")
-    .select("id, titulo, fecha, prioridad")
-    .eq("owner_user_id", ctx.id)
-    .eq("estado", "pendiente")
-    .is("fecha", null)
-    .is("archived_at", null)
-    .order("fecha", { ascending: true, nullsFirst: false })
-    .limit(8);
-  notifications = (tareas ?? []) as NotificationItem[];
+  if (userId) {
+    const isAdminUser = userRole === "Administrador";
 
-  const userName = `${ctx.nombre} ${ctx.apellidos}`.trim() || "Usuario";
+    const queries: Promise<{ data: unknown }>[] = [
+      supabase
+        .from("tareas")
+        .select("id, titulo, fecha, prioridad")
+        .eq("owner_user_id", userId)
+        .eq("estado", "pendiente")
+        .is("fecha", null)
+        .is("archived_at", null)
+        .order("fecha", { ascending: true, nullsFirst: false })
+        .limit(5),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any)
+        .from("soporte_notificaciones")
+        .select("id, ticket_id, mensaje, created_at, tipo")
+        .eq("usuario_id", userId)
+        .eq("leido", false)
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ];
+
+    if (isAdminUser) {
+      queries.push(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any)
+          .from("notificaciones")
+          .select("id, titulo, mensaje, created_at, login_audit_id")
+          .eq("usuario_id", userId)
+          .eq("leido", false)
+          .order("created_at", { ascending: false })
+          .limit(5)
+      );
+    }
+
+    const results = await Promise.all(queries);
+    const [{ data: tareas }, { data: soporteNotifs }] = results;
+    const loginNotifs = isAdminUser ? (results[2]?.data ?? []) : [];
+
+    const tareaItems: NotificationItem[] = ((tareas ?? []) as { id: number; titulo: string; fecha: string | null; prioridad: string | null }[]).map((t) => ({
+      id: t.id,
+      titulo: t.titulo,
+      fecha: t.fecha,
+      prioridad: t.prioridad,
+      type: "tarea" as const,
+    }));
+
+    const soporteItems: NotificationItem[] = ((soporteNotifs ?? []) as { id: number; ticket_id: number; mensaje: string; created_at: string; tipo: string }[]).map((n) => ({
+      id: n.id,
+      titulo: n.mensaje,
+      fecha: n.created_at,
+      prioridad: "media",
+      type: "soporte" as const,
+      href: `/soporte?ticket=${n.ticket_id}`,
+    }));
+
+    const loginItems: NotificationItem[] = ((loginNotifs ?? []) as { id: number; titulo: string; mensaje: string; created_at: string; login_audit_id: number | null }[]).map((n) => ({
+      id: n.id,
+      titulo: n.titulo,
+      fecha: n.created_at,
+      prioridad: null,
+      type: "login" as const,
+      href: "/seguridad",
+    }));
+
+    notifications = [...loginItems, ...soporteItems, ...tareaItems].slice(0, 8);
+  }
 
   return (
-    <>
-      <ThemeScript />
-      <div className="min-h-screen bg-background md:grid md:grid-cols-[220px_minmax(0,1fr)]">
-        <Sidebar userRole={ctx.role} />
-        <div className="flex h-screen min-w-0 flex-col">
-          <Header userName={userName} userEmail={ctx.email} avatarUrl={ctx.avatarUrl} notifications={notifications} />
-          <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
-            {children}
+    <ThemeProvider>
+      <KeyboardShortcuts />
+      <RoutePreloader />
+      <div className="h-dvh overflow-hidden bg-background">
+        <Sidebar userRole={userRole} deniedResourceKeys={deniedKeys} />
+        <div className="sidebar-content-wrapper flex h-full min-w-0 flex-col">
+          <Header userName={userName} userEmail={userEmail} avatarUrl={userAvatarUrl} notifications={notifications} />
+          <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background px-4 py-5 pb-20 md:px-6 md:py-6 md:pb-6 lg:px-7 lg:py-7" aria-label="Contenido principal">
+            <div className="w-full min-w-0">
+              {children}
+            </div>
           </main>
         </div>
+        <MobileBottomNav />
       </div>
-    </>
+    </ThemeProvider>
   );
 }

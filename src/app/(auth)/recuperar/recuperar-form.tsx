@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { resetPassword } from "./actions";
+import { useI18n } from "@/lib/i18n";
+import { translateVisibleText } from "@/lib/i18n/translate-text";
 
 const fieldClassName =
   "w-full border-0 border-b border-[#d8d3cb] bg-transparent px-0 py-3 text-sm text-[#171717] outline-none transition placeholder:text-[#b1aba3] focus:border-[#7ba4e0] focus:ring-0";
 
 export default function RecuperarForm() {
+  const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -28,14 +31,13 @@ export default function RecuperarForm() {
     return (
       <div className="space-y-8">
         <div className="rounded-2xl border border-[#cfe8d3] bg-[#f3fbf4] px-4 py-4 text-sm leading-6 text-[#28643a]">
-          Te hemos enviado un correo con las instrucciones para restablecer tu
-          contraseña.
+          {t("auth:recoverySent")}
         </div>
         <Link
           href="/login"
           className="inline-flex w-full justify-center rounded-full border border-[#9fc0ee] px-4 py-2.5 text-sm font-medium text-[#6f96cf] transition hover:border-[#7ba4e0] hover:text-[#5f8fd4]"
         >
-          Volver al login
+          {t("auth:backToLogin")}
         </Link>
       </div>
     );
@@ -45,7 +47,7 @@ export default function RecuperarForm() {
     <form action={handleSubmit} className="space-y-8">
       {error && (
         <div className="rounded-2xl border border-[#f2c7c7] bg-[#fff3f3] px-4 py-3 text-sm text-[#b42318]">
-          {error}
+          {translateVisibleText(error)}
         </div>
       )}
 
@@ -54,7 +56,7 @@ export default function RecuperarForm() {
           htmlFor="email"
           className="mb-2 block text-sm font-medium text-[#2f2f2f]"
         >
-          Correo electrónico
+          {t("auth:email")}
         </label>
         <input
           id="email"
@@ -72,7 +74,7 @@ export default function RecuperarForm() {
         disabled={isPending}
         className="w-full rounded-full border border-[#9fc0ee] px-4 py-2.5 text-sm font-medium text-[#6f96cf] transition hover:border-[#7ba4e0] hover:text-[#5f8fd4] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isPending ? "Enviando..." : "Enviar enlace de recuperación"}
+        {isPending ? t("auth:sending") : t("auth:sendRecoveryLink")}
       </button>
 
       <div className="text-center">
@@ -80,7 +82,7 @@ export default function RecuperarForm() {
           href="/login"
           className="text-sm font-medium text-[#7ba4e0] transition hover:text-[#5f8fd4]"
         >
-          Volver al login
+          {t("auth:backToLogin")}
         </Link>
       </div>
     </form>

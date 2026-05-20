@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createAdminClient } from "@/lib/supabase-admin";
-import { getCurrentUserContext } from "@/lib/current-user";
-import { canViewIdealistaLeads } from "@/lib/roles";
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 
@@ -199,12 +196,6 @@ interface GmailMessage {
 // ─── POST /api/google/gmail-sync ─────────────────────────────────────────────
 
 export async function POST() {
-  const currentUser = await getCurrentUserContext();
-  if (!currentUser) return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
-  if (!canViewIdealistaLeads(currentUser.role)) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
-
   const auth = await getGmailToken();
   if (!auth) {
     return NextResponse.json({ error: "gmail_not_connected" }, { status: 401 });
@@ -231,9 +222,8 @@ export async function POST() {
 
   const messageIds: string[] = listData.messages.map((m: { id: string }) => m.id);
 
-  // Check which message IDs are already in DB
-  const adminSupabase = createAdminClient();
-  const { data: existing } = await adminSupabase
+  // idealista_leads tiene RLS con política por empresa_id; createClient() es suficiente.
+  const { data: existing } = await supabase
     .from("idealista_leads")
     .select("gmail_message_id")
     .in("gmail_message_id", messageIds);
@@ -299,7 +289,7 @@ export async function POST() {
     return response;
   }
 
-  const { data: inserted, error } = await adminSupabase
+  const { data: inserted, error } = await supabase
     .from("idealista_leads")
     .insert(leadsToInsert)
     .select();

@@ -5,6 +5,7 @@ import type { ActivityType } from "@/lib/activity-options";
 export type SummaryData = {
   noticias: number;
   investigaciones: number;
+  seguimientos: number;
   encargos: number;
   pedidosActivos: number;
 };
@@ -16,6 +17,8 @@ export type PropertyListing = {
   nombre: string;
   sector: string;
   finca: string;
+  zona?: string;
+  propietario?: string;
   estado: string;
   agente: string;
   detailHref?: string;
@@ -63,6 +66,8 @@ export type KanbanCardData = {
   tipo?: ActivityType;
   dueDate?: string;
   time?: string | null;
+  timeEnd?: string | null;
+  reminderMinutesBefore?: number | null;
   assignedBy?: string | null;
   assignedTo?: string | null;
   assignedUserIds?: number[];

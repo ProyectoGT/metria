@@ -1,0 +1,32 @@
+{
+  "title": "Calendario",
+  "today": "Oggi",
+  "month": "Mese",
+  "week": "Settimana",
+  "day": "Giorno",
+  "addEvent": "Aggiungi evento",
+  "allDay": "Tutto il giorno",
+  "days": {
+    "mon": "Lunedì",
+    "tue": "Martedì",
+    "wed": "Mercoledì",
+    "thu": "Giovedì",
+    "fri": "Venerdì",
+    "sat": "Sabato",
+    "sun": "Domenica"
+  },
+  "months": {
+    "jan": "Gennaio",
+    "feb": "Febbraio",
+    "mar": "Marzo",
+    "apr": "Aprile",
+    "may": "Maggio",
+    "jun": "Giugno",
+    "jul": "Luglio",
+    "aug": "Agosto",
+    "sep": "Settembre",
+    "oct": "Ottobre",
+    "nov": "Novembre",
+    "dec": "Dicembre"
+  }
+}

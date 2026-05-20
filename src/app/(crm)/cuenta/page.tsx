@@ -1,63 +1,48 @@
-import PageHeader from "@/components/layout/page-header";
+﻿import PageHeader from "@/components/layout/page-header";
 import { getConfirmationPasswordStatus } from "@/lib/delete-confirmation-password";
-import { getCurrentUserContext } from "@/lib/current-user";
+import { requirePageAccess } from "@/lib/access-control/route-guard";
 import { createClient } from "@/lib/supabase";
 import SecuritySettingsForm from "./security-settings-form";
-import AccountProfileCard from "@/components/cuenta/AccountProfileCard";
+import ProfileHero from "@/modules/cuenta/components/ProfileHero";
+import PersonalInfoCard from "@/modules/cuenta/components/PersonalInfoCard";
+import SecurityCard from "@/modules/cuenta/components/SecurityCard";
+import PreferencesCard from "@/modules/cuenta/components/PreferencesCard";
+import EmailConnectionCard from "@/modules/email/components/EmailConnectionCard";
+
+type UserStatus = "active" | "invited" | "disabled";
 
 export default async function CuentaPage() {
   const supabase = await createClient();
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
 
-  if (!authUser) {
-    return null;
-  }
-
-  const [user, passwordStatus] = await Promise.all([
-    getCurrentUserContext(),
+  const [user, passwordStatus, { data: { user: authUser } }] = await Promise.all([
+    requirePageAccess("cuenta"),
     getConfirmationPasswordStatus(),
+    supabase.auth.getUser(),
   ]);
 
-  const isAdmin = user?.role === "Administrador";
-
-  if (!user) {
-    return (
-      <>
-        <PageHeader
-          title="Cuenta"
-          description="Perfil actual y seguridad de operaciones sensibles"
-        />
-        <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-          <h2 className="text-base font-semibold text-text-primary">
-            Usuario actual
-          </h2>
-          <div className="mt-5 space-y-4">
-            <div className="rounded-xl border border-border/80 bg-background px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-                Correo
-              </p>
-              <p className="mt-1 text-sm font-medium text-text-primary">
-                {authUser.email ?? "-"}
-              </p>
-            </div>
-            <div className="rounded-xl border border-accent/30 bg-accent/10 px-4 py-3">
-              <p className="text-xs font-medium text-accent">
-                Tu cuenta de acceso no está vinculada a un perfil de usuario.
-                Contacta con el administrador para que asocie tu correo en la
-                tabla de usuarios.
-              </p>
-            </div>
-          </div>
-        </section>
-      </>
-    );
-  }
+  const isAdmin = user.role === "Administrador";
 
   const fullName = `${user.nombre} ${user.apellidos}`.trim();
   const avatarUrl =
-    (authUser.user_metadata?.avatar_url as string | undefined) ?? null;
+    (authUser?.user_metadata?.avatar_url as string | undefined) ?? null;
+
+  const { data: profileExtra } = await supabase
+    .from("usuarios")
+    .select("estado")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const userStatus: UserStatus = (profileExtra?.estado as UserStatus) ?? "active";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: emailAccount } = await (supabase as any)
+    .from("email_accounts")
+    .select("email,status,last_sync_at,last_error")
+    .eq("user_id", user.id)
+    .eq("provider", "gmail")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   return (
     <>
@@ -66,24 +51,40 @@ export default async function CuentaPage() {
         description="Perfil actual y seguridad de operaciones sensibles"
       />
 
-      <div
-        className={
-          isAdmin
-            ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]"
-            : "grid gap-6"
-        }
-      >
-        <AccountProfileCard
-          authUserId={authUser.id}
-          initialNombre={fullName}
-          email={user.email ?? authUser.email ?? ""}
+      <div className="space-y-6">
+        <ProfileHero
+          authUserId={authUser?.id ?? ""}
+          fullName={fullName}
+          email={user.email ?? authUser?.email ?? ""}
           rol={user.role}
-          initialAvatarUrl={avatarUrl}
+          avatarUrl={avatarUrl}
+          status={userStatus}
         />
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="flex flex-col gap-6">
+            <PersonalInfoCard
+              initialNombre={fullName}
+              email={user.email ?? authUser?.email ?? ""}
+              rol={user.role}
+              status={userStatus}
+            />
+            <SecurityCard />
+          </div>
+
+          <div className="flex flex-col gap-6">
+            <EmailConnectionCard
+              email={emailAccount?.email ?? null}
+              status={emailAccount?.status ?? "not_connected"}
+              lastSyncAt={emailAccount?.last_sync_at ?? null}
+              lastError={emailAccount?.last_error ?? null}
+            />
+            <PreferencesCard />
+          </div>
+        </div>
 
         {isAdmin && (
           <SecuritySettingsForm
-            currentRole={user.role}
             canManageConfirmationPassword={user.canManageConfirmationPassword}
             passwordStatus={passwordStatus}
           />

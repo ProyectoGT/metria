@@ -1,0 +1,15 @@
+{
+  "title": "Contatti",
+  "addContact": "Aggiungi contatto",
+  "name": "Nome",
+  "email": "Email",
+  "phone": "Telefono",
+  "type": {
+    "buyer": "Acquirente",
+    "seller": "Venditore",
+    "tenant": "Inquilino",
+    "landlord": "Proprietario"
+  },
+  "notes": "Note",
+  "associatedProperties": "Immobili associati"
+}

@@ -1,10 +1,10 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { canViewAllAgents } from "@/lib/roles";
-import { DEFAULT_OBJECTIVES, type RendimientoPeriodo } from "@/lib/desarrollo-metrics";
+import { DEFAULT_OBJECTIVES, type RendimientoPeriodo } from "@/modules/desarrollo/services/desarrollo-metrics";
 
 type UpdateObjetivosInput = {
   agenteId: number;

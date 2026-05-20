@@ -1,22 +1,17 @@
-import Image from "next/image";
+// ─── Avatar ───────────────────────────────────────────────────────────────────
+// Avatar de usuario con imagen o iniciales generadas determinísticamente.
+// Los colores de fallback usan tokens del sistema para coherencia con dark mode.
+// ─────────────────────────────────────────────────────────────────────────────
 
-const COLORS = [
-  "bg-blue-600",
-  "bg-emerald-600",
-  "bg-violet-600",
-  "bg-amber-600",
-  "bg-rose-600",
-  "bg-cyan-600",
-  "bg-indigo-600",
-  "bg-teal-600",
-];
+import Image from "next/image";
+import { AVATAR_COLORS } from "@/lib/theme";
 
 function colorFromName(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return COLORS[Math.abs(hash) % COLORS.length];
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
 function getInitials(name: string): string {
@@ -29,9 +24,11 @@ function getInitials(name: string): string {
 }
 
 const SIZES = {
+  xs: "h-5 w-5 text-[9px]",
   sm: "h-6 w-6 text-[10px]",
   md: "h-8 w-8 text-xs",
   lg: "h-10 w-10 text-sm",
+  xl: "h-12 w-12 text-base",
 } as const;
 
 interface AvatarProps {
@@ -42,7 +39,7 @@ interface AvatarProps {
 
 export default function Avatar({ name, src, size = "md" }: AvatarProps) {
   if (src) {
-    const sizeMap = { sm: 24, md: 32, lg: 40 };
+    const sizeMap = { xs: 20, sm: 24, md: 32, lg: 40, xl: 48 };
     const px = sizeMap[size];
     return (
       <Image
@@ -55,12 +52,12 @@ export default function Avatar({ name, src, size = "md" }: AvatarProps) {
     );
   }
 
-  const bg = colorFromName(name);
+  const colorClass = colorFromName(name);
   const initials = getInitials(name);
 
   return (
     <span
-      className={`${SIZES[size]} ${bg} inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white`}
+      className={`${SIZES[size]} ${colorClass} inline-flex shrink-0 items-center justify-center rounded-full font-semibold`}
     >
       {initials}
     </span>
