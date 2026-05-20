@@ -734,7 +734,7 @@ export default function CalendarioClient({
       eventsByDateKeys: Object.keys(eventsByDate).sort(),
       selectedDayEvents: eventsByDate[selectedDateStr] ?? [],
     });
-  }, [currentUserId, role, filterUserId, initialEvents, events.length, filteredEvents.length, selectedDateStr, eventsByDate, weekStart, currentDate]);
+  }, [currentUserId, role, initialEvents, events.length, filteredEvents.length, selectedDateStr, eventsByDate, weekStart, currentDate]);
 
   // Period label
   const periodLabel = viewMode === "month"

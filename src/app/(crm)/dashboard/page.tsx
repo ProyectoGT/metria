@@ -48,7 +48,6 @@ export default async function DashboardPage() {
     cookieStore.get("google_refresh_token")?.value
   );
   const supabase = await createClient();
-  const agendaAdmin = createAdminClient();
   const yo = await getCurrentUserContext();
 
   const role = yo?.role ?? "Agente";

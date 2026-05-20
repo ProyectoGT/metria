@@ -44,9 +44,9 @@ export default function SolicitudesTabs({
         <button
           onClick={() => setActive("solicitudes")}
           role="tab"
-          aria-selected={active === "solicitudes"}
+          aria-selected={activeTab === "solicitudes"}
           className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-            active === "solicitudes"
+            activeTab === "solicitudes"
               ? "bg-surface text-text-primary shadow-sm ring-1 ring-border/70"
               : "text-text-secondary hover:bg-surface/70 hover:text-text-primary"
           }`}
@@ -59,9 +59,9 @@ export default function SolicitudesTabs({
           <button
             onClick={() => setActive("idealista")}
             role="tab"
-            aria-selected={active === "idealista"}
+            aria-selected={activeTab === "idealista"}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-              active === "idealista"
+              activeTab === "idealista"
                 ? "bg-surface text-text-primary shadow-sm ring-1 ring-border/70"
                 : "text-text-secondary hover:bg-surface/70 hover:text-text-primary"
             }`}
@@ -78,8 +78,8 @@ export default function SolicitudesTabs({
       </div>
 
       {/* Content */}
-      <div role="tabpanel" aria-label={active === "solicitudes" ? "Solicitudes" : "Idealista"}>
-        {active === "solicitudes" ? solicitudesContent : idealistaContent}
+      <div role="tabpanel" aria-label={activeTab === "solicitudes" ? "Solicitudes" : "Idealista"}>
+        {activeTab === "solicitudes" ? solicitudesContent : idealistaContent}
       </div>
     </div>
   );
