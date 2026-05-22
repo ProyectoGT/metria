@@ -74,6 +74,7 @@ export type KanbanCardData = {
   assignedUsers?: string[];
   resultado?: string | null;
   isCompleted?: boolean;
+  completedAt?: string | null;
   fromOrdenDia?: boolean;
   gcalEventId?: string | null;
 };

@@ -306,7 +306,7 @@ export async function updateTareaAction(
     p_titulo: updates.titulo ?? existing.titulo,
     p_prioridad: updates.prioridad ?? existing.prioridad ?? "media",
     p_completed: updates.completed ?? existing.estado === "completado",
-    p_resultado: updates.resultado ?? existing.resultado ?? undefined,
+    p_resultado: updates.resultado !== undefined ? updates.resultado ?? undefined : existing.resultado ?? undefined,
     p_assigned_user_ids: updates.assignedUserIds?.length ? updates.assignedUserIds : currentAssigned,
   });
   if (error) throw new Error(error.message);
@@ -320,8 +320,8 @@ export async function updateTareaAction(
   }, {
     titulo: updates.titulo ?? existing.titulo,
     prioridad: updates.prioridad ?? existing.prioridad ?? "media",
-    estado: updates.completed !== undefined ? (updates.completed ? "completado" : existing.estado) : existing.estado,
-    resultado: updates.resultado ?? existing.resultado,
+    estado: updates.completed !== undefined ? (updates.completed ? "completado" : "pendiente") : existing.estado,
+    resultado: updates.resultado !== undefined ? updates.resultado : existing.resultado,
     assignedUserIds: updates.assignedUserIds?.length ? updates.assignedUserIds : currentAssigned,
   }, { empresaId: yo.empresaId });
 
@@ -770,9 +770,60 @@ export async function convertTareaToAgendaFullAction(
 }
 
 export async function deleteKanbanColumnAction(col_id: string): Promise<void> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const yo = await getCurrentUserContext();
   if (!yo) throw new Error("No autenticado");
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: orderedCards, error: readError } = await (supabase as any)
+    .from("kanban_card_orden")
+    .select("source, db_id")
+    .eq("user_id", yo.id)
+    .eq("column_id", col_id);
+  if (readError) throw new Error(readError.message);
+
+  const tareaIds = ((orderedCards ?? []) as Array<{ source: string; db_id: number }>)
+    .filter((row) => row.source === "tarea")
+    .map((row) => row.db_id);
+  const agendaIds = ((orderedCards ?? []) as Array<{ source: string; db_id: number }>)
+    .filter((row) => row.source === "agenda")
+    .map((row) => row.db_id);
+
+  if (tareaIds.length) {
+    const { error } = await supabase
+      .from("tareas")
+      .update({ estado: "pendiente" })
+      .eq("empresa_id", yo.empresaId ?? -1)
+      .in("id", tareaIds);
+    if (error) throw new Error(error.message);
+  }
+
+  if (agendaIds.length) {
+    const { error } = await supabase
+      .from("agenda")
+      .update({ completed: false })
+      .eq("empresa_id", yo.empresaId ?? -1)
+      .in("id", agendaIds);
+    if (error) throw new Error(error.message);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: orderError } = await (supabase as any)
+    .from("kanban_card_orden")
+    .update({ column_id: "pendientes", updated_at: new Date().toISOString() })
+    .eq("user_id", yo.id)
+    .eq("column_id", col_id)
+    .eq("source", "tarea");
+  if (orderError) throw new Error(orderError.message);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: agendaOrderError } = await (supabase as any)
+    .from("kanban_card_orden")
+    .update({ column_id: "en_progreso", updated_at: new Date().toISOString() })
+    .eq("user_id", yo.id)
+    .eq("column_id", col_id)
+    .eq("source", "agenda");
+  if (agendaOrderError) throw new Error(agendaOrderError.message);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
@@ -782,6 +833,7 @@ export async function deleteKanbanColumnAction(col_id: string): Promise<void> {
     .eq("col_id", col_id);
 
   if (error) throw new Error(error.message);
+  revalidatePath("/dashboard");
 }
 
 export async function updateKanbanCardOrderAction(rows: Array<{

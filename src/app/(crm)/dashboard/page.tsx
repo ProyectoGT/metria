@@ -1,5 +1,4 @@
 ﻿import { createClient } from "@/lib/supabase";
-import { createAdminClient } from "@/lib/supabase-admin";
 import { cookies } from "next/headers";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { getPeriodRange, mergeRendimientoRows } from "@/modules/desarrollo/services/desarrollo-metrics";
@@ -126,6 +125,54 @@ export default async function DashboardPage() {
     }
   }
 
+  const dashboardUserScope =
+    role === "Administrador"
+      ? null
+      : role === "Director"
+        ? null
+        : role === "Responsable"
+          ? [userId, ...(yo?.supervisedAgentIds ?? [])]
+          : [userId];
+
+  let scopedTareaIds: number[] = [];
+  let scopedAgendaIds: number[] = [];
+
+  if (dashboardUserScope?.length) {
+    const [{ data: tareaScopeRows }, { data: agendaScopeRows }] = await Promise.all([
+      supabase.from("tarea_usuarios").select("tarea_id").in("usuario_id", dashboardUserScope),
+      supabase.from("agenda_usuarios").select("agenda_id").in("usuario_id", dashboardUserScope),
+    ]);
+    scopedTareaIds = [...new Set((tareaScopeRows ?? []).map((row) => row.tarea_id))];
+    scopedAgendaIds = [...new Set((agendaScopeRows ?? []).map((row) => row.agenda_id))];
+  }
+
+  function applyTareaDashboardScope(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query: any,
+  ) {
+    if (yo?.empresaId != null) query = query.eq("empresa_id", yo.empresaId);
+    if (dashboardUserScope === null) return query;
+    if (dashboardUserScope.length === 0) return query.eq("id", -1);
+    return query.or([
+      `owner_user_id.in.(${dashboardUserScope.join(",")})`,
+      scopedTareaIds.length ? `id.in.(${scopedTareaIds.join(",")})` : "id.eq.-1",
+    ].join(","));
+  }
+
+  function applyAgendaDashboardScope(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query: any,
+  ) {
+    if (yo?.empresaId != null) query = query.eq("empresa_id", yo.empresaId);
+    if (dashboardUserScope === null) return query;
+    if (dashboardUserScope.length === 0) return query.eq("id", -1);
+    return query.or([
+      `owner_user_id.in.(${dashboardUserScope.join(",")})`,
+      `user_id.in.(${dashboardUserScope.join(",")})`,
+      scopedAgendaIds.length ? `id.in.(${scopedAgendaIds.join(",")})` : "id.eq.-1",
+    ].join(","));
+  }
+
   // Aplica filtros de zona/agente a una query builder de propiedades
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function applyPropFilters(query: any): any {
@@ -218,20 +265,19 @@ export default async function DashboardPage() {
       .lt("occurred_at", periodRange.to),
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any)
+    applyTareaDashboardScope((supabase as any)
       .from("tareas")
-      .select("id, titulo, prioridad, fecha, estado, resultado, from_orden_dia, owner_user_id, tarea_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .select("id, titulo, prioridad, fecha, estado, resultado, from_orden_dia, owner_user_id, completed_at, tarea_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
       .in("estado", ["pendiente", "completado"])
-      .order("id", { ascending: false }),
+      .order("id", { ascending: false })),
 
-    createAdminClient()
+    applyAgendaDashboardScope(supabase
       .from("agenda")
       .select("id, description, event_date, time, time_end, priority, tipo, completed, result, reminder_minutes_before, gcal_event_id, user_id, owner_user_id, empresa_id, created_at, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
       .is("archived_at", null)
       .eq("event_date", localDateKey())
-      .eq("empresa_id", yo?.empresaId ?? -1)
-      .order("time", { ascending: true, nullsFirst: false }),
+      .order("time", { ascending: true, nullsFirst: false })),
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
@@ -426,6 +472,7 @@ export default async function DashboardPage() {
     estado: string;
     resultado?: string | null;
     from_orden_dia?: boolean | null;
+    completed_at?: string | null;
     owner_user_id: number;
     tarea_usuarios?: Array<{ usuario_id: number; usuarios?: { nombre: string | null; apellidos: string | null } | null }>;
   };
@@ -523,8 +570,20 @@ export default async function DashboardPage() {
     };
   });
 
-  const myTareas = tareas.filter((t) => assignedIdsFromRows(t.tarea_usuarios).includes(userId) || t.owner_user_id === userId);
-  const myAgendaHoy = agendaHoy.filter((a) => assignedIdsFromRows(a.agenda_usuarios).includes(userId) || a.user_id === userId);
+  const scopedTareas = dashboardUserScope === null
+    ? tareas
+    : tareas.filter((t) => {
+        const assigned = assignedIdsFromRows(t.tarea_usuarios);
+        return assigned.some((id) => dashboardUserScope.includes(id)) || dashboardUserScope.includes(t.owner_user_id);
+      });
+  const scopedAgendaHoy = dashboardUserScope === null
+    ? agendaHoy
+    : agendaHoy.filter((a) => {
+        const assigned = assignedIdsFromRows(a.agenda_usuarios);
+        return assigned.some((id) => dashboardUserScope.includes(id))
+          || (a.owner_user_id != null && dashboardUserScope.includes(a.owner_user_id))
+          || (a.user_id != null && dashboardUserScope.includes(a.user_id));
+      });
 
   function toCard(t: TareaDbRow) {
     return {
@@ -540,6 +599,7 @@ export default async function DashboardPage() {
       assignedUsers: assignedNamesFromRows(t.tarea_usuarios),
       resultado: t.resultado ?? null,
       isCompleted: t.estado === "completado",
+      completedAt: t.completed_at ?? null,
       fromOrdenDia: t.from_orden_dia ?? false,
     };
   }
@@ -572,19 +632,15 @@ export default async function DashboardPage() {
         id: "pendientes",
         title: "Pendientes",
         fixed: true,
-        // Pendientes primero, luego completadas al final con tachado
-        cards: sortKanbanCards("pendientes", [
-          ...myTareas.filter((t) => t.estado === "pendiente").map(toCard),
-          ...myTareas.filter((t) => t.estado === "completado").map(toCard),
-        ]),
+        cards: sortKanbanCards("pendientes", scopedTareas.map(toCard)),
       },
       {
         id: "en_progreso",
         title: "Agenda hoy",
         fixed: true,
         cards: sortKanbanCards("en_progreso", [
-          ...myAgendaHoy.filter((a) => !a.completed).map(agendaToCard),
-          ...myAgendaHoy.filter((a) => a.completed).map(agendaToCard),
+          ...scopedAgendaHoy.filter((a) => !a.completed).map(agendaToCard),
+          ...scopedAgendaHoy.filter((a) => a.completed).map(agendaToCard),
         ]),
       },
     ],

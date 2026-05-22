@@ -36,30 +36,58 @@ export async function fetchKanbanBoard(params: KanbanQueryParams): Promise<Kanba
   const supabase = createClient();
   const userScope = params.agentIds?.length ? params.agentIds : [params.userId];
   const today = localDateKey();
+  const scopeList = userScope.join(",");
+
+  const { data: assignedTareaRows, error: assignedTareaError } = await supabase
+    .from("tarea_usuarios")
+    .select("tarea_id")
+    .in("usuario_id", userScope);
+  throwIfSupabaseError(assignedTareaError, "No se pudo cargar el alcance de tareas");
+
+  const scopedTareaIds = [...new Set((assignedTareaRows ?? []).map((row) => row.tarea_id))];
+  const tareaScopeClauses = [
+    `owner_user_id.in.(${scopeList})`,
+    scopedTareaIds.length ? `id.in.(${scopedTareaIds.join(",")})` : "id.eq.-1",
+  ];
 
   const { data: tareas, error: tareasError } = await supabase
     .from("tareas")
     .select(`
-      id, titulo, prioridad, fecha, estado, resultado, from_orden_dia,
+      id, titulo, prioridad, fecha, estado, resultado, from_orden_dia, owner_user_id,
       tarea_usuarios(usuario_id, usuarios(nombre, apellidos))
     `)
     .eq("empresa_id", params.empresaId)
     .in("estado", ["pendiente", "completado"])
     .is("archived_at", null)
+    .or(tareaScopeClauses.join(","))
     .order("fecha", { ascending: true, nullsFirst: false });
 
   throwIfSupabaseError(tareasError, "No se pudo cargar el tablero kanban");
+
+  const { data: assignedAgendaRows, error: assignedAgendaError } = await supabase
+    .from("agenda_usuarios")
+    .select("agenda_id")
+    .in("usuario_id", userScope);
+  throwIfSupabaseError(assignedAgendaError, "No se pudo cargar el alcance de agenda");
+
+  const scopedAgendaIds = [...new Set((assignedAgendaRows ?? []).map((row) => row.agenda_id))];
+  const agendaScopeClauses = [
+    `owner_user_id.in.(${scopeList})`,
+    `user_id.in.(${scopeList})`,
+    scopedAgendaIds.length ? `id.in.(${scopedAgendaIds.join(",")})` : "id.eq.-1",
+  ];
 
   const { data: agenda, error: agendaError } = await supabase
     .from("agenda")
     .select(`
       id, description, priority, tipo, event_date, time, time_end,
-      reminder_minutes_before, completed, result, gcal_event_id,
+      reminder_minutes_before, completed, result, gcal_event_id, user_id, owner_user_id,
       agenda_usuarios(usuario_id, usuarios(nombre, apellidos))
     `)
     .eq("empresa_id", params.empresaId)
     .eq("event_date", today)
     .is("archived_at", null)
+    .or(agendaScopeClauses.join(","))
     .order("time", { ascending: true, nullsFirst: false });
 
   throwIfSupabaseError(agendaError, "No se pudo cargar la agenda del kanban");
@@ -70,7 +98,10 @@ export async function fetchKanbanBoard(params: KanbanQueryParams): Promise<Kanba
   for (const t of tareas ?? []) {
     const joins = t.tarea_usuarios as AssignedUserJoin[] | null;
     const ids = assignedIds(joins);
-    if (ids.length && !ids.some((id) => userScope.includes(id))) continue;
+    if (
+      (t.owner_user_id == null || !userScope.includes(t.owner_user_id)) &&
+      !ids.some((id) => userScope.includes(id))
+    ) continue;
 
     const card: KanbanCardData = {
       id: `tarea-${t.id}`,
@@ -92,7 +123,11 @@ export async function fetchKanbanBoard(params: KanbanQueryParams): Promise<Kanba
   for (const a of agenda ?? []) {
     const joins = a.agenda_usuarios as AssignedUserJoin[] | null;
     const ids = assignedIds(joins);
-    if (ids.length && !ids.some((id) => userScope.includes(id))) continue;
+    if (
+      !ids.some((id) => userScope.includes(id)) &&
+      !userScope.includes(a.owner_user_id ?? -1) &&
+      !userScope.includes(a.user_id ?? -1)
+    ) continue;
 
     agendaHoy.push({
       id: `agenda-${a.id}`,
@@ -135,7 +170,7 @@ async function moveCard(input: KanbanMoveCardInput): Promise<void> {
     return;
   }
 
-  const estado = input.newEstado === "completado" ? "completado" : input.newEstado;
+  const estado = input.newEstado === "completado" ? "completado" : "pendiente";
   const { error } = await supabase
     .from("tareas")
     .update({ estado })

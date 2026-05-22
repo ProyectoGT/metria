@@ -41,10 +41,10 @@ export default async function LoginPage() {
           <Image
             src="/logo-bg-master-iberica.png"
             alt="Master Iberica"
-            width={240}
-            height={68}
+            width={380}
+            height={108}
             priority
-            className="h-auto w-auto max-w-[220px]"
+            className="h-auto w-auto max-w-[340px]"
           />
         </div>
 
