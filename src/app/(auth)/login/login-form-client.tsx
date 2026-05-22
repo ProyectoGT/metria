@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
-import { isRedirectError } from "next/dist/client/components/redirect-error";
+import { useRouter } from "next/navigation";
 import { login, loginWithGoogle } from "./actions";
 
 export type RecentSession = {
@@ -47,6 +47,7 @@ export default function LoginFormClient({ initialSessions }: Props) {
       ? "Cuenta verificada correctamente. Ya puedes iniciar sesión."
       : null;
 
+  const router = useRouter();
   const [sessions, setSessions] = useState<RecentSession[]>(initialSessions);
   const [error, setError] = useState<string | null>(urlError);
   const [success] = useState<string | null>(urlSuccess);
@@ -61,8 +62,8 @@ export default function LoginFormClient({ initialSessions }: Props) {
       try {
         const result = await login(formData);
         if (result?.error) setError(result.error);
-      } catch (e) {
-        if (isRedirectError(e)) throw e;
+        else if (result?.redirectTo) router.push(result.redirectTo);
+      } catch {
         setError("Error inesperado. Inténtalo de nuevo.");
       }
     });
@@ -74,8 +75,8 @@ export default function LoginFormClient({ initialSessions }: Props) {
       try {
         const result = await loginWithGoogle();
         if (result?.error) setError(result.error);
-      } catch (e) {
-        if (isRedirectError(e)) throw e;
+        else if (result?.redirectTo) window.location.href = result.redirectTo;
+      } catch {
         setError("Error inesperado. Inténtalo de nuevo.");
       }
     });

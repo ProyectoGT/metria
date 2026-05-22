@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { headers, cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
 import { authRateLimiter, getIp } from "@/lib/rate-limiter";
@@ -109,7 +108,7 @@ export async function login(formData: FormData) {
     path: "/",
   });
 
-  redirect("/dashboard");
+  return { redirectTo: "/dashboard" };
 }
 
 export async function loginWithGoogle() {
@@ -130,5 +129,5 @@ export async function loginWithGoogle() {
     return { error: error?.message ?? "No se pudo iniciar el login con Google" };
   }
 
-  redirect(data.url);
+  return { redirectTo: data.url };
 }

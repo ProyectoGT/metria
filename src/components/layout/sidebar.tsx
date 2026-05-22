@@ -28,6 +28,7 @@ import {
   Settings,
   Shield,
   MessageCircle,
+  DatabaseBackup,
   X,
   PanelLeftClose,
   PanelLeftOpen,
@@ -272,6 +273,7 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
   const canSeeOrganigrama = canViewOrgChart(role);
   const canSeeInsights = canViewInsights(role);
   const isAdmin = role === "Administrador";
+  const canSeeBackups = role === "Administrador" || role === "Director";
   const deniedSet = new Set(deniedResourceKeys);
 
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -434,6 +436,9 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
                 )}
                 {isAdmin && isNavVisible("configuracion") && (
                   <NavItem href="/configuracion/control-acceso" icon={Settings} label={t("navigation.accessControl")} active={isActive("/configuracion/control-acceso")} collapsed={collapsed} />
+                )}
+                {canSeeBackups && isNavVisible("backups") && (
+                  <NavItem href="/backups" icon={DatabaseBackup} label={t("navigation.backups")} active={isActive("/backups")} collapsed={collapsed} />
                 )}
                 {isAdmin && (
                   <NavItem href="/seguridad" icon={Shield} label={t("navigation.audit")} active={isActive("/seguridad")} collapsed={collapsed} />

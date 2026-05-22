@@ -51,3 +51,6 @@ dev-server.*.log
 
 # Reportes de auditoría (generados localmente, no commitear)
 reports/react-doctor/
+
+# pnpm store local (no commitear)
+.pnpm-store/

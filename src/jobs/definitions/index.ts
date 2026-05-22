@@ -1,8 +1,9 @@
 import type { JobHandler, JobScheduleDefinition } from "../types";
 import { registerJobHandlers } from "../registry";
 import { registerSchedules } from "../scheduler";
+import { backupCreateJobHandler } from "../handlers/backups";
 
-const definitions: JobHandler[] = [];
+const definitions: JobHandler[] = [backupCreateJobHandler as JobHandler];
 
 const schedules: JobScheduleDefinition[] = [];
 

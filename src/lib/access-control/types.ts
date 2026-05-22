@@ -11,7 +11,8 @@ export type Module =
   | "usuarios"
   | "zonas"
   | "ordenes"
-  | "configuracion";
+  | "configuracion"
+  | "backups";
 
 export type Action =
   | "view"
@@ -21,7 +22,11 @@ export type Action =
   | "complete"
   | "assign"
   | "export"
-  | "manage";
+  | "manage"
+  | "download"
+  | "restore_request"
+  | "restore_approve"
+  | "restore_execute";
 
 export type Resource = `${Module}:${Action}`;
 
