@@ -1,6 +1,9 @@
 -- Track when a task enters or leaves the completed state.
 -- Safe/idempotent: keeps existing completed_at values and clears the timestamp on reopen.
 
+alter table public.tareas
+  add column if not exists completed_at timestamptz;
+
 create or replace function public.set_tareas_completed_at()
 returns trigger
 language plpgsql

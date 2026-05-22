@@ -1,7 +1,7 @@
 import type { JobHandler } from "../types";
 import { backupDb } from "@/modules/backups/services/backupDb";
+import { BACKUP_CREATE_JOB } from "@/jobs/constants";
 import {
-  BACKUP_CREATE_JOB,
   executeBackupRun,
   getBackupRecipients,
   type BackupCreatePayload,

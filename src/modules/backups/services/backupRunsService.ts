@@ -13,7 +13,8 @@ import { assertCanCreateBackup, assertCanReadBackups } from "./backupPermissions
 import { recordBackupAudit } from "./backupAuditService";
 import { backupDb } from "./backupDb";
 
-export const BACKUP_CREATE_JOB = "backup.create";
+import { BACKUP_CREATE_JOB } from "@/jobs/constants";
+export { BACKUP_CREATE_JOB };
 
 type BackupCreatePayload = {
   backupRunId: string;
