@@ -1,9 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { login, loginWithGoogle } from "./actions";
+
+export type RecentSession = {
+  name: string;
+  email: string;
+  avatarInitials: string;
+};
+
+const AVATAR_COLORS = ["#0d1b2e", "#1D9E75"];
+const SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 
 const URL_ERRORS: Record<string, string> = {
   auth: "Error al iniciar sesión con Google. Inténtalo de nuevo.",
@@ -14,14 +23,17 @@ const URL_ERRORS: Record<string, string> = {
   verification_failed: "No se pudo activar tu cuenta. Inténtalo de nuevo.",
 };
 
-const URL_SUCCESS: Record<string, string> = {
-  verified: "Cuenta verificada correctamente. Ya puedes iniciar sesión.",
-};
-
 const fieldClass =
   "w-full rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-text-primary outline-none transition placeholder:text-text-secondary hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-primary/20";
 
-export default function LoginFormClient() {
+interface Props {
+  initialSessions: RecentSession[];
+}
+
+export default function LoginFormClient({ initialSessions }: Props) {
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
   const searchParams =
     typeof window !== "undefined"
       ? new URLSearchParams(window.location.search)
@@ -31,12 +43,17 @@ export default function LoginFormClient() {
     ? (URL_ERRORS[searchParams.get("error")!] ?? null)
     : null;
   const urlSuccess =
-    searchParams?.get("verified") === "true" ? URL_SUCCESS.verified : null;
+    searchParams?.get("verified") === "true"
+      ? "Cuenta verificada correctamente. Ya puedes iniciar sesión."
+      : null;
 
+  const [sessions, setSessions] = useState<RecentSession[]>(initialSessions);
   const [error, setError] = useState<string | null>(urlError);
   const [success] = useState<string | null>(urlSuccess);
   const [isPending, startTransition] = useTransition();
   const [isGooglePending, startGoogleTransition] = useTransition();
+
+  const hasSessions = sessions.length > 0;
 
   function handleSubmit(formData: FormData) {
     setError(null);
@@ -64,8 +81,37 @@ export default function LoginFormClient() {
     });
   }
 
+  function selectSession(session: RecentSession) {
+    if (emailRef.current) emailRef.current.value = session.email;
+    passwordRef.current?.focus();
+  }
+
+  function removeSession(email: string) {
+    const updated = sessions.filter((s) => s.email !== email);
+    setSessions(updated);
+    document.cookie = `recent_sessions=${encodeURIComponent(
+      JSON.stringify(updated)
+    )}; path=/; max-age=${SESSION_COOKIE_MAX_AGE}; samesite=lax`;
+  }
+
   return (
     <div className="space-y-5">
+      {/* Título + subtítulo */}
+      <div className="space-y-1 text-center lg:text-left">
+        <h1
+          className="text-4xl text-text-primary"
+          style={{ fontFamily: "var(--font-playfair), Georgia, serif" }}
+        >
+          Bienvenido
+        </h1>
+        <p className="text-sm text-text-secondary">
+          {hasSessions
+            ? "Elige una cuenta o inicia sesión con otra."
+            : "Inicia sesión para acceder a la plataforma."}
+        </p>
+      </div>
+
+      {/* Alertas */}
       {success && (
         <div className="rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
           {success}
@@ -74,6 +120,64 @@ export default function LoginFormClient() {
       {error && (
         <div className="rounded-lg border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
           {error}
+        </div>
+      )}
+
+      {/* Sesiones recientes */}
+      {hasSessions && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-secondary">
+            Sesiones recientes
+          </p>
+          <div className="overflow-hidden rounded-xl border border-border">
+            {sessions.map((session, i) => (
+              <div
+                key={session.email}
+                className="flex items-center gap-3 border-b border-border px-3 py-2.5 last:border-b-0"
+              >
+                {/* Avatar */}
+                <button
+                  type="button"
+                  onClick={() => selectSession(session)}
+                  className="flex flex-1 items-center gap-3 text-left"
+                  title={`Usar ${session.email}`}
+                >
+                  <span
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                    style={{ backgroundColor: AVATAR_COLORS[i % 2] }}
+                  >
+                    {session.avatarInitials}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-text-primary">
+                      {session.name}
+                    </p>
+                    <p className="truncate text-xs text-text-secondary">
+                      {session.email}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-text-secondary">›</span>
+                </button>
+                {/* Eliminar sesión */}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); removeSession(session.email); }}
+                  className="ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-text-secondary transition hover:bg-muted hover:text-text-primary"
+                  title="Eliminar sesión"
+                  aria-label={`Eliminar sesión de ${session.email}`}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Separador "usar otra cuenta" */}
+          <div className="flex items-center gap-3 py-1">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-text-secondary">usar otra cuenta</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
         </div>
       )}
 
@@ -97,19 +201,21 @@ export default function LoginFormClient() {
         {isGooglePending ? "Redirigiendo…" : "Continuar con Google"}
       </button>
 
-      {/* Separador */}
+      {/* Separador o con email */}
       <div className="flex items-center gap-3">
         <div className="h-px flex-1 bg-border" />
         <span className="text-xs text-text-secondary">o con email</span>
         <div className="h-px flex-1 bg-border" />
       </div>
 
+      {/* Formulario email + contraseña */}
       <form action={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-text-primary">
             Correo electrónico
           </label>
           <input
+            ref={emailRef}
             id="email"
             name="email"
             type="email"
@@ -133,6 +239,7 @@ export default function LoginFormClient() {
             </Link>
           </div>
           <input
+            ref={passwordRef}
             id="password"
             name="password"
             type="password"

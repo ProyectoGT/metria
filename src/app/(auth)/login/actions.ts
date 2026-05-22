@@ -1,11 +1,19 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import { createClient } from "@/lib/supabase";
 import { authRateLimiter, getIp } from "@/lib/rate-limiter";
 import { LoginSchema } from "@/lib/validations/auth";
 import { recordLoginAudit } from "@/lib/login-audit";
+
+type RecentSession = { name: string; email: string; avatarInitials: string };
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
 
 export async function login(formData: FormData) {
   const headersList = await headers();
@@ -78,6 +86,27 @@ export async function login(formData: FormData) {
     userRole: (profile as { rol?: string | null }).rol ?? "Agente",
     ipAddress: ip !== "unknown" ? ip : null,
     userAgent: headersList.get("user-agent"),
+  });
+
+  // Guardar sesión reciente en cookie (httpOnly: false para lectura en cliente)
+  const cookieStore = await cookies();
+  const raw = cookieStore.get("recent_sessions")?.value;
+  let sessions: RecentSession[] = [];
+  try { sessions = JSON.parse(raw ?? "[]"); } catch { /* cookie malformada */ }
+
+  const fullName = `${(profile as { nombre?: string }).nombre ?? ""} ${(profile as { apellidos?: string }).apellidos ?? ""}`.trim() || parsed.data.email;
+  const newSession: RecentSession = {
+    name: fullName,
+    email: parsed.data.email,
+    avatarInitials: getInitials(fullName),
+  };
+  sessions = [newSession, ...sessions.filter((s) => s.email !== newSession.email)].slice(0, 3);
+
+  cookieStore.set("recent_sessions", JSON.stringify(sessions), {
+    httpOnly: false,
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 30,
+    path: "/",
   });
 
   redirect("/dashboard");
