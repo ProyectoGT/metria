@@ -1,11 +1,11 @@
 ﻿"use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   Phone, Users, Home, Clock, BookOpen, Star, Activity, Calendar,
   ChevronLeft, ChevronRight, Trash2, Check, Circle, Pencil, CheckCircle2, User, Bell, Loader2,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useToast, Toaster } from "@/components/ui/toast";
 import type { UserRole } from "@/lib/roles";
@@ -424,19 +424,24 @@ export default function CalendarioClient({
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, AgendaEvent[]> = {};
-    for (const ev of filteredEvents) (map[ev.event_date] ??= []).push(ev);
+    for (const ev of filteredEvents) {
+      const normalized = normalizeCalendarEvent(ev);
+      if (!normalized.event_date) continue;
+      (map[normalized.event_date] ??= []).push(normalized);
+    }
     return map;
   }, [filteredEvents]);
+
+  const localAgendaIds = useMemo(() => new Set(events.map((ev) => String(ev.id))), [events]);
 
   const syncedGcalIds = useMemo(
     () =>
       new Set(
         events
-          .filter((e) => e.owner_user_id === currentUserId)
           .map((e) => e.gcal_event_id)
           .filter((id): id is string => Boolean(id))
       ),
-    [events, currentUserId]
+    [events]
   );
 
   const tareasByDate = useMemo(() => {
@@ -535,16 +540,18 @@ export default function CalendarioClient({
 
     for (const ev of gcalEvents) {
       if (syncedGcalIds.has(ev.id)) continue;
+      const agendaId = ev.extendedProperties?.private?.agendaId;
+      if (agendaId && localAgendaIds.has(agendaId)) continue;
 
       const d = ev.start.dateTime
-        ? ev.start.dateTime.split("T")[0]
+        ? utcToMadridDisplay(ev.start.dateTime).date
         : (ev.start.date ?? "");
 
       (map[d] ??= []).push(ev);
     }
 
     return map;
-  }, [gcalEvents, syncedGcalIds]);
+  }, [gcalEvents, localAgendaIds, syncedGcalIds]);
 
   // â"€â"€ Navigation â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
@@ -676,6 +683,58 @@ export default function CalendarioClient({
   const deleteTarget    = events.find((e) => e.id === deleteId);
 
   const showOwner = canSeeOthers(role);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    const normalizedInitialEvents = initialEvents.map(normalizeCalendarEvent);
+    console.debug("[agenda:calendario:client]", {
+      currentUserId,
+      role,
+      filterUserIds: [...filterUserIds],
+      receivedEvents: initialEvents.length,
+      stateEvents: events.length,
+      filteredEvents: filteredEvents.length,
+      selectedDateStr,
+      selectedDateEvents: eventsByDate[selectedDateStr]?.map((event) => ({
+        id: event.id,
+        event_date: event.event_date,
+        time: event.time,
+        user_id: event.user_id,
+        owner_user_id: event.owner_user_id,
+        description: event.description,
+      })) ?? [],
+      groupedDateKeys: Object.keys(eventsByDate).sort(),
+    });
+    console.log("[calendario:client]", {
+      initialCount: initialEvents.length,
+      initialEvents: initialEvents.slice(0, 10).map((event) => ({
+        id: event.id,
+        description: event.description,
+        event_date: event.event_date,
+        time: event.time,
+        tipo: event.tipo,
+        user_id: event.user_id,
+        owner_user_id: event.owner_user_id,
+        gcal_event_id: event.gcal_event_id,
+      })),
+      normalizedCount: events.length,
+      normalizedEvents: normalizedInitialEvents.slice(0, 10).map((event) => ({
+        id: event.id,
+        description: event.description,
+        event_date: event.event_date,
+        time: event.time,
+        tipo: event.tipo,
+        user_id: event.user_id,
+        owner_user_id: event.owner_user_id,
+        gcal_event_id: event.gcal_event_id,
+      })),
+      selectedDateStr,
+      currentWeekStart: toDateStr(weekStart),
+      currentMonth: `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`,
+      eventsByDateKeys: Object.keys(eventsByDate).sort(),
+      selectedDayEvents: eventsByDate[selectedDateStr] ?? [],
+    });
+  }, [currentUserId, role, initialEvents, events.length, filteredEvents.length, selectedDateStr, eventsByDate, weekStart, currentDate]);
 
   // Period label
   const periodLabel = viewMode === "month"

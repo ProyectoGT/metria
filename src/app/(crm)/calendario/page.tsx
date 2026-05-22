@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase-admin";
 import { requirePageAccess } from "@/lib/access-control/route-guard";
 import CalendarioClient from "./calendario-client";
 
+const AGENDA_SELECT = "id, description, event_date, time, priority, completed, result, gcal_event_id, user_id, created_at, owner_user_id, empresa_id, equipo_id, visibility, tipo, archived_at, archived_reason, converted_to_tarea_id, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))";
+
 export default async function CalendarioPage() {
   const cookieStore = await cookies();
   const isConnected = !!(
@@ -18,6 +20,12 @@ export default async function CalendarioPage() {
   const empresaId = yo.empresaId ?? null;
   const supervisedIds = yo.supervisedAgentIds ?? [];
 
+  const _today = new Date();
+  const calendarRange = {
+    from: new Date(_today.getFullYear(), _today.getMonth() - 6, 1).toISOString().slice(0, 10),
+    to: new Date(_today.getFullYear(), _today.getMonth() + 13, 0).toISOString().slice(0, 10),
+  };
+
   let eventsQuery;
 
   if (role === "Administrador" || role === "Director") {
@@ -27,7 +35,7 @@ export default async function CalendarioPage() {
     const adminSupa = createAdminClient();
     eventsQuery = adminSupa
       .from("agenda")
-      .select("*, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .select(AGENDA_SELECT)
       .is("archived_at", null)
       .order("event_date", { ascending: true });
     if (empresaId !== null) eventsQuery = eventsQuery.eq("empresa_id", empresaId);
@@ -41,7 +49,7 @@ export default async function CalendarioPage() {
     // y así el server y el hook del cliente devuelven el mismo conjunto.
     eventsQuery = supabase
       .from("agenda")
-      .select("*, agenda_usuarios(usuario_id, usuarios(nombre, apellidos))")
+      .select(AGENDA_SELECT)
       .is("archived_at", null)
       .eq("empresa_id", empresaId ?? -1)
       .order("event_date", { ascending: true });
@@ -67,6 +75,8 @@ export default async function CalendarioPage() {
       .select("gcal_event_id")
       .not("archived_at", "is", null)
       .not("gcal_event_id", "is", null)
+      .gte("event_date", calendarRange.from)
+      .lte("event_date", calendarRange.to)
       .eq("owner_user_id", userId),
   ]);
 
@@ -91,6 +101,11 @@ export default async function CalendarioPage() {
         const assigned = event.agenda_usuarios?.map((u) => u.usuario_id) ?? [];
         return assigned.includes(userId) || event.owner_user_id === userId || event.user_id === userId;
       })
+    : role === "Agente"
+      ? ((events ?? []) as unknown as EventWithAssignments[]).filter((event) => {
+          const assigned = event.agenda_usuarios?.map((u) => u.usuario_id) ?? [];
+          return assigned.includes(userId) || event.owner_user_id === userId || event.user_id === userId;
+        })
     : (events ?? []);
 
   if (process.env.NODE_ENV !== "production") {

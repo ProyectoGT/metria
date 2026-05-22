@@ -783,3 +783,32 @@ export async function deleteKanbanColumnAction(col_id: string): Promise<void> {
 
   if (error) throw new Error(error.message);
 }
+
+export async function updateKanbanCardOrderAction(rows: Array<{
+  source: "tarea" | "agenda";
+  dbId: number;
+  columnId: string;
+  position: number;
+}>): Promise<void> {
+  const supabase = await createClient();
+  const yo = await getCurrentUserContext();
+  if (!yo) throw new Error("No autenticado");
+
+  if (rows.length === 0) return;
+
+  const payload = rows.map((row) => ({
+    user_id: yo.id,
+    source: row.source,
+    db_id: row.dbId,
+    column_id: row.columnId,
+    posicion: row.position,
+    updated_at: new Date().toISOString(),
+  }));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from("kanban_card_orden")
+    .upsert(payload, { onConflict: "user_id,source,db_id" });
+
+  if (error) throw new Error(error.message);
+}

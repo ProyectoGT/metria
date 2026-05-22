@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase";
 import { getCurrentUserContext } from "@/lib/current-user";
 import { rateLimiter, getIp } from "@/lib/rate-limiter";
 import { SearchSchema } from "@/lib/validations/search";
+import { canAccessContactos } from "@/lib/roles";
+import { filterReadablePedidos } from "@/lib/pedidos-access";
 
 export type SearchResult = {
   id: string;
@@ -45,6 +47,7 @@ export async function GET(request: NextRequest) {
   const currentUserId = currentUser?.id ?? null;
 
   const supabase = await createClient();
+  const canSearchContactos = canAccessContactos(currentUser?.role ?? "Agente");
   const results: SearchResult[] = [];
 
   // ── Zona / Sectores / Fincas / Propiedades ──────────────────────────────────
@@ -142,7 +145,7 @@ export async function GET(request: NextRequest) {
     if (empresaId !== null) pedidosQ = pedidosQ.eq("empresa_id", empresaId);
     const { data: pedidos } = await pedidosQ.limit(ctx === "solicitudes" ? 10 : 5);
 
-    for (const p of pedidos ?? []) {
+    for (const p of filterReadablePedidos(pedidos ?? [], currentUser)) {
       results.push({
         id: `pedido-${p.id}`,
         type: "solicitud",
@@ -196,7 +199,7 @@ export async function GET(request: NextRequest) {
   // ── Contactos ─────────────────────────────────────────────────────────────────
   // TODO(deuda): contactos no está en database.types.ts — el `as any` es necesario
   // hasta que se regeneren los tipos con `supabase gen types typescript`.
-  if (ctx === "contactos" || ctx === "general") {
+  if ((ctx === "contactos" || ctx === "general") && canSearchContactos) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let contactosQ = (supabase as any)
       .from("contactos")

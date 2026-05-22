@@ -15,6 +15,7 @@ import {
   type AgentMetrics,
   type Rendimiento,
   type KanbanData,
+  type KanbanCardData,
   type OrdenDiaAgente,
   type KanbanPriority,
 } from "@/lib/mock/dashboard";
@@ -23,6 +24,8 @@ import type { NoticiaMapPoint } from "@/modules/dashboard/components/MapaDashboa
 import { combineLocalDateTime, formatLocalDateEs, localDateKey, normalizeTime } from "@/lib/local-date-time";
 import { normalizeAgendaEvent } from "@/modules/calendario/services/normalize-agenda-event";
 import { normalizeActivityType } from "@/lib/activity-options";
+import { rolloverOverdueAgendaToPendingTasks } from "@/lib/agenda/rollover-overdue-agenda";
+import { filterReadablePedidos } from "@/lib/pedidos-access";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -53,7 +56,8 @@ export default async function DashboardPage() {
   const userId = yo?.id ?? 0;
   const fullName = yo ? `${yo.nombre} ${yo.apellidos}`.trim() : "Usuario";
   const anioActual = new Date().getFullYear();
-  const currentDateLabel = formatLocalDateEs(localDateKey());
+  const today = localDateKey();
+  const currentDateLabel = formatLocalDateEs(today);
   const periodRange = getPeriodRange(anioActual, 0);
   const nextBestActionsPromise = getNextBestActions(yo);
   const pipelineSuggestionsPromise = yo ? generateAndFetchSuggestions(yo) : Promise.resolve([]);
@@ -61,11 +65,17 @@ export default async function DashboardPage() {
 
   const isManager = role === "Administrador" || role === "Director";
 
+  await rolloverOverdueAgendaToPendingTasks({
+    empresaId: yo?.empresaId ?? null,
+    today,
+  });
+
   // ─── 0. Calcular filtros de acceso ──────────────────────────────────────
   // fincaIdFilter: null = sin restricción, [] = sin acceso, [ids] = filtrar
   let fincaIdFilter: number[] | null = null;
   // agentIdFilter: null = sin restricción, [ids] = solo estos agentes
   let agentIdFilter: number[] | null = null;
+  let assignedPropiedadIds: number[] = [];
   // pedidoAgentFilter: null = sin restricción, [ids] = solo estos
   let pedidoAgentFilter: number[] | null = null;
 
@@ -103,27 +113,47 @@ export default async function DashboardPage() {
       agentIdFilter = supervised;
       pedidoAgentFilter = supervised;
     }
+
+    if (agentIdFilter && agentIdFilter.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: assignedRows } = await (supabase as any)
+        .from("propiedad_usuarios")
+        .select("propiedad_id")
+        .in("usuario_id", agentIdFilter);
+      assignedPropiedadIds = Array.from(new Set(
+        ((assignedRows ?? []) as Array<{ propiedad_id: number }>).map((row) => row.propiedad_id),
+      ));
+    }
   }
 
   // Aplica filtros de zona/agente a una query builder de propiedades
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function applyPropFilters(query: any): any {
     let q = query;
+    if (agentIdFilter !== null) {
+      if (agentIdFilter.length === 0) return q.eq("id", -1);
+      return q.or([
+        `agente_asignado.in.(${agentIdFilter.join(",")})`,
+        `owner_user_id.in.(${agentIdFilter.join(",")})`,
+        assignedPropiedadIds.length ? `id.in.(${assignedPropiedadIds.join(",")})` : "id.eq.-1",
+      ].join(","));
+    }
     if (fincaIdFilter !== null) {
       q = fincaIdFilter.length === 0 ? q.eq("id", -1) : q.in("finca_id", fincaIdFilter);
-    }
-    if (agentIdFilter !== null) {
-      q = agentIdFilter.length === 0 ? q.eq("agente_asignado", -1) : q.in("agente_asignado", agentIdFilter);
     }
     return q;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function applyPedidoFilters(query: any): any {
-    if (pedidoAgentFilter === null) return query;
+    let q = query;
+    if (yo?.empresaId != null) {
+      q = q.eq("empresa_id", yo.empresaId);
+    }
+    if (pedidoAgentFilter === null) return q;
     return pedidoAgentFilter.length === 0
-      ? query.eq("owner_user_id", -1)
-      : query.in("owner_user_id", pedidoAgentFilter);
+      ? q.eq("owner_user_id", -1)
+      : q.in("owner_user_id", pedidoAgentFilter);
   }
 
   // ─── 1. Summary counts + listings (paralelo) ────────────────────────────
@@ -144,8 +174,9 @@ export default async function DashboardPage() {
     { data: rendimientoData },
     { data: actividadData },
     { data: tareasData },
-    { data: agendaData },
+    { data: agendaData, error: agendaError },
     { data: kanbanColsData },
+    { data: kanbanOrderData },
     { data: agenteMesData },
     { data: noticiasMapData },
     { data: encargosMapData },
@@ -174,7 +205,7 @@ export default async function DashboardPage() {
     ),
     applyPedidoFilters(
       supabase.from("pedidos").select(
-        "id, nombre_cliente, tipo_propiedad, zona:zona_deseada(nombre), usuarios:usuarios!pedidos_owner_user_id_fkey(nombre, apellidos)"
+        "id, nombre_cliente, tipo_propiedad, owner_user_id, empresa_id, equipo_id, visibility, visibility_agente_ids, zona:zona_deseada(nombre), usuarios:usuarios!pedidos_owner_user_id_fkey(nombre, apellidos)"
       ).order("id", { ascending: false }).limit(50)
     ),
 
@@ -209,6 +240,12 @@ export default async function DashboardPage() {
       .eq("user_id", userId)
       .order("orden", { ascending: true }),
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from("kanban_card_orden")
+      .select("source, db_id, column_id, posicion")
+      .eq("user_id", userId),
+
     yo?.empresaId
       ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any)
@@ -228,7 +265,7 @@ export default async function DashboardPage() {
     applyPropFilters(
       supabase.from("propiedades")
         .select("id, propietario, planta, puerta, latitud, longitud, finca_id, fincas(id, numero, sector_id, sectores(id, numero, zona_id))")
-        .ilike("estado", "encargo")
+        .ilike("estado", "encarg%")
         .not("latitud", "is", null)
         .not("longitud", "is", null)
     ),
@@ -237,6 +274,23 @@ export default async function DashboardPage() {
     lostOpportunitiesPromise,
     listZonasGeograficas(),
   ]);
+
+  if (process.env.NODE_ENV !== "production") {
+    console.debug("[dashboard] agenda-query params", {
+      userId, role, empresaId: yo?.empresaId, today,
+      agendaCount: agendaData?.length ?? "null",
+    });
+    if (agendaError) {
+      console.error("[dashboard] Error cargando agenda:", {
+        message: agendaError?.message,
+        details: agendaError?.details,
+        hint: agendaError?.hint,
+        code: agendaError?.code,
+        raw: JSON.stringify(agendaError, Object.getOwnPropertyNames(agendaError)),
+      });
+      console.error("[dashboard] agendaError raw direct", agendaError);
+    }
+  }
 
   // ─── 2. Summary data ─────────────────────────────────────────────────────
   const summary: SummaryData = {
@@ -288,6 +342,11 @@ export default async function DashboardPage() {
     id: number;
     nombre_cliente: string;
     tipo_propiedad: string | null;
+    owner_user_id: number | null;
+    empresa_id: number | null;
+    equipo_id: number | null;
+    visibility: string | null;
+    visibility_agente_ids: number[] | null;
     zona: { nombre: string | null } | null;
     usuarios: { nombre: string | null; apellidos: string | null } | null;
   };
@@ -311,7 +370,7 @@ export default async function DashboardPage() {
     investigaciones: ((investigacionesList ?? []) as unknown as PropRow[]).map(mapPropiedad),
     seguimientos: ((seguimientosList ?? []) as unknown as PropRow[]).map(mapPropiedad),
     encargos: ((encargosList ?? []) as unknown as PropRow[]).map(mapPropiedad),
-    pedidosActivos: ((pedidosList ?? []) as unknown as PedidoRow[]).map(mapPedido),
+    pedidosActivos: filterReadablePedidos((pedidosList ?? []) as unknown as PedidoRow[], yo).map(mapPedido),
   };
 
   // ─── 3. Agentes filtrados por rol ────────────────────────────────────────
@@ -398,6 +457,31 @@ export default async function DashboardPage() {
     return (rows ?? [])
       .map((r) => `${r.usuarios?.nombre ?? ""} ${r.usuarios?.apellidos ?? ""}`.trim())
       .filter(Boolean);
+  }
+
+  type KanbanOrderRow = {
+    source: "tarea" | "agenda";
+    db_id: number;
+    column_id: string;
+    posicion: number;
+  };
+
+  const kanbanOrderMap = new Map(
+    ((kanbanOrderData ?? []) as KanbanOrderRow[]).map((row) => [
+      `${row.column_id}:${row.source}:${row.db_id}`,
+      row.posicion,
+    ]),
+  );
+
+  function sortKanbanCards(columnId: string, cards: KanbanCardData[]) {
+    return [...cards].sort((a, b) => {
+      const aOrder = kanbanOrderMap.get(`${columnId}:${a.source}:${a.dbId}`);
+      const bOrder = kanbanOrderMap.get(`${columnId}:${b.source}:${b.dbId}`);
+      if (aOrder != null && bOrder != null) return aOrder - bOrder;
+      if (aOrder != null) return -1;
+      if (bOrder != null) return 1;
+      return 0;
+    });
   }
 
   const tareas: TareaDbRow[] = (tareasData ?? []) as TareaDbRow[];
@@ -489,19 +573,19 @@ export default async function DashboardPage() {
         title: "Pendientes",
         fixed: true,
         // Pendientes primero, luego completadas al final con tachado
-        cards: [
+        cards: sortKanbanCards("pendientes", [
           ...myTareas.filter((t) => t.estado === "pendiente").map(toCard),
           ...myTareas.filter((t) => t.estado === "completado").map(toCard),
-        ],
+        ]),
       },
       {
         id: "en_progreso",
         title: "Agenda hoy",
         fixed: true,
-        cards: [
+        cards: sortKanbanCards("en_progreso", [
           ...myAgendaHoy.filter((a) => !a.completed).map(agendaToCard),
           ...myAgendaHoy.filter((a) => a.completed).map(agendaToCard),
-        ],
+        ]),
       },
     ],
   };

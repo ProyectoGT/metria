@@ -21,6 +21,7 @@ type PropiedadPayload = {
   notas: string | null;
   honorarios: number | null;
   agente_asignado: number | null;
+  assigned_user_ids?: number[];
   latitud: number | null;
   longitud: number | null;
 };
@@ -131,7 +132,7 @@ export async function upsertPropiedadAction(
     }
     revalidatePath(`/zona`);
     revalidatePath(`/dashboard`);
-    return { data: data as Record<string, unknown> };
+    return { data: data.row as Record<string, unknown> };
   } else {
     const createPayload = {
       ...payload,
@@ -186,7 +187,7 @@ export async function upsertPropiedadAction(
     }
     revalidatePath(`/zona`);
     revalidatePath(`/dashboard`);
-    return { data: data as Record<string, unknown> };
+    return { data: created.row as Record<string, unknown> };
   }
 }
 

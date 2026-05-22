@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createClient } from "@/lib/supabase";
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 
@@ -202,18 +201,7 @@ export async function POST() {
     return NextResponse.json({ error: "gmail_not_connected" }, { status: 401 });
   }
 
-  // Get current user + empresa
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
-
-  const { data: profile } = await supabase
-    .from("usuarios")
-    .select("empresa_id")
-    .eq("auth_id", user.id)
-    .maybeSingle();
-
-  const empresa_id = profile?.empresa_id ?? null;
+  const empresa_id = currentUser.empresaId;
 
   // Search Gmail for Idealista notification emails (last 3 months)
   const after = Math.floor(Date.now() / 1000 - 90 * 24 * 3600);
@@ -320,6 +308,12 @@ export async function POST() {
 
 // GET — just check connection status
 export async function GET() {
+  const currentUser = await getCurrentUserContext();
+  if (!currentUser) return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
+  if (!canViewIdealistaLeads(currentUser.role)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   const auth = await getGmailToken();
   const connected = !!auth;
   return NextResponse.json({ connected });
