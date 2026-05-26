@@ -33,17 +33,10 @@ export default async function ZonaDetailPage({
   const propiedadesPerFinca: Record<number, { total: number; contactadas: number }> = {};
 
   if (fincaIds.length > 0) {
-    let conteoQuery = supabase
+    const conteoQuery = supabase
       .from("propiedades")
       .select("id, finca_id, contactado")
       .in("finca_id", fincaIds);
-
-    if (user?.role === "Agente") {
-      conteoQuery = conteoQuery.or(`agente_asignado.eq.${user.id},owner_user_id.eq.${user.id}`) as typeof conteoQuery;
-    } else if (user?.role === "Responsable") {
-      const ids = [user.id, ...user.supervisedAgentIds];
-      conteoQuery = conteoQuery.or(`owner_user_id.eq.${user.id},agente_asignado.in.(${ids.join(",")})`) as typeof conteoQuery;
-    }
 
     const { data: propiedadesConteo } = await conteoQuery;
     for (const p of propiedadesConteo ?? []) {

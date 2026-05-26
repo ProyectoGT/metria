@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase-admin";
 import { getCurrentUserContext } from "@/lib/current-user";
 import PageHeader from "@/components/layout/page-header";
 import PropiedadDetailClient from "./propiedad-detail-client";
+import { getZonaPermissionLevel, hasZonaPermission, roleHasGlobalPropertyDelete, roleHasGlobalPropertyWrite } from "@/lib/zona-access";
 
 const PROPERTY_DETAIL_SELECT = `
   id, planta, puerta, propietario, telefono, propietario_secundario, telefono_secundario, estado, honorarios, precio,
@@ -367,6 +368,16 @@ export default async function PropiedadDetailPage({
   const zonaHref = propiedad.zona_id && propiedad.sector_id && propiedad.finca_id
     ? `/zona/${propiedad.zona_id}/sector/${propiedad.sector_id}/finca/${propiedad.finca_id}`
     : null;
+  const zonaPermission = await getZonaPermissionLevel(supabase, propiedad.zona_id, yo.id);
+  const canEditProperty =
+    roleHasGlobalPropertyWrite(yo.role) ||
+    hasZonaPermission(zonaPermission, "write") ||
+    propiedad.agente_id === yo.id ||
+    propiedad.creador_id === yo.id ||
+    (yo.role === "Responsable" && propiedad.agente_id != null && yo.supervisedAgentIds.includes(propiedad.agente_id));
+  const canDeleteProperty =
+    roleHasGlobalPropertyDelete(yo.role) ||
+    hasZonaPermission(zonaPermission, "admin");
 
   return (
     <>
@@ -377,6 +388,8 @@ export default async function PropiedadDetailPage({
       <PropiedadDetailClient
         propiedad={propiedad}
         isManager={yo.role === "Administrador" || yo.role === "Director"}
+        canEditProperty={canEditProperty}
+        canDeleteProperty={canDeleteProperty}
         zonaHref={zonaHref}
         backHref={backHref}
         agentes={(agentes ?? []).filter((a) => a.rol !== "Administrador")}

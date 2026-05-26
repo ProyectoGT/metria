@@ -101,11 +101,6 @@ export default async function CalendarioPage() {
         const assigned = event.agenda_usuarios?.map((u) => u.usuario_id) ?? [];
         return assigned.includes(userId) || event.owner_user_id === userId || event.user_id === userId;
       })
-    : role === "Agente"
-      ? ((events ?? []) as unknown as EventWithAssignments[]).filter((event) => {
-          const assigned = event.agenda_usuarios?.map((u) => u.usuario_id) ?? [];
-          return assigned.includes(userId) || event.owner_user_id === userId || event.user_id === userId;
-        })
     : (events ?? []);
 
   if (process.env.NODE_ENV !== "production") {

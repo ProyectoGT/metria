@@ -5,7 +5,7 @@ import { AlertTriangle, DatabaseBackup, History, RotateCcw, Settings, ShieldChec
 import { Tab, Tabs } from "@/components/ui/tabs";
 import { Card, SectionCard } from "@/components/ui/card";
 import Badge from "@/components/ui/badge";
-import type { BackupAuditEvent, BackupHealth, BackupProfile, BackupRun } from "../types/backup.types";
+import type { BackupAuditEvent, BackupHealth, BackupProfile, BackupRun, RetentionPolicy } from "../types/backup.types";
 import BackupHealthCard from "./BackupHealthCard";
 import ManualBackupWizard from "./ManualBackupWizard";
 import BackupProfilesList from "./BackupProfilesList";
@@ -22,9 +22,11 @@ type Props = {
   profiles: BackupProfile[];
   auditEvents: BackupAuditEvent[];
   canCreateIncremental: boolean;
+  canManageProfiles: boolean;
+  retentionPolicy?: RetentionPolicy;
 };
 
-export default function BackupsDashboard({ health, runs, profiles, auditEvents, canCreateIncremental }: Props) {
+export default function BackupsDashboard({ health, runs, profiles, auditEvents, canCreateIncremental, canManageProfiles, retentionPolicy }: Props) {
   const [tab, setTab] = useState("overview");
 
   return (
@@ -69,15 +71,15 @@ export default function BackupsDashboard({ health, runs, profiles, auditEvents, 
       )}
 
       {tab === "manual" && <ManualBackupWizard canCreateIncremental={canCreateIncremental} />}
-      {tab === "automations" && <BackupProfilesList profiles={profiles} />}
-      {tab === "history" && <BackupHistoryTable runs={runs} />}
-      {tab === "restore" && <RestoreWizard runs={runs} />}
+      {tab === "automations" && <BackupProfilesList profiles={profiles} canManage={canManageProfiles} />}
+      {tab === "history" && <BackupHistoryTable runs={runs} canManage={canManageProfiles} />}
+      {tab === "restore" && <RestoreWizard runs={runs} canManage={canManageProfiles} />}
       {tab === "audit" && <BackupAuditLog events={auditEvents} />}
       {tab === "settings" && (
         <div className="space-y-4">
           <BackupDestinationCard />
-          <BackupRetentionEditor />
-          <BackupNotificationSettings />
+          <BackupRetentionEditor initialPolicy={retentionPolicy} canManage={canManageProfiles} />
+          <BackupNotificationSettings canManage={canManageProfiles} />
           <Card padding="lg">
             <p className="text-sm font-semibold text-text-primary">Integridad obligatoria</p>
             <div className="mt-3 grid gap-2 text-sm text-text-secondary md:grid-cols-2">

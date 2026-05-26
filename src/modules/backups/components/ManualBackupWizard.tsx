@@ -20,7 +20,7 @@ const STEPS = ["Tipo", "Alcance", "Destino", "Verificacion", "Notificaciones", "
 export default function ManualBackupWizard({ canCreateIncremental, onCreated }: Props) {
   const [step, setStep] = useState(0);
   const [backupType, setBackupType] = useState<BackupType>("full");
-  const [scope, setScope] = useState<BackupScopeKey[]>(["database", "storage", "settings"]);
+  const [scope, setScope] = useState<BackupScopeKey[]>(["all"]);
   const [destination, setDestination] = useState<"supabase_storage" | "s3" | "local_download">("supabase_storage");
   const [verificationLevel, setVerificationLevel] = useState<BackupVerificationLevel>("basic");
   const [notifyCreator, setNotifyCreator] = useState(true);
@@ -128,16 +128,34 @@ export default function ManualBackupWizard({ canCreateIncremental, onCreated }: 
       {step === 2 && (
         <div className="grid gap-3 md:grid-cols-3">
           <ChoiceCard title="Supabase Storage privado" description="Destino interno protegido y sin URLs publicas." active={destination === "supabase_storage"} onClick={() => setDestination("supabase_storage")} />
-          <ChoiceCard title="S3 compatible externo" description="Arquitectura preparada; integracion real en fase posterior." active={destination === "s3"} disabled onClick={() => setDestination("s3")} badge="Proximamente" />
+          <ChoiceCard title="S3 / almacenamiento externo" description="Requiere credenciales de S3 configuradas en variables de entorno." active={destination === "s3"} disabled onClick={() => setDestination("s3")} badge="Requiere config." />
           <ChoiceCard title="Descarga manual cifrada" description="Preparado para export descargable con reautenticacion." active={destination === "local_download"} onClick={() => setDestination("local_download")} />
         </div>
       )}
 
       {step === 3 && (
         <div className="grid gap-3 md:grid-cols-3">
-          <ChoiceCard icon={<ShieldCheck className="h-5 w-5" />} title="Basica" description="Manifiesto, conteos y checksum del manifiesto." active={verificationLevel === "basic"} onClick={() => setVerificationLevel("basic")} />
-          <ChoiceCard title="Completa" description="Preparada para checks avanzados de base de datos y Storage." active={verificationLevel === "complete"} disabled onClick={() => setVerificationLevel("complete")} badge="Fase 2" />
-          <ChoiceCard title="Completa + simulacion" description="Validara una restauracion controlada en entorno seguro." active={verificationLevel === "restore_simulation"} disabled onClick={() => setVerificationLevel("restore_simulation")} badge="Fase 4" />
+          <ChoiceCard
+            icon={<ShieldCheck className="h-5 w-5" />}
+            title="Basica"
+            description="Manifiesto, conteos de filas y checksum verificado."
+            active={verificationLevel === "basic"}
+            onClick={() => setVerificationLevel("basic")}
+          />
+          <ChoiceCard
+            icon={<CheckCircle2 className="h-5 w-5" />}
+            title="Completa"
+            description="Exportacion real de datos, checksums por entidad, schema snapshot e integridad de Storage."
+            active={verificationLevel === "complete"}
+            onClick={() => setVerificationLevel("complete")}
+          />
+          <ChoiceCard
+            icon={<ShieldCheck className="h-5 w-5" />}
+            title="Completa + simulacion"
+            description="Exportacion completa y analisis automatico de impacto para validar la restauracion."
+            active={verificationLevel === "restore_simulation"}
+            onClick={() => setVerificationLevel("restore_simulation")}
+          />
         </div>
       )}
 

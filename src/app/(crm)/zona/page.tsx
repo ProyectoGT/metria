@@ -25,7 +25,8 @@ export default async function ZonaPage() {
           .order("nombre")
       : Promise.resolve({ data: [] }),
     // Todos necesitan los accesos para filtrar (Responsable/Agente) o gestionar (Admin/Director)
-    supabase.from("zona_acceso").select("zona_id, usuario_id"),
+    (supabase.from("zona_acceso") as never as { select: (columns: string) => Promise<{ data: unknown[] | null }> })
+      .select("zona_id, usuario_id, permission_level"),
     getUserOrdenAction("zona"),
     getUserOrdenAction("sectores"),
   ]);
@@ -53,7 +54,7 @@ export default async function ZonaPage() {
   }));
   if (!isManager) {
     const zonasPermitidas = new Set(
-      (accesosData ?? [])
+      ((accesosData ?? []) as { zona_id: number; usuario_id: number; permission_level?: string | null }[])
         .filter((a) => a.usuario_id === userId)
         .map((a) => a.zona_id),
     );
@@ -67,7 +68,7 @@ export default async function ZonaPage() {
       canDeleteSectores={user?.canDeleteSectores ?? false}
       canManageAccess={isManager}
       usuarios={(usuariosData ?? []) as { id: number; nombre: string; apellidos: string; rol: string }[]}
-      initialAccesos={(accesosData ?? []) as { zona_id: number; usuario_id: number }[]}
+      initialAccesos={(accesosData ?? []) as unknown as { zona_id: number; usuario_id: number; permission_level: string | null }[]}
     />
   );
 }

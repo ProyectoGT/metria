@@ -38,6 +38,7 @@ type Propiedad = {
   honorarios: number | null;
   posicion: number | null;
   agente_asignado: number | null;
+  owner_user_id?: number | null;
   created_by_user_id?: number | null;
   finca_id: number | null;
   latitud?: number | null;
@@ -52,6 +53,7 @@ type Propiedad = {
   has_encargo_data?: boolean;
   usuarios: { id: number; nombre: string; apellidos: string; rol?: string | null } | null;
   creador?: { id: number; nombre: string; apellidos: string; rol?: string | null } | null;
+  propiedad_usuarios?: { usuario_id: number; usuarios?: { nombre: string; apellidos: string } | null }[];
   _order?: number;
 };
 
@@ -231,6 +233,9 @@ export default function PropiedadesClient({
   initialPropiedades,
   agentes,
   canDeletePropiedades,
+  canCreatePropiedades,
+  canEditZonaPropiedades,
+  canDeleteZonaPropiedades,
   currentUserRole,
   currentUserId,
   supervisedAgentIds,
@@ -239,6 +244,9 @@ export default function PropiedadesClient({
   initialPropiedades: Propiedad[];
   agentes: Agente[];
   canDeletePropiedades: boolean;
+  canCreatePropiedades: boolean;
+  canEditZonaPropiedades: boolean;
+  canDeleteZonaPropiedades: boolean;
   currentUserRole: UserRole;
   currentUserId: number;
   supervisedAgentIds: number[];
@@ -317,6 +325,7 @@ export default function PropiedadesClient({
     [agentes]
   );
   const currentUserAssignable = currentUserRole !== "Administrador";
+  const canCreateInFinca = canCreatePropiedades;
   const selectedAgent = form.agente_asignado
     ? agentes.find((agente) => String(agente.id) === form.agente_asignado)
     : null;
@@ -388,6 +397,10 @@ export default function PropiedadesClient({
   }), [propiedades]);
 
   function openCreate() {
+    if (!canCreateInFinca) {
+      toast("No tienes permiso para crear propiedades en esta zona.", "error");
+      return;
+    }
     setEditTarget(null);
     setShowSecondOwner(false);
     setForm({
@@ -400,6 +413,10 @@ export default function PropiedadesClient({
   }
 
   function openEdit(propiedad: Propiedad) {
+    if (!canEditPropiedad(propiedad)) {
+      toast("No tienes permiso para editar esta propiedad.", "error");
+      return;
+    }
     setEditTarget(propiedad);
     setSaveError(null);
     setShowSecondOwner(Boolean(propiedad.propietario_secundario || propiedad.telefono_secundario));
@@ -482,6 +499,15 @@ export default function PropiedadesClient({
   }
 
   async function handleSave() {
+    if (!editTarget && !canCreateInFinca) {
+      setSaveError("No tienes permiso para crear propiedades en esta zona.");
+      return;
+    }
+    if (editTarget && !canEditPropiedad(editTarget)) {
+      setSaveError("No tienes permiso para editar esta propiedad.");
+      return;
+    }
+
     setSaving(true);
     setSaveError(null);
 
@@ -642,6 +668,19 @@ export default function PropiedadesClient({
     setDeleteId(null);
     setDeletePassword("");
     toast("Propiedad eliminada");
+  }
+
+  function canEditPropiedad(propiedad: Propiedad): boolean {
+    if (canEditZonaPropiedades) return true;
+    if (propiedad.owner_user_id === currentUserId || propiedad.agente_asignado === currentUserId) return true;
+    if (currentUserRole === "Responsable" && propiedad.agente_asignado != null) {
+      return supervisedAgentIds.includes(propiedad.agente_asignado);
+    }
+    return false;
+  }
+
+  function canDeletePropiedad(): boolean {
+    return canDeletePropiedades || canDeleteZonaPropiedades;
   }
 
   function handleToggleContactado(propiedad: Propiedad) {
@@ -861,6 +900,7 @@ export default function PropiedadesClient({
           </button>
           <button
             onClick={openCreate}
+            disabled={!canCreateInFinca}
             className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark sm:flex-none"
           >
             + Nueva propiedad
@@ -965,6 +1005,7 @@ export default function PropiedadesClient({
           {!hayFiltrosActivos && !filtroPendientes && (
             <button
               onClick={openCreate}
+              disabled={!canCreateInFinca}
               className="mt-4 text-sm font-medium text-primary hover:underline"
             >
               Anadir la primera propiedad
@@ -1093,13 +1134,15 @@ export default function PropiedadesClient({
                       {isEncargo ? "Encargo" : "Historial encargo"}
                     </button>
                   )}
-                  <button
-                    onClick={() => openEdit(propiedad)}
-                    className="rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
-                  >
-                    Editar
-                  </button>
-                  {canDeletePropiedades && (
+                  {canEditPropiedad(propiedad) && (
+                    <button
+                      onClick={() => openEdit(propiedad)}
+                      className="rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+                    >
+                      Editar
+                    </button>
+                  )}
+                  {canDeletePropiedad() && (
                     <button
                       onClick={() => {
                         setDeleteError(null);
@@ -1348,13 +1391,15 @@ export default function PropiedadesClient({
                                   >
                                     <FileText className="h-3.5 w-3.5" />
                                   </button>
-                                  <button
-                                    onClick={() => openEdit(propiedad)}
-                                    className="rounded px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
-                                  >
-                                    Editar
-                                  </button>
-                                  {canDeletePropiedades && (
+                                  {canEditPropiedad(propiedad) && (
+                                    <button
+                                      onClick={() => openEdit(propiedad)}
+                                      className="rounded px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+                                    >
+                                      Editar
+                                    </button>
+                                  )}
+                                  {canDeletePropiedad() && (
                                     <button
                                       onClick={() => {
                                         setDeleteError(null);

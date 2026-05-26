@@ -21,6 +21,7 @@ import {
   useDeleteAgendaItem,
 } from "@/modules/agenda/hooks/use-agenda-items";
 import { useCompleteTask, useTasks } from "@/modules/tareas/hooks/use-tasks";
+import { utcToMadridDisplay } from "@/lib/dates/timezone";
 import type { TareaRow } from "@/modules/tareas/services/tareas.service";
 import EventFormModal from "./event-form-modal";
 import UserMultiFilter from "./UserMultiFilter";
@@ -734,7 +735,7 @@ export default function CalendarioClient({
       eventsByDateKeys: Object.keys(eventsByDate).sort(),
       selectedDayEvents: eventsByDate[selectedDateStr] ?? [],
     });
-  }, [currentUserId, role, initialEvents, events.length, filteredEvents.length, selectedDateStr, eventsByDate, weekStart, currentDate]);
+  }, [currentUserId, role, initialEvents, events.length, filteredEvents.length, selectedDateStr, eventsByDate, weekStart, currentDate, filterUserIds]);
 
   // Period label
   const periodLabel = viewMode === "month"

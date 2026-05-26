@@ -447,17 +447,17 @@ function EventFormModalInner({
       title={editId !== null ? t("calendar.editarActividad") : t("calendar.nuevaActividadLabel")}
       width="md"
       footer={
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             onClick={onClose}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background"
+            className="w-full rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-background sm:w-auto"
           >
             {t("calendar.cancelar")}
           </button>
           <button
             onClick={handleSave}
             disabled={savingLocal || !form.description.trim() || form.assignedUserIds.length === 0}
-            className="pressable inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60"
+            className="pressable inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-60 sm:w-auto"
           >
             {savingLocal && <Loader2 className="h-4 w-4 animate-spin" />}
             {savingLocal

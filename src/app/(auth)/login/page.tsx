@@ -24,12 +24,12 @@ export default async function LoginPage() {
 
   return (
     <main
-      className={`${playfair.variable} ${dmSans.variable} flex min-h-screen`}
+      className={`${playfair.variable} ${dmSans.variable} flex min-h-dvh lg:h-dvh lg:overflow-hidden`}
       style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}
     >
       {/* ── Panel izquierdo 42% ──────────────────────────────────────────── */}
       <section
-        className="relative hidden lg:block lg:w-[42%]"
+        className="relative hidden min-h-dvh overflow-hidden lg:block lg:w-[42%]"
         style={{ backgroundColor: "#0d1b2e" }}
       >
         {/* Círculos decorativos */}
@@ -78,7 +78,7 @@ export default async function LoginPage() {
       </section>
 
       {/* ── Panel derecho 58% ────────────────────────────────────────────── */}
-      <section className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-12 lg:w-[58%]">
+      <section className="flex min-h-dvh flex-1 flex-col items-center justify-center bg-background px-6 py-12 lg:w-[58%] lg:overflow-y-auto">
         <div className="w-full max-w-[340px] space-y-6">
           {/* Píldora */}
           <div className="flex justify-center lg:justify-start">

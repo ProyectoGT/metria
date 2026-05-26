@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Plus, Trash2, ShieldCheck, Loader2 } from "lucide-react";
+import { ChevronDown, Plus, Trash2, ShieldCheck } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { deleteZonaAction, deleteSectorAction } from "@/app/actions/security";
 import { updateZonasPosicionesAction, updateSectoresPosicionesAction, resetZonasPosicionesAction, resetSectoresPosicionesAction } from "@/app/(crm)/zona/actions";
@@ -13,6 +13,7 @@ import { useToast, Toaster } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase-browser";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { AnimatedChevron, AnimatedAccordion } from "@/components/ui/animated";
+import { normalizeZonaPermissionLevel, type ZonaPermissionLevel } from "@/lib/zona-access";
 
 type Sector = {
   id: number;
@@ -37,6 +38,13 @@ type DeleteTarget =
 
 type UsuarioAcceso = { id: number; nombre: string; apellidos: string; rol: string };
 
+const ZONA_PERMISSION_OPTIONS: Array<{ value: "none" | ZonaPermissionLevel; label: string }> = [
+  { value: "none", label: "Sin acceso" },
+  { value: "read", label: "Lectura" },
+  { value: "write", label: "Edicion" },
+  { value: "admin", label: "Control total" },
+];
+
 export default function ZonasClient({
   initialZonas,
   canDeleteZonas,
@@ -50,7 +58,7 @@ export default function ZonasClient({
   canDeleteSectores: boolean;
   canManageAccess?: boolean;
   usuarios?: UsuarioAcceso[];
-  initialAccesos?: { zona_id: number; usuario_id: number }[];
+  initialAccesos?: { zona_id: number; usuario_id: number; permission_level?: string | null }[];
 }) {
   const [zonas, setZonas] = useState<Zona[]>(
     initialZonas.map((z, i) => ({ ...z, posicion: z.posicion ?? i }))
@@ -58,11 +66,11 @@ export default function ZonasClient({
   const [openIds, setOpenIds] = useState<Set<number>>(() => new Set());
 
   // Accesos: mapa zona_id → Set<usuario_id>
-  const [accesos, setAccesos] = useState<Map<number, Set<number>>>(() => {
-    const m = new Map<number, Set<number>>();
+  const [accesos, setAccesos] = useState<Map<number, Map<number, ZonaPermissionLevel>>>(() => {
+    const m = new Map<number, Map<number, ZonaPermissionLevel>>();
     for (const a of initialAccesos) {
-      if (!m.has(a.zona_id)) m.set(a.zona_id, new Set());
-      m.get(a.zona_id)!.add(a.usuario_id);
+      if (!m.has(a.zona_id)) m.set(a.zona_id, new Map());
+      m.get(a.zona_id)!.set(a.usuario_id, normalizeZonaPermissionLevel(a.permission_level));
     }
     return m;
   });
@@ -202,11 +210,10 @@ export default function ZonasClient({
   }
 
   // ── Toggle acceso usuario/zona ───────────────────────────────────────────
-  async function handleToggleAcceso(zonaId: number, usuarioId: number) {
+  async function handleSetAcceso(zonaId: number, usuarioId: number, permissionLevel: "none" | ZonaPermissionLevel) {
     setTogglingId(usuarioId);
-    const tieneAcceso = accesos.get(zonaId)?.has(usuarioId) ?? false;
 
-    if (tieneAcceso) {
+    if (permissionLevel === "none") {
       const { error } = await supabase
         .from("zona_acceso")
         .delete()
@@ -216,20 +223,26 @@ export default function ZonasClient({
       else {
         setAccesos((prev) => {
           const next = new Map(prev);
-          next.get(zonaId)?.delete(usuarioId);
+          const zoneAccess = new Map(next.get(zonaId) ?? []);
+          zoneAccess.delete(usuarioId);
+          next.set(zonaId, zoneAccess);
           return next;
         });
       }
     } else {
       const { error } = await supabase
         .from("zona_acceso")
-        .insert({ zona_id: zonaId, usuario_id: usuarioId });
+        .upsert(
+          { zona_id: zonaId, usuario_id: usuarioId, permission_level: permissionLevel } as never,
+          { onConflict: "zona_id,usuario_id" },
+        );
       if (error) { toast(`Error: ${error.message}`, "error"); }
       else {
         setAccesos((prev) => {
           const next = new Map(prev);
-          if (!next.has(zonaId)) next.set(zonaId, new Set());
-          next.get(zonaId)!.add(usuarioId);
+          const zoneAccess = new Map(next.get(zonaId) ?? []);
+          zoneAccess.set(usuarioId, permissionLevel);
+          next.set(zonaId, zoneAccess);
           return next;
         });
       }
@@ -696,11 +709,11 @@ export default function ZonasClient({
         open={!!accesoModal}
         onClose={() => setAccesoModal(null)}
         title={accesoModal ? `Acceso a ${accesoModal.zonaNombre}` : ""}
-        subtitle="Elige quien puede ver esta zona"
+        subtitle="Elige que puede hacer cada usuario en esta zona"
         width="sm"
         footer={
           <p className="text-xs text-text-secondary">
-            Los usuarios sin acceso asignado no podran ver ninguna zona.
+            Lectura permite ver propiedades; Edicion permite crear y modificar; Control total permite eliminar propiedades.
           </p>
         }
       >
@@ -721,7 +734,7 @@ export default function ZonasClient({
                         {rol}s
                       </p>
                       {grupo.map((u) => {
-                        const tiene = accesos.get(accesoModal.zonaId)?.has(u.id) ?? false;
+                        const permission = accesos.get(accesoModal.zonaId)?.get(u.id) ?? "none";
                         const toggling = togglingId === u.id;
                         const initials = `${u.nombre[0]}${u.apellidos[0]}`.toUpperCase();
                         return (
@@ -738,26 +751,23 @@ export default function ZonasClient({
                               </p>
                               <p className="text-xs text-text-secondary">{u.rol}</p>
                             </div>
-                            <button
-                              onClick={() => handleToggleAcceso(accesoModal.zonaId, u.id)}
+                            <select
+                              value={permission}
+                              onChange={(event) => handleSetAcceso(accesoModal.zonaId, u.id, event.target.value as "none" | ZonaPermissionLevel)}
                               disabled={toggling}
-                              className={[
-                                "relative h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none disabled:opacity-60",
-                                tiene ? "bg-primary" : "bg-border",
-                              ].join(" ")}
-                              title={tiene ? "Quitar acceso" : "Dar acceso"}
+                              className="input h-9 w-32 shrink-0 py-1 text-xs disabled:opacity-60"
+                              title="Permiso de zona"
                             >
                               {toggling ? (
-                                <Loader2 className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 animate-spin text-white" />
+                                <option value={permission}>Guardando...</option>
                               ) : (
-                                <span
-                                  className={[
-                                    "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all",
-                                    tiene ? "left-[22px]" : "left-0.5",
-                                  ].join(" ")}
-                                />
+                                ZONA_PERMISSION_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))
                               )}
-                            </button>
+                            </select>
                           </div>
                         );
                       })}

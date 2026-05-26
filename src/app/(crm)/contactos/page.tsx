@@ -4,7 +4,7 @@ import ContactosClient from "./contactos-client";
 import { createClient } from "@/lib/supabase";
 import type { Contacto } from "@/types";
 import { requirePageAccess } from "@/lib/access-control/route-guard";
-import { canAccessContactos } from "@/lib/roles";
+import { canAccessContactos, type UserRole } from "@/lib/roles";
 
 export default async function ContactosPage() {
   const supabase = await createClient();
@@ -14,7 +14,7 @@ export default async function ContactosPage() {
     redirect("/login");
   }
 
-  const role = yo?.role ?? "Agente";
+  const role: UserRole = yo?.role ?? "Agente";
   if (!canAccessContactos(role)) {
     redirect("/dashboard");
   }
@@ -35,7 +35,7 @@ export default async function ContactosPage() {
 
   // Agentes solo ven los suyos + company visibility (RLS lo garantiza,
   // pero añadimos filtro extra para reducir filas transferidas)
-  if (role === "Agente") {
+  if ((role as string) === "Agente") {
     query = query.or(`owner_user_id.eq.${userId},visibility.eq.company`);
   }
 

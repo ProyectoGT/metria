@@ -7,8 +7,10 @@ import {
   verifyConfirmationPassword,
 } from "@/lib/delete-confirmation-password";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { createClient } from "@/lib/supabase";
 import { validatePassword } from "@/lib/password";
 import { canUseFeature } from "@/lib/access-control/can-access";
+import { getZonaPermissionForPropiedad, hasZonaPermission } from "@/lib/zona-access";
 
 type ActionResult = {
   success?: boolean;
@@ -49,13 +51,18 @@ async function deleteRecord(table: DeleteTable, id: number) {
   }
 }
 
-function getDeletePermission(
+async function getDeletePermission(
   table: DeleteTable,
-  user: NonNullable<Awaited<ReturnType<typeof getCurrentUserContext>>>
+  user: NonNullable<Awaited<ReturnType<typeof getCurrentUserContext>>>,
+  id: number,
 ) {
   switch (table) {
-    case "propiedades":
-      return user.canDeletePropiedades;
+    case "propiedades": {
+      if (user.canDeletePropiedades) return true;
+      const supabase = await createClient();
+      const zonePermission = await getZonaPermissionForPropiedad(supabase, id, user.id);
+      return hasZonaPermission(zonePermission, "admin");
+    }
     case "fincas":
       return user.canDeleteFincas;
     case "sectores":
@@ -114,7 +121,8 @@ async function deleteWithConfirmation(
     return { error: "Tu sesión no es válida. Vuelve a iniciar sesión." };
   }
 
-  if (!getDeletePermission(table, user)) {
+  const hasDeletePermission = await getDeletePermission(table, user, id);
+  if (!hasDeletePermission) {
     return { error: getDeleteErrorMessage(table) };
   }
 
@@ -125,7 +133,8 @@ async function deleteWithConfirmation(
     propiedades: "properties.delete",
   };
 
-  if (!(await canUseFeature(user, featureKey[table]))) {
+  const skipFeatureGateForZoneAdmin = table === "propiedades" && !user.canDeletePropiedades;
+  if (!skipFeatureGateForZoneAdmin && !(await canUseFeature(user, featureKey[table]))) {
     return { error: getDeleteErrorMessage(table) };
   }
 

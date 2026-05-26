@@ -131,8 +131,8 @@ export default function PropiedadesClient({ propiedades, zonas, agentes, isManag
       if (q && ![getDisplayTitle(p), p.propietario, p.planta, p.puerta, p.zona_nombre, p.finca_numero]
         .some((v) => v?.toLowerCase().includes(q))) return false;
       if (filtros.estado && p.estado !== filtros.estado) return false;
-      if (filtros.zonaId && String(p.zona_id) !== filtros.zonaId) return false;
-      if (filtros.agentId && String(p.agente_asignado) !== filtros.agentId) return false;
+      if (filtros.zonaId && p.zona_id !== filtros.zonaId) return false;
+      if (filtros.agentId && p.agente_asignado !== filtros.agentId) return false;
       if (filtros.tipo && p.tipo_operacion !== filtros.tipo) return false;
       if (filtros.web === "si"  && !p.publicar_en_web) return false;
       if (filtros.web === "no"  && p.publicar_en_web)  return false;
@@ -145,8 +145,8 @@ export default function PropiedadesClient({ propiedades, zonas, agentes, isManag
   // ── Chips activos ───────────────────────────────────────────────────────
   const chips: { key: string; label: string; onRemove: () => void }[] = [];
   if (filtros.estado) chips.push({ key: "estado", label: `Estado: ${ESTADOS[filtros.estado] ?? filtros.estado}`, onRemove: () => setFiltro("estado", null) });
-  if (filtros.zonaId) chips.push({ key: "zona", label: `Zona: ${zonas.find((z) => String(z.id) === filtros.zonaId)?.nombre ?? filtros.zonaId}`, onRemove: () => setFiltro("zonaId", null) });
-  if (filtros.agentId) chips.push({ key: "agente", label: `Agente: ${agentes.find((a) => String(a.id) === filtros.agentId)?.nombre ?? filtros.agentId}`, onRemove: () => setFiltro("agentId", null) });
+  if (filtros.zonaId) chips.push({ key: "zona", label: `Zona: ${zonas.find((z) => z.id === filtros.zonaId)?.nombre ?? filtros.zonaId}`, onRemove: () => setFiltro("zonaId", null) });
+  if (filtros.agentId) chips.push({ key: "agente", label: `Agente: ${agentes.find((a) => a.id === filtros.agentId)?.nombre ?? filtros.agentId}`, onRemove: () => setFiltro("agentId", null) });
   if (filtros.tipo) chips.push({ key: "tipo", label: `Operacion: ${OPERACION_LABEL[filtros.tipo] ?? filtros.tipo}`, onRemove: () => setFiltro("tipo", null) });
   if (filtros.web) chips.push({ key: "web", label: `Web: ${filtros.web === "si" ? "En web" : "No en web"}`, onRemove: () => setFiltro("web", null) });
   if (filtros.ficha) chips.push({ key: "ficha", label: `Ficha: ${filtros.ficha === "completa" ? "Completa" : "Incompleta"}`, onRemove: () => setFiltro("ficha", null) });
@@ -186,7 +186,7 @@ export default function PropiedadesClient({ propiedades, zonas, agentes, isManag
 
         <FilterSelect
           value={filtros.zonaId ?? ""}
-          onChange={(e) => setFiltro("zonaId", e.target.value || null)}
+          onChange={(e) => setFiltro("zonaId", e.target.value ? Number(e.target.value) : null)}
           label="Zona"
         >
           <option value="">Todas las zonas</option>
@@ -196,7 +196,7 @@ export default function PropiedadesClient({ propiedades, zonas, agentes, isManag
         {isManager && (
           <FilterSelect
             value={filtros.agentId ?? ""}
-            onChange={(e) => setFiltro("agentId", e.target.value || null)}
+            onChange={(e) => setFiltro("agentId", e.target.value ? Number(e.target.value) : null)}
             label="Agente"
           >
             <option value="">Todos los agentes</option>
@@ -301,7 +301,7 @@ export default function PropiedadesClient({ propiedades, zonas, agentes, isManag
             {hasFilters ? "Sin resultados para los filtros aplicados" : "No hay propiedades registradas"}
           </p>
           {hasFilters && (
-            <button onClick={resetFilters} className="mt-2 text-xs text-primary hover:underline">
+            <button onClick={resetFiltros} className="mt-2 text-xs text-primary hover:underline">
               Quitar filtros
             </button>
           )}

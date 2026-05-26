@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, CheckCircle2, Clock, DatabaseBackup, Info } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Clock, DatabaseBackup } from "lucide-react";
 import Badge from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import type { BackupHealth } from "../types/backup.types";
@@ -16,15 +16,6 @@ export default function BackupHealthCard({ health }: { health: BackupHealth }) {
 
   return (
     <div className="space-y-3">
-      {/* Fase 1 disclaimer — manifiesto lógico, no backup real */}
-      <div className="flex gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-text-secondary">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-        <p>
-          <span className="font-semibold text-text-primary">Fase 1 — Manifiesto lógico.</span>{" "}
-          Las copias actuales registran recuentos de filas y checksums de tablas, pero no exportan datos reales ni objetos de Storage.
-          El restore productivo quedará disponible en fases posteriores.
-        </p>
-      </div>
     <div className="grid gap-4 xl:grid-cols-[1.2fr_2fr]">
       <Card padding="lg" className="space-y-4">
         <div className="flex items-start justify-between gap-3">

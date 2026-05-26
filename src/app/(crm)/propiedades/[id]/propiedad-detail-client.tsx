@@ -113,6 +113,8 @@ function ScoreBar({ score }: { score: number }) {
 type Props = {
   propiedad: PropiedadDetail;
   isManager: boolean;
+  canEditProperty: boolean;
+  canDeleteProperty: boolean;
   zonaHref: string | null;
   backHref: string;
   agentes: Array<{ id: number; nombre: string; apellidos: string }>;
@@ -120,7 +122,7 @@ type Props = {
   currentUserName: string;
 };
 
-export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, backHref, agentes, currentUserId, currentUserName }: Props) {
+export default function PropiedadDetailClient({ propiedad, isManager, canEditProperty, zonaHref, backHref, agentes, currentUserId, currentUserName }: Props) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [showEncargoPanel, setShowEncargoPanel] = useState(false);
@@ -230,7 +232,7 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, 
               Ver en mapa
             </a>
           )}
-          {zonaHref && (
+          {zonaHref && canEditProperty && (
             <Link
               href={zonaHref}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
@@ -649,7 +651,7 @@ export default function PropiedadDetailClient({ propiedad, isManager, zonaHref, 
             setEncargoReadOnly(false);
           }}
           onEdit={() => {
-            if (zonaHref) window.location.href = zonaHref;
+            if (zonaHref && canEditProperty) window.location.href = zonaHref;
           }}
         />
       )}

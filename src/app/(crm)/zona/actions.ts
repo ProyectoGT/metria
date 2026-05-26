@@ -8,6 +8,12 @@ import { canUseFeature } from "@/lib/access-control/can-access";
 import { canBeAssignedProperty, canSetVendido } from "@/lib/roles";
 import { changePropertyStatusAction, type PropertySaleInput } from "@/modules/propiedades/services/commercial-cycles";
 import { revalidatePath } from "next/cache";
+import {
+  getZonaPermissionForFinca,
+  getZonaPermissionForPropiedad,
+  hasZonaPermission,
+  roleHasGlobalPropertyWrite,
+} from "@/lib/zona-access";
 
 type PropiedadPayload = {
   planta: string | null;
@@ -79,6 +85,16 @@ export async function upsertPropiedadAction(
     if (!existing) return { error: "Propiedad no encontrada o sin acceso." };
     if (yo.role !== "Administrador" && existing.empresa_id !== yo.empresaId) return { error: "Sin acceso a esta propiedad." };
 
+    const zonePermission = await getZonaPermissionForPropiedad(supabase, propiedadId, yo.id);
+    const canWriteByZone = hasZonaPermission(zonePermission, "write");
+    const canWriteByAssignment =
+      existing.agente_asignado === yo.id ||
+      existing.created_by_user_id === yo.id ||
+      (yo.role === "Responsable" && existing.agente_asignado != null && yo.supervisedAgentIds.includes(existing.agente_asignado));
+    if (!roleHasGlobalPropertyWrite(yo.role) && !canWriteByZone && !canWriteByAssignment) {
+      return { error: "No tienes permiso para editar esta propiedad." };
+    }
+
     const previousStatus = existing.estado ?? null;
     const nextStatus = payload.estado ?? null;
     const statusChanged = nextStatus !== null && nextStatus !== previousStatus;
@@ -132,8 +148,13 @@ export async function upsertPropiedadAction(
     }
     revalidatePath(`/zona`);
     revalidatePath(`/dashboard`);
-    return { data: data.row as Record<string, unknown> };
+    return { data: data as Record<string, unknown> };
   } else {
+    const zonePermission = await getZonaPermissionForFinca(supabase, fincaId, yo.id);
+    if (!roleHasGlobalPropertyWrite(yo.role) && !hasZonaPermission(zonePermission, "write")) {
+      return { error: "No tienes permiso para crear propiedades en esta zona." };
+    }
+
     const createPayload = {
       ...payload,
       finca_id: fincaId,
@@ -187,7 +208,7 @@ export async function upsertPropiedadAction(
     }
     revalidatePath(`/zona`);
     revalidatePath(`/dashboard`);
-    return { data: created.row as Record<string, unknown> };
+    return { data: data as Record<string, unknown> };
   }
 }
 
