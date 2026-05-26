@@ -81,6 +81,16 @@ const PERMISSIONS: Partial<Record<Module, Partial<Record<Action, PermissionRule>
     view: { roles: ADMIN_ROLES },
     manage: { roles: ADMIN_ROLES },
   },
+  backups: {
+    view: { roles: MANAGER_ROLES },
+    create: { roles: ADMIN_ROLES },
+    download: { roles: ADMIN_ROLES },
+    delete: { roles: ADMIN_ROLES },
+    restore_request: { roles: MANAGER_ROLES },
+    restore_approve: { roles: MANAGER_ROLES },
+    restore_execute: { roles: ADMIN_ROLES },
+    manage: { roles: ADMIN_ROLES },
+  },
 };
 
 export function getPermissionRule(

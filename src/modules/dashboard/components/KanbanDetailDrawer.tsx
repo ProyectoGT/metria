@@ -223,9 +223,10 @@ export default function KanbanDetailDrawer({
           description={
             isAgenda
               ? "Esta actividad se archivara y desaparecera del tablero. Esta accion no se puede deshacer."
-              : "Esta tarea se eliminara permanentemente. Esta accion no se puede deshacer."
+              : "Esta tarea se archivara y desaparecera del tablero. No se borrara de la base de datos."
           }
           confirmLabel="Eliminar"
+          variant="danger"
           onCancel={() => setShowDeleteConfirm(false)}
           onConfirm={() => { setShowDeleteConfirm(false); onDelete(); }}
         />

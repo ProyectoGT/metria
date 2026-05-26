@@ -13,6 +13,11 @@ import Drawer from "@/components/ui/drawer";
 import { ContactosTable } from "./contactos-table";
 import type { Contacto, ContactoTipo, ContactoEstado, ContactoInsert } from "@/types";
 import type { UserRole } from "@/lib/roles";
+import {
+  archiveContactAction,
+  listArchivedContactsAction,
+  restoreContactAction,
+} from "./actions";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -342,12 +347,12 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
   const handleArchive = useCallback(async (id: number) => {
     if (archivingId === id) return;
     setArchivingId(id);
-    const { error } = await db.from("contactos").update({ archived_at: new Date().toISOString() }).eq("id", id);
+    const result = await archiveContactAction(id);
     setArchivingId(null);
-    if (error) { toast(error.message, "error"); return; }
+    if (!result.success) { toast(result.error, "error"); return; }
     setContactos((prev) => prev.filter((c) => c.id !== id));
     toast("Contacto archivado");
-  }, [archivingId, db, toast]);
+  }, [archivingId, toast]);
 
   const handleTimeline = useCallback((c: Contacto) => {
     setTimelineContacto(c);
@@ -355,16 +360,11 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
 
   const fetchArchived = useCallback(async () => {
     setLoadingArchived(true);
-    const { data, error } = await db
-      .from("contactos")
-      .select("id,nombre,apellidos,empresa,cargo,tipo,email,telefono,telefono_secundario,direccion,ciudad,provincia,codigo_postal,pais,notas,origen,estado,owner_user_id,empresa_id,equipo_id,visibility,created_at,updated_at,archived_at")
-      .not("archived_at", "is", null)
-      .order("archived_at", { ascending: false })
-      .limit(100);
+    const result = await listArchivedContactsAction();
     setLoadingArchived(false);
-    if (error) { toast(error.message, "error"); return; }
-    setArchived((data ?? []) as Contacto[]);
-  }, [db, toast]);
+    if (!result.success) { toast(result.error, "error"); return; }
+    setArchived(result.dataList ?? []);
+  }, [toast]);
 
   async function toggleArchived() {
     const next = !showArchived;
@@ -375,11 +375,11 @@ export default function ContactosClient({ initialContactos, currentUserId, curre
   async function handleRestore(id: number) {
     if (restoringId === id) return;
     setRestoringId(id);
-    const { data, error } = await db.from("contactos").update({ archived_at: null }).eq("id", id).select().single();
+    const result = await restoreContactAction(id);
     setRestoringId(null);
-    if (error) { toast(error.message, "error"); return; }
+    if (!result.success) { toast(result.error, "error"); return; }
     setArchived((prev) => prev.filter((c) => c.id !== id));
-    setContactos((prev) => [data as Contacto, ...prev]);
+    if (result.data) setContactos((prev) => [result.data!, ...prev]);
     toast("Contacto restaurado");
   }
 

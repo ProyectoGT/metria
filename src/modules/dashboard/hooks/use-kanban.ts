@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { eventBus } from "@/lib/event-bus";
 import { trackAppEvent, trackMutationError, trackRpcError } from "@/lib/observability";
@@ -18,7 +18,6 @@ export function useKanban({ params, initialData }: UseKanbanOptions) {
     queryKey: queryKeys.kanban.board(params),
     queryFn: () => kanbanService.getBoard(params),
     initialData,
-    placeholderData: keepPreviousData,
     staleTime: 1000 * 30,
   });
 }

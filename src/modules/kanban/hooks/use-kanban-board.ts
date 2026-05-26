@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invalidateAfterMutation } from "@/lib/invalidation-map";
 import { trackAppEvent, trackMutationError, trackRpcError } from "@/lib/observability";
 import { kanbanQueryKeys } from "../query-keys";
@@ -30,7 +30,6 @@ export function useKanbanBoard(params: KanbanQueryParams, options: KanbanBoardOp
     queryFn: () => kanbanService.getBoard(params),
     enabled: options.enabled ?? true,
     initialData: options.initialData,
-    placeholderData: keepPreviousData,
     staleTime: 1000 * 30,
   });
 }

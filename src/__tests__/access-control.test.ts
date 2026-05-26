@@ -29,6 +29,20 @@ type ScopedRow = {
   visibility: "private" | "team" | "company";
 };
 
+type ZonaPermission = "read" | "write" | "admin";
+
+type PropertyRow = ScopedRow & {
+  id: number;
+  zona_id: number;
+  agente_asignado: number | null;
+};
+
+const zonaRank: Record<ZonaPermission, number> = {
+  read: 1,
+  write: 2,
+  admin: 3,
+};
+
 // ─── Implementación TypeScript de can_access_scoped_row (SQL → TS) ────────────
 //
 // Replica exactamente la lógica de la función SQL homónima en:
@@ -77,6 +91,18 @@ function canManageScopedRow(user: UserCtx, row: ScopedRow): boolean {
   }
 
   return false;
+}
+
+function canAccessPropertyByZona(
+  user: UserCtx,
+  row: PropertyRow,
+  zonaAccess: Record<number, ZonaPermission | undefined>,
+  min: ZonaPermission,
+): boolean {
+  if (row.empresa_id !== user.empresaId) return false;
+  if (user.role === "Administrador" || user.role === "Director") return true;
+  const level = zonaAccess[row.zona_id];
+  return level ? zonaRank[level] >= zonaRank[min] : false;
 }
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -265,5 +291,43 @@ describe("Agente no puede modificar datos no asignados", () => {
     };
     expect(canAccessScopedRow(agenteA, filaCompanyAjena)).toBe(true);  // puede ver
     expect(canManageScopedRow(agenteA, filaCompanyAjena)).toBe(false); // no puede modificar
+  });
+});
+
+describe("Permisos de propiedades por zona", () => {
+  const propiedadAjenaZona10: PropertyRow = {
+    id: 100,
+    zona_id: 10,
+    owner_user_id: agenteB.id,
+    agente_asignado: agenteB.id,
+    empresa_id: EMPRESA_A,
+    equipo_id: EQUIPO_2,
+    visibility: "private",
+  };
+
+  it("read permite ver propiedades ajenas de la zona, pero no editar ni borrar", () => {
+    const access = { 10: "read" as const };
+    expect(canAccessPropertyByZona(agenteA, propiedadAjenaZona10, access, "read")).toBe(true);
+    expect(canAccessPropertyByZona(agenteA, propiedadAjenaZona10, access, "write")).toBe(false);
+    expect(canAccessPropertyByZona(agenteA, propiedadAjenaZona10, access, "admin")).toBe(false);
+  });
+
+  it("write permite editar, pero no borrar", () => {
+    const access = { 10: "write" as const };
+    expect(canAccessPropertyByZona(agenteA, propiedadAjenaZona10, access, "read")).toBe(true);
+    expect(canAccessPropertyByZona(agenteA, propiedadAjenaZona10, access, "write")).toBe(true);
+    expect(canAccessPropertyByZona(agenteA, propiedadAjenaZona10, access, "admin")).toBe(false);
+  });
+
+  it("admin permite ver, editar y borrar dentro de la zona", () => {
+    const access = { 10: "admin" as const };
+    expect(canAccessPropertyByZona(agenteA, propiedadAjenaZona10, access, "read")).toBe(true);
+    expect(canAccessPropertyByZona(agenteA, propiedadAjenaZona10, access, "write")).toBe(true);
+    expect(canAccessPropertyByZona(agenteA, propiedadAjenaZona10, access, "admin")).toBe(true);
+  });
+
+  it("un acceso a otra zona no concede visibilidad", () => {
+    const access = { 11: "admin" as const };
+    expect(canAccessPropertyByZona(agenteA, propiedadAjenaZona10, access, "read")).toBe(false);
   });
 });

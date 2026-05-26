@@ -5,6 +5,7 @@ import PageHeader from "@/components/layout/page-header";
 import Breadcrumb from "@/components/ui/breadcrumb";
 import { notFound } from "next/navigation";
 import PropiedadesClient from "./propiedades-client";
+import { getZonaPermissionLevel, hasZonaPermission, roleHasGlobalPropertyDelete, roleHasGlobalPropertyWrite } from "@/lib/zona-access";
 
 export default async function FincaDetailPage({
   params,
@@ -15,25 +16,12 @@ export default async function FincaDetailPage({
   const supabase = await createClient();
   const user = await getCurrentUserContext();
 
-  // Construye el filtro de visibilidad segun el rol:
-  //   Administrador / Director: ven todo (RLS lo garantiza, sin filtro adicional)
-  //   Responsable: sus propiedades + las de sus agentes supervisados
-  //   Agente: solo las propiedades donde es el agente asignado o el propietario
-  let propQuery = supabase
+  const propQuery = supabase
     .from("propiedades")
     .select("*, usuarios:usuarios!propiedades_agente_asignado_fkey(id, nombre, apellidos, rol)")
     .eq("finca_id", Number(fincaId))
     .order("planta")
     .order("puerta");
-
-  if (user?.role === "Agente") {
-    propQuery = propQuery.or(`agente_asignado.eq.${user.id},owner_user_id.eq.${user.id}`) as typeof propQuery;
-  } else if (user?.role === "Responsable") {
-    // Incluye propiedades propias + las asignadas a sus agentes supervisados
-    const ids = [user.id, ...user.supervisedAgentIds];
-    propQuery = propQuery.or(`owner_user_id.eq.${user.id},agente_asignado.in.(${ids.join(",")})`) as typeof propQuery;
-  }
-  // Administrador y Director: sin filtro adicional; RLS ya garantiza visibilidad total
 
   const [
     { data: zona },
@@ -56,6 +44,12 @@ export default async function FincaDetailPage({
   }
 
   if (!zona || !sector || !finca) notFound();
+
+  const zonaPermission = user
+    ? await getZonaPermissionLevel(supabase, Number(zonaId), user.id)
+    : null;
+  const canWriteByZone = hasZonaPermission(zonaPermission, "write");
+  const canDeleteByZone = hasZonaPermission(zonaPermission, "admin");
 
   const propiedadIds = (propiedadesRaw ?? []).map((p) => p.id);
   const encargoDataPropiedadIds = new Set<number>();
@@ -153,6 +147,9 @@ export default async function FincaDetailPage({
         initialPropiedades={propiedades}
         agentes={agentes ?? []}
         canDeletePropiedades={user?.canDeletePropiedades ?? false}
+        canCreatePropiedades={Boolean(user && (roleHasGlobalPropertyWrite(user.role) || canWriteByZone))}
+        canEditZonaPropiedades={Boolean(user && (roleHasGlobalPropertyWrite(user.role) || canWriteByZone))}
+        canDeleteZonaPropiedades={Boolean(user && (roleHasGlobalPropertyDelete(user.role) || canDeleteByZone))}
         currentUserRole={user?.role ?? "Agente"}
         currentUserId={user?.id ?? 0}
         supervisedAgentIds={user?.supervisedAgentIds ?? []}

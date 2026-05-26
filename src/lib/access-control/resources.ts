@@ -138,6 +138,14 @@ export const ACCESS_RESOURCES: AccessResource[] = [
     description: "Ajustes del CRM (solo Administrador)",
     defaultRoles: ADMIN_ONLY,
   },
+  {
+    key: "backups",
+    type: "page",
+    label: "Copias de seguridad",
+    description: "Centro de recuperacion, integridad y auditoria",
+    defaultRoles: MANAGER_ROLES,
+    critical: true,
+  },
 
   // ── Funciones / Acciones ────────────────────────────────
   {
@@ -375,6 +383,30 @@ export const ACCESS_RESOURCES: AccessResource[] = [
     type: "feature",
     label: "Config. seguridad",
     description: "Modificar contraseña de confirmación para operaciones destructivas",
+    defaultRoles: ADMIN_ONLY,
+    critical: true,
+  },
+  {
+    key: "backup.create",
+    type: "feature",
+    label: "Crear backups",
+    description: "Crear copias manuales del sistema",
+    defaultRoles: ADMIN_ONLY,
+    critical: true,
+  },
+  {
+    key: "backup.restore",
+    type: "feature",
+    label: "Solicitar restauraciones",
+    description: "Solicitar restauraciones protegidas por aprobacion",
+    defaultRoles: MANAGER_ROLES,
+    critical: true,
+  },
+  {
+    key: "backup.download",
+    type: "feature",
+    label: "Descargar backups",
+    description: "Descargar copias cifradas con reautenticacion",
     defaultRoles: ADMIN_ONLY,
     critical: true,
   },

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Droppable } from "@hello-pangea/dnd";
 import { CheckCircle2, Plus, X } from "lucide-react";
@@ -13,6 +13,7 @@ type KanbanColumnProps = {
   onAddCard?:      (columnId: string) => void;
   onCompleteCard?: (columnId: string, cardId: string, card: KanbanCardData) => void;
   onDetailCard:    (columnId: string, card: KanbanCardData) => void;
+  headerAction?:    ReactNode;
 };
 
 function KanbanColumn({
@@ -21,6 +22,7 @@ function KanbanColumn({
   onAddCard,
   onCompleteCard,
   onDetailCard,
+  headerAction,
 }: KanbanColumnProps) {
   const activeCount = useMemo(() => column.cards.filter((c) => !c.isCompleted).length, [column.cards]);
   const totalCount  = column.cards.length;
@@ -44,7 +46,7 @@ function KanbanColumn({
       className="group flex min-w-0 flex-col overflow-hidden rounded-ds-lg border border-border bg-surface shadow-layer-1 interactive-surface"
     >
       {/* ── Cabecera (sticky) ─────────────────────────────────────── */}
-      <div className="sticky top-0 z-10 grid h-14 grid-cols-[minmax(0,1fr)_2rem] items-center gap-3 border-b border-border bg-surface-elevated px-4 shadow-layer-1">
+      <div className="sticky top-0 z-10 grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-surface-elevated px-4 py-2 shadow-layer-1">
         <div className="flex min-w-0 items-center gap-2.5">
           <h3 className="truncate text-sm font-semibold text-text-primary">{column.title}</h3>
           <div className="flex items-center gap-1">
@@ -56,7 +58,8 @@ function KanbanColumn({
             )}
           </div>
         </div>
-        <div className="flex h-8 w-8 items-center justify-center">
+        <div className="flex min-h-8 items-center justify-end gap-1">
+          {headerAction}
           {!column.fixed && (
           <button
             onClick={handleDelete}

@@ -15,7 +15,7 @@ export async function GET(
 
   try {
     const attachment = await downloadAttachment(supabase, currentUser, Number(attachmentId));
-    return new NextResponse(attachment.buffer, {
+    return new NextResponse(attachment.buffer as unknown as BodyInit, {
       headers: {
         "Content-Type": attachment.mimeType ?? "application/octet-stream",
         "Content-Disposition": `attachment; filename="${attachment.filename.replace(/"/g, "")}"`,

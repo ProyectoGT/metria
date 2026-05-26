@@ -79,7 +79,7 @@ export default function Drawer({
   return (
     <AnimatePresence>
       {open && (
-        <div className={`fixed inset-0 ${zIndex} flex justify-end`}>
+        <div className={`fixed inset-0 ${zIndex} flex h-dvh justify-end overflow-hidden`}>
           {/* Overlay */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -102,7 +102,7 @@ export default function Drawer({
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 380, damping: 34, mass: 0.65 }}
             className={cn(
-              "relative z-10 flex h-full flex-col",
+              "relative z-10 flex h-dvh max-h-dvh flex-col",
               "modal-panel",
               WIDTH_CLASSES[width],
             )}

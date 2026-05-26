@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
-import { X, Plus } from "lucide-react";
+import { X, Plus, CheckCircle2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import KanbanColumn from "./KanbanColumn";
 import Drawer from "@/components/ui/drawer";
@@ -15,6 +15,7 @@ const KanbanAddCard      = dynamic(() => import("./KanbanAddCard"),      { ssr: 
 const KanbanEditCard     = dynamic(() => import("./KanbanEditCard"),     { ssr: false });
 const KanbanDetailDrawer = dynamic(() => import("./KanbanDetailDrawer"), { ssr: false });
 const KanbanConvertCard  = dynamic(() => import("./KanbanConvertCard"),  { ssr: false });
+const KanbanCompletedTasksDrawer = dynamic(() => import("./KanbanCompletedTasksDrawer"), { ssr: false });
 import type { KanbanData, KanbanColumnData, KanbanCardData, KanbanPriority } from "@/lib/mock/dashboard";
 import type { UserRole } from "@/lib/roles";
 import type { ActivityType } from "@/lib/activity-options";
@@ -29,6 +30,7 @@ import {
   deleteKanbanColumnAction,
   deleteTareaAction,
   archiveAgendaAction,
+  updateKanbanCardOrderAction,
   updateAgendaAction,
   updateTareaAction,
 } from "@/app/(crm)/dashboard/actions";
@@ -63,6 +65,7 @@ export type KanbanModalState =
   | { type: "confirm_delete_from_detail"; columnId: string; card: KanbanCardData }
   | { type: "confirm_delete_target";    target: DeleteTarget }
   | { type: "resultado";                columnId: string; cardId: string; titulo: string; text: string }
+  | { type: "completed_tasks" }
   | { type: "converting";               card: KanbanCardData; sourceColId: string; destColId: string; sourceIndex: number; destIndex: number };
 
 export type KanbanModalAction =
@@ -72,6 +75,7 @@ export type KanbanModalAction =
   | { type: "REQUEST_DELETE_COLUMN";            columnId: string }
   | { type: "REQUEST_DELETE_CARD_FROM_DETAIL" }
   | { type: "OPEN_RESULTADO";                   columnId: string; cardId: string; titulo: string }
+  | { type: "OPEN_COMPLETED_TASKS" }
   | { type: "OPEN_CONVERTING";                  card: KanbanCardData; sourceColId: string; destColId: string; sourceIndex: number; destIndex: number }
   | { type: "CLOSE" }
   | { type: "SET_RESULTADO_TEXT";               text: string };
@@ -101,6 +105,9 @@ function kanbanModalReducer(state: KanbanModalState, action: KanbanModalAction):
       // text starts empty; the user fills it in before confirming
       return { type: "resultado", columnId: action.columnId, cardId: action.cardId, titulo: action.titulo, text: "" };
 
+    case "OPEN_COMPLETED_TASKS":
+      return { type: "completed_tasks" };
+
     case "OPEN_CONVERTING":
       return {
         type:        "converting",
@@ -128,6 +135,22 @@ function kanbanModalReducer(state: KanbanModalState, action: KanbanModalAction):
 type NewKanbanCard = Omit<KanbanCardData, "id" | "source" | "dbId"> & {
   syncToGcal?: boolean;
 };
+
+function completedPending(columns: KanbanColumnData[]) {
+  return columns
+    .find((column) => column.id === "pendientes")
+    ?.cards.filter((card) => card.source === "tarea" && card.isCompleted) ?? [];
+}
+
+function withoutCompletedPending(columns: KanbanColumnData[]) {
+  return columns.map((column) => {
+    if (column.id !== "pendientes") return column;
+    return {
+      ...column,
+      cards: column.cards.filter((card) => !(card.source === "tarea" && card.isCompleted)),
+    };
+  });
+}
 
 type KanbanBoardProps = {
   initialData:    KanbanData;
@@ -169,8 +192,12 @@ function KanbanBoard({
     const custom: KanbanColumnData[] = customColumns.map((c) => ({
       id: c.id, title: c.title, cards: [], fixed: false,
     }));
-    return [...initialData.columns, ...custom];
+    return [...withoutCompletedPending(initialData.columns), ...custom];
   });
+  const [completedPendingCards, setCompletedPendingCards] = useState<KanbanCardData[]>(() =>
+    completedPending(initialData.columns),
+  );
+  const [reopeningId, setReopeningId] = useState<string | null>(null);
 
   // Modal state — replaces 8 individual useState calls (addingCardCol,
   // editingCard, detailCard, deleteTarget, confirmDeleteCard, resultadoModal,
@@ -189,7 +216,11 @@ function KanbanBoard({
       id: c.id, title: c.title, cards: [], fixed: false,
     }));
     queueMicrotask(() => {
-      if (!cancelled) setColumns([...(kanbanQuery.data?.columns ?? initialData.columns), ...custom]);
+      if (!cancelled) {
+        const sourceColumns = kanbanQuery.data?.columns ?? initialData.columns;
+        setColumns([...withoutCompletedPending(sourceColumns), ...custom]);
+        setCompletedPendingCards(completedPending(sourceColumns));
+      }
     });
     return () => { cancelled = true; };
   }, [customColumns, initialData.columns, kanbanQuery.data?.columns]);
@@ -240,6 +271,21 @@ function KanbanBoard({
     }
 
     if (kanbanParams) {
+      const movedOrderRows = (() => {
+        const next = columns.map((col) => ({ ...col, cards: [...col.cards] }));
+        const sourceCol = next.find((c) => c.id === source.droppableId);
+        const destCol = next.find((c) => c.id === destination.droppableId);
+        if (!sourceCol || !destCol) return [];
+        const [card] = sourceCol.cards.splice(source.index, 1);
+        destCol.cards.splice(destination.index, 0, card);
+        return destCol.cards.map((item, position) => ({
+          source: item.source,
+          dbId: item.dbId,
+          columnId: destination.droppableId,
+          position,
+        }));
+      })();
+      updateKanbanCardOrderAction(movedOrderRows).catch(() => {});
       moveKanbanCard.mutate(
         {
           cardId:    moved.id,
@@ -299,9 +345,34 @@ function KanbanBoard({
   }, []);
 
   const handleDeleteColumn = useCallback((columnId: string) => {
-    setColumns((prev) => prev.filter((c) => c.id !== columnId));
-    deleteKanbanColumnAction(columnId).catch(() => {});
-  }, []);
+    setColumns((prev) => {
+      const removed = prev.find((c) => c.id === columnId);
+      const remaining = prev.filter((c) => c.id !== columnId);
+      if (!removed || removed.cards.length === 0) return remaining;
+      return remaining.map((column) => {
+        if (column.id === "pendientes") {
+          return {
+            ...column,
+            cards: [
+              ...removed.cards.filter((card) => card.source === "tarea").map((card) => ({ ...card, isCompleted: false })),
+              ...column.cards,
+            ],
+          };
+        }
+        if (column.id === "en_progreso") {
+          return {
+            ...column,
+            cards: [
+              ...removed.cards.filter((card) => card.source === "agenda").map((card) => ({ ...card, isCompleted: false })),
+              ...column.cards,
+            ],
+          };
+        }
+        return column;
+      });
+    });
+    deleteKanbanColumnAction(columnId).then(() => router.refresh()).catch(() => router.refresh());
+  }, [router]);
 
   function handleStartAddColumn() {
     setNewColTitle("");
@@ -510,10 +581,16 @@ function KanbanBoard({
     setColumns((prev) =>
       prev.map((col) =>
         col.id === columnId
-          ? { ...col, cards: col.cards.map((c) => c.id === cardId ? { ...c, isCompleted: true } : c) }
+          ? { ...col, cards: col.cards.filter((c) => c.id !== cardId) }
           : col,
       ),
     );
+    if (columnId === "pendientes") {
+      setCompletedPendingCards((prev) => [
+        { ...card, isCompleted: true, completedAt: new Date().toISOString() },
+        ...prev.filter((item) => item.id !== card.id),
+      ]);
+    }
     completeTareaAction(card.dbId).then(() => router.refresh()).catch(() => router.refresh());
   }, [router]);
 
@@ -537,6 +614,29 @@ function KanbanBoard({
     } else if (card?.source === "tarea") {
       completeTareaAction(card.dbId, resultado || undefined).then(() => router.refresh()).catch(() => router.refresh());
     }
+  }
+
+  async function handleReopenCompletedTask(card: KanbanCardData) {
+    if (reopeningId) return;
+    setReopeningId(card.id);
+    try {
+      await updateTareaAction(card.dbId, { completed: false, resultado: null });
+      setCompletedPendingCards((prev) => prev.filter((item) => item.id !== card.id));
+      setColumns((prev) =>
+        prev.map((col) =>
+          col.id === "pendientes"
+            ? { ...col, cards: [{ ...card, isCompleted: false, completedAt: null, resultado: null }, ...col.cards] }
+            : col,
+        ),
+      );
+      router.refresh();
+    } finally {
+      setReopeningId(null);
+    }
+  }
+
+  function handleViewCompletedTask(card: KanbanCardData) {
+    dispatchModal({ type: "OPEN_DETAIL", columnId: "pendientes", card });
   }
 
   function handleConfirmDelete() {
@@ -647,6 +747,17 @@ function KanbanBoard({
               onAddCard={handleOpenAddCard}
               onCompleteCard={handleCompleteCard}
               onDetailCard={handleOpenDetail}
+              headerAction={column.id === "pendientes" ? (
+                <button
+                  type="button"
+                  onClick={() => dispatchModal({ type: "OPEN_COMPLETED_TASKS" })}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-primary"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span className="hidden lg:inline">Completadas</span>
+                  <span className="rounded-full bg-muted px-1.5 py-px text-[10px]">{completedPendingCards.length}</span>
+                </button>
+              ) : undefined}
             />
           ))}
 
@@ -702,10 +813,33 @@ function KanbanBoard({
               onAddCard={handleOpenAddCard}
               onCompleteCard={handleCompleteCard}
               onDetailCard={handleOpenDetail}
+              headerAction={columns[mobileColIndex].id === "pendientes" ? (
+                <button
+                  type="button"
+                  onClick={() => dispatchModal({ type: "OPEN_COMPLETED_TASKS" })}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-primary"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>{completedPendingCards.length}</span>
+                </button>
+              ) : undefined}
             />
           )}
         </div>
       </DragDropContext>
+
+      {modal.type === "completed_tasks" && (
+        <KanbanCompletedTasksDrawer
+          open
+          tasks={completedPendingCards}
+          loading={kanbanQuery.isFetching}
+          error={kanbanQuery.error instanceof Error ? kanbanQuery.error.message : null}
+          reopeningId={reopeningId}
+          onClose={() => dispatchModal({ type: "CLOSE" })}
+          onView={handleViewCompletedTask}
+          onReopen={handleReopenCompletedTask}
+        />
+      )}
 
       {/* Drawer detalle de tarjeta */}
       {detailModalData && (
@@ -769,9 +903,10 @@ function KanbanBoard({
           description={
             modal.card.source === "agenda"
               ? "Esta actividad se archivara y desaparecera del tablero. Esta accion no se puede deshacer."
-              : "Esta tarea se eliminara permanentemente. Esta accion no se puede deshacer."
+              : "Esta tarea se archivara y desaparecera del tablero. No se borrara de la base de datos."
           }
           confirmLabel="Eliminar"
+          variant="danger"
           onCancel={() => dispatchModal({ type: "CLOSE" })}
           onConfirm={handleConfirmDeleteCard}
         />
@@ -834,12 +969,13 @@ function KanbanBoard({
           title={modal.target.type === "column" ? "Eliminar columna" : "Eliminar actividad"}
           description={
             modal.target.type === "column"
-              ? "Esta columna desaparecera de tu tablero. Las tareas dentro NO se eliminaran de la base de datos y quedaran sin columna asignada. ¿Seguro?"
+              ? "Esta columna desaparecera de tu tablero. Las tareas no se eliminaran: volveran a Pendientes. Las actividades de Agenda volveran a Agenda hoy."
               : modal.target.isAgenda
                 ? "Esta actividad se archivara. ¿Quieres continuar?"
                 : "¿Estas seguro de que quieres eliminar esta tarea? Esta accion no se puede deshacer."
           }
           confirmLabel="Eliminar"
+          variant="danger"
           onCancel={() => dispatchModal({ type: "CLOSE" })}
           onConfirm={handleConfirmDelete}
         />

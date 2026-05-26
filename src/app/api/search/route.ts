@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
   if (ctx === "solicitudes" || ctx === "general") {
     let pedidosQ = supabase
       .from("pedidos")
-      .select("id, nombre_cliente, tipo_propiedad, origen, referencia")
+      .select("id, nombre_cliente, tipo_propiedad, origen, referencia, owner_user_id, empresa_id, equipo_id, visibility, visibility_agente_ids")
       .or(`nombre_cliente.ilike.%${q}%,tipo_propiedad.ilike.%${q}%,origen.ilike.%${q}%,referencia.ilike.%${q}%`);
     if (empresaId !== null) pedidosQ = pedidosQ.eq("empresa_id", empresaId);
     const { data: pedidos } = await pedidosQ.limit(ctx === "solicitudes" ? 10 : 5);

@@ -187,10 +187,6 @@ create index if not exists idx_tareas_created_at
   on public.tareas (created_at desc)
   where archived_at is null;
 
--- fecha_limite: tareas próximas a vencer (agenda operativa)
-create index if not exists idx_tareas_fecha_limite
-  on public.tareas (fecha_limite)
-  where archived_at is null and fecha_limite is not null;
 
 -- (empresa_id, estado): combinación frecuente en dashboard
 create index if not exists idx_tareas_empresa_estado

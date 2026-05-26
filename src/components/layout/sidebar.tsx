@@ -28,9 +28,11 @@ import {
   Settings,
   Shield,
   MessageCircle,
+  DatabaseBackup,
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  ChevronDown,
 } from "lucide-react";
 
 // ─── Grupos de navegación ─────────────────────────────────────────────────────
@@ -55,12 +57,19 @@ type NavSectionConfig = {
   items: NavItemConfig[];
 };
 
+type SidebarSectionKey =
+  | "principal"
+  | "activity"
+  | "crm"
+  | "tools"
+  | "company"
+  | "system";
+
 const NAV_SECTIONS: NavSectionConfig[] = [
   {
     labelKey: "navigation.sectionPrincipal",
     items: [
       { labelKey: "navigation.dashboard", href: "/dashboard", resourceKey: "dashboard", icon: LayoutDashboard, priority: "core", favoriteSlot: true },
-      { labelKey: "navigation.requests", href: "/solicitudes", resourceKey: "solicitudes", icon: ClipboardList, priority: "core", favoriteSlot: true },
       {
         labelKey: "navigation.zone",
         href: "/zona",
@@ -72,6 +81,7 @@ const NAV_SECTIONS: NavSectionConfig[] = [
           { labelKey: "navigation.zoneMapAction", href: "/zonas-geograficas", resourceKey: "zonas-geograficas", icon: Map, display: "icon" },
         ],
       },
+      { labelKey: "navigation.requests", href: "/solicitudes", resourceKey: "solicitudes", icon: ClipboardList, priority: "core", favoriteSlot: true },
       { labelKey: "navigation.properties", href: "/propiedades", resourceKey: "propiedades", icon: Building2 },
     ],
   },
@@ -106,6 +116,9 @@ const NAV_SECTIONS: NavSectionConfig[] = [
     ],
   },
 ];
+
+const NAV_SECTION_KEYS: SidebarSectionKey[] = ["principal", "activity", "crm", "tools"];
+const COLLAPSED_SECTIONS_STORAGE_KEY = "metria-sidebar-collapsed-sections";
 
 // ─── Estilos compartidos ──────────────────────────────────────────────────────
 
@@ -235,18 +248,49 @@ function NavItem({
   );
 }
 
-function NavGroup({ label, collapsed, children }: { label?: string; collapsed?: boolean; children: React.ReactNode }) {
+function NavGroup({
+  label,
+  collapsed,
+  groupCollapsed = false,
+  onToggle,
+  children,
+}: {
+  label?: string;
+  collapsed?: boolean;
+  groupCollapsed?: boolean;
+  onToggle?: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <div className={collapsed ? "flex flex-col items-center gap-0.5" : "space-y-0.5"}>
       {label && !collapsed && (
-        <p className="mb-2 mt-6 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-text-secondary/50 first:mt-0">
-          {label}
-        </p>
+        <div className="mb-2 mt-6 flex items-center justify-between px-3 first:mt-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-secondary/50">
+            {label}
+          </p>
+          {onToggle && (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="flex h-6 w-6 items-center justify-center rounded-lg text-text-secondary/50 transition-colors hover:bg-sidebar-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+              aria-label={groupCollapsed ? `Mostrar ${label}` : `Ocultar ${label}`}
+              title={groupCollapsed ? `Mostrar ${label}` : `Ocultar ${label}`}
+            >
+              <ChevronDown
+                className={[
+                  "h-3.5 w-3.5 transition-transform duration-150",
+                  groupCollapsed ? "-rotate-90" : "rotate-0",
+                ].join(" ")}
+                aria-hidden="true"
+              />
+            </button>
+          )}
+        </div>
       )}
       {collapsed && label && (
         <div className="my-2 h-px w-5 rounded-full bg-border" aria-hidden="true" />
       )}
-      {children}
+      {!groupCollapsed && children}
     </div>
   );
 }
@@ -272,15 +316,33 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
   const canSeeOrganigrama = canViewOrgChart(role);
   const canSeeInsights = canViewInsights(role);
   const isAdmin = role === "Administrador";
+  const canSeeBackups = role === "Administrador" || role === "Director";
   const deniedSet = new Set(deniedResourceKeys);
 
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [collapsedSections, setCollapsedSections] = useState<Set<SidebarSectionKey>>(() => new Set());
 
   // Sync sidebar collapsed state from localStorage after hydration.
   // Intentionally setState in effect — required for SSR-safe localStorage persistence.
   useEffect(() => {
     const stored = localStorage.getItem("metria-sidebar-collapsed");
     if (stored === "true") setIsCollapsed(true); // eslint-disable-line react-hooks/set-state-in-effect
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(COLLAPSED_SECTIONS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(parsed)) return;
+      const valid = new Set<SidebarSectionKey>(
+        parsed.filter((key): key is SidebarSectionKey =>
+          ["principal", "activity", "crm", "tools", "company", "system"].includes(key),
+        ),
+      );
+      setCollapsedSections(valid); // eslint-disable-line react-hooks/set-state-in-effect
+    } catch {
+      localStorage.removeItem(COLLAPSED_SECTIONS_STORAGE_KEY);
+    }
   }, []);
 
   const toggleCollapsed = useCallback(() => {
@@ -295,6 +357,20 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
   useEffect(() => {
     document.documentElement.style.setProperty("--sidebar-width", isCollapsed ? "72px" : "260px");
   }, [isCollapsed]);
+
+  const toggleSection = useCallback((sectionKey: SidebarSectionKey) => {
+    setCollapsedSections((current) => {
+      const next = new Set(current);
+      if (next.has(sectionKey)) next.delete(sectionKey);
+      else next.add(sectionKey);
+      localStorage.setItem(COLLAPSED_SECTIONS_STORAGE_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+
+  function isSectionCollapsed(sectionKey: SidebarSectionKey, sidebarCollapsed: boolean): boolean {
+    return !sidebarCollapsed && collapsedSections.has(sectionKey);
+  }
 
   function isNavVisible(key: string): boolean {
     return !deniedSet.has(key);
@@ -386,28 +462,42 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
           style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
         >
 
-          {NAV_SECTIONS.map((section) => (
-            <motion.div key={section.labelKey} variants={staggerContainer} initial="initial" animate="animate">
-              <NavGroup label={collapsed ? undefined : t(section.labelKey)} collapsed={collapsed}>
-                {section.items.filter(itemIsVisible).map((item) => (
-                  <NavItem
-                    key={item.href}
-                    href={item.href}
-                    icon={item.icon}
-                    label={t(item.labelKey)}
-                    active={isActive(item.href)}
-                    priority={item.priority}
-                    actions={getVisibleActions(item)}
-                    collapsed={collapsed}
-                  />
-                ))}
-              </NavGroup>
-            </motion.div>
-          ))}
+          {NAV_SECTIONS.map((section, index) => {
+            const sectionKey = NAV_SECTION_KEYS[index];
+            const groupCollapsed = isSectionCollapsed(sectionKey, collapsed);
+            return (
+              <motion.div key={section.labelKey} variants={staggerContainer} initial="initial" animate="animate">
+                <NavGroup
+                  label={collapsed ? undefined : t(section.labelKey)}
+                  collapsed={collapsed}
+                  groupCollapsed={groupCollapsed}
+                  onToggle={collapsed ? undefined : () => toggleSection(sectionKey)}
+                >
+                  {section.items.filter(itemIsVisible).map((item) => (
+                    <NavItem
+                      key={item.href}
+                      href={item.href}
+                      icon={item.icon}
+                      label={t(item.labelKey)}
+                      active={isActive(item.href)}
+                      priority={item.priority}
+                      actions={getVisibleActions(item)}
+                      collapsed={collapsed}
+                    />
+                  ))}
+                </NavGroup>
+              </motion.div>
+            );
+          })}
 
           {/* Gestión: base permission + configurable layer */}
           {(canSeeUsers || canSeeOrganigrama) && (
-            <NavGroup label={collapsed ? undefined : t("navigation.sectionCompany")} collapsed={collapsed}>
+            <NavGroup
+              label={collapsed ? undefined : t("navigation.sectionCompany")}
+              collapsed={collapsed}
+              groupCollapsed={isSectionCollapsed("company", collapsed)}
+              onToggle={collapsed ? undefined : () => toggleSection("company")}
+            >
               {canSeeUsers && isNavVisible("usuarios") && (
                 <NavItem
                   href="/usuarios"
@@ -428,12 +518,20 @@ export default function Sidebar({ userRole: _userRole, deniedResourceKeys = [] }
 
           <div className="mt-5 border-t border-border pt-4">
             {(isNavVisible("soporte") || isAdmin) && (
-              <NavGroup label={collapsed ? undefined : t("navigation.sectionSystem")} collapsed={collapsed}>
+              <NavGroup
+                label={collapsed ? undefined : t("navigation.sectionSystem")}
+                collapsed={collapsed}
+                groupCollapsed={isSectionCollapsed("system", collapsed)}
+                onToggle={collapsed ? undefined : () => toggleSection("system")}
+              >
                 {isNavVisible("soporte") && (
                   <NavItem href="/soporte" icon={LifeBuoy} label={t("navigation.support")} active={isActive("/soporte")} collapsed={collapsed} />
                 )}
                 {isAdmin && isNavVisible("configuracion") && (
                   <NavItem href="/configuracion/control-acceso" icon={Settings} label={t("navigation.accessControl")} active={isActive("/configuracion/control-acceso")} collapsed={collapsed} />
+                )}
+                {canSeeBackups && isNavVisible("backups") && (
+                  <NavItem href="/backups" icon={DatabaseBackup} label={t("navigation.backups")} active={isActive("/backups")} collapsed={collapsed} />
                 )}
                 {isAdmin && (
                   <NavItem href="/seguridad" icon={Shield} label={t("navigation.audit")} active={isActive("/seguridad")} collapsed={collapsed} />

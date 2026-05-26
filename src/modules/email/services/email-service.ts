@@ -184,6 +184,7 @@ export async function sendMessage(
   let sourceMessage: StoredMessage | null = null;
   if (params.sourceMessageId) {
     sourceMessage = await getMessage(supabase, currentUser, params.sourceMessageId);
+    if (!sourceMessage) throw new Error("message_not_found");
     sendParams = {
       from: account.email,
       ...buildGmailReply({

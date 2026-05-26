@@ -56,8 +56,6 @@ export default async function PropiedadesPage() {
 
   // ── Construir filtros de acceso según rol ─────────────────────────────
   let fincaIdFilter: number[] | null = null;
-  let agentIdFilter: number[] | null = null;
-
   const isManager = yo.role === "Administrador" || yo.role === "Director";
 
   if (!isManager) {
@@ -78,12 +76,6 @@ export default async function PropiedadesPage() {
       );
     } else {
       fincaIdFilter = [];
-    }
-
-    if (yo.role === "Agente") {
-      agentIdFilter = [yo.id];
-    } else if (yo.role === "Responsable") {
-      agentIdFilter = [yo.id, ...(yo.supervisedAgentIds ?? [])];
     }
   }
 
@@ -111,10 +103,6 @@ export default async function PropiedadesPage() {
       query = query.in("finca_id", fincaIdFilter);
     }
   }
-  if (agentIdFilter !== null) {
-    query = query.in("agente_asignado", agentIdFilter);
-  }
-
   const { data: rawData, error: loadError } = await query;
 
   // ── Normalizar filas ──────────────────────────────────────────────────
